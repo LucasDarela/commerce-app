@@ -63,9 +63,10 @@ export default function AddOrder() {
     customer_id: "",
     note_number: "",
     document_type: "internal",
-    payment_method: "cash",
-    payment_condition: "cash",
-    days_ticket: "12",
+    customer: "",
+    standard_price: "",
+    payment_method: "pix",
+    days_ticket: "1",
   });
   const [loading, setLoading] = useState<boolean>(false);
 
@@ -128,7 +129,7 @@ export default function AddOrder() {
 
   const generateNoteNumber = (type: string) => {
     const timestamp = Date.now().toString().slice(-6);
-    return type === "fiscal" ? `${timestamp}` : `${timestamp}`;
+    return type === "invoice" ? `${timestamp}` : `${timestamp}`;
   };
 
   const handleSubmit = async () => {
@@ -207,7 +208,7 @@ export default function AddOrder() {
             </SelectTrigger>
             <SelectContent className="shadow-md rounded-md">
               <SelectItem value="internal">Internal</SelectItem>
-              <SelectItem value="fiscal">Invoice</SelectItem>
+              <SelectItem value="invoice">Invoice</SelectItem>
             </SelectContent>
           </Select>
 

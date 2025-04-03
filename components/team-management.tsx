@@ -13,6 +13,14 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
+import {
+  Table,
+  TableHeader,
+  TableRow,
+  TableHead,
+  TableBody,
+  TableCell,
+} from "@/components/ui/table"
 import { toast } from "sonner";
 
 export default function TeamManagementPage() {
@@ -116,7 +124,7 @@ export default function TeamManagementPage() {
           <Input
             type="email"
             placeholder="New member email"
-            value={newMember.email}
+            value={newMember.email ?? ""}
             onChange={(e) =>
               setNewMember({ ...newMember, email: e.target.value })
             }
@@ -124,13 +132,13 @@ export default function TeamManagementPage() {
           <Input
             type="password"
             placeholder="Password"
-            value={newMember.password}
+            value={newMember.password ?? ""}
             onChange={(e) =>
               setNewMember({ ...newMember, password: e.target.value })
             }
           />
           <Select
-            value={newMember.role}
+            value={newMember.role ?? ""}
             onValueChange={(value) =>
               setNewMember({ ...newMember, role: value })
             }
@@ -146,48 +154,54 @@ export default function TeamManagementPage() {
         </div>
         <Button onClick={handleAddMember}>Add Member</Button>
 
-        <table className="w-full h-auto text-sm my-8">
-          <thead>
-            <tr>
-              <th className="text-left">Email</th>
-              <th>Role</th>
-              <th>Status</th>
-              <th className="text-left">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
+        <Table className="my-8 text-sm w-full">
+          <TableHeader>
+            <TableRow>
+              <TableHead className="text-left">Email</TableHead>
+              <TableHead>Role</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="text-left">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {teamMembers.map((member, index) => (
-              <tr key={index}>
-                <td className="py-2">{member.email}</td>
-                <td className="py-2">{member.role === "admin" ? "👑" : "👤"}</td>
-                <td className="py-2">{member.isBlocked ? "Blocked" : "Active"}</td>
-                <td className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleToggleBlock(member.id, !member.isBlocked)}
-                  >
-                    {member.isBlocked ? "Unlock" : "Block"}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => handleResetPassword(member.email)}
-                  >
-                    Update Password
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => handleRemoveUser(member.id)}
-                  >
-                    Delete
-                  </Button>
-                </td>
-              </tr>
+              <TableRow key={index}>
+                <TableCell className="py-2">{member.email}</TableCell>
+                <TableCell className="py-2">
+                  {member.role === "admin" ? "👑" : "👤"}
+                </TableCell>
+                <TableCell className="py-2">
+                  {member.isBlocked ? "Blocked" : "Active"}
+                </TableCell>
+                <TableCell className="py-2">
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleToggleBlock(member.id, !member.isBlocked)}
+                    >
+                      {member.isBlocked ? "Unlock" : "Block"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => handleResetPassword(member.email)}
+                    >
+                      Update Password
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => handleRemoveUser(member.id)}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </CardContent>
     </Card>
   );

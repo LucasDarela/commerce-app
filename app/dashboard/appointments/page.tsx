@@ -13,9 +13,12 @@ export default function OrdersPage() {
   useEffect(() => {
     if (!companyId) return
 
+    console.log("companyId:", companyId)
+
     const getData = async () => {
       setLoading(true)
       const data = await fetchOrders(companyId)
+      console.log("orders data:", data) // ✅ Verifica se está vindo algo
       setOrders(data)
       setLoading(false)
     }

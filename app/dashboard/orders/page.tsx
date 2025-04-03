@@ -28,18 +28,20 @@ export default function ListOrders() {
 
     const fetchOrders = async () => {
       const { data, error } = await supabase
-        .from("orders")
-        .select(`
-          id,
-          total,
-          payed,
-          appointment_date,
-          appointment_hour,
-          appointment_local,
-          customers(name)
-        `)
-        .eq("company_id", companyId)
-        .order("created_at", { ascending: false });
+      .from("orders")
+      .select(`
+        id,
+        total,
+        payment_status,
+        appointment_date,
+        appointment_hour,
+        appointment_local,
+        customers (
+          name
+        )
+      `)
+      .eq("company_id", companyId)
+      .order("created_at", { ascending: false });
 
       if (error) {
         console.error("Erro ao buscar pedidos:", error);
