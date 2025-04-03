@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { format } from "date-fns"
 import {
   DndContext,
   KeyboardSensor,
@@ -105,16 +106,75 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs"
+import Link from "next/link"
 
+//New Schema
 export const schema = z.object({
-  id: z.number(),
-  header: z.string(),
-  type: z.string(),
-  status: z.string(),
-  target: z.string(),
-  limit: z.string(),
-  reviewer: z.string(),
+  id: z.string(), // ou z.number() se estiver usando ID numérico
+  date: z.string(), // formato ISO (yyyy-MM-dd)
+  hour: z.string(), // formato HH:mm
+  customer: z.string(),
+  phone: z.string(),
+  amount: z.number(),
+  location: z.string(),
+  delivery_status: z.enum(["Deliver", "Collect"]),
+  payment_status: z.enum(["Pending", "Paid"]),
+  payment_method: z.enum(["Pix", "Cash", "Ticket", "Card"])
 })
+
+type Sale = z.infer<typeof schema>
+
+//New Columns
+export const columns: ColumnDef<Sale>[] = [
+  {
+    accessorKey: "date",
+    header: "Date",
+    cell: ({ row }) => {
+      const rawDate = row.original.date
+      if (!rawDate) return "—"
+    
+      const parsedDate = new Date(rawDate)
+      if (isNaN(parsedDate.getTime())) return "Data inválida"
+    
+      return format(parsedDate, "dd/MM/yyyy")
+    },
+  },
+  {
+    accessorKey: "hour",
+    header: "Hour",
+    cell: ({ row }) => row.original.hour,
+  },
+  {
+    accessorKey: "customer",
+    header: "Customer",
+    cell: ({ row }) => row.original.customer,
+  },
+  {
+    accessorKey: "phone",
+    header: "Phone",
+    cell: ({ row }) => row.original.phone,
+  },
+  {
+    accessorKey: "amount",
+    header: "Amount",
+    cell: ({ row }) => row.original.amount,
+  },
+  {
+    accessorKey: "location",
+    header: "Location",
+    cell: ({ row }) => row.original.location,
+  },
+  {
+    accessorKey: "delivery_status",
+    header: "Delivery",
+    cell: ({ row }) => row.original.delivery_status,
+  },
+  {
+    accessorKey: "payment_status",
+    header: "Payment",
+    cell: ({ row }) => row.original.payment_status,
+  },
+]
 
 // Create a separate component for the drag handle
 function DragHandle({ id }: { id: number }) {
@@ -136,180 +196,178 @@ function DragHandle({ id }: { id: number }) {
   )
 }
 
-const columns: ColumnDef<z.infer<typeof schema>>[] = [
-  {
-    id: "drag",
-    header: () => null,
-    cell: ({ row }) => <DragHandle id={row.original.id} />,
-  },
-  {
-    id: "select",
-    header: ({ table }) => (
-      <div className="flex items-center justify-center">
-        <Checkbox
-          checked={
-            table.getIsAllPageRowsSelected() ||
-            (table.getIsSomePageRowsSelected() && "indeterminate")
-          }
-          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-          aria-label="Select all"
-        />
-      </div>
-    ),
-    cell: ({ row }) => (
-      <div className="flex items-center justify-center">
-        <Checkbox
-          checked={row.getIsSelected()}
-          onCheckedChange={(value) => row.toggleSelected(!!value)}
-          aria-label="Select row"
-        />
-      </div>
-    ),
-    enableSorting: false,
-    enableHiding: false,
-  },
-  {
-    accessorKey: "header",
-    header: "Header",
-    cell: ({ row }) => {
-      return <TableCellViewer item={row.original} />
-    },
-    enableHiding: false,
-  },
-  {
-    accessorKey: "type",
-    header: "Section Type",
-    cell: ({ row }) => (
-      <div className="w-32">
-        <Badge variant="outline" className="text-muted-foreground px-1.5">
-          {row.original.type}
-        </Badge>
-      </div>
-    ),
-  },
-  {
-    accessorKey: "status",
-    header: "Status",
-    cell: ({ row }) => (
-      <Badge variant="outline" className="text-muted-foreground px-1.5">
-        {row.original.status === "Done" ? (
-          <IconCircleCheckFilled className="fill-green-500 dark:fill-green-400" />
-        ) : (
-          <IconLoader />
-        )}
-        {row.original.status}
-      </Badge>
-    ),
-  },
-  {
-    accessorKey: "target",
-    header: () => <div className="w-full text-right">Target</div>,
-    cell: ({ row }) => (
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          toast.promise(new Promise((resolve) => setTimeout(resolve, 1000)), {
-            loading: `Saving ${row.original.header}`,
-            success: "Done",
-            error: "Error",
-          })
-        }}
-      >
-        <Label htmlFor={`${row.original.id}-target`} className="sr-only">
-          Target
-        </Label>
-        <Input
-          className="hover:bg-input/30 focus-visible:bg-background dark:hover:bg-input/30 dark:focus-visible:bg-input/30 h-8 w-16 border-transparent bg-transparent text-right shadow-none focus-visible:border dark:bg-transparent"
-          defaultValue={row.original.target}
-          id={`${row.original.id}-target`}
-        />
-      </form>
-    ),
-  },
-  {
-    accessorKey: "limit",
-    header: () => <div className="w-full text-right">Limit</div>,
-    cell: ({ row }) => (
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          toast.promise(new Promise((resolve) => setTimeout(resolve, 1000)), {
-            loading: `Saving ${row.original.header}`,
-            success: "Done",
-            error: "Error",
-          })
-        }}
-      >
-        <Label htmlFor={`${row.original.id}-limit`} className="sr-only">
-          Limit
-        </Label>
-        <Input
-          className="hover:bg-input/30 focus-visible:bg-background dark:hover:bg-input/30 dark:focus-visible:bg-input/30 h-8 w-16 border-transparent bg-transparent text-right shadow-none focus-visible:border dark:bg-transparent"
-          defaultValue={row.original.limit}
-          id={`${row.original.id}-limit`}
-        />
-      </form>
-    ),
-  },
-  {
-    accessorKey: "reviewer",
-    header: "Reviewer",
-    cell: ({ row }) => {
-      const isAssigned = row.original.reviewer !== "Assign reviewer"
+// const columns: ColumnDef<z.infer<typeof schema>>[] = [
+//   {
+//     id: "drag",
+//     header: () => null,
+//     cell: ({ row }) => <DragHandle id={row.original.id} />,
+//   },
+//   {
+//     id: "select",
+//     header: ({ table }) => (
+//       <div className="flex items-center justify-center">
+//         <Checkbox
+//           checked={
+//             table.getIsAllPageRowsSelected() ||
+//             (table.getIsSomePageRowsSelected() && "indeterminate")
+//           }
+//           onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+//           aria-label="Select all"
+//         />
+//       </div>
+//     ),
+//     cell: ({ row }) => (
+//       <div className="flex items-center justify-center">
+//         <Checkbox
+//           checked={row.getIsSelected()}
+//           onCheckedChange={(value) => row.toggleSelected(!!value)}
+//           aria-label="Select row"
+//         />
+//       </div>
+//     ),
+//     enableSorting: false,
+//     enableHiding: false,
+//   },
+//   {
+//     accessorKey: "header",
+//     header: "Customer",
+//     cell: ({ row }) => {
+//       return <TableCellViewer item={row.original} />
+//     },
+//     enableHiding: false,
+//   },
+//   {
+//     accessorKey: "type",
+//     header: "Section Type",
+//     cell: ({ row }) => (
+//       <div className="w-32">
+//         <Badge variant="outline" className="text-muted-foreground px-1.5">
+//           {row.original.type}
+//         </Badge>
+//       </div>
+//     ),
+//   },
+//   {
+//     accessorKey: "status",
+//     header: "Status",
+//     cell: ({ row }) => (
+//       <Badge variant="outline" className="text-muted-foreground px-1.5">
+//         {row.original.status === "Done" ? (
+//           <IconCircleCheckFilled className="fill-green-500 dark:fill-green-400" />
+//         ) : (
+//           <IconLoader />
+//         )}
+//         {row.original.status}
+//       </Badge>
+//     ),
+//   },
+//   {
+//     accessorKey: "target",
+//     header: () => <div className="w-full text-right">Target</div>,
+//     cell: ({ row }) => (
+//       <form
+//         onSubmit={(e) => {
+//           e.preventDefault()
+//           toast.promise(new Promise((resolve) => setTimeout(resolve, 1000)), {
+//             loading: `Saving ${row.original.header}`,
+//             success: "Done",
+//             error: "Error",
+//           })
+//         }}
+//       >
+//         <Label htmlFor={`${row.original.id}-target`} className="sr-only">
+//           Target
+//         </Label>
+//         <Input
+//           className="hover:bg-input/30 focus-visible:bg-background dark:hover:bg-input/30 dark:focus-visible:bg-input/30 h-8 w-16 border-transparent bg-transparent text-right shadow-none focus-visible:border dark:bg-transparent"
+//           defaultValue={row.original.target}
+//           id={`${row.original.id}-target`}
+//         />
+//       </form>
+//     ),
+//   },
+//   {
+//     accessorKey: "limit",
+//     header: () => <div className="w-full text-right">Limit</div>,
+//     cell: ({ row }) => (
+//       <form
+//         onSubmit={(e) => {
+//           e.preventDefault()
+//           toast.promise(new Promise((resolve) => setTimeout(resolve, 1000)), {
+//             loading: `Saving ${row.original.header}`,
+//             success: "Done",
+//             error: "Error",
+//           })
+//         }}
+//       >
+//         <Label htmlFor={`${row.original.id}-limit`} className="sr-only">
+//           Limit
+//         </Label>
+//         <Input
+//           className="hover:bg-input/30 focus-visible:bg-background dark:hover:bg-input/30 dark:focus-visible:bg-input/30 h-8 w-16 border-transparent bg-transparent text-right shadow-none focus-visible:border dark:bg-transparent"
+//           defaultValue={row.original.limit}
+//           id={`${row.original.id}-limit`}
+//         />
+//       </form>
+//     ),
+//   },
+//   {
+//     accessorKey: "reviewer",
+//     header: "Reviewer",
+//     cell: ({ row }) => {
+//       const isAssigned = row.original.reviewer !== "Assign reviewer"
 
-      if (isAssigned) {
-        return row.original.reviewer
-      }
+//       if (isAssigned) {
+//         return row.original.reviewer
+//       }
 
-      return (
-        <>
-          <Label htmlFor={`${row.original.id}-reviewer`} className="sr-only">
-            Reviewer
-          </Label>
-          <Select>
-            <SelectTrigger
-              className="w-38 **:data-[slot=select-value]:block **:data-[slot=select-value]:truncate"
-              size="sm"
-              id={`${row.original.id}-reviewer`}
-            >
-              <SelectValue placeholder="Assign reviewer" />
-            </SelectTrigger>
-            <SelectContent align="end">
-              <SelectItem value="Eddie Lake">Eddie Lake</SelectItem>
-              <SelectItem value="Jamik Tashpulatov">
-                Jamik Tashpulatov
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </>
-      )
-    },
-  },
-  {
-    id: "actions",
-    cell: () => (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            className="data-[state=open]:bg-muted text-muted-foreground flex size-8"
-            size="icon"
-          >
-            <IconDotsVertical />
-            <span className="sr-only">Open menu</span>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-32">
-          <DropdownMenuItem>Edit</DropdownMenuItem>
-          <DropdownMenuItem>Make a copy</DropdownMenuItem>
-          <DropdownMenuItem>Favorite</DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem variant="destructive">Delete</DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    ),
-  },
-]
+//       return (
+//         <>
+//           <Label htmlFor={`${row.original.id}-reviewer`} className="sr-only">
+//             Reviewer
+//           </Label>
+//           <Select>
+//             <SelectTrigger
+//               className="w-38 **:data-[slot=select-value]:block **:data-[slot=select-value]:truncate"
+//               size="sm"
+//               id={`${row.original.id}-reviewer`}
+//             >
+//               <SelectValue placeholder="Assign reviewer" />
+//             </SelectTrigger>
+//             <SelectContent align="end">
+//               <SelectItem value="Eddie Lake">Eddie Lake</SelectItem>
+//               <SelectItem value="Jamik Tashpulatov">
+//                 Jamik Tashpulatov
+//               </SelectItem>
+//             </SelectContent>
+//           </Select>
+//         </>
+//       )
+//     },
+//   },
+//   {
+//     id: "actions",
+//     cell: () => (
+//       <DropdownMenu>
+//         <DropdownMenuTrigger asChild>
+//           <Button
+//             variant="ghost"
+//             className="data-[state=open]:bg-muted text-muted-foreground flex size-8"
+//             size="icon"
+//           >
+//             <IconDotsVertical />
+//             <span className="sr-only">Open menu</span>
+//           </Button>
+//         </DropdownMenuTrigger>
+//         <DropdownMenuContent align="end" className="w-32">
+//           <DropdownMenuItem>Edit</DropdownMenuItem>
+//           <DropdownMenuSeparator />
+//           <DropdownMenuItem variant="destructive">Delete</DropdownMenuItem>
+//         </DropdownMenuContent>
+//       </DropdownMenu>
+//     ),
+//   },
+// ]
 
 function DraggableRow({ row }: { row: Row<z.infer<typeof schema>> }) {
   const { transform, transition, setNodeRef, isDragging } = useSortable({
@@ -469,10 +527,12 @@ export function DataTable({
                 })}
             </DropdownMenuContent>
           </DropdownMenu>
+          <Link href={"/dashboard/orders/add"}>
           <Button variant="outline" size="sm">
             <IconPlus />
-            <span className="hidden lg:inline">Add Section</span>
+            <span className="hidden lg:inline">Add Order</span>
           </Button>
+          </Link>
         </div>
       </div>
       <TabsContent

@@ -14,65 +14,58 @@ export default function EditClient() {
   const inputRefs = useRef<HTMLInputElement[]>([]);
   const [loading, setLoading] = useState(true);
   const [cliente, setCliente] = useState({
-    tipe: "CPF",
+    type: "CPF",
     document: "",
     name: "",
     fantasy_name: "",
-    cep: "",
+    zip_code: "",
     address: "",
-    bairro: "",
+    neighborhood: "",
     city: "",
     state: "",
-    numero: "",
-    complemento: "",
+    number: "",
+    complement: "",
     phone: "",
     email: "",
     state_registration: "",
   });
 
-  // 🔹 Mapeamento dos placeholders personalizados
   const placeholdersMap: Record<string, string> = {
     document: "CPF/CNPJ",
     name: "Nome Completo / Razão Social",
     fantasy_name: "Nome Fantasia",
-    cep: "CEP",
+    zip_code: "CEP",
     address: "Endereço",
-    bairro: "Bairro",
+    neighborhood: "Bairro",
     city: "Cidade",
     state: "Estado",
-    numero: "Número",
-    complemento: "Complemento",
+    number: "Número",
+    complement: "Complemento",
     phone: "Telefone",
     email: "Email (Opcional)",
     state_registration: "Inscrição Estadual",
   };
 
-  // 🔹 Converter para Maiúsculas (exceto email)
   const formatarMaiusculo = (valor: string, campo: string) => {
     return campo === "email" ? valor : valor.toUpperCase();
   };
 
-  // 🔹 Buscar Cliente no Supabase
   useEffect(() => {
     const fetchCliente = async () => {
       if (!id) return;
 
-      console.log("🔍 Buscando cliente ID:", id);
-
-      const { data, error } = await supabase.from("clients").select("*").eq("id", id).single();
+      const { data, error } = await supabase.from("customers").select("*").eq("id", id).single();
 
       if (error || !data) {
         toast.error("Erro ao carregar cliente");
         console.error("❌ Erro ao buscar cliente:", error?.message);
       } else {
-        console.log("✅ Cliente encontrado:", data);
-
         setCliente({
           ...data,
           name: formatarMaiusculo(data.name || "", "name"),
           fantasy_name: formatarMaiusculo(data.fantasy_name || "", "fantasy_name"),
           address: formatarMaiusculo(data.address || "", "address"),
-          bairro: formatarMaiusculo(data.bairro || "", "bairro"),
+          neighborhood: formatarMaiusculo(data.neighborhood || "", "neighborhood"),
           city: formatarMaiusculo(data.city || "", "city"),
           state: formatarMaiusculo(data.state || "", "state"),
           state_registration: formatarMaiusculo(data.state_registration || "", "state_registration"),
@@ -84,23 +77,21 @@ export default function EditClient() {
     fetchCliente();
   }, [id]);
 
-  // 🔹 Atualiza os dados ao digitar
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value: rawValue } = e.target;
     const formattedValue =
       name === "phone"
-        ? formatarTelefone(rawValue) // 📌 Formata telefone se for o campo "phone"
+        ? formatarTelefone(rawValue)
         : name === "email"
-        ? rawValue.trim() // 📌 Mantém email inalterado
-        : formatarMaiusculo(rawValue, name); // 📌 Converte para maiúsculo os outros campos
-  
+        ? rawValue.trim()
+        : formatarMaiusculo(rawValue, name);
+
     setCliente((prevCliente) => ({
       ...prevCliente,
       [name]: formattedValue,
     }));
   };
 
-  // 🔹 Pula para o próximo campo ao pressionar Enter
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
     if (e.key === "Enter") {
       e.preventDefault();
@@ -111,20 +102,19 @@ export default function EditClient() {
     }
   };
 
-  // 🔹 Buscar Endereço pelo CEP ao sair do campo
   const buscarEndereco = async () => {
-    if (!cliente.cep || cliente.cep.length !== 8) return;
+    if (!cliente.zip_code || cliente.zip_code.length !== 8) return;
 
     try {
-      const { data } = await axios.get(`https://viacep.com.br/ws/${cliente.cep}/json/`);
+      const { data } = await axios.get(`https://viacep.com.br/ws/${cliente.zip_code}/json/`);
       if (data.erro) {
         toast.error("CEP inválido!");
-        setCliente((prev) => ({ ...prev, address: "", bairro: "", city: "", state: "" }));
+        setCliente((prev) => ({ ...prev, address: "", neighborhood: "", city: "", state: "" }));
       } else {
         setCliente((prev) => ({
           ...prev,
           address: formatarMaiusculo(data.logradouro || "", "address"),
-          bairro: formatarMaiusculo(data.bairro || "", "bairro"),
+          neighborhood: formatarMaiusculo(data.bairro || "", "neighborhood"),
           city: formatarMaiusculo(data.localidade || "", "city"),
           state: formatarMaiusculo(data.uf || "", "state"),
         }));
@@ -134,19 +124,17 @@ export default function EditClient() {
     }
   };
 
-  // 🔹 Atualizar Cliente no Supabase
   const handleUpdate = async () => {
-    const { error } = await supabase.from("clients").update(cliente).eq("id", id);
+    const { error } = await supabase.from("customers").update(cliente).eq("id", id);
 
     if (error) {
       toast.error("Erro ao atualizar cliente: " + error.message);
     } else {
       toast.success("Cliente atualizado com sucesso!");
-      router.push("/dashboard/clientes");
+      router.push("/dashboard/customers");
     }
   };
 
-  // 🔹 Formatar telefone corretamente
   const formatarTelefone = (valor: string) => {
     let telefone = valor.replace(/\D/g, "").slice(0, 11);
     if (telefone.length >= 3) {
@@ -160,27 +148,27 @@ export default function EditClient() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto p-6 bg-white rounded-lg shadow-md">
-      <h1 className="text-2xl font-bold mb-4">Editar Cliente</h1>
-
-      {/* 🔹 Botões para CPF e CNPJ (desativados) */}
-      <div className="flex gap-2 mb-4">
-        <Button variant={cliente.tipe === "CPF" ? "default" : "outline"} disabled>Pessoa Física</Button>
-        <Button variant={cliente.tipe === "CNPJ" ? "default" : "outline"} disabled>Pessoa Jurídica</Button>
+    <div className="max-w-3xl mx-auto w-full px-4 py-6 rounded-lg shadow-md">
+      <div  className="flex gap-2 items-center justify-center">
+          <h1 className="text-2xl font-bold mb-4">Edit Customer</h1>
       </div>
 
-      {/* 🔹 Campos do formulário */}
+      <div className="flex gap-2 mb-6 items-center justify-center">
+        <Button variant={cliente.type === "CPF" ? "default" : "outline"} disabled>Pessoa Física</Button>
+        <Button variant={cliente.type === "CNPJ" ? "default" : "outline"} disabled>Pessoa Jurídica</Button>
+      </div>
+
       {Object.keys(placeholdersMap).map((campo, index) => {
-        if (cliente.tipe === "CPF" && ["fantasy_name", "state_registration"].includes(campo)) return null;
+        if (cliente.type === "CPF" && ["fantasy_name", "state_registration"].includes(campo)) return null;
         return (
           <Input
             key={campo}
             type={campo === "email" ? "email" : "text"}
             name={campo}
             placeholder={placeholdersMap[campo]}
-            value={cliente[campo as keyof typeof cliente]}
+            value={cliente[campo as keyof typeof cliente] || ""}
             onChange={handleChange}
-            onBlur={campo === "cep" ? buscarEndereco : undefined}
+            onBlur={campo === "zip_code" ? buscarEndereco : undefined}
             onKeyDown={(e) => handleKeyDown(e, index)}
             className="mt-2"
           />

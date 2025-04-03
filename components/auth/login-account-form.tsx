@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { useRouter } from "next/navigation";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
-
+import { useState } from "react";
+import { toast } from "sonner";
 
 
 const formSchema = z.object ({
@@ -62,6 +63,25 @@ export function LoginAccountForm() {
         }
     };
 
+    const [showReset, setShowReset] = useState(false);
+    const [resetEmail, setResetEmail] = useState("");
+
+    const handleResetPassword = async () => {
+    const supabase = createClientComponentClient();
+
+    const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+        redirectTo: `${location.origin}/auth/reset-password`, // página que o usuário será redirecionado
+    });
+
+    if (error) {
+        toast.error("Erro ao enviar e-mail de recuperação.");
+    } else {
+        toast.success("Verifique seu e-mail para redefinir a senha.");
+        setShowReset(false);
+        setResetEmail("");
+    }
+    };
+
     return (
     <div className="flex flex-col justify-center items-center space-y-2">
             <span className="text-lg p-4">It's good to see you again.</span>
@@ -103,9 +123,35 @@ export function LoginAccountForm() {
                         />
                         <Button type="submit" className="my-4 w-full">Login</Button>
 
+                        
+
                 </form>
             </Form>
+    {/* Forgot Password Block (fora do form) */}
+    <div className="text-sm text-center w-full">
+        <button
+          type="button"
+          onClick={() => setShowReset(!showReset)}
+          className="text-blue-600 hover:underline"
+        >
+          Forgot Password?
+        </button>
+      </div>
+
+      {showReset && (
+        <div className="flex flex-col gap-4 w-auto p-6">
+          <Input
+            type="email"
+            placeholder="Type your e-mail"
+            value={resetEmail}
+            onChange={(e) => setResetEmail(e.target.value)}
+          />
+          <Button type="button" onClick={handleResetPassword} className="w-full">
+            Reset Password
+          </Button>
+        </div>
+      )}
     </div>
-    );
+  );
 }
 

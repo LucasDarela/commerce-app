@@ -1,77 +1,147 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useRouter } from "next/navigation";
 import { Check, X } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
+import { toast } from "sonner";
 
 export default function ListOrders() {
   const router = useRouter();
-  
-  // Simulação de dados de vendas (será substituído por dados do Supabase)
-  const [vendas, setVendas] = useState([
-    { id: 1, cliente: "João Silva", produto: "Chopp Heineken", quantidade: 3, total: "R$ 150,00", pago: false },
-    { id: 2, cliente: "Maria Souza", produto: "Chopp Amstel", quantidade: 2, total: "R$ 90,00", pago: true },
-  ]);
-
+  const { companyId, loading } = useAuthenticatedCompany();
+  const [orders, setOrders] = useState<any[]>([]);
   const [search, setSearch] = useState("");
 
-  // Filtrar vendas com base na pesquisa
-  const filteredVendas = vendas.filter((venda) =>
-    venda.cliente.toLowerCase().includes(search.toLowerCase().trim()) ||
-    venda.produto.toLowerCase().includes(search.toLowerCase().trim()) ||
-    (search.toLowerCase() === "pago" && venda.pago) ||
-    (search.toLowerCase() === "não pago" && !venda.pago)
-  );
-  const togglePago = (id: number) => {
-    setVendas(vendas.map(venda => venda.id === id ? { ...venda, pago: !venda.pago } : venda));
+  useEffect(() => {
+    if (!companyId || loading) return;
+
+    const fetchOrders = async () => {
+      const { data, error } = await supabase
+        .from("orders")
+        .select(`
+          id,
+          total,
+          payed,
+          appointment_date,
+          appointment_hour,
+          appointment_local,
+          customers(name)
+        `)
+        .eq("company_id", companyId)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Erro ao buscar pedidos:", error);
+        toast.error("Erro ao carregar pedidos");
+        return;
+      }
+
+      setOrders(data);
+    };
+
+    fetchOrders();
+  }, [companyId, loading]);
+
+  const filteredOrders = orders.filter((order) => {
+    const searchTerm = search.toLowerCase().trim();
+    return (
+      order.customers?.name?.toLowerCase().includes(searchTerm) ||
+      order.total.toString().includes(searchTerm) ||
+      (searchTerm === "pago" && order.payed) ||
+      (searchTerm === "não pago" && !order.payed)
+    );
+  });
+
+  const togglePayed = async (id: string, currentStatus: boolean) => {
+    const { error } = await supabase
+      .from("orders")
+      .update({ payed: !currentStatus })
+      .eq("id", id);
+
+    if (error) {
+      toast.error("Erro ao atualizar status do pagamento");
+      return;
+    }
+
+    setOrders((prev) =>
+      prev.map((order) =>
+        order.id === id ? { ...order, payed: !currentStatus } : order
+      )
+    );
   };
+
   return (
     <div className="p-8">
-      {/* Campo de Pesquisa */}
+      {/* Search and Add */}
       <div className="mb-4 flex flex-col-2 gap-6">
         <Input
           type="text"
-          placeholder="Pesquisar por Cliente, Produto ou Status de Pagamento (Pago/Não Pago)"
+          placeholder="Search by Customer or Payment Status"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="w-full p-2 border rounded-md"
         />
-             <Button onClick={() => router.push("/dashboard/orders/add")}>Add Order</Button>
+        <Button onClick={() => router.push("/dashboard/orders/add")}>Add Order</Button>
       </div>
-{/* table */}
+
+      {/* Orders Table */}
       <div className="p-6 rounded-lg shadow-md overflow-x-auto max-w-full">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>ID</TableHead>
-              <TableHead>Cliente</TableHead>
-              <TableHead>Produto</TableHead>
-              <TableHead>Quantidade</TableHead>
-              <TableHead>Total</TableHead>
-              <TableHead>Pago</TableHead>
+              <TableHead>Customer</TableHead>
+              <TableHead>Total (R$)</TableHead>
+              <TableHead>Appointment</TableHead>
+              <TableHead>Location</TableHead>
+              <TableHead>Payed</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredVendas.map((venda) => (
-              <TableRow key={venda.id}>
-                <TableCell>{venda.id}</TableCell>
-                <TableCell>{venda.cliente}</TableCell>
-                <TableCell>{venda.produto}</TableCell>
-                <TableCell>{venda.quantidade}</TableCell>
-                <TableCell>{venda.total}</TableCell>
-                <TableCell>
-                  <Button variant="outline" size="icon" onClick={() => togglePago(venda.id)}>
-                    {venda.pago ? <Check size={16} className="text-green-500" /> : <X size={16} className="text-red-500" />}
-                  </Button>
+            {filteredOrders.length > 0 ? (
+              filteredOrders.map((order) => (
+                <TableRow key={order.id}>
+                  <TableCell>{order.customers?.name || "-"}</TableCell>
+                  <TableCell>{Number(order.total).toFixed(2)}</TableCell>
+                  <TableCell>
+                    {order.appointment_date} {order.appointment_hour}
+                  </TableCell>
+                  <TableCell>{order.appointment_local || "-"}</TableCell>
+                  <TableCell>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => togglePayed(order.id, order.payed)}
+                    >
+                      {order.payed ? (
+                        <Check size={16} className="text-green-500" />
+                      ) : (
+                        <X size={16} className="text-red-500" />
+                      )}
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center">
+                  No orders found.
                 </TableCell>
               </TableRow>
-            ))}
+            )}
           </TableBody>
         </Table>
       </div>
-      </div>
+    </div>
   );
 }

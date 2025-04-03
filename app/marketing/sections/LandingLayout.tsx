@@ -70,9 +70,6 @@ export default function LandingLayout(){
             <Button asChild className="px-4 py-2 text-white rounded-md hover:bg-blue-700">
               <Link href="/login-signin">Log In</Link>
             </Button>
-            <Button asChild className="px-4 py-2 text-white rounded-md hover:bg-blue-700">
-              <Link href="/login-signin">Sign Up</Link>
-            </Button>
           </div>
 
           {/* Menu Mobile */}
@@ -93,11 +90,6 @@ export default function LandingLayout(){
           <li>
             <Button asChild className="hover:bg-blue-700">
               <Link href="/login-signin" onClick={toggleMenu}>Log In</Link>
-            </Button>
-          </li>
-          <li>
-            <Button asChild className="hover:bg-blue-700">
-              <Link href="/login-signin" onClick={toggleMenu}>Sign Up</Link>
             </Button>
           </li>
         </ul>

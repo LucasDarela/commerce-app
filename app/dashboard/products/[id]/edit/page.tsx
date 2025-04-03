@@ -10,128 +10,123 @@ import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { useRouter, useParams } from "next/navigation";
 
-// 🔹 Tipo Produto para tipagem correta
-type Produto = {
+// 🔹 Product Type
+type Product = {
   id: number;
-  codigo: string;
-  nome: string;
-  fabricante: string;
-  preco: string;
-  tributos: string;
-  classe_material: string;
-  sub_classe: string;
-  classificacao_fiscal: string;
-  origem: string;
-  aplicacao: string;
-  codigo_comodato?: string;
-  estoque: number;
-  imagem_url?: string;
+  code: string;
+  name: string;
+  manufacturer: string;
+  standard_price: string;
+  percentage_taxes: string;
+  material_class: string;
+  submaterial_class: string;
+  tax_classification: string;
+  material_origin: string;
+  aplication: string;
+  loan_product_code?: string;
+  stock: number;
+  image_url?: string;
 };
 
 export default function EditProduct() {
   const router = useRouter();
   const { id } = useParams();
   const [loading, setLoading] = useState(false);
-  const [produto, setProduto] = useState<Produto>({
+  const [product, setProduct] = useState<Product>({
     id: 0,
-    codigo: "",
-    nome: "",
-    fabricante: "",
-    preco: "0",
-    tributos: "",
-    classe_material: "Chopp",
-    sub_classe: "",
-    classificacao_fiscal: "",
-    origem: "Nacional",
-    aplicacao: "",
-    codigo_comodato: "",
-    estoque: 0,
-    imagem_url: "",
+    code: "",
+    name: "",
+    manufacturer: "",
+    standard_price: "0",
+    percentage_taxes: "",
+    material_class: "Chopp",
+    submaterial_class: "",
+    tax_classification: "",
+    material_origin: "Nacional",
+    aplication: "",
+    loan_product_code: "",
+    stock: 0,
+    image_url: "",
   });
 
-  const [imagem, setImagem] = useState<File | null>(null);
-  const [imagemPreview, setImagemPreview] = useState<string | null>(null);
+  const [image, setImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
-  // 🔹 Buscar dados do produto
   useEffect(() => {
-    const fetchProduto = async () => {
-      const { data, error } = await supabase.from("produtos").select("*").eq("id", id).single();
+    const fetchProduct = async () => {
+      const { data, error } = await supabase.from("products").select("*").eq("id", id).single();
       if (error) {
         toast.error("Erro ao carregar produto!");
       } else {
-        setProduto(data);
-        if (data.imagem_url) setImagemPreview(data.imagem_url);
+        setProduct(data);
+        if (data.image_url) setImagePreview(data.image_url);
       }
     };
-    if (id) fetchProduto();
+    if (id) fetchProduct();
   }, [id]);
 
-  // 🔹 Manipula mudanças nos inputs
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setProduto({ ...produto, [e.target.name]: e.target.value });
+    setProduct({ ...product, [e.target.name]: e.target.value });
   };
 
-  // 🔹 Manipula mudanças nos selects
-  const handleSelectChange = (name: keyof Produto, value: string) => {
-    setProduto((prevProduto) => ({
-      ...prevProduto,
+  const handleSelectChange = (name: keyof Product, value: string) => {
+    setProduct((prev) => ({
+      ...prev,
       [name]: value,
     }));
   };
 
-  // 🔹 Manipula upload de imagem
-  const handleImagemChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setImagem(file);
+      setImage(file);
       const reader = new FileReader();
-      reader.onload = () => setImagemPreview(reader.result as string);
+      reader.onload = () => setImagePreview(reader.result as string);
       reader.readAsDataURL(file);
     }
   };
 
-  // 🔹 Atualiza o produto no Supabase
   const handleSubmit = async () => {
     setLoading(true);
-    if (!produto.nome || !produto.preco || !produto.classe_material) {
+    if (!product.name || !product.standard_price || !product.material_class) {
       toast.error("Preencha os campos obrigatórios!");
       setLoading(false);
       return;
     }
 
-    let imagemUrl = produto.imagem_url ?? "";
-    if (imagem) {
-      const fileExt = imagem.name.split(".").pop();
+    let imageUrl = product.image_url ?? "";
+    if (image) {
+      const fileExt = image.name.split(".").pop();
       const fileName = `${Date.now()}.${fileExt}`;
-      const filePath = `produtos/${fileName}`;
-      const { data, error } = await supabase.storage.from("produtos").upload(filePath, imagem);
+      const filePath = `products/${fileName}`;
+      const { data, error } = await supabase.storage.from("products").upload(filePath, image);
       if (error) {
         toast.error("Erro ao fazer upload da imagem!");
       } else {
-        imagemUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/produtos/${filePath}`;
+        imageUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/products/${filePath}`;
       }
     }
 
-    const { error } = await supabase.from("produtos").update({
-      codigo: produto.codigo,
-      nome: produto.nome,
-      fabricante: produto.fabricante,
-      preco: parseFloat(produto.preco),
-      tributos: produto.tributos ? parseFloat(produto.tributos) : null,
-      classe_material: produto.classe_material,
-      sub_classe: produto.sub_classe || null,
-      classificacao_fiscal: produto.classificacao_fiscal || null,
-      origem: produto.origem,
-      aplicacao: produto.aplicacao || null,
-      codigo_comodato: produto.codigo_comodato || null,
-      imagem_url: imagemUrl,
+    const { error } = await supabase.from("products").update({
+      code: product.code,
+      name: product.name,
+      manufacturer: product.manufacturer,
+      standard_price: parseFloat(product.standard_price),
+      percentage_taxes: product.percentage_taxes ? parseFloat(product.percentage_taxes) : null,
+      material_class: product.material_class,
+      submaterial_class: product.submaterial_class || null,
+      tax_classification: product.tax_classification || null,
+      material_origin: product.material_origin,
+      aplication: product.aplication || null,
+      loan_product_code: product.loan_product_code || null,
+      image_url: imageUrl,
     }).eq("id", id);
 
     if (error) {
       toast.error("Erro ao atualizar produto!");
     } else {
       toast.success("Produto atualizado com sucesso!");
-      router.push("/dashboard/produtos");
+      router.push("/dashboard/products");
     }
     setLoading(false);
   };
@@ -139,44 +134,39 @@ export default function EditProduct() {
   return (
     <div className="max-w-3xl mx-auto p-6 bg-white rounded-lg shadow-md">
       <h1 className="text-2xl font-bold mb-4">Editar Produto</h1>
-      
-      {/* 🔹 Upload da Imagem */}
+
       <Card className="mb-6">
         <CardContent className="p-4 flex flex-col items-center">
-          <label htmlFor="imagemUpload" className="cursor-pointer">
-            {imagemPreview ? (
-              <img src={imagemPreview} alt="Preview" className="h-40 object-cover rounded-lg shadow-md" />
+          <label htmlFor="imageUpload" className="cursor-pointer">
+            {imagePreview ? (
+              <img src={imagePreview} alt="Preview" className="h-40 object-cover rounded-lg shadow-md" />
             ) : (
               <div className="h-40 w-full flex items-center justify-center border-2 border-dashed border-gray-300 rounded-lg">
                 <span className="text-gray-500">Clique para adicionar uma imagem</span>
               </div>
             )}
           </label>
-          <input type="file" id="imagemUpload" accept="image/png, image/jpeg" className="hidden" onChange={handleImagemChange} />
+          <input type="file" id="imageUpload" accept="image/png, image/jpeg" className="hidden" onChange={handleImageChange} />
         </CardContent>
       </Card>
 
-      {/* 🔹 Formulário de Edição */}
       <Card>
         <CardContent className="p-6 space-y-4">
-          {/* Código e Nome */}
           <div className="grid grid-cols-3 gap-4">
-            <Input type="text" name="codigo" value={produto.codigo} onChange={handleChange} placeholder="Código do Produto" required />
-            <Input type="text" name="nome" value={produto.nome} onChange={handleChange} placeholder="Nome do Produto" className="col-span-2" required />
+            <Input type="text" name="code" value={product.code} onChange={handleChange} placeholder="Product Code" required />
+            <Input type="text" name="name" value={product.name} onChange={handleChange} placeholder="Product Name" className="col-span-2" required />
           </div>
 
-          {/* Preço, Fabricante e Tributos */}
           <div className="grid grid-cols-3 gap-4">
-            <Input type="text" name="preco" value={produto.preco} onChange={handleChange} placeholder="Preço Padrão (R$)" required />
-            <Input type="text" name="fabricante" value={produto.fabricante} onChange={handleChange} placeholder="Fabricante" />
-            <Input type="text" name="tributos" value={produto.tributos} onChange={handleChange} placeholder="Tributos (%)" />
+            <Input type="text" name="standard_price" value={product.standard_price} onChange={handleChange} placeholder="Standard Price (R$)" required />
+            <Input type="text" name="manufacturer" value={product.manufacturer} onChange={handleChange} placeholder="Manufacturer" />
+            <Input type="text" name="percentage_taxes" value={product.percentage_taxes} onChange={handleChange} placeholder="Taxes (%)" />
           </div>
 
-          {/* 🔹 Nova seção adicionada abaixo de "Tributos" */}
           <div className="grid grid-cols-2 gap-4">
-            <Select onValueChange={(value) => handleSelectChange("classe_material", value)}>
+            <Select onValueChange={(value) => handleSelectChange("material_class", value)}>
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Classe do Material" />
+                <SelectValue placeholder="Material Class" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="Chopp">Chopp</SelectItem>
@@ -184,14 +174,14 @@ export default function EditProduct() {
                 <SelectItem value="Acessório">Acessório</SelectItem>
               </SelectContent>
             </Select>
-            <Input type="text" name="sub_classe" value={produto.sub_classe} onChange={handleChange} placeholder="Subclasse do Material" />
+            <Input type="text" name="submaterial_class" value={product.submaterial_class} onChange={handleChange} placeholder="Submaterial Class" />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <Input type="text" name="classificacao_fiscal" value={produto.classificacao_fiscal} onChange={handleChange} placeholder="Classificação Fiscal" />
-            <Select onValueChange={(value) => handleSelectChange("origem", value)}>
+            <Input type="text" name="tax_classification" value={product.tax_classification} onChange={handleChange} placeholder="Tax Classification" />
+            <Select onValueChange={(value) => handleSelectChange("material_origin", value)}>
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Origem do Material" />
+                <SelectValue placeholder="Material Origin" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="Nacional">Nacional</SelectItem>
@@ -200,12 +190,9 @@ export default function EditProduct() {
             </Select>
           </div>
 
-          {/* Aplicação do Produto */}
-          <Textarea name="aplicacao" value={produto.aplicacao} onChange={handleChange} placeholder="Aplicação do Produto" />
-          <Input type="text" name="codigo_comodato" value={produto.codigo_comodato ?? ""} onChange={handleChange} placeholder="Código do Produto Vinculado" />
+          <Textarea name="aplication" value={product.aplication} onChange={handleChange} placeholder="Product Application" />
+          <Input type="text" name="loan_product_code" value={product.loan_product_code ?? ""} onChange={handleChange} placeholder="Loan Product Code" />
 
-
-          {/* Botão de Salvar */}
           <Button className="w-full bg-black text-white hover:bg-gray-800" onClick={handleSubmit} disabled={loading}>
             {loading ? "Salvando..." : "Salvar Produto"}
           </Button>

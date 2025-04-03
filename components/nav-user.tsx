@@ -1,4 +1,7 @@
-"use client"
+"use client";
+
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { useRouter } from "next/navigation";
 
 import {
   IconCreditCard,
@@ -6,13 +9,13 @@ import {
   IconLogout,
   IconNotification,
   IconUserCircle,
-} from "@tabler/icons-react"
+} from "@tabler/icons-react";
 
 import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-} from "@/components/ui/avatar"
+} from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,24 +24,32 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
 import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
-} from "@/components/ui/sidebar"
+} from "@/components/ui/sidebar";
 
 export function NavUser({
   user,
 }: {
   user: {
-    name: string
-    email: string
-    avatar: string
-  }
+    name: string;
+    email: string;
+    avatar: string;
+  };
 }) {
-  const { isMobile } = useSidebar()
+  const { isMobile } = useSidebar();
+
+  const supabase = createClientComponentClient();
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push("/login-signin");
+  };
 
   return (
     <SidebarMenu>
@@ -51,7 +62,9 @@ export function NavUser({
             >
               <Avatar className="h-8 w-8 rounded-lg grayscale">
                 <AvatarImage src={user.avatar} alt={user.name} />
-                <AvatarFallback className="rounded-lg">CN</AvatarFallback>
+                <AvatarFallback className="rounded-lg">
+                  {user.name.charAt(0).toUpperCase()}
+                </AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{user.name}</span>
@@ -72,7 +85,9 @@ export function NavUser({
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                 <Avatar className="h-8 w-8 rounded-lg">
                   <AvatarImage src={user.avatar} alt={user.name} />
-                  <AvatarFallback className="rounded-lg">CN</AvatarFallback>
+                  <AvatarFallback className="rounded-lg">
+                    {user.name.charAt(0).toUpperCase()}
+                  </AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
                   <span className="truncate font-medium">{user.name}</span>
@@ -84,27 +99,27 @@ export function NavUser({
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
-                <IconUserCircle />
+              <DropdownMenuItem onClick={() => router.push("/dashboard/account")}>
+                <IconUserCircle className="mr-2 h-4 w-4" />
                 Account
               </DropdownMenuItem>
               <DropdownMenuItem>
-                <IconCreditCard />
+                <IconCreditCard className="mr-2 h-4 w-4" />
                 Billing
               </DropdownMenuItem>
               <DropdownMenuItem>
-                <IconNotification />
+                <IconNotification className="mr-2 h-4 w-4" />
                 Notifications
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <IconLogout />
+            <DropdownMenuItem onClick={handleLogout}>
+              <IconLogout className="mr-2 h-4 w-4" />
               Log out
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>
     </SidebarMenu>
-  )
+  );
 }

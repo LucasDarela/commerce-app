@@ -9,6 +9,7 @@ import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { Pencil, Trash } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 
 // 🔹 Definição do tipo Cliente
 type Cliente = {
@@ -17,13 +18,13 @@ type Cliente = {
   type: string;
   document: string;
   phone: string;
-  cep: string;
+  zip_code: string;
   address: string;
-  bairro: string;
+  neighborhood: string;
   city: string;
   state: string;
-  numero: string;
-  complemento: string;
+  number: string;
+  complement: string;
   email: string;
   state_registration?: string;
   fantasy_name?: string;
@@ -31,58 +32,40 @@ type Cliente = {
 
 export default function ListCustomers() {
   const router = useRouter();
+  const { user, companyId, loading } = useAuthenticatedCompany();
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [search, setSearch] = useState<string>("");
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // 🔹 Buscar clientes da empresa do usuário logado
   useEffect(() => {
-    const fetchClientes = async () => {
+    if (!companyId || loading) return;
+  
+    const fetchCustomers = async () => {
       try {
-        // 🔹 Obtém o usuário autenticado
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-  
-        if (authError || !user) {
-          console.error("❌ Erro ao buscar usuário autenticado:", authError?.message);
-          toast.error("Erro ao carregar informações do usuário.");
-          return;
-        }
-  
-        // 🔹 Busca o usuário na tabela `user` pelo e-mail para pegar a empresa_id
-        const { data: usuario, error: usuarioError } = await supabase
-          .from("user")
-          .select("empresa_id")
-          .eq("email", user.email) 
-          .maybeSingle();
-  
-        if (usuarioError || !usuario) {
-          console.error("❌ Erro ao buscar empresa do usuário:", usuarioError?.message);
-          toast.error("Erro ao carregar dados da empresa.");
-          return;
-        }
-
-        // 🔹 Agora busca apenas os clientes vinculados à empresa do usuário
         const { data: clientes, error: clientesError } = await supabase
-          .from("clients")
+          .from("customers")
           .select("*")
-          .eq("empresa_id", usuario.empresa_id)
+          .eq("company_id", companyId)
           .order("name", { ascending: true });
-
+  
         if (clientesError) {
           console.error("Erro ao buscar clientes:", clientesError.message);
           toast.error("Erro ao carregar clientes.");
-        } else {
-          setClientes(clientes || []);
+          return;
         }
+  
+        setClientes(clientes || []);
       } catch (error) {
         console.error("❌ Erro inesperado ao buscar clientes:", error);
         toast.error("Erro inesperado ao carregar clientes.");
       }
     };
-
-    fetchClientes();
-  }, []);
+  
+    if (typeof window !== "undefined") {
+      fetchCustomers();
+    }
+  }, [companyId, loading]);
 
   // 🔹 Normaliza texto (remove acentos e converte para minúsculas)
   const normalizeText = (text: string) => {
@@ -96,10 +79,10 @@ export default function ListCustomers() {
   // 🔹 Filtrar clientes diretamente no momento da renderização
   const filteredClientes = clientes.filter((cliente) => {
     const searchTerm = normalizeText(search);
-    const nomeCliente = normalizeText(cliente.name);
-    const cpfCnpj = cliente.document.replace(/\D/g, "");
-    const telefone = cliente.phone.replace(/\D/g, "");
-
+    const nomeCliente = normalizeText(cliente.name || "");
+    const cpfCnpj = cliente.document ? cliente.document.replace(/\D/g, "") : "";
+    const telefone = cliente.phone ? cliente.phone.replace(/\D/g, "") : "";
+  
     return (
       nomeCliente.includes(searchTerm) ||
       cpfCnpj.includes(search.replace(/\D/g, "")) ||
@@ -122,7 +105,7 @@ export default function ListCustomers() {
   // 🔹 Redireciona para edição
   const handleEdit = () => {
     if (selectedCliente) {
-      router.push(`/dashboard/clientes/${selectedCliente.id}/editar`);
+      router.push(`/dashboard/customers/${selectedCliente.id}/edit`);
       closeModal();
     }
   };
@@ -130,7 +113,7 @@ export default function ListCustomers() {
   // 🔹 Exclui cliente
   const handleDelete = async (id: number) => {
     if (confirm("Tem certeza que deseja excluir este cliente?")) {
-      const { error } = await supabase.from("clients").delete().eq("id", id);
+      const { error } = await supabase.from("customers").delete().eq("id", id);
 
       if (error) {
         toast.error("Erro ao excluir cliente: " + error.message);
@@ -148,12 +131,12 @@ export default function ListCustomers() {
       <div className="mb-4 flex flex-col-2 gap-6">
         <Input
           type="text"
-          placeholder="Pesquise por CPF ou Telefone..."
+          placeholder="Pesquise por Nome, CPF ou telefone..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="w-full p-2 border rounded-md"
         />
-                <Button onClick={() => router.push("/dashboard/clientes/cadastrar")} className="w-full sm:w-auto">
+                <Button onClick={() => router.push("/dashboard/customers/add")} className="w-full sm:w-auto">
           Add Customer
         </Button>
       </div>
@@ -215,12 +198,13 @@ export default function ListCustomers() {
         <p><strong>Tipo:</strong> {selectedCliente.type}</p>
         <p><strong>Documento:</strong> {selectedCliente.document}</p>
         <p><strong>Telefone:</strong> {selectedCliente.phone}</p>
-        <p><strong>CEP:</strong> {selectedCliente.cep}</p>
+        <p><strong>CEP:</strong> {selectedCliente.zip_code}</p>
         <p><strong>Endereço:</strong> {[
           selectedCliente.address,
-          selectedCliente.bairro,
-          selectedCliente.numero
+          selectedCliente.neighborhood,
+          selectedCliente.number
         ].filter(Boolean).join(", ")}</p>
+        {selectedCliente.complement && <p><strong>Complemento:</strong> {selectedCliente.complement}</p>}
         {selectedCliente.complemento && <p><strong>Complemento:</strong> {selectedCliente.complemento}</p>}
         <p><strong>Cidade:</strong> {selectedCliente.city}</p>
         <p><strong>Estado:</strong> {selectedCliente.state}</p>

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner"; 
 
 const formSchema = z
   .object({
@@ -40,32 +41,35 @@ export function CreateAccountForm() {
           },
     });
 
-    const onSubmit = async (values: z.infer<typeof 
-        formSchema>) => {
-            try {
-                const supabase = createClientComponentClient()
-                const { email, password } = values;
-        
-                const {
-                    error, 
-                    data: { user },
-            } = await supabase.auth.signUp({
-                    email,
-                    password,
-                    options: {
-                        emailRedirectTo: `${location.origin}/auth/callback`,
-                    }
-                });
-
-            if(user) {
-                form.reset();
-                router.push("/");
-            }
-                
-            }catch(error) {
-                console.log("CreateAccountForm", error);
-            }
-        };
+    const onSubmit = async (values: z.infer<typeof formSchema>) => {
+      try {
+        const supabase = createClientComponentClient();
+        const { email, password } = values;
+    
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: `${location.origin}/auth/callback`,
+          },
+        });
+    
+        if (error) {
+          console.error("Erro no signUp:", error.message);
+          toast.error("Erro ao criar conta. Tente novamente.");
+          return;
+        }
+    
+        if (data.user) {
+          toast.success("Verifique seu e-mail para confirmar sua inscrição.");
+          form.reset();
+          router.push("/login-signin");
+        }
+      } catch (error) {
+        console.error("CreateAccountForm", error);
+        toast.error("Erro inesperado. Tente novamente.");
+      }
+    };
 
     return (
     <div className="flex flex-col justify-center items-center space-y-2">

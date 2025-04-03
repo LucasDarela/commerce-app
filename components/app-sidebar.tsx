@@ -1,7 +1,9 @@
 "use client"
 
 import * as React from "react"
+import NavUserWrapper from "@/components/nav-user-wrapper"
 import Link from "next/link"
+import { CompanyBrand } from "@/components/company-brand"
 import {
   IconCamera,
   IconChartBar,
@@ -21,6 +23,10 @@ import {
   IconShoppingCart,
   IconPackage,
   IconBeerFilled,
+  IconUserCog,
+  IconInvoice,
+  IconCalendarSmile,
+  IconBuildingBank,
 } from "@tabler/icons-react"
 
 import { NavDocuments } from "@/components/nav-documents"
@@ -38,11 +44,7 @@ import {
 } from "@/components/ui/sidebar"
 
 const data = {
-  user: {
-    name: "shadcn",
-    email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
-  },
+
   navMain: [
     {
       title: "Dashboard",
@@ -50,9 +52,9 @@ const data = {
       icon: IconDashboard,
     },
     {
-      title: "Orders",
-      url: "/dashboard/orders",
-      icon: IconShoppingCart,
+      title: "Customers",
+      url: "/dashboard/customers",
+      icon: IconUsers,
     },
     {
       title: "Products",
@@ -60,9 +62,14 @@ const data = {
       icon: IconPackage,
     },
     {
-      title: "Customers",
-      url: "/dashboard/customers",
-      icon: IconUsers,
+      title: "Suppliers",
+      url: "/dashboard/suppliers",
+      icon: IconUserCog,
+    },
+    {
+      title: "Financial",
+      url: "/dashboard/financial",
+      icon: IconBuildingBank,
     },
     {
       title: "Analytics",
@@ -121,12 +128,12 @@ const data = {
   navSecondary: [
     {
       title: "Settings",
-      url: "#",
+      url: "/dashboard/settings",
       icon: IconSettings,
     },
     {
       title: "Get Help",
-      url: "#",
+      url: "/dashboard/help",
       icon: IconHelp,
     },
     {
@@ -135,21 +142,16 @@ const data = {
       icon: IconSearch,
     },
   ],
-  documents: [
+  document: [
     {
-      name: "Data Library",
-      url: "#",
-      icon: IconDatabase,
+      name: "Orders",
+      url: "/dashboard/orders",
+      icon: IconShoppingCart,
     },
     {
-      name: "Reports",
-      url: "#",
-      icon: IconReport,
-    },
-    {
-      name: "Word Assistant",
-      url: "#",
-      icon: IconFileWord,
+      name: "Appointments",
+      url: "/dashboard/appointments",
+      icon: IconCalendarSmile,
     },
   ],
 }
@@ -164,21 +166,20 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               asChild
               className="data-[slot=sidebar-menu-button]:!p-1.5"
             >
-              <a href="#">
-                <IconBeerFilled className="!size-5" />
-                <span className="text-base font-semibold">Darela Chopp</span>
-              </a>
+            <a href="#">
+              <CompanyBrand />
+            </a>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} />
-        <NavDocuments items={data.documents} />
+        <NavDocuments items={data.document} />
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+      <NavUserWrapper />
       </SidebarFooter>
     </Sidebar>
   )

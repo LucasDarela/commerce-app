@@ -10,16 +10,12 @@ import {
   SidebarInset,
   SidebarProvider,
 } from "@/components/ui/sidebar"
-
-
 import data from "./data.json"
 
 export default async function DashboardPage() {
 
   const supabase = createServerComponentClient({ cookies });
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  const { data: { session } } = await supabase.auth.getSession();
 
   if (!session?.user) {
     redirect("/login-signin");

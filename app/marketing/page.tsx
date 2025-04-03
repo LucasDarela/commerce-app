@@ -1,24 +1,21 @@
-import { createServerComponentClient} from "@supabase/auth-helpers-nextjs"
+import { createServerComponentClient } from "@supabase/auth-helpers-nextjs";
 import { cookies } from "next/headers";
-import { redirect, RedirectType } from "next/navigation";
+import { redirect } from "next/navigation";
 import LandingLayout from "./sections/LandingLayout";
 
 export default async function LandingPage() {
+  const supabase = createServerComponentClient({ cookies });
 
-  let loggedIn = false;
   try {
-    const cookieStore = cookies();
-    const supabase = createServerComponentClient({ cookies: () => cookieStore });
     const { data: { session } } = await supabase.auth.getSession();
-  
-    if (session) loggedIn = true;
+
+    if (session) {
+      return redirect("/dashboard");
+    }
   } catch (error) {
-    console.log("Landing Page: ", error);
-  } finally {
-    if (loggedIn) redirect("/dashboard");
+    console.log("LandingPage: Erro ao verificar sessão, ignorando:", error?.message);
+    // não faz nada, apenas segue para a landing page
   }
 
-  return (
-    <LandingLayout />
-  );
+  return <LandingLayout />;
 }
