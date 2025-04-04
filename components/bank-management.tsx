@@ -78,10 +78,10 @@ export default function BankManagement() {
         return
       }
       const { data, error } = await supabase
-        .from("user")
-        .select("company_id")
-        .eq("email", user.email)
-        .maybeSingle()
+      .from("profiles")
+      .select("company_id")
+      .eq("id", user.id)
+      .maybeSingle();
 
       if (error || !data) {
         toast.error("Error loading company info")
@@ -105,11 +105,26 @@ export default function BankManagement() {
   }, [])
 
   const handleAddAccount = async () => {
-    if (!newAccount.bankName || !newAccount.branch || !newAccount.accountNumber || !companyId) {
-      toast.error("Please fill all required fields")
+
+    console.log("DEBUG ⬇️");
+    console.log("Bank Name:", newAccount.bankName);
+    console.log("Branch:", newAccount.branch);
+    console.log("Account Number:", newAccount.accountNumber);
+    console.log("Company ID:", companyId);
+
+    const isEmpty = (val: unknown) =>
+      typeof val !== "string" || val.trim() === ""
+    
+    if (
+      !newAccount.bankName ||
+      !newAccount.branch ||
+      !newAccount.accountNumber ||
+      !companyId
+    ) {
+      toast.error("Please fill: Bank Name, Branch, and Account Number")
       return
     }
-
+  
     const { error } = await supabase.from("bank_accounts").insert({
       name: newAccount.bankName,
       branch: newAccount.branch,
@@ -135,7 +150,7 @@ export default function BankManagement() {
       message_3: newAccount.messageLine3,
       message_4: newAccount.messageLine4,
     })
-
+  
     if (error) {
       toast.error("Error saving bank account")
     } else {
@@ -166,6 +181,16 @@ export default function BankManagement() {
         messageLine3: "",
         messageLine4: "",
       })
+    }
+  }
+
+  const handleDeleteAccount = async (id: string) => {
+    const { error } = await supabase.from("bank_accounts").delete().eq("id", id)
+    if (error) {
+      toast.error("Error deleting bank account.")
+    } else {
+      toast.success("Bank account deleted.")
+      setBankAccounts(prev => prev.filter(acc => acc.id !== id))
     }
   }
 
@@ -220,20 +245,32 @@ export default function BankManagement() {
               <TableHead className="text-right"></TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody>
-            <TableRow>
-              <TableCell className="font-medium">INV001</TableCell>
-              <TableCell>Paid</TableCell>
-              <TableCell>Credit Card</TableCell>
-              <TableCell className="text-right">                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => handleRemoveUser(member.id)}
-                  >
-                    Delete
-                  </Button></TableCell>
-            </TableRow>
-          </TableBody>
+            <TableBody>
+              {bankAccounts.length > 0 ? (
+                bankAccounts.map((account) => (
+                  <TableRow key={account.id}>
+                    <TableCell className="font-medium">{account.branch}</TableCell>
+                    <TableCell>{account.name}</TableCell>
+                    <TableCell>{account.account}</TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => handleDeleteAccount(account.id)}
+                      >
+                        Delete
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center text-sm text-muted-foreground">
+                    No bank accounts found.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
         </Table>
     </div>
   );

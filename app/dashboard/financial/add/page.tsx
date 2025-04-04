@@ -1,319 +1,261 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 
-// 🔹 Definição dos tipos de dados
-interface ContaBancaria {
+interface BankAccount {
   id: string;
-  nome: string;
-  agencia: string;
-  conta: string;
+  name: string;
+  agency: string;
+  account: string;
 }
 
-interface Fornecedor {
+interface Supplier {
   id: string;
   name: string;
 }
 
-export default function ContasAPagar() {
-  const [contasBancarias, setContasBancarias] = useState<ContaBancaria[]>([]);
-  const [fornecedores, setFornecedores] = useState<Fornecedor[]>([]);
-  const [novaConta, setNovaConta] = useState({ banco: "", agencia: "", conta: "" });
+export default function AddFinancialRecord() {
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [newBank, setNewBank] = useState({ bank: "", agency: "", account: "" });
 
-  const [contaSelecionada, setContaSelecionada] = useState<string>("");
-  const [categoriaSelecionada, setCategoriaSelecionada] = useState<string>("");
-  const [categoriaPersonalizada, setCategoriaPersonalizada] = useState<string>("");
-  const [fornecedorSelecionado, setFornecedorSelecionado] = useState<string>("");
-  const [formaPagamento, setFormaPagamento] = useState<string>("pix");
-  const [diasPagamento, setDiasPagamento] = useState<number | "">("");
-  const [valor, setValor] = useState<number | "">("");
-  const [descricao, setDescricao] = useState<string>("");
-  const [vencimento, setVencimento] = useState<string>("");
-  const [emissao, setEmissao] = useState<string>("");
-  const [recorrencia, setRecorrencia] = useState<boolean>(false);
-  const [observacoes, setObservacoes] = useState<string>("");
-  const [modalAberto, setModalAberto] = useState<boolean>(false);
-  const [tipoRecorrencia, setTipoRecorrencia] = useState("");
-  const [numeroNotaEntrada, setNumeroNotaEntrada] = useState(""); 
-  const [empresaId, setEmpresaId] = useState<string | null>(null);
+  const [selectedAccount, setSelectedAccount] = useState<string>("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [customCategory, setCustomCategory] = useState<string>("");
+  const [selectedSupplier, setSelectedSupplier] = useState<string>("");
+  const [paymentMethod, setPaymentMethod] = useState<string>("pix");
+  const [paymentDays, setPaymentDays] = useState<number | "">("");
+  const [amount, setAmount] = useState<number | "">("");
+  const [description, setDescription] = useState<string>("");
+  const [dueDate, setDueDate] = useState<string>("");
+  const [issueDate, setIssueDate] = useState<string>("");
+  const [recurring, setRecurring] = useState<boolean>(false);
+  const [recurrenceType, setRecurrenceType] = useState("");
+  const [notes, setNotes] = useState<string>("");
+  const [modalOpen, setModalOpen] = useState<boolean>(false);
+  const [companyId, setCompanyId] = useState<string | null>(null);
 
-  const registrarPagamento = async () => {
-    if (!valor || !descricao || !formaPagamento) {
-      toast.error("Preencha todos os campos obrigatórios!");
+  const handleSubmit = async () => {
+    if (!amount || !description || !paymentMethod) {
+      toast.error("Please fill in all required fields.");
       return;
     }
-  
-    const novaContaPagar = {
-      descricao,
-      valor,
-      forma_pagamento: formaPagamento,
-      pago: false, // Assumindo que a conta começa como "não paga"
-      vencimento: vencimento ? vencimento : new Date().toISOString().split("T")[0],
-      emissao: emissao ? emissao : new Date().toISOString().split("T")[0],
-      categoria: categoriaSelecionada || categoriaPersonalizada || "outros",
-      conta_id: contaSelecionada || null,
+
+    const record = {
+      company_id: companyId,
+      issue_date: issueDate || new Date().toISOString().split("T")[0],
+      due_date: dueDate,
+      supplier: selectedSupplier,
+      description,
+      category: selectedCategory || customCategory || "others",
+      amount,
+      notes,
+      status: "Unpaid",
       created_at: new Date().toISOString(),
+      bank_account_id: selectedAccount || null, // ✅ se você criou a coluna
     };
-  
-    console.log("🔍 Enviando para Supabase:", novaContaPagar); // 🔹 Verificar o que está sendo enviado
-  
-    const { error } = await supabase.from("contas_a_pagar").insert([novaContaPagar]);
-  
+
+    const { error } = await supabase.from("financial_records").insert([record]);
+
     if (error) {
-      console.error("❌ Erro ao registrar conta a pagar:", error.message);
-      toast.error("Erro ao registrar conta a pagar: " + error.message);
+      toast.error("Failed to create record: " + error.message);
     } else {
-      toast.success("Conta a pagar registrada com sucesso!");
-      console.log("✅ Conta a pagar salva no banco de dados");
+      toast.success("Financial record created successfully!");
     }
   };
 
   useEffect(() => {
-    const fetchFornecedores = async () => {
-      const { data, error } = await supabase
-        .from("fornecedores") // Certifique-se que o nome da tabela está correto
-        .select("id, name");
-  
-      if (error) {
-        console.error("❌ Erro ao buscar fornecedores:", error.message);
-        toast.error("Erro ao carregar fornecedores.");
-      } else {
-        setFornecedores(data || []);
-        console.log("✅ Fornecedores carregados:", data);
-      }
+    const fetchSuppliers = async () => {
+      const { data, error } = await supabase.from("suppliers").select("id, name");
+      if (!error) setSuppliers(data || []);
     };
-  
-    fetchFornecedores();
+    fetchSuppliers();
   }, []);
 
   useEffect(() => {
-    const fetchEmpresaId = async () => {
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError || !user) {
-        console.error("❌ Erro ao buscar usuário autenticado:", authError?.message);
-        toast.error("Erro ao carregar informações do usuário.");
-        return;
+    const fetchBankAccounts = async () => {
+      if (!companyId) return;
+  
+      const { data, error } = await supabase
+        .from("bank_accounts")
+        .select("id, name, agency_name, account")
+        .eq("company_id", companyId); // <-- filtro por empresa
+  
+      if (!error) {
+        setBankAccounts(data || []);
+      } else {
+        console.error("Error loading bank accounts:", error.message);
       }
-      const { data: usuario, error: usuarioError } = await supabase
-        .from("user")
-        .select("empresa_id")
-        .eq("email", user.email)
+    };
+  
+    fetchBankAccounts();
+  }, [companyId]); // <-- importante: disparar quando o companyId estiver disponível
+
+  useEffect(() => {
+    const fetchCompanyId = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+  
+      if (!user) return;
+  
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("company_id")
+        .eq("id", user.id)
         .maybeSingle();
-      if (usuarioError || !usuario) {
-        console.error("❌ Erro ao buscar empresa do usuário:", usuarioError?.message);
-        toast.error("Erro ao carregar dados da empresa.");
-        return;
-      }
-      setEmpresaId(usuario.empresa_id);
-    };
-
-    fetchEmpresaId();
-  }, []);
-
-  useEffect(() => {
-    const fetchContas = async () => {
-      const { data, error } = await supabase
-        .from("contas_bancarias")
-        .select("id, nome, agencia, conta"); // 🔹 Alterado para garantir que `nome` está sendo buscado corretamente
   
-      if (error) {
-        toast.error("Erro ao buscar contas bancárias.");
-        console.error("Erro ao buscar contas bancárias:", error.message);
+      if (!error && data) {
+        setCompanyId(data.company_id);
       } else {
-        setContasBancarias(Array.isArray(data) ? data : []);
-        console.log("✅ Contas bancárias carregadas:", data); // 🔹 Debug para conferir a resposta do Supabase
+        console.error("Failed to load company ID:", error?.message);
       }
     };
   
-    fetchContas();
+    fetchCompanyId();
   }, []);
-
-  const adicionarContaBancaria = async () => {
-  if (!novaConta.banco || !novaConta.agencia || !novaConta.conta || !empresaId) {
-    toast.error("Preencha todos os campos corretamente.");
-    return;
-  }
-
-  console.log("Enviando para Supabase:", {
-    nome: novaConta.banco, // Certifique-se de que está enviando a chave correta
-    agencia: novaConta.agencia,
-    conta: novaConta.conta,
-    empresa_id: empresaId, // 🔹 Garante que o banco está vinculado à empresa correta
-  });
-
-  const { error } = await supabase.from("contas_bancarias").insert([
-    {
-      nome: novaConta.banco, // 🔹 Ajuste para garantir que está enviando para a coluna correta
-      agencia: novaConta.agencia,
-      conta: novaConta.conta,
-      empresa_id: empresaId,
-    },
-  ]);
-
-  if (error) {
-    console.error("❌ Erro ao cadastrar conta bancária:", error.message);
-    toast.error("Erro ao cadastrar conta bancária: " + error.message);
-  } else {
-    toast.success("Conta bancária cadastrada com sucesso!");
-    setModalAberto(false);
-    setNovaConta({ banco: "", agencia: "", conta: "" }); // Limpa os campos após cadastro
-  }
-};
 
   return (
     <div className="max-w-3xl mx-auto p-6 rounded-lg shadow-md">
-      <h1 className="text-2xl font-bold mb-4">Registrar Conta a Pagar</h1>
-      
-      {/* Bank account */}
-            <div className="grid grid-cols-2 gap-4 items-end">
-            <Select value={contaSelecionada} onValueChange={setContaSelecionada}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Selecione a conta bancária" />
-            </SelectTrigger>
-            <SelectContent>
-              {contasBancarias.map((conta) => (
-                <SelectItem key={conta.id} value={conta.id}>
-                  {conta.nome} - {conta.agencia}/{conta.conta} {/* 🔹 Agora `nome` é reconhecido corretamente */}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        <Button onClick={() => setModalAberto(true)} className="col-span-1">
-          Adicionar Banco
-        </Button>
+      <h1 className="text-2xl font-bold mb-4">Add Financial Record</h1>
+
+      <div className="grid grid-cols-3 gap-4">
+        <Select value={selectedAccount} onValueChange={setSelectedAccount}>
+          <SelectTrigger>
+            <SelectValue placeholder="Select bank account" />
+          </SelectTrigger>
+          <SelectContent>
+            {bankAccounts.map((acc) => (
+              <SelectItem key={acc.id} value={acc.id}>
+                {acc.name} - {acc.agency}/{acc.account}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
-      <div className="grid grid-cols-3 gap-4 items-end">
+
+      <div className="grid grid-cols-3 gap-4 mt-4">
+        <Input placeholder="Issue Date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} />
+        <Input placeholder="Due Date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+        <Input placeholder="Invoice Number (optional)" />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 mt-4">
+        <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+          <SelectTrigger>
+            <SelectValue placeholder="Select category" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="product_purchase">Product Purchase</SelectItem>
+            <SelectItem value="employee_payment">Employee Payment</SelectItem>
+            <SelectItem value="employee_advance">Employee Advance</SelectItem>
+            <SelectItem value="utilities">Utilities</SelectItem>
+            <SelectItem value="rent">Rent</SelectItem>
+            <SelectItem value="vehicle_expenses">Vehicle Expenses</SelectItem>
+            <SelectItem value="others">+ Custom</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={selectedSupplier} onValueChange={setSelectedSupplier}>
+          <SelectTrigger>
+            <SelectValue placeholder="Select supplier" />
+          </SelectTrigger>
+          <SelectContent>
+            {suppliers.map((supplier) => (
+              <SelectItem key={supplier.id} value={supplier.id}>
+                {supplier.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {selectedCategory === "others" && (
+        <Input
+          placeholder="Enter custom category"
+          value={customCategory}
+          onChange={(e) => setCustomCategory(e.target.value)}
+          className="mt-4"
+        />
+      )}
+
+      <div className="grid grid-cols-2 gap-4 mt-4">
+        <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+          <SelectTrigger>
+            <SelectValue placeholder="Payment method" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="cash">Cash</SelectItem>
+            <SelectItem value="pix">Pix</SelectItem>
+            <SelectItem value="card">Card</SelectItem>
+            <SelectItem value="boleto">Boleto</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {paymentMethod === "boleto" && (
+          <Input
+            type="number"
+            placeholder="Days to pay"
+            value={paymentDays}
+            onChange={(e) => setPaymentDays(Number(e.target.value) || "")}
+          />
+        )}
+      </div>
+
       <Input
-        type="text"
-        placeholder="Número da Nota (Opcional)"
-        value={numeroNotaEntrada}
-        onChange={(e) => setNumeroNotaEntrada(e.target.value)}
+        placeholder="Amount"
+        type="number"
+        value={amount}
+        onChange={(e) => setAmount(Number(e.target.value) || "")}
         className="mt-4"
       />
-      <Input placeholder="Data de Emissao" value={emissao} onChange={(e) => setEmissao(e.target.value)} className="mt-4" />
-      <Input placeholder="Data de Vencimento" value={vencimento} onChange={(e) => setVencimento(e.target.value)} className="mt-4" />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4 items-end">
-      {/* Categoria */}
-      <Select value={categoriaSelecionada} onValueChange={setCategoriaSelecionada}>
-        <SelectTrigger className="w-full mt-4">
-          <SelectValue placeholder="Selecione uma categoria" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="compra_produto">Compra de Produto</SelectItem>
-          <SelectItem value="pagamento_funcionario">Pagamento Funcionário</SelectItem>
-          <SelectItem value="vale_funcionario">Vale Funcionário</SelectItem>
-          <SelectItem value="agua">Água</SelectItem>
-          <SelectItem value="luz">Luz</SelectItem>
-          <SelectItem value="aluguel">Aluguel</SelectItem>
-          <SelectItem value="veiculo">Despesas Veículos</SelectItem>
-          <SelectItem value="outros">+ Personalizar</SelectItem>
-        </SelectContent>
-      </Select>
-
-{/* Fornecedor */}
-      <Select value={fornecedorSelecionado} onValueChange={setFornecedorSelecionado}>
-  <SelectTrigger className="w-full mt-4">
-    <SelectValue placeholder="Selecione o Fornecedor" />
-  </SelectTrigger>
-  <SelectContent>
-    {fornecedores.length > 0 ? (
-      fornecedores
-        .filter((fornecedor) => fornecedor.id) // Filtra fornecedores inválidos
-        .map((fornecedor) => (
-          <SelectItem key={fornecedor.id} value={fornecedor.id}>
-            {fornecedor.name}
-          </SelectItem>
-        ))
-    ) : (
-      <SelectItem key="nenhum" value="nenhum" disabled>
-        Nenhum fornecedor encontrado
-      </SelectItem>
-    )}
-  </SelectContent>
-</Select>
-      </div>
-      {categoriaSelecionada === "outros" && <Input placeholder="Informe a categoria personalizada" value={categoriaPersonalizada} onChange={(e) => setCategoriaPersonalizada(e.target.value)} className="mt-4" />}
-            
- <div className="grid grid-cols-2 gap-4 items-end">     
-      {/* Forma de Pagamento */}
-      <Select value={formaPagamento} onValueChange={setFormaPagamento}>
-        <SelectTrigger className="w-full mt-4">
-          <SelectValue placeholder="Forma de Pagamento" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="dinheiro">Dinheiro</SelectItem>
-          <SelectItem value="pix">Pix</SelectItem>
-          <SelectItem value="cartao">Cartão</SelectItem>
-          <SelectItem value="boleto">Boleto</SelectItem>
-        </SelectContent>
-      </Select>
-      {formaPagamento === "boleto" && <Input type="number" placeholder="Dias para pagamento" value={diasPagamento} onChange={(e) => setDiasPagamento(Number(e.target.value) || "")} className="mt-2" />}
-      
-      <Input type="number" placeholder="Valor" value={valor} onChange={(e) => setValor(Number(e.target.value) || "")} className="mt-4" />
-      </div>
-      <Input placeholder="Descrição" value={descricao} onChange={(e) => setDescricao(e.target.value)} className="mt-4" />
-
-  {/* Checkbox para ativar a recorrência */}
-  <div className="grid grid-cols-2 mt-4" >
-  <div className="flex items-center gap-2">
-    <input
-      type="checkbox"
-      checked={recorrencia}
-      onChange={() => setRecorrencia(!recorrencia)}
-      className="w-5 h-5"
-    />
-    <span>Pagamento recorrente</span>
-  </div>
-
-  {/* Dropdown de recorrência (só aparece se recorrência estiver ativada) */}
-  <div className="w-full">
-  {recorrencia && (
-    <Select
-      value={tipoRecorrencia}
-      onValueChange={setTipoRecorrencia}
-      
-    >
-      <SelectTrigger className="w-full">
-        <SelectValue placeholder="Escolha a frequência" />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="semanal">Semanal</SelectItem>
-        <SelectItem value="mensal">Mensal</SelectItem>
-        <SelectItem value="anual">Anual</SelectItem>
-      </SelectContent>
-    </Select>
-  )}
-  </div>
-</div>
+      <Input
+        placeholder="Description"
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        className="mt-4"
+      />
 
       <textarea
-            placeholder="Observações (Opcional)"
-            value={observacoes}
-            onChange={(e) => setObservacoes(e.target.value)}
-            className="mt-4 w-full h-32 p-2 border rounded-md resize-none"
-          ></textarea>
-      
-      <Button className="mt-4 w-full" onClick={registrarPagamento} >Registrar Pagamento</Button>
-      
-      {/* Modal de Conta Bancária */}
-      <Dialog open={modalAberto} onOpenChange={setModalAberto}>
+        placeholder="Notes (optional)"
+        value={notes}
+        onChange={(e) => setNotes(e.target.value)}
+        className="mt-4 w-full h-32 p-2 border rounded-md resize-none"
+      ></textarea>
+
+      <Button className="mt-4 w-full" onClick={handleSubmit}>
+        Save Financial Record
+      </Button>
+
+      {/* Modal for adding new bank account */}
+      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Adicionar Conta Bancária</DialogTitle>
+            <DialogTitle>Add Bank Account</DialogTitle>
           </DialogHeader>
-          <Input placeholder="Banco" value={novaConta.banco} onChange={(e) => setNovaConta({ ...novaConta, banco: e.target.value })} />
-          <Input placeholder="Agência" value={novaConta.agencia} onChange={(e) => setNovaConta({ ...novaConta, agencia: e.target.value })} />
-          <Input placeholder="Conta Corrente" value={novaConta.conta} onChange={(e) => setNovaConta({ ...novaConta, conta: e.target.value })} />
+          <Input placeholder="Bank Name" value={newBank.bank} onChange={(e) => setNewBank({ ...newBank, bank: e.target.value })} />
+          <Input placeholder="Agency" value={newBank.agency} onChange={(e) => setNewBank({ ...newBank, agency: e.target.value })} />
+          <Input placeholder="Account Number" value={newBank.account} onChange={(e) => setNewBank({ ...newBank, account: e.target.value })} />
           <DialogFooter>
-            <Button onClick={adicionarContaBancaria}>Salvar</Button>
+            <Button onClick={() => setModalOpen(false)}>Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

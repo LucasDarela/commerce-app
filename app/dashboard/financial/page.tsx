@@ -3,134 +3,234 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { Pencil, Trash } from "lucide-react";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 
-// 🔹 Tipo Nota
-interface Nota {
-  id: number;
-  data: string;
-  fornecedor: string;
-  descricao: string;
-  categoria: string;
-  valor: number;
+interface Invoice {
+  id: string;
+  issue_date: string;
+  due_date: string;
+  supplier: string;
+  description: string;
+  category: string;
+  amount: number;
+  status: "Paid" | "Unpaid";
 }
 
-export default function Financeiro() {
+export default function FinancialPage() {
   const router = useRouter();
-  const [notas, setNotas] = useState<Nota[]>([]);
+  const { companyId } = useAuthenticatedCompany();
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [search, setSearch] = useState<string>("");
-  const [selectedNota, setSelectedNota] = useState<Nota | null>(null);
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // 🔹 Buscar notas do Supabase
   useEffect(() => {
-    const fetchNotas = async () => {
+    if (!companyId) return;
+
+    const fetchInvoices = async () => {
       const { data, error } = await supabase
-        .from("contas_a_pagar")
+        .from("financial_records")
         .select("*")
-        .order("data", { ascending: false });
+        .eq("company_id", companyId)
+        .order("due_date", { ascending: false });
 
       if (error) {
-        console.error("Erro ao buscar notas:", error.message);
+        console.error("Error fetching invoices:", error.message);
       } else {
-        setNotas(data || []);
+        setInvoices(data || []);
       }
     };
 
-    fetchNotas();
-  }, []);
+    fetchInvoices();
+  }, [companyId]);
 
-  // 🔹 Filtrar notas conforme pesquisa
-  const notasFiltradas = notas.filter((nota) => {
-    const searchTerm = search.toLowerCase();
+  const filteredInvoices = invoices.filter((invoice) => {
+    const term = search.toLowerCase();
     return (
-      nota.descricao.toLowerCase().includes(searchTerm) ||
-      nota.fornecedor.toLowerCase().includes(searchTerm) ||
-      nota.categoria.toLowerCase().includes(searchTerm)
+      invoice.description.toLowerCase().includes(term) ||
+      invoice.supplier.toLowerCase().includes(term) ||
+      invoice.category.toLowerCase().includes(term)
     );
   });
 
-  // 🔹 Abre o modal com detalhes da nota
-  const openModal = (nota: Nota) => {
-    setSelectedNota(nota);
+  const openModal = (invoice: Invoice) => {
+    setSelectedInvoice(invoice);
     setIsModalOpen(true);
   };
 
-  // 🔹 Fecha o modal
   const closeModal = () => {
-    setSelectedNota(null);
+    setSelectedInvoice(null);
     setIsModalOpen(false);
   };
 
-  // 🔹 Exclui uma nota
-  const handleDelete = async (id: number) => {
-    if (confirm("Tem certeza que deseja excluir esta nota?")) {
-      const { error } = await supabase.from("contas_a_pagar").delete().eq("id", id);
+  const handleDelete = async (id: string) => {
+    if (confirm("Are you sure you want to delete this invoice?")) {
+      const { error } = await supabase
+        .from("financial_records")
+        .delete()
+        .eq("id", id);
 
       if (error) {
-        toast.error("Erro ao excluir nota: " + error.message);
+        toast.error("Failed to delete invoice: " + error.message);
       } else {
-        toast.success("Nota excluída com sucesso!");
-        setNotas(notas.filter((nota) => nota.id !== id));
+        toast.success("Invoice deleted successfully!");
+        setInvoices(invoices.filter((inv) => inv.id !== id));
       }
     }
   };
 
+  const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
+
+useEffect(() => {
+  const fetchSuppliers = async () => {
+    const { data, error } = await supabase
+      .from("suppliers")
+      .select("id, name");
+
+    if (error) {
+      console.error("Error fetching suppliers:", error.message);
+    } else {
+      setSuppliers(data || []);
+    }
+  };
+
+  if (companyId) fetchSuppliers();
+}, [companyId]);
+
+const formatDate = (date: string) => {
+  const d = new Date(date);
+  return d.toLocaleDateString("pt-BR", {
+    timeZone: "UTC",
+  });
+};
+
+const formatCategory = (category: string) => {
+  return category
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
+const formatCurrency = (amount: number) => {
+  return amount.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  });
+};
+
+const markAsPaid = async (id: string) => {
+  const { error } = await supabase
+    .from("financial_records")
+    .update({ status: "Paid" })
+    .eq("id", id);
+
+  if (error) {
+    toast.error("Failed to update status");
+  } else {
+    toast.success("Marked as Paid");
+    setInvoices((prev) =>
+      prev.map((inv) => (inv.id === id ? { ...inv, status: "Paid" } : inv))
+    );
+  }
+};
+
   return (
-        <div className="p-8">
+    <div className="p-8">
+      <div className="mb-4 flex flex-col-2 gap-6">
+        <Input
+          type="text"
+          placeholder="Search by description, supplier, or category..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full h-8 p-2 border rounded-md"
+        />
+        <Button
+          size="sm"
+          onClick={() => router.push("/dashboard/financial/add")}
+          className="w-full sm:w-auto"
+        >
+          Add Invoice
+        </Button>
+      </div>
 
-        {/* 🔹 Campo de Pesquisa */}
-        <div className="mb-4 flex flex-col-2 gap-6">
-          <Input
-            type="text"
-            placeholder="Search..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full h-8 p-2 border rounded-md"
-          />
-                  <Button size="sm" onClick={() => router.push("/dashboard/financial/add")} className="w-full sm:w-auto">
-            Add Financial
-          </Button>
-        </div>
-
-      {/* 🔹 Tabela de Notas */}
       <div className="p-4 rounded-lg shadow-md overflow-x-auto max-w-full">
         <Table className="w-full">
           <TableHeader>
             <TableRow>
-              <TableHead>Data</TableHead>
-              <TableHead>Fornecedor</TableHead>
-              <TableHead>Descrição</TableHead>
-              <TableHead>Categoria</TableHead>
-              <TableHead>Valor</TableHead>
-              <TableHead>Ações</TableHead>
+              <TableHead>Duo Date</TableHead>
+              <TableHead>Supplier</TableHead>
+              <TableHead>Description</TableHead>
+              <TableHead>Category</TableHead>
+              <TableHead>Amount</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {notasFiltradas.length > 0 ? (
-              notasFiltradas.map((nota) => (
-                <TableRow key={nota.id} onClick={() => openModal(nota)} className="cursor-pointer hover:bg-gray-100">
-                  <TableCell>{nota.data}</TableCell>
-                  <TableCell>{nota.fornecedor}</TableCell>
-                  <TableCell>{nota.descricao}</TableCell>
-                  <TableCell>{nota.categoria}</TableCell>
-                  <TableCell>R$ {nota.valor.toFixed(2)}</TableCell>
+            {filteredInvoices.length > 0 ? (
+              filteredInvoices.map((invoice) => (
+                <TableRow
+                  key={invoice.id}
+                  onClick={() => openModal(invoice)}
+                  className="cursor-pointer hover:bg-gray-100"
+                >
+              <TableCell>{formatDate(invoice.due_date)}</TableCell>     
+              <TableCell>
+                {suppliers.find(s => s.id === invoice.supplier)?.name ?? invoice.supplier}
+              </TableCell>
+              <TableCell>{invoice.description}</TableCell>
+              <TableCell>
+                {invoice.category.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}
+              </TableCell>
+              <TableCell>R$ {invoice.amount.toFixed(2).replace(".", ",")}</TableCell>
+              <TableCell>
+  {invoice.status === "Unpaid" ? (
+    <Button variant="outline" size="sm" onClick={(e) => {
+      e.stopPropagation();
+      markAsPaid(invoice.id);
+    }}>
+      Mark as Paid
+    </Button>
+  ) : (
+    <span className="text-green-600 font-medium">Paid</span>
+  )}
+</TableCell>
                   <TableCell>
-                    <Button variant="destructive" size="sm" onClick={() => handleDelete(nota.id)}>
-                      <Trash className="mr-2 h-4 w-4" /> Excluir
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(invoice.id);
+                      }}
+                    >
+                      <Trash className="mr-2 h-4 w-4" /> Delete
                     </Button>
                   </TableCell>
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={6} className="text-center">
-                  Nenhuma nota encontrada
+                <TableCell colSpan={7} className="text-center">
+                  No invoices found
                 </TableCell>
               </TableRow>
             )}
@@ -138,26 +238,43 @@ export default function Financeiro() {
         </Table>
       </div>
 
-      {/* 🔹 Modal de Detalhes da Nota */}
-      {selectedNota && (
+      {selectedInvoice && (
         <Dialog open={isModalOpen} onOpenChange={closeModal}>
           <DialogContent className="max-w-lg w-full">
             <DialogHeader>
-              <DialogTitle>Detalhes da Nota</DialogTitle>
+              <DialogTitle>Invoice Details</DialogTitle>
             </DialogHeader>
             <div className="space-y-2">
-              <p><strong>Data:</strong> {selectedNota.data}</p>
-              <p><strong>Fornecedor:</strong> {selectedNota.fornecedor}</p>
-              <p><strong>Descrição:</strong> {selectedNota.descricao}</p>
-              <p><strong>Categoria:</strong> {selectedNota.categoria}</p>
-              <p><strong>Valor:</strong> R$ {selectedNota.valor.toFixed(2)}</p>
+              <p><strong>Duo Date:</strong> {formatDate(selectedInvoice.due_date)}</p>
+              <p><strong>Supplier:</strong> {suppliers.find(s => s.id === selectedInvoice.supplier)?.name ?? selectedInvoice.supplier}</p>
+              <p><strong>Description:</strong> {selectedInvoice.description}</p>
+              <p><strong>Notes:</strong> {selectedInvoice.notes}</p>
+              <p><strong>Category:</strong> {selectedInvoice.category.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}</p>
+              <p><strong>Amount:</strong> R$ {selectedInvoice.amount.toFixed(2).replace(".", ",")}</p>
+              <p><strong>Status:</strong>   {selectedInvoice.status === "Unpaid" ? (
+                  <Button variant="outline" size="sm" onClick={(e) => {
+                    e.stopPropagation();
+                    markAsPaid(selectedInvoice.id);
+                  }}>
+                    Mark as Paid
+                  </Button>
+                ) : (
+                  <span className="text-green-600 font-medium">Paid</span>
+                )}</p>
             </div>
             <DialogFooter className="flex justify-between">
-              <Button variant="destructive" onClick={() => handleDelete(selectedNota.id)}>
-                <Trash className="mr-2 h-4 w-4" /> Excluir
+              <Button
+                variant="destructive"
+                onClick={() => handleDelete(selectedInvoice.id)}
+              >
+                <Trash className="mr-2 h-4 w-4" /> Delete
               </Button>
-              <Button onClick={() => router.push(`/dashboard/financeiro/${selectedNota.id}/editar`)}>
-                <Pencil className="mr-2 h-4 w-4" /> Editar Nota
+              <Button
+                onClick={() =>
+                  router.push(`/dashboard/financial/${selectedInvoice.id}/edit`)
+                }
+              >
+                <Pencil className="mr-2 h-4 w-4" /> Edit Invoice
               </Button>
             </DialogFooter>
           </DialogContent>
