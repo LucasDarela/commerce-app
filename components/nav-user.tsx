@@ -103,11 +103,11 @@ export function NavUser({
                 <IconUserCircle className="mr-2 h-4 w-4" />
                 Account
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push("/dashboard/billing")}>
                 <IconCreditCard className="mr-2 h-4 w-4" />
                 Billing
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push("/dashboard/notifications")}>
                 <IconNotification className="mr-2 h-4 w-4" />
                 Notifications
               </DropdownMenuItem>

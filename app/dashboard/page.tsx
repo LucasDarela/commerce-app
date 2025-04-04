@@ -29,7 +29,6 @@ export default async function DashboardPage() {
               <div className="px-4 lg:px-6">
                 <ChartAreaInteractive />
               </div>
-              <DataTable data={data} />
             </div>
           </div>
         </div>

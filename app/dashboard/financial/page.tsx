@@ -91,9 +91,9 @@ export default function Financeiro() {
             placeholder="Search..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full p-2 border rounded-md"
+            className="w-full h-8 p-2 border rounded-md"
           />
-                  <Button onClick={() => router.push("/dashboard/financial/add")} className="w-full sm:w-auto">
+                  <Button size="sm" onClick={() => router.push("/dashboard/financial/add")} className="w-full sm:w-auto">
             Add Financial
           </Button>
         </div>

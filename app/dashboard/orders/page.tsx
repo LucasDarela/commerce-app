@@ -92,9 +92,9 @@ export default function ListOrders() {
           placeholder="Search by Customer or Payment Status"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full p-2 border rounded-md"
+          className="w-full h-8 p-2 border rounded-md"
         />
-        <Button onClick={() => router.push("/dashboard/orders/add")}>Add Order</Button>
+        <Button size="sm" onClick={() => router.push("/dashboard/orders/add")}>Add Order</Button>
       </div>
 
       {/* Orders Table */}

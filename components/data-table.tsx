@@ -106,6 +106,15 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
 import Link from "next/link"
 
 //New Schema
@@ -115,7 +124,7 @@ export const schema = z.object({
   hour: z.string(), // formato HH:mm
   customer: z.string(),
   phone: z.string(),
-  amount: z.number(),
+  products: z.number(),
   location: z.string(),
   delivery_status: z.enum(["Deliver", "Collect"]),
   payment_status: z.enum(["Pending", "Paid"]),
@@ -124,103 +133,6 @@ export const schema = z.object({
 
 type Sale = z.infer<typeof schema>
 
-//New Columns
-export const columns: ColumnDef<any>[] = [
-  {
-    id: "drag",
-    header: () => null,
-    cell: ({ row }) => <IconGripVertical className="cursor-move text-muted-foreground size-4" />,
-    enableSorting: false,
-    enableHiding: false,
-  },
-  {
-    id: "select",
-    header: ({ table }) => (
-      <div className="flex items-center justify-center">
-        <Checkbox
-          checked={table.getIsAllPageRowsSelected()}
-          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-          aria-label="Select all"
-        />
-      </div>
-    ),
-    cell: ({ row }) => (
-      <div className="flex items-center justify-center">
-        <Checkbox
-          checked={row.getIsSelected()}
-          onCheckedChange={(value) => row.toggleSelected(!!value)}
-          aria-label="Select row"
-        />
-      </div>
-    ),
-    enableSorting: false,
-    enableHiding: false,
-  },
-  {
-    accessorKey: "date",
-    header: "Date",
-    cell: ({ row }) => {
-      const rawDate = row.original.date
-      if (!rawDate) return "—"
-      const parsed = new Date(rawDate)
-      return format(parsed, "dd/MM/yyyy")
-    },
-  },
-  {
-    accessorKey: "hour",
-    header: "Hour",
-    cell: ({ row }) => row.original.hour,
-  },
-  {
-    accessorKey: "customer",
-    header: "Customer",
-    cell: ({ row }) => row.original.customer,
-  },
-  {
-    accessorKey: "phone",
-    header: "Phone",
-    cell: ({ row }) => row.original.phone,
-  },
-  {
-    accessorKey: "amount",
-    header: "Amount",
-    cell: ({ row }) => row.original.amount,
-  },
-  {
-    accessorKey: "location",
-    header: "Location",
-    cell: ({ row }) => row.original.location,
-  },
-  {
-    accessorKey: "delivery_status",
-    header: "Delivery",
-    cell: ({ row }) => row.original.delivery_status,
-  },
-  {
-    accessorKey: "payment_status",
-    header: "Payment",
-    cell: ({ row }) => row.original.payment_status,
-  },
-  {
-    id: "actions",
-    header: "",
-    cell: ({ row }) => (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="text-muted-foreground">
-            <IconDotsVertical size={16} />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem>View</DropdownMenuItem>
-          <DropdownMenuItem>Edit</DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem variant="destructive">Delete</DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    ),
-  },
-]
 
 // Create a separate component for the drag handle
 function DragHandle({ id }: { id: number }) {
@@ -241,179 +153,6 @@ function DragHandle({ id }: { id: number }) {
     </Button>
   )
 }
-
-// const columns: ColumnDef<z.infer<typeof schema>>[] = [
-//   {
-//     id: "drag",
-//     header: () => null,
-//     cell: ({ row }) => <DragHandle id={row.original.id} />,
-//   },
-//   {
-//     id: "select",
-//     header: ({ table }) => (
-//       <div className="flex items-center justify-center">
-//         <Checkbox
-//           checked={
-//             table.getIsAllPageRowsSelected() ||
-//             (table.getIsSomePageRowsSelected() && "indeterminate")
-//           }
-//           onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-//           aria-label="Select all"
-//         />
-//       </div>
-//     ),
-//     cell: ({ row }) => (
-//       <div className="flex items-center justify-center">
-//         <Checkbox
-//           checked={row.getIsSelected()}
-//           onCheckedChange={(value) => row.toggleSelected(!!value)}
-//           aria-label="Select row"
-//         />
-//       </div>
-//     ),
-//     enableSorting: false,
-//     enableHiding: false,
-//   },
-//   {
-//     accessorKey: "header",
-//     header: "Customer",
-//     cell: ({ row }) => {
-//       return <TableCellViewer item={row.original} />
-//     },
-//     enableHiding: false,
-//   },
-//   {
-//     accessorKey: "type",
-//     header: "Section Type",
-//     cell: ({ row }) => (
-//       <div className="w-32">
-//         <Badge variant="outline" className="text-muted-foreground px-1.5">
-//           {row.original.type}
-//         </Badge>
-//       </div>
-//     ),
-//   },
-//   {
-//     accessorKey: "status",
-//     header: "Status",
-//     cell: ({ row }) => (
-//       <Badge variant="outline" className="text-muted-foreground px-1.5">
-//         {row.original.status === "Done" ? (
-//           <IconCircleCheckFilled className="fill-green-500 dark:fill-green-400" />
-//         ) : (
-//           <IconLoader />
-//         )}
-//         {row.original.status}
-//       </Badge>
-//     ),
-//   },
-//   {
-//     accessorKey: "target",
-//     header: () => <div className="w-full text-right">Target</div>,
-//     cell: ({ row }) => (
-//       <form
-//         onSubmit={(e) => {
-//           e.preventDefault()
-//           toast.promise(new Promise((resolve) => setTimeout(resolve, 1000)), {
-//             loading: `Saving ${row.original.header}`,
-//             success: "Done",
-//             error: "Error",
-//           })
-//         }}
-//       >
-//         <Label htmlFor={`${row.original.id}-target`} className="sr-only">
-//           Target
-//         </Label>
-//         <Input
-//           className="hover:bg-input/30 focus-visible:bg-background dark:hover:bg-input/30 dark:focus-visible:bg-input/30 h-8 w-16 border-transparent bg-transparent text-right shadow-none focus-visible:border dark:bg-transparent"
-//           defaultValue={row.original.target}
-//           id={`${row.original.id}-target`}
-//         />
-//       </form>
-//     ),
-//   },
-//   {
-//     accessorKey: "limit",
-//     header: () => <div className="w-full text-right">Limit</div>,
-//     cell: ({ row }) => (
-//       <form
-//         onSubmit={(e) => {
-//           e.preventDefault()
-//           toast.promise(new Promise((resolve) => setTimeout(resolve, 1000)), {
-//             loading: `Saving ${row.original.header}`,
-//             success: "Done",
-//             error: "Error",
-//           })
-//         }}
-//       >
-//         <Label htmlFor={`${row.original.id}-limit`} className="sr-only">
-//           Limit
-//         </Label>
-//         <Input
-//           className="hover:bg-input/30 focus-visible:bg-background dark:hover:bg-input/30 dark:focus-visible:bg-input/30 h-8 w-16 border-transparent bg-transparent text-right shadow-none focus-visible:border dark:bg-transparent"
-//           defaultValue={row.original.limit}
-//           id={`${row.original.id}-limit`}
-//         />
-//       </form>
-//     ),
-//   },
-//   {
-//     accessorKey: "reviewer",
-//     header: "Reviewer",
-//     cell: ({ row }) => {
-//       const isAssigned = row.original.reviewer !== "Assign reviewer"
-
-//       if (isAssigned) {
-//         return row.original.reviewer
-//       }
-
-//       return (
-//         <>
-//           <Label htmlFor={`${row.original.id}-reviewer`} className="sr-only">
-//             Reviewer
-//           </Label>
-//           <Select>
-//             <SelectTrigger
-//               className="w-38 **:data-[slot=select-value]:block **:data-[slot=select-value]:truncate"
-//               size="sm"
-//               id={`${row.original.id}-reviewer`}
-//             >
-//               <SelectValue placeholder="Assign reviewer" />
-//             </SelectTrigger>
-//             <SelectContent align="end">
-//               <SelectItem value="Eddie Lake">Eddie Lake</SelectItem>
-//               <SelectItem value="Jamik Tashpulatov">
-//                 Jamik Tashpulatov
-//               </SelectItem>
-//             </SelectContent>
-//           </Select>
-//         </>
-//       )
-//     },
-//   },
-//   {
-//     id: "actions",
-//     cell: () => (
-//       <DropdownMenu>
-//         <DropdownMenuTrigger asChild>
-//           <Button
-//             variant="ghost"
-//             className="data-[state=open]:bg-muted text-muted-foreground flex size-8"
-//             size="icon"
-//           >
-//             <IconDotsVertical />
-//             <span className="sr-only">Open menu</span>
-//           </Button>
-//         </DropdownMenuTrigger>
-//         <DropdownMenuContent align="end" className="w-32">
-//           <DropdownMenuItem>Edit</DropdownMenuItem>
-//           <DropdownMenuSeparator />
-//           <DropdownMenuItem variant="destructive">Delete</DropdownMenuItem>
-//         </DropdownMenuContent>
-//       </DropdownMenu>
-//     ),
-//   },
-// ]
 
 function DraggableRow({ row }: { row: Row<z.infer<typeof schema>> }) {
   const { transform, transition, setNodeRef, isDragging } = useSortable({
@@ -445,6 +184,153 @@ export function DataTable({
 }: {
   data: z.infer<typeof schema>[]
 }) {
+  const [selectedCustomer, setSelectedCustomer] = React.useState<Sale | null>(null)
+  const [sheetOpen, setSheetOpen] = React.useState(false)
+
+  //const columns
+  const columns: ColumnDef<any>[] = [
+    {
+      id: "drag",
+      header: () => null,
+      cell: ({ row }) => <IconGripVertical className="cursor-move text-muted-foreground size-4" />,
+      enableSorting: false,
+      enableHiding: false,
+    },
+    {
+      id: "select",
+      header: ({ table }) => (
+        <div className="flex items-center justify-center">
+          <Checkbox
+            checked={table.getIsAllPageRowsSelected()}
+            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+            aria-label="Select all"
+          />
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="flex items-center justify-center">
+          <Checkbox
+            checked={row.getIsSelected()}
+            onCheckedChange={(value) => row.toggleSelected(!!value)}
+            aria-label="Select row"
+          />
+        </div>
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
+    {
+      accessorKey: "date",
+      header: "Date",
+      cell: ({ row }) => {
+        const rawDate = row.original.date
+        if (!rawDate) return "—"
+        const parsed = new Date(rawDate)
+        return format(parsed, "dd/MM/yyyy")
+      },
+    },
+    {
+      accessorKey: "hour",
+      header: "Hour",
+      cell: ({ row }) => row.original.hour,
+    },
+    {
+      accessorKey: "customer",
+      header: "Customer",
+      cell: ({ row }) => {
+        const sale = row.original
+        return (
+          <Button
+            variant="link"
+            className="p-0 text-left text-primary hover:underline"
+            onClick={() => {
+              setSelectedCustomer(sale)
+              setSheetOpen(true)
+            }}
+          >
+            {sale.customer}
+          </Button>
+        )
+      },
+    },
+    {
+      accessorKey: "phone",
+      header: "Phone",
+      cell: ({ row }) => {
+        const raw = row.original.phone || ""
+        const cleaned = raw.replace(/\D/g, "") // Remove ( ) - espaços
+        const message = "Olá, tudo bem? Sua entrega de chopp está a caminho."
+        const encodedMessage = encodeURIComponent(message)
+        const link = `https://wa.me/55${cleaned}?text=${encodedMessage}`
+    
+        return (
+          <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+          <a href={link} target="_blank" rel="noopener noreferrer">
+            <svg 
+            width="28"
+            height="28"
+            viewBox="0 0 32 32" 
+            className="text-primary hover:text-primary/80 fill-current transition-transform hover:scale-110"
+             xmlns="http://www.w3.org/2000/svg"
+            >
+              <path d=" M19.11 17.205c-.372 0-1.088 1.39-1.518 1.39a.63.63 0 0 1-.315-.1c-.802-.402-1.504-.817-2.163-1.447-.545-.516-1.146-1.29-1.46-1.963a.426.426 0 0 1-.073-.215c0-.33.99-.945.99-1.49 0-.143-.73-2.09-.832-2.335-.143-.372-.214-.487-.6-.487-.187 0-.36-.043-.53-.043-.302 0-.53.115-.746.315-.688.645-1.032 1.318-1.06 2.264v.114c-.015.99.472 1.977 1.017 2.78 1.23 1.82 2.506 3.41 4.554 4.34.616.287 2.035.888 2.722.888.817 0 2.15-.515 2.478-1.318.13-.33.244-.73.244-1.088 0-.058 0-.144-.03-.215-.1-.172-2.434-1.39-2.678-1.39zm-2.908 7.593c-1.747 0-3.48-.53-4.942-1.49L7.793 24.41l1.132-3.337a8.955 8.955 0 0 1-1.72-5.272c0-4.955 4.04-8.995 8.997-8.995S25.2 10.845 25.2 15.8c0 4.958-4.04 8.998-8.998 8.998zm0-19.798c-5.96 0-10.8 4.842-10.8 10.8 0 1.964.53 3.898 1.546 5.574L5 27.176l5.974-1.92a10.807 10.807 0 0 0 16.03-9.455c0-5.958-4.842-10.8-10.802-10.8z" 
+              fillRule="evenodd">
+              </path>
+            </svg>
+  
+          </a>
+          </TooltipTrigger>
+            <TooltipContent>
+              Send message via WhatsApp
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        );
+      },
+    },
+    {
+      accessorKey: "products",
+      header: "Products",
+      cell: ({ row }) => row.original.products,
+    },
+    {
+      accessorKey: "location",
+      header: "Location",
+      cell: ({ row }) => row.original.location,
+    },
+    {
+      accessorKey: "delivery_status",
+      header: "Delivery",
+      cell: ({ row }) => row.original.delivery_status,
+    },
+    {
+      accessorKey: "payment_status",
+      header: "Payment",
+      cell: ({ row }) => row.original.payment_status,
+    },
+    {
+      id: "actions",
+      header: "",
+      cell: ({ row }) => (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="text-muted-foreground">
+              <IconDotsVertical size={16} />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem>View</DropdownMenuItem>
+            <DropdownMenuItem>Edit</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem variant="destructive">Delete</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ),
+    },
+  ]
+
   const [data, setData] = React.useState(() => initialData)
   const [rowSelection, setRowSelection] = React.useState({})
   const [columnVisibility, setColumnVisibility] =
@@ -530,12 +416,12 @@ export function DataTable({
           </SelectContent>
         </Select>
         <TabsList className="**:data-[slot=badge]:bg-muted-foreground/30 hidden **:data-[slot=badge]:size-5 **:data-[slot=badge]:rounded-full **:data-[slot=badge]:px-1 @4xl/main:flex">
-          <TabsTrigger value="outline">Outline</TabsTrigger>
+          <TabsTrigger value="outline">Delivery</TabsTrigger>
           <TabsTrigger value="past-performance">
-            Past Performance <Badge variant="secondary">3</Badge>
+            Collect <Badge variant="secondary">3</Badge>
           </TabsTrigger>
           <TabsTrigger value="key-personnel">
-            Key Personnel <Badge variant="secondary">2</Badge>
+            Pending Payment <Badge variant="secondary">2</Badge>
           </TabsTrigger>
           <TabsTrigger value="focus-documents">Focus Documents</TabsTrigger>
         </TabsList>
@@ -574,7 +460,7 @@ export function DataTable({
             </DropdownMenuContent>
           </DropdownMenu>
           <Link href={"/dashboard/orders/add"}>
-          <Button variant="outline" size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground min-w-8 duration-200 ease-linear">
+          <Button variant="default" size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground min-w-8 duration-200 ease-linear">
             <IconPlus />
             <span className="hidden lg:inline">Add Order</span>
           </Button>
@@ -634,6 +520,29 @@ export function DataTable({
                 )}
               </TableBody>
             </Table>
+            <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+            <SheetContent side="right">
+              <SheetHeader>
+                <SheetTitle>Customer Details</SheetTitle>
+                <SheetDescription>
+                  Details about <strong>{selectedCustomer?.customer}</strong>
+                </SheetDescription>
+              </SheetHeader>
+
+    {selectedCustomer && (
+      <div className="mt-4 flex flex-col gap-2 text-sm">
+        <div><strong>Date:</strong> {selectedCustomer.date}</div>
+        <div><strong>Hour:</strong> {selectedCustomer.hour}</div>
+        <div><strong>Phone:</strong> {selectedCustomer.phone}</div>
+        <div><strong>Amount:</strong> {selectedCustomer.amount}</div>
+        <div><strong>Location:</strong> {selectedCustomer.location}</div>
+        <div><strong>Products:</strong> {selectedCustomer.products}</div>
+        <div><strong>Delivery:</strong> {selectedCustomer.delivery_status}</div>
+        <div><strong>Payment:</strong> {selectedCustomer.payment_status}</div>
+      </div>
+    )}
+  </SheetContent>
+</Sheet>
           </DndContext>
         </div>
         <div className="flex items-center justify-between px-4">
@@ -718,10 +627,14 @@ export function DataTable({
         value="past-performance"
         className="flex flex-col px-4 lg:px-6"
       >
-        <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
+        <div className="aspect-video w-full flex-1 rounded-lg border border-dashed">
+          <h1>To Collect</h1>
+        </div>
       </TabsContent>
       <TabsContent value="key-personnel" className="flex flex-col px-4 lg:px-6">
-        <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
+        <div className="aspect-video w-full flex-1 rounded-lg border border-dashed">
+        <h1>To Payment</h1>
+        </div>
       </TabsContent>
       <TabsContent
         value="focus-documents"

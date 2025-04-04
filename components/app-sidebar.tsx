@@ -136,11 +136,6 @@ const data = {
       url: "/dashboard/help",
       icon: IconHelp,
     },
-    {
-      title: "Search",
-      url: "#",
-      icon: IconSearch,
-    },
   ],
   document: [
     {

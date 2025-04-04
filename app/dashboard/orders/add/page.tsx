@@ -65,7 +65,7 @@ export default function AddOrder() {
     document_type: "internal",
     customer: "",
     standard_price: "",
-    payment_method: "pix",
+    payment_method: "Pix",
     days_ticket: "1",
   });
   const [loading, setLoading] = useState<boolean>(false);
@@ -137,30 +137,69 @@ export default function AddOrder() {
       toast.error("Select a customer and at least one product.");
       return;
     }
-
+  
     setLoading(true);
+  
+    // Calcular dados derivados
+    const amount = items.reduce((acc, item) => acc + item.quantity, 0);
+    const productsDescription = items.map((item) => `${item.name} (${item.quantity}x)`).join(", ");
+    const total = getTotal();
+
+    const capitalize = (text: string) =>
+      text.charAt(0).toUpperCase() + text.slice(1).toLowerCase()
+  
     const newOrder = {
       customer_id: order.customer_id,
+      customer: selectedCustomer?.name ?? "N/A",
+      phone: selectedCustomer?.phone ?? "N/A",
+      products: items.length > 0 ? items.map(item => `${item.name} (${item.quantity}x)`).join(", ") : "No products",
+      amount: items.reduce((sum, item) => sum + item.quantity, 0),
       note_number: order.note_number,
       document_type: order.document_type,
-      payment_method: order.payment_method,
-      payment_condition: order.payment_condition,
-      days_ticket: order.payment_method === "boleto" ? parseInt(order.days_ticket) : null,
+      payment_method: capitalize(order.payment_method),
+      payment_status: "Pending",
+      days_ticket: ["Pix", "Cash"].includes(capitalize(order.payment_method)) ? "1" : order.days_ticket || "1",
       total: getTotal(),
       freight,
-      payed: false,
       delivery_status: "Pending",
       appointment_date: appointment.date ? format(appointment.date, "yyyy-MM-dd") : null,
       appointment_hour: appointment.hour,
       appointment_local: appointment.location,
       created_at: new Date().toISOString(),
     };
-
-    const { error } = await supabase.from("orders").insert([newOrder]);
-    if (error) toast.error("Failed to create order.");
-    else toast.success("Order created.");
+  
+    const { data: insertedOrder, error } = await supabase
+      .from("orders")
+      .insert([newOrder])
+      .select()
+      .single();
+  
+    if (error) {
+      toast.error("Failed to create order.");
+      console.error("❌ Error inserting order:", error);
+      setLoading(false);
+      return;
+    }
+  
+    // 🔹 Inserir os itens na tabela `order_items`
+    const orderItems = items.map((item) => ({
+      order_id: insertedOrder.id,
+      product_id: item.id,
+      quantity: item.quantity,
+      price: item.standard_price,
+    }));
+  
+    const { error: itemError } = await supabase.from("order_items").insert(orderItems);
+  
+    if (itemError) {
+      toast.error("Order created but failed to insert items.");
+      console.error("❌ Error inserting order items:", itemError);
+    } else {
+      toast.success("Order created successfully!");
+      router.push("/dashboard/orders");
+    }
+  
     setLoading(false);
-    router.push("/dashboard/orders");
   };
 
   const customersFiltered = searchCustomer.trim()
@@ -356,10 +395,10 @@ export default function AddOrder() {
                 <SelectValue placeholder="Payment Method" />
               </SelectTrigger>
               <SelectContent className="w-full shadow-md rounded-md">
-                <SelectItem value="pix">Pix</SelectItem>
-                <SelectItem value="cash">Cash</SelectItem>
-                <SelectItem value="card">Card</SelectItem>
-                <SelectItem value="boleto">Boleto</SelectItem>
+              <SelectItem value="Pix">Pix</SelectItem>
+              <SelectItem value="Cash">Cash</SelectItem>
+              <SelectItem value="Card">Card</SelectItem>
+              <SelectItem value="Ticket">Ticket</SelectItem>
               </SelectContent>
             </Select>
             <Input
@@ -368,7 +407,7 @@ export default function AddOrder() {
               value={order.days_ticket}
               onChange={(e) => setOrder((prev) => ({ ...prev, days_ticket: e.target.value }))}
               disabled={["pix", "cash"].includes(order.payment_method)}
-              className={`w-full border border-gray-300 rounded-md shadow-sm ${["pix", "cash"].includes(order.payment_method) ? "cursor-not-allowed bg-gray-100 text-gray-500" : ""}`}
+              className={`w-full border border-gray-300 rounded-md shadow-sm ${["Pix", "Cash"].includes(order.payment_method) ? "cursor-not-allowed bg-gray-100 text-gray-500" : ""}`}
             />
           </div>
 
