@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/table"
 import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
+import { Card } from "./ui/card"
 
 interface BankAccount {
   id: string;
@@ -198,7 +199,7 @@ export default function BankManagement() {
   
 
   return (
-    <div className="max-w-3xl mx-auto p-6 rounded-lg shadow-md mt-4">
+    <Card className="max-w-3xl mx-auto p-6 rounded-lg shadow-md mt-4" >
       <h2 className="text-xl font-bold mb-4">Register Bank Account</h2>
       <div className="w-full flex justify-center gap-2 pb-4">
             <Input placeholder="Bank Code" value={newAccount.bankCode} onChange={(e) => setNewAccount({ ...newAccount, bankCode: e.target.value })} />
@@ -281,6 +282,6 @@ export default function BankManagement() {
               )}
             </TableBody>
         </Table>
-    </div>
+    </Card>
   );
 }

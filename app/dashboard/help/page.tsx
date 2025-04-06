@@ -15,36 +15,9 @@ export default function Help() {
 
         <Accordion type="single" collapsible>
         <AccordionItem value="item-1">
-            <AccordionTrigger>Is it accessible?</AccordionTrigger>
+            <AccordionTrigger>Building Get Help 🚧</AccordionTrigger>
             <AccordionContent>
-            Yes. It adheres to the WAI-ARIA design pattern.
-            </AccordionContent>
-        </AccordionItem>
-        </Accordion>
-
-        <Accordion type="single" collapsible>
-        <AccordionItem value="item-2">
-            <AccordionTrigger>Is it accessible?</AccordionTrigger>
-            <AccordionContent>
-            Yes. It adheres to the WAI-ARIA design pattern.
-            </AccordionContent>
-        </AccordionItem>
-        </Accordion>
-
-        <Accordion type="single" collapsible>
-        <AccordionItem value="item-3">
-            <AccordionTrigger>Is it accessible?</AccordionTrigger>
-            <AccordionContent>
-            Yes. It adheres to the WAI-ARIA design pattern.
-            </AccordionContent>
-        </AccordionItem>
-        </Accordion>
-
-        <Accordion type="single" collapsible>
-        <AccordionItem value="item-4">
-            <AccordionTrigger>Is it accessible?</AccordionTrigger>
-            <AccordionContent>
-            Yes. It adheres to the WAI-ARIA design pattern.
+            Thanks for your pacience, we are building this section.
             </AccordionContent>
         </AccordionItem>
         </Accordion>
