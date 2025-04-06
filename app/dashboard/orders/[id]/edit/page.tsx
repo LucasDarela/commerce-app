@@ -12,7 +12,6 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { Trash, Calendar as CalendarIcon } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";

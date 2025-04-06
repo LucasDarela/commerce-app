@@ -70,5 +70,5 @@ export async function fetchOrders(companyId: string): Promise<Order[]> {
 
   
 
-  return result.data
+  return result.data ?? [];
 }

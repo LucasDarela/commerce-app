@@ -5,20 +5,6 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui/select"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog"
-import {
   Table,
   TableBody,
   TableCaption,
@@ -31,39 +17,69 @@ import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
 
 interface BankAccount {
-  id: string
-  name: string
-  branch: string
-  account: string
+  id: string;
+  name: string;
+  branch: string;
+  account: string;
+  agency_name: string;
+  bank_code: string;
 }
+
+interface NewAccountInput {
+  bankCode: string;
+  bankName: string;
+  accountNumber: string;
+  branch: string;
+  agencyName: string;
+  remittanceProgram: string;
+  returnProgram: string;
+  companyCode: string;
+  launchAccount: string;
+  boletoIssuer: string;
+  mainAccount: boolean;
+  emitsCheck: boolean;
+  wallet: string;
+  interest: string;
+  protestDays: string;
+  lateFee: string;
+  cedentAccount: string;
+  initialNumber: string;
+  finalNumber: string;
+  messageLine1: string;
+  messageLine2: string;
+  messageLine3: string;
+  messageLine4: string;
+}
+
+const defaultNewAccount: NewAccountInput = {
+  bankCode: "",
+  bankName: "",
+  accountNumber: "",
+  branch: "",
+  agencyName: "",
+  remittanceProgram: "",
+  returnProgram: "",
+  companyCode: "",
+  launchAccount: "",
+  boletoIssuer: "",
+  mainAccount: false,
+  emitsCheck: false,
+  wallet: "",
+  interest: "",
+  protestDays: "",
+  lateFee: "",
+  cedentAccount: "",
+  initialNumber: "",
+  finalNumber: "",
+  messageLine1: "",
+  messageLine2: "",
+  messageLine3: "",
+  messageLine4: "",
+};
 
 export default function BankManagement() {
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([])
-  const [newAccount, setNewAccount] = useState({
-    bankCode: "",
-    bankName: "",
-    accountNumber: "",
-    branch: "",
-    agencyName: "",
-    remittanceProgram: "",
-    returnProgram: "",
-    companyCode: "",
-    launchAccount: "",
-    boletoIssuer: "",
-    mainAccount: false,
-    emitsCheck: false,
-    wallet: "",
-    interest: "",
-    protestDays: "",
-    lateFee: "",
-    cedentAccount: "",
-    initialNumber: "",
-    finalNumber: "",
-    messageLine1: "",
-    messageLine2: "",
-    messageLine3: "",
-    messageLine4: "",
-  })
+  const [newAccount, setNewAccount] = useState<NewAccountInput>(defaultNewAccount);
   const [modalOpen, setModalOpen] = useState(false)
   const [companyId, setCompanyId] = useState<string | null>(null)
 
@@ -92,25 +108,32 @@ export default function BankManagement() {
     fetchCompany()
   }, [])
 
-  useEffect(() => {
-    const fetchAccounts = async () => {
-      const { data, error } = await supabase.from("bank_accounts").select("id, name, branch, account")
-      if (error) {
-        toast.error("Error loading bank accounts")
-      } else {
-        setBankAccounts(data || [])
-      }
+  const fetchAccounts = async () => {
+    const { data, error } = await supabase
+      .from("bank_accounts")
+      .select("id, name, branch, account, agency_name, bank_code")
+      .returns<BankAccount[]>();
+  
+    if (error) {
+      toast.error("Error loading bank accounts");
+    } else if (data) {
+      const formatted: BankAccount[] = data.map((item) => ({
+        id: item.id,
+        name: item.name,
+        branch: item.branch,
+        account: item.account,
+        agency_name: item.agency_name,
+        bank_code: item.bank_code, 
+      }));
+      setBankAccounts(formatted);
     }
-    fetchAccounts()
-  }, [])
+  };
+  
+  useEffect(() => { fetchAccounts() }, []);
+
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleAddAccount = async () => {
-
-    console.log("DEBUG ⬇️");
-    console.log("Bank Name:", newAccount.bankName);
-    console.log("Branch:", newAccount.branch);
-    console.log("Account Number:", newAccount.accountNumber);
-    console.log("Company ID:", companyId);
 
     const isEmpty = (val: unknown) =>
       typeof val !== "string" || val.trim() === ""
@@ -124,11 +147,12 @@ export default function BankManagement() {
       toast.error("Please fill: Bank Name, Branch, and Account Number")
       return
     }
-  
+    setIsSaving(true);
     const { error } = await supabase.from("bank_accounts").insert({
       name: newAccount.bankName,
       branch: newAccount.branch,
       account: newAccount.accountNumber,
+      bank_code: newAccount.bankCode,
       company_id: companyId,
       agency_name: newAccount.agencyName,
       remittance_program: newAccount.remittanceProgram,
@@ -156,31 +180,8 @@ export default function BankManagement() {
     } else {
       toast.success("Bank account added successfully!")
       setModalOpen(false)
-      setNewAccount({
-        bankCode: "",
-        bankName: "",
-        accountNumber: "",
-        branch: "",
-        agencyName: "",
-        remittanceProgram: "",
-        returnProgram: "",
-        companyCode: "",
-        launchAccount: "",
-        boletoIssuer: "",
-        mainAccount: false,
-        emitsCheck: false,
-        wallet: "",
-        interest: "",
-        protestDays: "",
-        lateFee: "",
-        cedentAccount: "",
-        initialNumber: "",
-        finalNumber: "",
-        messageLine1: "",
-        messageLine2: "",
-        messageLine3: "",
-        messageLine4: "",
-      })
+      setNewAccount(defaultNewAccount);
+      await fetchAccounts();
     }
   }
 
@@ -193,6 +194,8 @@ export default function BankManagement() {
       setBankAccounts(prev => prev.filter(acc => acc.id !== id))
     }
   }
+
+  
 
   return (
     <div className="max-w-3xl mx-auto p-6 rounded-lg shadow-md mt-4">
@@ -233,7 +236,13 @@ export default function BankManagement() {
         </Tabs>
 
         <div className="w-full flex justify-center mt-4">
-          <Button onClick={handleAddAccount} className="w-full">Add Bank</Button>
+        <Button
+          onClick={handleAddAccount}
+          disabled={isSaving || !newAccount.bankName || !newAccount.branch || !newAccount.accountNumber}
+          className="w-full"
+        >
+          {isSaving ? "Saving..." : "Add Bank"}
+        </Button>
         </div>
 
         <Table className="mt-6">
@@ -249,7 +258,7 @@ export default function BankManagement() {
               {bankAccounts.length > 0 ? (
                 bankAccounts.map((account) => (
                   <TableRow key={account.id}>
-                    <TableCell className="font-medium">{account.branch}</TableCell>
+                    <TableCell className="font-medium">{account.bank_code}</TableCell>
                     <TableCell>{account.name}</TableCell>
                     <TableCell>{account.account}</TableCell>
                     <TableCell className="text-right">

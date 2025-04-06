@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -25,10 +26,14 @@ interface Supplier {
   name: string;
 }
 
-export default function AddFinancialRecord() {
+export default function EditFinancialRecord() {
+  const router = useRouter();
+  const params = useParams();
+  const invoiceId = params.id as string;
+
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [newBank, setNewBank] = useState({ bank: "", agency_name: "", account: "" });
+  const [companyId, setCompanyId] = useState<string | null>(null);
 
   const [selectedAccount, setSelectedAccount] = useState<string>("");
   const [selectedCategory, setSelectedCategory] = useState<string>("");
@@ -39,94 +44,104 @@ export default function AddFinancialRecord() {
   const [amount, setAmount] = useState<number | "">("");
   const [description, setDescription] = useState<string>("");
   const [dueDate, setDueDate] = useState<string>("");
-  const [invoiceNumber, setInvoiceNumber] = useState<string>("");
   const [issueDate, setIssueDate] = useState<string>("");
-  const [recurring, setRecurring] = useState<boolean>(false);
-  const [recurrenceType, setRecurrenceType] = useState("");
   const [notes, setNotes] = useState<string>("");
-  const [modalOpen, setModalOpen] = useState<boolean>(false);
-  const [companyId, setCompanyId] = useState<string | null>(null);
-
-  const handleSubmit = async () => {
-    if (!amount || !description || !paymentMethod) {
-      toast.error("Please fill in all required fields.");
-      return;
-    }
-
-    const record = {
-      company_id: companyId,
-      issue_date: issueDate || new Date().toISOString().split("T")[0],
-      due_date: dueDate,
-      invoice_number: invoiceNumber,
-      supplier: selectedSupplier,
-      description,
-      category: selectedCategory || customCategory || "others",
-      amount,
-      notes,
-      status: "Unpaid",
-      created_at: new Date().toISOString(),
-      bank_account_id: selectedAccount || null, // ✅ se você criou a coluna
-    };
-
-    const { error } = await supabase.from("financial_records").insert([record]);
-
-    if (error) {
-      toast.error("Failed to create record: " + error.message);
-    } else {
-      toast.success("Financial record created successfully!");
-    }
-  };
 
   useEffect(() => {
-    const fetchSuppliers = async () => {
-      const { data, error } = await supabase.from("suppliers").select("id, name");
-      if (!error) setSuppliers(data || []);
-    };
-    fetchSuppliers();
-  }, []);
-
-  useEffect(() => {
-    const fetchBankAccounts = async () => {
-      if (!companyId) return;
-  
+    const loadInvoice = async () => {
       const { data, error } = await supabase
-        .from("bank_accounts")
-        .select("id, name, agency_name, account")
-        .eq("company_id", companyId); // <-- filtro por empresa
-  
-      if (!error) {
-        setBankAccounts(data || []);
-      } else {
-        console.error("Error loading bank accounts:", error.message);
+        .from("financial_records")
+        .select("*")
+        .eq("id", invoiceId)
+        .maybeSingle();
+
+      if (error || !data) {
+        toast.error("Failed to load record");
+        return;
       }
+
+      setSelectedAccount(data.bank_account_id || "");
+      setSelectedCategory(data.category || "");
+      setSelectedSupplier(data.supplier || "");
+      setAmount(data.amount || "");
+      setDescription(data.description || "");
+      setDueDate(data.due_date || "");
+      setIssueDate(data.issue_date || "");
+      setNotes(data.notes || "");
+      setPaymentMethod(data.payment_method || "pix");
     };
-  
-    fetchBankAccounts();
-  }, [companyId]); // <-- importante: disparar quando o companyId estiver disponível
+
+    loadInvoice();
+  }, [invoiceId]);
 
   useEffect(() => {
     const fetchCompanyId = async () => {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-  
+
       if (!user) return;
-  
+
       const { data, error } = await supabase
         .from("profiles")
         .select("company_id")
         .eq("id", user.id)
         .maybeSingle();
-  
+
       if (!error && data) {
         setCompanyId(data.company_id);
-      } else {
-        console.error("Failed to load company ID:", error?.message);
       }
     };
-  
+
     fetchCompanyId();
   }, []);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!companyId) return;
+
+      const [{ data: accounts }, { data: suppliersData }] = await Promise.all([
+        supabase
+          .from("bank_accounts")
+          .select("id, name, agency_name, account")
+          .eq("company_id", companyId),
+        supabase.from("suppliers").select("id, name"),
+      ]);
+
+      setBankAccounts(accounts || []);
+      setSuppliers(suppliersData || []);
+    };
+
+    fetchData();
+  }, [companyId]);
+
+  const handleUpdate = async () => {
+    if (!amount || !description || !paymentMethod) {
+      toast.error("Please fill in all required fields.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("financial_records")
+      .update({
+        bank_account_id: selectedAccount,
+        supplier: selectedSupplier,
+        description,
+        category: selectedCategory || customCategory || "others",
+        payment_method: paymentMethod,
+        issue_date: issueDate,
+        due_date: dueDate,
+        amount,
+        notes,
+      })
+      .eq("id", invoiceId);
+
+    if (error) {
+      toast.error("Failed to update record: " + error.message);
+    } else {
+      toast.success("Record updated successfully!");
+    }
+  };
 
   const formatDate = (value: string) => {
     const cleaned = value.replace(/\D/g, "").slice(0, 8); // remove tudo que não for número
@@ -149,9 +164,9 @@ export default function AddFinancialRecord() {
 
   return (
     <div className="max-w-3xl mx-auto p-6 rounded-lg shadow-md">
-  <h1 className="text-2xl font-bold mb-4">Add Financial Record</h1>
+  <h1 className="text-2xl font-bold mb-4">Edit Financial Record</h1>
 
-  {/* Banco */}
+  {/* Bank account */}
   <div className="w-full">
     <Select value={selectedAccount} onValueChange={setSelectedAccount}>
       <SelectTrigger className="w-full">
@@ -167,14 +182,14 @@ export default function AddFinancialRecord() {
     </Select>
   </div>
 
-  {/* Datas + Número da nota */}
+  {/* Dates and invoice number */}
   <div className="grid grid-cols-3 gap-4 mt-4">
     <Input placeholder="Issue Date" value={issueDate} onChange={(e) => setIssueDate(formatDate(e.target.value))} />
     <Input placeholder="Due Date" value={dueDate} onChange={(e) => setDueDate(formatDate(e.target.value))} />
-    <Input placeholder="Invoice Number (optional)" value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} />
+    <Input placeholder="Invoice Number (optional)" />
   </div>
 
-  {/* Categoria + Fornecedor */}
+  {/* Category and Supplier */}
   <div className="grid grid-cols-2 gap-4 mt-4">
     <Select value={selectedCategory} onValueChange={setSelectedCategory}>
       <SelectTrigger className="w-full">
@@ -205,6 +220,7 @@ export default function AddFinancialRecord() {
     </Select>
   </div>
 
+  {/* Custom category if 'others' */}
   {selectedCategory === "others" && (
     <Input
       placeholder="Enter custom category"
@@ -214,7 +230,7 @@ export default function AddFinancialRecord() {
     />
   )}
 
-  {/* Pagamento + Valor */}
+  {/* Payment Method and Amount */}
   <div className="grid grid-cols-2 gap-4 mt-4">
     <Select value={paymentMethod} onValueChange={setPaymentMethod}>
       <SelectTrigger className="w-full">
@@ -236,18 +252,18 @@ export default function AddFinancialRecord() {
     />
   </div>
 
-  {/* Parcelamento se boleto */}
+  {/* Days to pay (if boleto) */}
   {paymentMethod === "boleto" && (
     <Input
-      className="mt-4"
       type="number"
       placeholder="Days to pay"
       value={paymentDays}
       onChange={(e) => setPaymentDays(Number(e.target.value) || "")}
+      className="mt-4"
     />
   )}
 
-  {/* Descrição */}
+  {/* Description */}
   <Input
     placeholder="Description"
     value={description}
@@ -255,7 +271,7 @@ export default function AddFinancialRecord() {
     className="mt-4"
   />
 
-  {/* Notas */}
+  {/* Notes */}
   <textarea
     placeholder="Notes (optional)"
     value={notes}
@@ -263,9 +279,9 @@ export default function AddFinancialRecord() {
     className="mt-4 w-full h-32 p-2 border rounded-md resize-none"
   ></textarea>
 
-  {/* Botão */}
-  <Button className="mt-4 w-full" onClick={handleSubmit}>
-    Save Financial Record
+  {/* Submit button */}
+  <Button className="mt-4 w-full bg-blue-600 hover:bg-blue-700" onClick={handleUpdate}>
+    Update Record
   </Button>
 </div>
   );

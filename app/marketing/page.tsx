@@ -13,8 +13,7 @@ export default async function LandingPage() {
       return redirect("/dashboard");
     }
   } catch (error) {
-    console.log("LandingPage: Erro ao verificar sessão, ignorando:", error?.message);
-    // não faz nada, apenas segue para a landing page
+    console.log("Erro:", (error as { message?: string })?.message);
   }
 
   return <LandingLayout />;

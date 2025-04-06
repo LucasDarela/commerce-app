@@ -119,19 +119,21 @@ import Link from "next/link"
 
 //New Schema
 export const schema = z.object({
-  id: z.string(), // ou z.number() se estiver usando ID numérico
-  date: z.string(), // formato ISO (yyyy-MM-dd)
-  hour: z.string(), // formato HH:mm
+  id: z.string(),
+  appointment_date: z.string(),
+  appointment_hour: z.string(),
+  appointment_local: z.string(),
   customer: z.string(),
   phone: z.string(),
-  products: z.number(),
-  location: z.string(),
-  delivery_status: z.enum(["Deliver", "Collect"]),
+  products: z.string(),
+  amount: z.number(),
+  delivery_status: z.enum(["Pending", "Deliver" , "Collect"]),
   payment_status: z.enum(["Pending", "Paid"]),
-  payment_method: z.enum(["Pix", "Cash", "Ticket", "Card"])
+  payment_method: z.enum(["Pix", "Cash", "Ticket", "Card"]),
 })
 
 type Sale = z.infer<typeof schema>
+type Order = z.infer<typeof schema>
 
 
 // Create a separate component for the drag handle
@@ -220,19 +222,19 @@ export function DataTable({
       enableHiding: false,
     },
     {
-      accessorKey: "date",
+      accessorKey: "appointment_date",
       header: "Date",
       cell: ({ row }) => {
-        const rawDate = row.original.date
+        const rawDate = row.original.appointment_date
         if (!rawDate) return "—"
         const parsed = new Date(rawDate)
         return format(parsed, "dd/MM/yyyy")
       },
     },
     {
-      accessorKey: "hour",
+      accessorKey: "appointment_hour",
       header: "Hour",
-      cell: ({ row }) => row.original.hour,
+      cell: ({ row }) => row.original.appointment_hour,
     },
     {
       accessorKey: "customer",
@@ -296,9 +298,9 @@ export function DataTable({
       cell: ({ row }) => row.original.products,
     },
     {
-      accessorKey: "location",
+      accessorKey: "appointment_local",
       header: "Location",
-      cell: ({ row }) => row.original.location,
+      cell: ({ row }) => row.original.appointment_local,
     },
     {
       accessorKey: "delivery_status",
@@ -396,6 +398,7 @@ export function DataTable({
       defaultValue="outline"
       className="w-full flex-col justify-start gap-6"
     >
+      {/* Selector  */}
       <div className="flex items-center justify-between px-4 lg:px-6">
         <Label htmlFor="view-selector" className="sr-only">
           View
@@ -467,6 +470,7 @@ export function DataTable({
           </Link>
         </div>
       </div>
+      {/* Delivery Tabs  */}
       <TabsContent
         value="outline"
         className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6"
@@ -531,11 +535,11 @@ export function DataTable({
 
     {selectedCustomer && (
       <div className="mt-4 flex flex-col gap-2 text-sm">
-        <div><strong>Date:</strong> {selectedCustomer.date}</div>
-        <div><strong>Hour:</strong> {selectedCustomer.hour}</div>
+        <div><strong>Date:</strong> {selectedCustomer.appointment_date}</div>
+        <div><strong>Hour:</strong> {selectedCustomer.appointment_hour}</div>
         <div><strong>Phone:</strong> {selectedCustomer.phone}</div>
         <div><strong>Amount:</strong> {selectedCustomer.amount}</div>
-        <div><strong>Location:</strong> {selectedCustomer.location}</div>
+        <div><strong>Location:</strong> {selectedCustomer.appointment_local}</div>
         <div><strong>Products:</strong> {selectedCustomer.products}</div>
         <div><strong>Delivery:</strong> {selectedCustomer.delivery_status}</div>
         <div><strong>Payment:</strong> {selectedCustomer.payment_status}</div>
@@ -623,6 +627,7 @@ export function DataTable({
           </div>
         </div>
       </TabsContent>
+      {/* To Collect Tabs  */}
       <TabsContent
         value="past-performance"
         className="flex flex-col px-4 lg:px-6"
@@ -631,11 +636,13 @@ export function DataTable({
           <h1>To Collect</h1>
         </div>
       </TabsContent>
+      {/* Pendign Payment Tabs */}
       <TabsContent value="key-personnel" className="flex flex-col px-4 lg:px-6">
         <div className="aspect-video w-full flex-1 rounded-lg border border-dashed">
         <h1>To Payment</h1>
         </div>
       </TabsContent>
+      {/* Focus Document Tabs  */}
       <TabsContent
         value="focus-documents"
         className="flex flex-col px-4 lg:px-6"
@@ -646,181 +653,181 @@ export function DataTable({
   )
 }
 
-const chartData = [
-  { month: "January", desktop: 186, mobile: 80 },
-  { month: "February", desktop: 305, mobile: 200 },
-  { month: "March", desktop: 237, mobile: 120 },
-  { month: "April", desktop: 73, mobile: 190 },
-  { month: "May", desktop: 209, mobile: 130 },
-  { month: "June", desktop: 214, mobile: 140 },
-]
+// const chartData = [
+//   { month: "January", desktop: 186, mobile: 80 },
+//   { month: "February", desktop: 305, mobile: 200 },
+//   { month: "March", desktop: 237, mobile: 120 },
+//   { month: "April", desktop: 73, mobile: 190 },
+//   { month: "May", desktop: 209, mobile: 130 },
+//   { month: "June", desktop: 214, mobile: 140 },
+// ]
 
-const chartConfig = {
-  desktop: {
-    label: "Desktop",
-    color: "var(--primary)",
-  },
-  mobile: {
-    label: "Mobile",
-    color: "var(--primary)",
-  },
-} satisfies ChartConfig
+// const chartConfig = {
+//   desktop: {
+//     label: "Desktop",
+//     color: "var(--primary)",
+//   },
+//   mobile: {
+//     label: "Mobile",
+//     color: "var(--primary)",
+//   },
+// } satisfies ChartConfig
 
-function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
-  const isMobile = useIsMobile()
+// function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
+//   const isMobile = useIsMobile()
 
-  return (
-    <Drawer direction={isMobile ? "bottom" : "right"}>
-      <DrawerTrigger asChild>
-        <Button variant="link" className="text-foreground w-fit px-0 text-left">
-          {item.header}
-        </Button>
-      </DrawerTrigger>
-      <DrawerContent>
-        <DrawerHeader className="gap-1">
-          <DrawerTitle>{item.header}</DrawerTitle>
-          <DrawerDescription>
-            Showing total visitors for the last 6 months
-          </DrawerDescription>
-        </DrawerHeader>
-        <div className="flex flex-col gap-4 overflow-y-auto px-4 text-sm">
-          {!isMobile && (
-            <>
-              <ChartContainer config={chartConfig}>
-                <AreaChart
-                  accessibilityLayer
-                  data={chartData}
-                  margin={{
-                    left: 0,
-                    right: 10,
-                  }}
-                >
-                  <CartesianGrid vertical={false} />
-                  <XAxis
-                    dataKey="month"
-                    tickLine={false}
-                    axisLine={false}
-                    tickMargin={8}
-                    tickFormatter={(value) => value.slice(0, 3)}
-                    hide
-                  />
-                  <ChartTooltip
-                    cursor={false}
-                    content={<ChartTooltipContent indicator="dot" />}
-                  />
-                  <Area
-                    dataKey="mobile"
-                    type="natural"
-                    fill="var(--color-mobile)"
-                    fillOpacity={0.6}
-                    stroke="var(--color-mobile)"
-                    stackId="a"
-                  />
-                  <Area
-                    dataKey="desktop"
-                    type="natural"
-                    fill="var(--color-desktop)"
-                    fillOpacity={0.4}
-                    stroke="var(--color-desktop)"
-                    stackId="a"
-                  />
-                </AreaChart>
-              </ChartContainer>
-              <Separator />
-              <div className="grid gap-2">
-                <div className="flex gap-2 leading-none font-medium">
-                  Trending up by 5.2% this month{" "}
-                  <IconTrendingUp className="size-4" />
-                </div>
-                <div className="text-muted-foreground">
-                  Showing total visitors for the last 6 months. This is just
-                  some random text to test the layout. It spans multiple lines
-                  and should wrap around.
-                </div>
-              </div>
-              <Separator />
-            </>
-          )}
-          <form className="flex flex-col gap-4">
-            <div className="flex flex-col gap-3">
-              <Label htmlFor="header">Header</Label>
-              <Input id="header" defaultValue={item.header} />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-3">
-                <Label htmlFor="type">Type</Label>
-                <Select defaultValue={item.type}>
-                  <SelectTrigger id="type" className="w-full">
-                    <SelectValue placeholder="Select a type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Table of Contents">
-                      Table of Contents
-                    </SelectItem>
-                    <SelectItem value="Executive Summary">
-                      Executive Summary
-                    </SelectItem>
-                    <SelectItem value="Technical Approach">
-                      Technical Approach
-                    </SelectItem>
-                    <SelectItem value="Design">Design</SelectItem>
-                    <SelectItem value="Capabilities">Capabilities</SelectItem>
-                    <SelectItem value="Focus Documents">
-                      Focus Documents
-                    </SelectItem>
-                    <SelectItem value="Narrative">Narrative</SelectItem>
-                    <SelectItem value="Cover Page">Cover Page</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex flex-col gap-3">
-                <Label htmlFor="status">Status</Label>
-                <Select defaultValue={item.status}>
-                  <SelectTrigger id="status" className="w-full">
-                    <SelectValue placeholder="Select a status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Done">Done</SelectItem>
-                    <SelectItem value="In Progress">In Progress</SelectItem>
-                    <SelectItem value="Not Started">Not Started</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-3">
-                <Label htmlFor="target">Target</Label>
-                <Input id="target" defaultValue={item.target} />
-              </div>
-              <div className="flex flex-col gap-3">
-                <Label htmlFor="limit">Limit</Label>
-                <Input id="limit" defaultValue={item.limit} />
-              </div>
-            </div>
-            <div className="flex flex-col gap-3">
-              <Label htmlFor="reviewer">Reviewer</Label>
-              <Select defaultValue={item.reviewer}>
-                <SelectTrigger id="reviewer" className="w-full">
-                  <SelectValue placeholder="Select a reviewer" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Eddie Lake">Eddie Lake</SelectItem>
-                  <SelectItem value="Jamik Tashpulatov">
-                    Jamik Tashpulatov
-                  </SelectItem>
-                  <SelectItem value="Emily Whalen">Emily Whalen</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </form>
-        </div>
-        <DrawerFooter>
-          <Button>Submit</Button>
-          <DrawerClose asChild>
-            <Button variant="outline">Done</Button>
-          </DrawerClose>
-        </DrawerFooter>
-      </DrawerContent>
-    </Drawer>
-  )
-}
+//   return (
+//     <Drawer direction={isMobile ? "bottom" : "right"}>
+//       <DrawerTrigger asChild>
+//         <Button variant="link" className="text-foreground w-fit px-0 text-left">
+//           {item.header}
+//         </Button>
+//       </DrawerTrigger>
+//       <DrawerContent>
+//         <DrawerHeader className="gap-1">
+//           <DrawerTitle>{item.header}</DrawerTitle>
+//           <DrawerDescription>
+//             Showing total visitors for the last 6 months
+//           </DrawerDescription>
+//         </DrawerHeader>
+//         <div className="flex flex-col gap-4 overflow-y-auto px-4 text-sm">
+//           {!isMobile && (
+//             <>
+//               <ChartContainer config={chartConfig}>
+//                 <AreaChart
+//                   accessibilityLayer
+//                   data={chartData}
+//                   margin={{
+//                     left: 0,
+//                     right: 10,
+//                   }}
+//                 >
+//                   <CartesianGrid vertical={false} />
+//                   <XAxis
+//                     dataKey="month"
+//                     tickLine={false}
+//                     axisLine={false}
+//                     tickMargin={8}
+//                     tickFormatter={(value) => value.slice(0, 3)}
+//                     hide
+//                   />
+//                   <ChartTooltip
+//                     cursor={false}
+//                     content={<ChartTooltipContent indicator="dot" />}
+//                   />
+//                   <Area
+//                     dataKey="mobile"
+//                     type="natural"
+//                     fill="var(--color-mobile)"
+//                     fillOpacity={0.6}
+//                     stroke="var(--color-mobile)"
+//                     stackId="a"
+//                   />
+//                   <Area
+//                     dataKey="desktop"
+//                     type="natural"
+//                     fill="var(--color-desktop)"
+//                     fillOpacity={0.4}
+//                     stroke="var(--color-desktop)"
+//                     stackId="a"
+//                   />
+//                 </AreaChart>
+//               </ChartContainer>
+//               <Separator />
+//               <div className="grid gap-2">
+//                 <div className="flex gap-2 leading-none font-medium">
+//                   Trending up by 5.2% this month{" "}
+//                   <IconTrendingUp className="size-4" />
+//                 </div>
+//                 <div className="text-muted-foreground">
+//                   Showing total visitors for the last 6 months. This is just
+//                   some random text to test the layout. It spans multiple lines
+//                   and should wrap around.
+//                 </div>
+//               </div>
+//               <Separator />
+//             </>
+//           )}
+//           <form className="flex flex-col gap-4">
+//             <div className="flex flex-col gap-3">
+//               <Label htmlFor="header">Header</Label>
+//               <Input id="header" defaultValue={item.header} />
+//             </div>
+//             <div className="grid grid-cols-2 gap-4">
+//               <div className="flex flex-col gap-3">
+//                 <Label htmlFor="type">Type</Label>
+//                 <Select defaultValue={item.type}>
+//                   <SelectTrigger id="type" className="w-full">
+//                     <SelectValue placeholder="Select a type" />
+//                   </SelectTrigger>
+//                   <SelectContent>
+//                     <SelectItem value="Table of Contents">
+//                       Table of Contents
+//                     </SelectItem>
+//                     <SelectItem value="Executive Summary">
+//                       Executive Summary
+//                     </SelectItem>
+//                     <SelectItem value="Technical Approach">
+//                       Technical Approach
+//                     </SelectItem>
+//                     <SelectItem value="Design">Design</SelectItem>
+//                     <SelectItem value="Capabilities">Capabilities</SelectItem>
+//                     <SelectItem value="Focus Documents">
+//                       Focus Documents
+//                     </SelectItem>
+//                     <SelectItem value="Narrative">Narrative</SelectItem>
+//                     <SelectItem value="Cover Page">Cover Page</SelectItem>
+//                   </SelectContent>
+//                 </Select>
+//               </div>
+//               <div className="flex flex-col gap-3">
+//                 <Label htmlFor="status">Status</Label>
+//                 <Select defaultValue={item.status}>
+//                   <SelectTrigger id="status" className="w-full">
+//                     <SelectValue placeholder="Select a status" />
+//                   </SelectTrigger>
+//                   <SelectContent>
+//                     <SelectItem value="Done">Done</SelectItem>
+//                     <SelectItem value="In Progress">In Progress</SelectItem>
+//                     <SelectItem value="Not Started">Not Started</SelectItem>
+//                   </SelectContent>
+//                 </Select>
+//               </div>
+//             </div>
+//             <div className="grid grid-cols-2 gap-4">
+//               <div className="flex flex-col gap-3">
+//                 <Label htmlFor="target">Target</Label>
+//                 <Input id="target" defaultValue={item.target} />
+//               </div>
+//               <div className="flex flex-col gap-3">
+//                 <Label htmlFor="limit">Limit</Label>
+//                 <Input id="limit" defaultValue={item.limit} />
+//               </div>
+//             </div>
+//             <div className="flex flex-col gap-3">
+//               <Label htmlFor="reviewer">Reviewer</Label>
+//               <Select defaultValue={item.reviewer}>
+//                 <SelectTrigger id="reviewer" className="w-full">
+//                   <SelectValue placeholder="Select a reviewer" />
+//                 </SelectTrigger>
+//                 <SelectContent>
+//                   <SelectItem value="Eddie Lake">Eddie Lake</SelectItem>
+//                   <SelectItem value="Jamik Tashpulatov">
+//                     Jamik Tashpulatov
+//                   </SelectItem>
+//                   <SelectItem value="Emily Whalen">Emily Whalen</SelectItem>
+//                 </SelectContent>
+//               </Select>
+//             </div>
+//           </form>
+//         </div>
+//         <DrawerFooter>
+//           <Button>Submit</Button>
+//           <DrawerClose asChild>
+//             <Button variant="outline">Done</Button>
+//           </DrawerClose>
+//         </DrawerFooter>
+//       </DrawerContent>
+//     </Drawer>
+//   )
+// }

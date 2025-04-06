@@ -27,12 +27,14 @@ import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 interface Invoice {
   id: string;
   issue_date: string;
-  due_date: string;
+  due_date?: string;
   supplier: string;
   description: string;
   category: string;
   amount: number;
   status: "Paid" | "Unpaid";
+  payment_method: string;
+  notes?: string;
 }
 
 export default function FinancialPage() {
@@ -179,9 +181,9 @@ const markAsPaid = async (id: string) => {
               <TableHead>Supplier</TableHead>
               <TableHead>Description</TableHead>
               <TableHead>Category</TableHead>
+              <TableHead>Method</TableHead>
               <TableHead>Amount</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -192,7 +194,7 @@ const markAsPaid = async (id: string) => {
                   onClick={() => openModal(invoice)}
                   className="cursor-pointer hover:bg-gray-100"
                 >
-              <TableCell>{formatDate(invoice.due_date)}</TableCell>     
+              <TableCell>{formatDate(invoice.due_date ?? '')}</TableCell>     
               <TableCell>
                 {suppliers.find(s => s.id === invoice.supplier)?.name ?? invoice.supplier}
               </TableCell>
@@ -200,31 +202,20 @@ const markAsPaid = async (id: string) => {
               <TableCell>
                 {invoice.category.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}
               </TableCell>
+              <TableCell>{invoice.payment_method}</TableCell>
               <TableCell>R$ {invoice.amount.toFixed(2).replace(".", ",")}</TableCell>
               <TableCell>
-  {invoice.status === "Unpaid" ? (
-    <Button variant="outline" size="sm" onClick={(e) => {
-      e.stopPropagation();
-      markAsPaid(invoice.id);
-    }}>
-      Mark as Paid
-    </Button>
-  ) : (
-    <span className="text-green-600 font-medium">Paid</span>
-  )}
-</TableCell>
-                  <TableCell>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(invoice.id);
-                      }}
-                    >
-                      <Trash className="mr-2 h-4 w-4" /> Delete
-                    </Button>
-                  </TableCell>
+                {invoice.status === "Unpaid" ? (
+                  <Button variant="outline" size="sm" onClick={(e) => {
+                    e.stopPropagation();
+                    markAsPaid(invoice.id);
+                  }}>
+                    Mark as Paid
+                  </Button>
+                ) : (
+                  <span className="text-green-600 font-medium">Paid</span>
+                )}
+              </TableCell>
                 </TableRow>
               ))
             ) : (
@@ -245,11 +236,12 @@ const markAsPaid = async (id: string) => {
               <DialogTitle>Invoice Details</DialogTitle>
             </DialogHeader>
             <div className="space-y-2">
-              <p><strong>Duo Date:</strong> {formatDate(selectedInvoice.due_date)}</p>
+              <p><strong>Duo Date:</strong> {formatDate(selectedInvoice.due_date ?? '')}</p>
               <p><strong>Supplier:</strong> {suppliers.find(s => s.id === selectedInvoice.supplier)?.name ?? selectedInvoice.supplier}</p>
               <p><strong>Description:</strong> {selectedInvoice.description}</p>
               <p><strong>Notes:</strong> {selectedInvoice.notes}</p>
               <p><strong>Category:</strong> {selectedInvoice.category.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}</p>
+              <p><strong>Payment Method:</strong> {selectedInvoice.payment_method}</p>
               <p><strong>Amount:</strong> R$ {selectedInvoice.amount.toFixed(2).replace(".", ",")}</p>
               <p><strong>Status:</strong>   {selectedInvoice.status === "Unpaid" ? (
                   <Button variant="outline" size="sm" onClick={(e) => {
@@ -267,14 +259,14 @@ const markAsPaid = async (id: string) => {
                 variant="destructive"
                 onClick={() => handleDelete(selectedInvoice.id)}
               >
-                <Trash className="mr-2 h-4 w-4" /> Delete
+                <Trash className="h-4 w-4" /> Delete
               </Button>
               <Button
                 onClick={() =>
                   router.push(`/dashboard/financial/${selectedInvoice.id}/edit`)
                 }
               >
-                <Pencil className="mr-2 h-4 w-4" /> Edit Invoice
+                <Pencil className="h-4 w-4" /> Edit Invoice
               </Button>
             </DialogFooter>
           </DialogContent>

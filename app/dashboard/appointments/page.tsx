@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { fetchOrders } from "@/lib/fetchOrders"
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany"
 import { DataTable } from "@/components/data-table" 
+import { Order } from "@/components/types/order"
 
 export default function OrdersPage() {
   const { companyId } = useAuthenticatedCompany()
@@ -18,7 +19,7 @@ export default function OrdersPage() {
     const getData = async () => {
       setLoading(true)
       const data = await fetchOrders(companyId)
-      console.log("orders data:", data) // ✅ Verifica se está vindo algo
+      console.log("orders data:", data) 
       setOrders(data)
       setLoading(false)
     }

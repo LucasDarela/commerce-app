@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { toast } from "sonner";
+import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 
 export default function ResetPasswordPage() {
   const supabase = createClientComponentClient();
@@ -16,7 +17,9 @@ export default function ResetPasswordPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [sessionRestored, setSessionRestored] = useState(false);
 
-  // ✅ Aqui a mágica: aguardar evento de recuperação de senha
+  const { user, companyId, loading } = useAuthenticatedCompany();
+
+  // ✅ Aguarda o evento de recuperação de senha
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
@@ -27,17 +30,17 @@ export default function ResetPasswordPage() {
       }
     );
 
-    // Verifica se a sessão já existe (caso a página seja recarregada após o login)
-    const { user, loading } = useAuthenticatedCompany().then(({ data }) => {
-      if (data.session) {
-        setSessionRestored(true);
-      }
-    });
-
     return () => {
-      authListener.subscription.unsubscribe();
+      authListener?.subscription?.unsubscribe();
     };
-  }, []);
+  }, [supabase]);
+
+  // ✅ Se o usuário já estiver autenticado após reload
+  useEffect(() => {
+    if (!loading && user) {
+      setSessionRestored(true);
+    }
+  }, [loading, user]);
 
   const handleResetPassword = async () => {
     if (newPassword !== confirmPassword) {
