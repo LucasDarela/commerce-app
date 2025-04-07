@@ -14,35 +14,33 @@ export function useAuthenticatedCompany() {
 
   const fetchCompany = useCallback(async () => {
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getUser();
+      const { data, error: userError } = await supabase.auth.getUser();
 
-      if (!session) {
-        console.warn("❌ Sessão ausente.");
+      if (userError || !data?.user) {
+        console.warn("❌ Sessão ausente ou erro ao buscar usuário:", userError?.message);
         setLoading(false);
         return;
       }
 
-      const user = session.user;
-      setUser(user);
+      const currentUser = data.user;
+      setUser(currentUser);
 
-      const { data: companyUser, error } = await supabase
+      const { data: companyUser, error: companyError } = await supabase
         .from("company_users")
         .select("company_id")
-        .eq("user_id", user.id)
+        .eq("user_id", currentUser.id)
         .maybeSingle();
 
-      if (error || !companyUser) {
-        console.error("❌ Erro ao buscar empresa:", error?.message);
+      if (companyError || !companyUser) {
+        console.error("❌ Erro ao buscar empresa:", companyError?.message);
         toast.error("Erro ao carregar empresa do usuário.");
         setLoading(false);
         return;
       }
 
       setCompanyId(companyUser.company_id);
-    } catch (error) {
-      console.error("❌ Erro inesperado no hook useAuthenticatedCompany:", error);
+    } catch (err) {
+      console.error("❌ Erro inesperado no hook useAuthenticatedCompany:", err);
       toast.error("Erro inesperado ao buscar empresa.");
     } finally {
       setLoading(false);
@@ -52,7 +50,6 @@ export function useAuthenticatedCompany() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // ✅ Apenas executa uma vez quando o componente monta
     fetchCompany();
   }, [fetchCompany]);
 

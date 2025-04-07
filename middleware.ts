@@ -8,14 +8,14 @@ export async function middleware(req: NextRequest) {
   const supabase = createMiddlewareClient({ req, res });
 
   const {
-    data: { session },
+    data: { user },
   } = await supabase.auth.getUser();
 
-  if (!session?.user) {
+  if (!user) {
     return NextResponse.redirect(new URL("/login-signin", req.url));
   }
 
-  const userId = session.user.id;
+  const userId = user.id;
 
   // ⚠️ Só executa essa parte para rotas sensíveis (ex: API ou painel de admin)
   const isRestrictedAdminRoute = req.nextUrl.pathname.startsWith("/dashboard/team") || req.nextUrl.pathname.startsWith("/api/users/add-member");

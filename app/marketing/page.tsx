@@ -7,9 +7,9 @@ export default async function LandingPage() {
   const supabase = createServerComponentClient({ cookies });
 
   try {
-    const { data: { session } } = await supabase.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    if (session) {
+    if (user) {
       return redirect("/dashboard");
     }
   } catch (error) {
