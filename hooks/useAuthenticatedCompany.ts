@@ -16,7 +16,7 @@ export function useAuthenticatedCompany() {
     try {
       const {
         data: { session },
-      } = await supabase.auth.getSession();
+      } = await supabase.auth.getUser();
 
       if (!session) {
         console.warn("❌ Sessão ausente.");

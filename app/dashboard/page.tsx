@@ -15,7 +15,7 @@ import data from "./data.json"
 export default async function DashboardPage() {
 
   const supabase = createServerComponentClient({ cookies });
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { session } } = await supabase.auth.getUser();
 
   if (!session?.user) {
     redirect("/login-signin");
