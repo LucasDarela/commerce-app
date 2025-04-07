@@ -11,7 +11,6 @@ import { Pencil, Trash } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 
-// 🔹 Definição do tipo Cliente
 type Cliente = {
   id: number;
   name: string;
@@ -90,7 +89,6 @@ export default function ListCustomers() {
     );
   });
 
-  // 🔹 Abre o modal com os detalhes do cliente
   const openModal = (cliente: Cliente) => {
     setSelectedCliente(cliente);
     setIsModalOpen(true);
@@ -102,7 +100,6 @@ export default function ListCustomers() {
     setIsModalOpen(false);
   };
 
-  // 🔹 Redireciona para edição
   const handleEdit = () => {
     if (selectedCliente) {
       router.push(`/dashboard/customers/${selectedCliente.id}/edit`);
@@ -110,7 +107,6 @@ export default function ListCustomers() {
     }
   };
 
-  // 🔹 Exclui cliente
   const handleDelete = async (id: number) => {
     if (confirm("Tem certeza que deseja excluir este cliente?")) {
       const { error } = await supabase.from("customers").delete().eq("id", id);
@@ -125,8 +121,7 @@ export default function ListCustomers() {
   };
 
   return (
-<div className="p-8">
-
+  <div className="p-8">
       {/* 🔹 Campo de Pesquisa */}
       <div className="mb-4 flex flex-col-2 gap-6">
         <Input
@@ -137,7 +132,7 @@ export default function ListCustomers() {
           className="w-full h-8 p-2 border rounded-md"
         />
                 <Button size="sm" onClick={() => router.push("/dashboard/customers/add")} className="w-full sm:w-auto">
-          Add Customer
+          Adicionar Cliente
         </Button>
       </div>
 
@@ -147,22 +142,22 @@ export default function ListCustomers() {
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
-              <TableHead className="hidden md:table-cell">Type</TableHead>
-              <TableHead className="hidden md:table-cell">Document</TableHead>
-              <TableHead className="hidden md:table-cell">Phone</TableHead>
-              <TableHead className="hidden md:table-cell">City</TableHead>
+              <TableHead className="hidden md:table-cell">Tipo</TableHead>
+              <TableHead className="hidden md:table-cell">Documento</TableHead>
+              <TableHead className="hidden md:table-cell">Telefone</TableHead>
+              <TableHead className="hidden md:table-cell">Cidade</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredClientes.length > 0 ? (
               filteredClientes.map((cliente) => (
-<TableRow
-  key={cliente.id}
-  onClick={() => {
-    openModal(cliente);
-  }}
-  className="cursor-pointer hover:bg-gray-100"
->
+            <TableRow
+              key={cliente.id}
+              onClick={() => {
+                openModal(cliente);
+              }}
+              className="cursor-pointer hover:bg-gray-100 h-[50px]"
+            >
                   <TableCell>{cliente.name}</TableCell>
                   <TableCell className="hidden md:table-cell">{cliente.type}</TableCell>
                   <TableCell className="hidden md:table-cell">{cliente.document}</TableCell>
@@ -173,7 +168,7 @@ export default function ListCustomers() {
             ) : (
               <TableRow>
                 <TableCell colSpan={5} className="text-center">
-                  No customers here...
+                  Nenhum cliente encontrado...
                 </TableCell>
               </TableRow>
             )}
@@ -181,48 +176,47 @@ export default function ListCustomers() {
         </Table>
       </div>
 
-{/* 🔹 Modal de Detalhes do Cliente */}
-{isModalOpen && selectedCliente && (
-  <Dialog open={isModalOpen} onOpenChange={closeModal}>
-    <DialogContent className="max-w-lg w-full" aria-describedby="cliente-modal-description">
-      <DialogHeader>
-        <DialogTitle>Detalhes do Cliente</DialogTitle>
-      </DialogHeader>
-      {/* 🔹 Descrição acessível */}
-      <p id="cliente-modal-description" className="sr-only">
-        Informações detalhadas do cliente selecionado.
-      </p>
-      <div className="space-y-2">
-        <p><strong>Nome:</strong> {selectedCliente.name}</p>
-        {selectedCliente.fantasy_name && <p><strong>Nome Fantasia:</strong> {selectedCliente.fantasy_name}</p>}
-        <p><strong>Tipo:</strong> {selectedCliente.type}</p>
-        <p><strong>Documento:</strong> {selectedCliente.document}</p>
-        <p><strong>Telefone:</strong> {selectedCliente.phone}</p>
-        <p><strong>CEP:</strong> {selectedCliente.zip_code}</p>
-        <p><strong>Endereço:</strong> {[
-          selectedCliente.address,
-          selectedCliente.neighborhood,
-          selectedCliente.number
-        ].filter(Boolean).join(", ")}</p>
-        {selectedCliente.complement && <p><strong>Complemento:</strong> {selectedCliente.complement}</p>}
-        {selectedCliente.complement && <p><strong>Complemento:</strong> {selectedCliente.complement}</p>}
-        <p><strong>Cidade:</strong> {selectedCliente.city}</p>
-        <p><strong>Estado:</strong> {selectedCliente.state}</p>
-        <p><strong>Email:</strong> {selectedCliente.email || ""}</p>
-        {selectedCliente.state_registration && <p><strong>Inscrição Estadual:</strong> {selectedCliente.state_registration}</p>}
-      </div>
-      <DialogFooter className="flex justify-between">
-        <Button variant="destructive" onClick={() => handleDelete(selectedCliente.id)}>
-          <Trash className="mr-2 h-4 w-4" /> Excluir
-        </Button>
-        <Button onClick={handleEdit}>
-          <Pencil className="mr-2 h-4 w-4" /> Editar Cliente
-        </Button>
-      </DialogFooter>
-    </DialogContent>
-  </Dialog>
-)}
-
+      {/* 🔹 Modal de Detalhes do Cliente */}
+      {isModalOpen && selectedCliente && (
+        <Dialog open={isModalOpen} onOpenChange={closeModal}>
+          <DialogContent className="max-w-lg w-full" aria-describedby="cliente-modal-description">
+            <DialogHeader>
+              <DialogTitle>Detalhes do Cliente</DialogTitle>
+            </DialogHeader>
+            {/* 🔹 Descrição acessível */}
+            <p id="cliente-modal-description" className="sr-only">
+              Informações detalhadas do cliente selecionado.
+            </p>
+            <div className="space-y-2">
+              <p><strong>Nome:</strong> {selectedCliente.name}</p>
+              {selectedCliente.fantasy_name && <p><strong>Nome Fantasia:</strong> {selectedCliente.fantasy_name}</p>}
+              <p><strong>Tipo:</strong> {selectedCliente.type}</p>
+              <p><strong>Documento:</strong> {selectedCliente.document}</p>
+              <p><strong>Telefone:</strong> {selectedCliente.phone}</p>
+              <p><strong>CEP:</strong> {selectedCliente.zip_code}</p>
+              <p><strong>Endereço:</strong> {[
+                selectedCliente.address,
+                selectedCliente.neighborhood,
+                selectedCliente.number
+              ].filter(Boolean).join(", ")}</p>
+              {selectedCliente.complement && <p><strong>Complemento:</strong> {selectedCliente.complement}</p>}
+              {selectedCliente.complement && <p><strong>Complemento:</strong> {selectedCliente.complement}</p>}
+              <p><strong>Cidade:</strong> {selectedCliente.city}</p>
+              <p><strong>Estado:</strong> {selectedCliente.state}</p>
+              <p><strong>Email:</strong> {selectedCliente.email || ""}</p>
+              {selectedCliente.state_registration && <p><strong>Inscrição Estadual:</strong> {selectedCliente.state_registration}</p>}
+            </div>
+            <DialogFooter className="flex justify-between">
+              <Button onClick={handleEdit}>
+                <Pencil className="h-4 w-4" /> Editar
+              </Button>
+              <Button variant="destructive" onClick={() => handleDelete(selectedCliente.id)}>
+                <Trash className="h-4 w-4" />
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

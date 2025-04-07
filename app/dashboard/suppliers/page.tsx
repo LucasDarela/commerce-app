@@ -116,7 +116,7 @@ export default function ListSuppliers() {
           className="w-full h-8 p-2 border rounded-md"
         />
         <Button size="sm" onClick={() => router.push("/dashboard/suppliers/add")} className="w-full sm:w-auto">
-          Add Supplier
+          Adicionar Fornecedor
         </Button>
       </div>
 
@@ -124,17 +124,17 @@ export default function ListSuppliers() {
         <Table className="w-full">
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead className="hidden md:table-cell">Type</TableHead>
-              <TableHead className="hidden md:table-cell">Document</TableHead>
-              <TableHead className="hidden md:table-cell">Phone</TableHead>
-              <TableHead className="hidden md:table-cell">City</TableHead>
+              <TableHead>Nome</TableHead>
+              <TableHead className="hidden md:table-cell">Tipo</TableHead>
+              <TableHead className="hidden md:table-cell">Documento</TableHead>
+              <TableHead className="hidden md:table-cell">Telefone</TableHead>
+              <TableHead className="hidden md:table-cell">Cidade</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredSuppliers.length > 0 ? (
               filteredSuppliers.map((supplier) => (
-                <TableRow key={supplier.id} onClick={() => openModal(supplier)} className="cursor-pointer hover:bg-gray-100">
+                <TableRow key={supplier.id} onClick={() => openModal(supplier)} className="cursor-pointer hover:bg-gray-100 h-[50px]">
                   <TableCell>{supplier.name}</TableCell>
                   <TableCell className="hidden md:table-cell">{supplier.type}</TableCell>
                   <TableCell className="hidden md:table-cell">{supplier.document}</TableCell>
@@ -145,7 +145,7 @@ export default function ListSuppliers() {
             ) : (
               <TableRow>
                 <TableCell colSpan={5} className="text-center">
-                  No suppliers found
+                  Nenhum fornecedor encontrado.
                 </TableCell>
               </TableRow>
             )}
@@ -157,32 +157,32 @@ export default function ListSuppliers() {
         <Dialog open={isModalOpen} onOpenChange={closeModal}>
           <DialogContent className="max-w-lg w-full">
             <DialogHeader>
-              <DialogTitle>Supplier Details</DialogTitle>
+              <DialogTitle>Detalhes do Fornecedor</DialogTitle>
             </DialogHeader>
             <div className="space-y-2">
-              <p><strong>Name:</strong> {selectedSupplier.name}</p>
-              {selectedSupplier.fantasy_name && <p><strong>Fantasy Name:</strong> {selectedSupplier.fantasy_name}</p>}
-              <p><strong>Type:</strong> {selectedSupplier.type}</p>
-              <p><strong>Document:</strong> {selectedSupplier.document}</p>
-              <p><strong>Phone:</strong> {selectedSupplier.phone}</p>
-              <p><strong>ZIP Code:</strong> {selectedSupplier.zip_code}</p>
-              <p><strong>Address:</strong> {[
+              <p><strong>Nome:</strong> {selectedSupplier.name}</p>
+              {selectedSupplier.fantasy_name && <p><strong>Nome Fantasia:</strong> {selectedSupplier.fantasy_name}</p>}
+              <p><strong>Tipo:</strong> {selectedSupplier.type}</p>
+              <p><strong>Documento:</strong> {selectedSupplier.document}</p>
+              <p><strong>Telefone:</strong> {selectedSupplier.phone}</p>
+              <p><strong>CEP:</strong> {selectedSupplier.zip_code}</p>
+              <p><strong>Endereço:</strong> {[
                 selectedSupplier.address,
                 selectedSupplier.neighborhood,
                 selectedSupplier.number
               ].filter(Boolean).join(", ")}</p>
-              {selectedSupplier.complement && <p><strong>Complement:</strong> {selectedSupplier.complement}</p>}
-              <p><strong>City:</strong> {selectedSupplier.city}</p>
-              <p><strong>State:</strong> {selectedSupplier.state}</p>
+              {selectedSupplier.complement && <p><strong>Complemento:</strong> {selectedSupplier.complement}</p>}
+              <p><strong>Cidade:</strong> {selectedSupplier.city}</p>
+              <p><strong>Estado:</strong> {selectedSupplier.state}</p>
               <p><strong>Email:</strong> {selectedSupplier.email || ""}</p>
-              {selectedSupplier.state_registration && <p><strong>State Registration:</strong> {selectedSupplier.state_registration}</p>}
+              {selectedSupplier.state_registration && <p><strong>Inscrição Estadual:</strong> {selectedSupplier.state_registration}</p>}
             </div>
             <DialogFooter className="flex justify-between">
-              <Button variant="destructive" onClick={() => handleDelete(selectedSupplier.id)}>
-                <Trash className="mr-2 h-4 w-4" /> Delete
+            <Button onClick={handleEdit}>
+                <Pencil className="h-4 w-4" /> Editar
               </Button>
-              <Button onClick={handleEdit}>
-                <Pencil className="mr-2 h-4 w-4" /> Edit Supplier
+              <Button variant="destructive" onClick={() => handleDelete(selectedSupplier.id)}>
+                <Trash className="h-4 w-4" />
               </Button>
             </DialogFooter>
           </DialogContent>

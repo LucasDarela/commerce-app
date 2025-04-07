@@ -52,32 +52,32 @@ const data = {
       icon: IconDashboard,
     },
     {
-      title: "Customers",
+      title: "Clientes",
       url: "/dashboard/customers",
       icon: IconUsers,
     },
     {
-      title: "Products",
+      title: "Produtos",
       url: "/dashboard/products",
       icon: IconPackage,
     },
     {
-      title: "Suppliers",
+      title: "Fornecedores",
       url: "/dashboard/suppliers",
       icon: IconUserCog,
     },
     {
-      title: "Financial",
+      title: "Financeiro",
       url: "/dashboard/financial",
       icon: IconBuildingBank,
     },
     {
-      title: "Orders",
+      title: "Vendas",
       url: "/dashboard/orders",
       icon: IconShoppingCart,
     },
     {
-      title: "Analytics",
+      title: "Relatórios",
       url: "/dashboard/analytics",
       icon: IconChartBar,
     },
@@ -85,12 +85,12 @@ const data = {
 
   navSecondary: [
     {
-      title: "Settings",
+      title: "Configurações",
       url: "/dashboard/settings",
       icon: IconSettings,
     },
     {
-      title: "Get Help",
+      title: "Ajuda",
       url: "/dashboard/help",
       icon: IconHelp,
     },

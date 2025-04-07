@@ -138,7 +138,7 @@ export default function AddProduct() {
 
   return (
     <div className="max-w-3xl mx-auto p-6 rounded-lg shadow-md">
-      <h1 className="text-2xl font-bold mb-4">Add Product</h1>
+      <h1 className="text-2xl font-bold mb-4">Adicionar Produto</h1>
 
       <Card className="mb-6">
         <CardContent className="p-4 flex flex-col items-center">
@@ -147,7 +147,7 @@ export default function AddProduct() {
               <img src={imagePreview} alt="Preview" className="h-40 object-cover rounded-lg shadow-md" />
             ) : (
               <div className="h-40 w-full flex items-center justify-center border-2 border-dashed border-gray-300 rounded-lg">
-                <span className="text-gray-500">Click to upload image</span>
+                <span className="text-gray-500">Clique para adicionar imagem</span>
               </div>
             )}
           </label>
@@ -158,49 +158,49 @@ export default function AddProduct() {
       <Card>
         <CardContent className="p-6 space-y-4">
           <div className="grid grid-cols-3 gap-4">
-            <Input type="text" name="code" value={product.code} onChange={handleChange} placeholder="Product Code" required />
-            <Input type="text" name="name" value={product.name} onChange={handleChange} placeholder="Product Name" className="col-span-2" required />
+            <Input type="text" name="code" value={product.code} onChange={handleChange} placeholder="Código do Produto" required />
+            <Input type="text" name="name" value={product.name} onChange={handleChange} placeholder="Nome do Produto" className="col-span-2" required />
           </div>
 
           <div className="grid grid-cols-3 gap-4">
-            <Input type="text" name="standard_price" value={product.standard_price} onChange={handleChange} placeholder="Standard Price (R$)" required />
-            <Input type="text" name="manufacturer" value={product.manufacturer} onChange={handleChange} placeholder="Manufacturer" />
-            <Input type="text" name="percentage_taxes" value={product.percentage_taxes} onChange={handleChange} placeholder="Taxes (%)" />
+            <Input type="text" name="standard_price" value={product.standard_price} onChange={handleChange} placeholder="Preço (R$)" required />
+            <Input type="text" name="manufacturer" value={product.manufacturer} onChange={handleChange} placeholder="Fabricante" />
+            <Input type="text" name="percentage_taxes" value={product.percentage_taxes} onChange={handleChange} placeholder="Taxas (%)" />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <Select value={product.material_class} onValueChange={(value) => handleSelectChange("material_class", value)}>
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Material Class" />
+                <SelectValue placeholder="Classe do Material" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Beer">Beer</SelectItem>
-                <SelectItem value="Equipment">Equipment</SelectItem>
-                <SelectItem value="Accessory">Accessory</SelectItem>
+                <SelectItem value="Beer">Chopp</SelectItem>
+                <SelectItem value="Equipment">Equipmento</SelectItem>
+                <SelectItem value="Accessory">Acessorio</SelectItem>
               </SelectContent>
             </Select>
-            <Input type="text" name="submaterial_class" value={product.submaterial_class} onChange={handleChange} placeholder="Sub Class" />
+            <Input type="text" name="submaterial_class" value={product.submaterial_class} onChange={handleChange} placeholder="Sub Classe" />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <Input type="text" name="tax_classification" value={product.tax_classification} onChange={handleChange} placeholder="Tax Classification" />
+            <Input type="text" name="tax_classification" value={product.tax_classification} onChange={handleChange} placeholder="Classificação Tributária" />
             <Select value={product.material_origin} onValueChange={(value) => handleSelectChange("material_origin", value)}>
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Material Origin" />
+                <SelectValue placeholder="Origem do Produto" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="National">National</SelectItem>
-                <SelectItem value="Imported">Imported</SelectItem>
+                <SelectItem value="Imported">Importado</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          <Textarea name="aplication" value={product.aplication} onChange={handleChange} placeholder="Product Aplication" />
+          <Textarea name="aplication" value={product.aplication} onChange={handleChange} placeholder="Aplicação do Produto" />
 
-          <Input type="text" name="loan_product_code" value={product.loan_product_code} onChange={handleChange} placeholder="Loan Product Code (Optional)" />
+          <Input type="text" name="loan_product_code" value={product.loan_product_code} onChange={handleChange} placeholder="Produto Vinculado (Opcional)" />
 
           <Button className="w-full" onClick={handleSubmit} disabled={loading || submitting}>
-            {submitting ? "Saving..." : "Save Product"}
+            {submitting ? "Savando..." : "Salvar Produto"}
           </Button>
         </CardContent>
       </Card>

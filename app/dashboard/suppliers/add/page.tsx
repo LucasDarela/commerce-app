@@ -33,18 +33,18 @@ export default function AddSupplier() {
 
   const placeholders: Record<string, string> = {
     document: "CNPJ/CPF",
-    name: "Company Name / Full Name",
-    fantasy_name: "Trade Name",
-    zip_code: "ZIP Code",
-    address: "Address",
-    neighborhood: "Neighborhood",
-    city: "City",
-    state: "State",
-    number: "Number",
-    complement: "Complement",
-    phone: "Phone",
-    email: "Email (Optional)",
-    state_registration: "State Registration",
+    name: "Razão Social / Nome Completo",
+    fantasy_name: "Nome Fanstasia",
+    zip_code: "CEP",
+    address: "Endereço",
+    neighborhood: "Bairro",
+    city: "Cidade",
+    state: "Estado",
+    number: "Numbero",
+    complement: "Complemento",
+    phone: "Telefone",
+    email: "Email (Opcional)",
+    state_registration: "Inscrição Estadual",
   };
 
   const formatUpper = (value: string, field: string) =>
@@ -154,7 +154,7 @@ export default function AddSupplier() {
   return (
     <div className="max-w-3xl mx-auto w-full px-4 py-6 rounded-lg shadow-md">
       <div className="flex gap-2 items-center justify-center">
-        <h1 className="text-2xl font-bold mb-4">Add Supplier</h1>
+        <h1 className="text-2xl font-bold mb-4">Adicionar Fornecedor</h1>
       </div>
 
       {/* 🔹 Campos do formulário */}
@@ -179,7 +179,7 @@ export default function AddSupplier() {
       })}
 
       <Button className="mt-4 w-full" onClick={handleSubmit}>
-        Save Supplier
+        Salvar
       </Button>
     </div>
   );

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Loader2 } from "lucide-react"
 import {
   Select,
   SelectTrigger,
@@ -46,6 +47,7 @@ export default function EditFinancialRecord() {
   const [dueDate, setDueDate] = useState<string>("");
   const [issueDate, setIssueDate] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
+  const [invoiceNumber, setInvoiceNumber] = useState<string>("");
 
   useEffect(() => {
     const loadInvoice = async () => {
@@ -140,6 +142,7 @@ export default function EditFinancialRecord() {
       toast.error("Failed to update record: " + error.message);
     } else {
       toast.success("Record updated successfully!");
+      router.push("/dashboard/financial"); 
     }
   };
 
@@ -162,15 +165,26 @@ export default function EditFinancialRecord() {
     return parts.join("/");
   };
 
+  const [loading, setLoading] = useState(false)
+
+  const handleClick = async () => {
+    setLoading(true)
+
+    // Simula uma chamada assíncrona
+    await new Promise((resolve) => setTimeout(resolve, 2000))
+
+    setLoading(false)
+  }
+
   return (
     <div className="max-w-3xl mx-auto p-6 rounded-lg shadow-md">
-  <h1 className="text-2xl font-bold mb-4">Edit Financial Record</h1>
+  <h1 className="text-2xl font-bold mb-4">Editar Nota Financeira</h1>
 
   {/* Bank account */}
   <div className="w-full">
     <Select value={selectedAccount} onValueChange={setSelectedAccount}>
       <SelectTrigger className="w-full">
-        <SelectValue placeholder="Select bank account" />
+        <SelectValue placeholder="Selecione uma conta bancária" />
       </SelectTrigger>
       <SelectContent>
         {bankAccounts.map((acc) => (
@@ -184,31 +198,31 @@ export default function EditFinancialRecord() {
 
   {/* Dates and invoice number */}
   <div className="grid grid-cols-3 gap-4 mt-4">
-    <Input placeholder="Issue Date" value={issueDate} onChange={(e) => setIssueDate(formatDate(e.target.value))} />
-    <Input placeholder="Due Date" value={dueDate} onChange={(e) => setDueDate(formatDate(e.target.value))} />
-    <Input placeholder="Invoice Number (optional)" />
+  <Input placeholder="Data de Emissão" value={issueDate} onChange={(e) => setIssueDate(formatDate(e.target.value))} />
+    <Input placeholder="Data de Vencimento" value={dueDate} onChange={(e) => setDueDate(formatDate(e.target.value))} />
+    <Input placeholder="Numero da Nota (opcional)" value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} />
   </div>
 
   {/* Category and Supplier */}
   <div className="grid grid-cols-2 gap-4 mt-4">
     <Select value={selectedCategory} onValueChange={setSelectedCategory}>
       <SelectTrigger className="w-full">
-        <SelectValue placeholder="Select category" />
+        <SelectValue placeholder="Selecione a categoria" />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="product_purchase">Product Purchase</SelectItem>
-        <SelectItem value="employee_payment">Employee Payment</SelectItem>
-        <SelectItem value="employee_advance">Employee Advance</SelectItem>
-        <SelectItem value="utilities">Utilities</SelectItem>
-        <SelectItem value="rent">Rent</SelectItem>
-        <SelectItem value="vehicle_expenses">Vehicle Expenses</SelectItem>
-        <SelectItem value="others">+ Custom</SelectItem>
+        <SelectItem value="product_purchase">Compra de Produto</SelectItem>
+        <SelectItem value="employee_payment">Pagamento Funcionário</SelectItem>
+        <SelectItem value="employee_advance">Vale Funcionário</SelectItem>
+        <SelectItem value="utilities">Utilidades</SelectItem>
+        <SelectItem value="rent">Aluguel</SelectItem>
+        <SelectItem value="vehicle_expenses">Gastos com Veículos</SelectItem>
+        <SelectItem value="others">+ Personalizado</SelectItem>
       </SelectContent>
     </Select>
 
     <Select value={selectedSupplier} onValueChange={setSelectedSupplier}>
       <SelectTrigger className="w-full">
-        <SelectValue placeholder="Select supplier" />
+      <SelectValue placeholder="Selecione um Fornecedor" />
       </SelectTrigger>
       <SelectContent>
         {suppliers.map((supplier) => (
@@ -223,7 +237,7 @@ export default function EditFinancialRecord() {
   {/* Custom category if 'others' */}
   {selectedCategory === "others" && (
     <Input
-      placeholder="Enter custom category"
+      placeholder="Digite uma Categoria Pesonalizada"
       value={customCategory}
       onChange={(e) => setCustomCategory(e.target.value)}
       className="mt-4"
@@ -234,18 +248,18 @@ export default function EditFinancialRecord() {
   <div className="grid grid-cols-2 gap-4 mt-4">
     <Select value={paymentMethod} onValueChange={setPaymentMethod}>
       <SelectTrigger className="w-full">
-        <SelectValue placeholder="Payment method" />
+      <SelectValue placeholder="Método de pagamento" />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="cash">Cash</SelectItem>
+        <SelectItem value="cash">Dinheiro</SelectItem>
         <SelectItem value="pix">Pix</SelectItem>
-        <SelectItem value="card">Card</SelectItem>
+        <SelectItem value="card">Cartão</SelectItem>
         <SelectItem value="boleto">Boleto</SelectItem>
       </SelectContent>
     </Select>
 
     <Input
-      placeholder="Amount"
+      placeholder="Valor"
       type="number"
       value={amount}
       onChange={(e) => setAmount(Number(e.target.value) || "")}
@@ -265,7 +279,7 @@ export default function EditFinancialRecord() {
 
   {/* Description */}
   <Input
-    placeholder="Description"
+    placeholder="Descrição"
     value={description}
     onChange={(e) => setDescription(e.target.value)}
     className="mt-4"
@@ -273,15 +287,16 @@ export default function EditFinancialRecord() {
 
   {/* Notes */}
   <textarea
-    placeholder="Notes (optional)"
+    placeholder="Notas (opcional)"
     value={notes}
     onChange={(e) => setNotes(e.target.value)}
     className="mt-4 w-full h-32 p-2 border rounded-md resize-none"
   ></textarea>
 
   {/* Submit button */}
-  <Button className="mt-4 w-full bg-blue-600 hover:bg-blue-700" onClick={handleUpdate}>
-    Update Record
+  <Button className="mt-4 w-full" onClick={handleUpdate} disabled={loading}>
+  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+  {loading ? "Atualizando..." : "Atualizar Nota"}
   </Button>
 </div>
   );

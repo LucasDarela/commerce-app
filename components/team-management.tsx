@@ -54,12 +54,14 @@ export default function TeamManagementPage() {
 
       if (!error && data) {
         setTeamMembers(
-          data.map((item: any) => ({
-            id: item.profiles.id,
-            email: item.profiles.email,
-            role: item.role,
-            isBlocked: false, // default value for now
-          }))
+          data
+            .filter((item: any) => item.profiles) // opcional
+            .map((item: any) => ({
+              id: item.profiles?.id ?? "",
+              email: item.profiles?.email ?? "",
+              role: item.role,
+              isBlocked: false,
+            }))
         );
       }
     };

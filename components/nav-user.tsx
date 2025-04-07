@@ -101,21 +101,21 @@ export function NavUser({
             <DropdownMenuGroup>
               <DropdownMenuItem onClick={() => router.push("/dashboard/account")}>
                 <IconUserCircle className="mr-2 h-4 w-4" />
-                Account
+                Conta
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => router.push("/dashboard/billing")}>
                 <IconCreditCard className="mr-2 h-4 w-4" />
-                Billing
+                Pagamento
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => router.push("/dashboard/notifications")}>
                 <IconNotification className="mr-2 h-4 w-4" />
-                Notifications
+                Notificações
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout}>
               <IconLogout className="mr-2 h-4 w-4" />
-              Log out
+              Sair
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

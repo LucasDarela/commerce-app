@@ -136,7 +136,7 @@ export default function ListProduct() {
           className="w-full h-8 p-2 border rounded-md"
         />
         <Button size="sm" onClick={() => router.push("/dashboard/products/add")} className="w-full sm:w-auto">
-          Add Product
+          Adicionar Produto
         </Button>
       </div>
 
@@ -144,12 +144,12 @@ export default function ListProduct() {
         <Table>
           <TableHeader>
             <TableRow className="hidden sm:table-row">
-              <TableHead>Code</TableHead>
-              <TableHead>Name</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead>Price</TableHead>
-              <TableHead>Stock</TableHead>
-              <TableHead>Loan Code</TableHead>
+              <TableHead>Código</TableHead>
+              <TableHead>Nome</TableHead>
+              <TableHead>Categoria</TableHead>
+              <TableHead>Preço</TableHead>
+              <TableHead>Estoque</TableHead>
+              <TableHead>Comodato</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -158,7 +158,7 @@ export default function ListProduct() {
                 <TableRow
                   key={product.id}
                   onClick={() => openModal(product)}
-                  className="cursor-pointer hover:bg-gray-100"
+                  className="cursor-pointer hover:bg-gray-100 h-[50px]"
                 >
                   <TableCell>{product.code}</TableCell>
                   <TableCell>{product.name}</TableCell>
@@ -183,7 +183,7 @@ export default function ListProduct() {
         <Dialog open={isModalOpen} onOpenChange={closeModal}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Product Details</DialogTitle>
+              <DialogTitle>Detalhes do Produto</DialogTitle>
             </DialogHeader>
             <div className="space-y-2">
               {selectedProduct.image_url && (
@@ -195,25 +195,25 @@ export default function ListProduct() {
                   />
                 </Card>
               )}
-              <p><strong>Code:</strong> {selectedProduct.code}</p>
-              <p><strong>Name:</strong> {selectedProduct.name}</p>
-              <p><strong>Manufacturer:</strong> {selectedProduct.manufacturer}</p>
-              <p><strong>Price:</strong> {selectedProduct.standard_price}</p>
-              <p><strong>Taxes:</strong> {selectedProduct.percentage_taxes}</p>
-              <p><strong>Class:</strong> {selectedProduct.material_class}</p>
-              <p><strong>Subclass:</strong> {selectedProduct.submaterial_class}</p>
-              <p><strong>Tax Classification:</strong> {selectedProduct.tax_classification}</p>
-              <p><strong>Origin:</strong> {selectedProduct.material_origin}</p>
-              <p><strong>Application:</strong> {selectedProduct.aplication}</p>
-              <p><strong>Stock:</strong> {selectedProduct.stock}</p>
-              <p><strong>Loan Code:</strong> {selectedProduct.loan_product_code}</p>
+              <p><strong>Codigo:</strong> {selectedProduct.code}</p>
+              <p><strong>Nome:</strong> {selectedProduct.name}</p>
+              <p><strong>Fabricante:</strong> {selectedProduct.manufacturer}</p>
+              <p><strong>Preço:</strong> {selectedProduct.standard_price}</p>
+              <p><strong>Taxas:</strong> {selectedProduct.percentage_taxes}</p>
+              <p><strong>Classe:</strong> {selectedProduct.material_class}</p>
+              <p><strong>Subclasse:</strong> {selectedProduct.submaterial_class}</p>
+              <p><strong>Classificação Tributária:</strong> {selectedProduct.tax_classification}</p>
+              <p><strong>Origem:</strong> {selectedProduct.material_origin}</p>
+              <p><strong>Aplicação:</strong> {selectedProduct.aplication}</p>
+              <p><strong>Estoque:</strong> {selectedProduct.stock}</p>
+              <p><strong>Comodato:</strong> {selectedProduct.loan_product_code}</p>
             </div>
             <DialogFooter className="flex justify-between">
-              <Button variant="destructive" onClick={() => handleDelete(selectedProduct.id)}>
-                <Trash className="mr-2 h-4 w-4" /> Delete
+            <Button onClick={handleEdit}>
+                <Pencil className="h-4 w-4" /> Editar
               </Button>
-              <Button onClick={handleEdit}>
-                <Pencil className="mr-2 h-4 w-4" /> Edit
+              <Button variant="destructive" onClick={() => handleDelete(selectedProduct.id)}>
+                <Trash className="h-4 w-4" />
               </Button>
             </DialogFooter>
           </DialogContent>

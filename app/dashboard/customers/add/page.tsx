@@ -224,7 +224,7 @@ export default function CreateClient() {
   return (
 <div className="max-w-3xl mx-auto w-full px-4 py-6 rounded-lg shadow-md">
   <div  className="flex gap-2 items-center justify-center">
-      <h1 className="text-2xl font-bold mb-4">Create Customer</h1>
+      <h1 className="text-2xl font-bold mb-4">Adicionar Cliente</h1>
   </div>
       {/* 🔹 Botões para selecionar CPF ou CNPJ */}
       <div className="flex gap-2 mb-6 items-center justify-center">

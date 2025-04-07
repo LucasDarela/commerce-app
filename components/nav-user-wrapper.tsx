@@ -39,7 +39,7 @@ export default function NavUserWrapper() {
     fetchUserData();
   }, []);
 
-  if (!userData) return null; // ou um loading spinner
+  if (!userData) return null; 
 
   return <NavUser user={userData} />;
 }
