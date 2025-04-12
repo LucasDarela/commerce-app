@@ -27,6 +27,7 @@ import {
   IconInvoice,
   IconCalendarSmile,
   IconBuildingBank,
+  IconBarrel,
 } from "@tabler/icons-react"
 
 import { NavDocuments } from "@/components/nav-documents"
@@ -42,6 +43,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
+import NavDocumentsSidebar from "./nav-documents-sidebar"
 
 const data = {
 
@@ -57,14 +59,19 @@ const data = {
       icon: IconUsers,
     },
     {
+      title: "Fornecedores",
+      url: "/dashboard/suppliers",
+      icon: IconUserCog,
+    },
+    {
       title: "Produtos",
       url: "/dashboard/products",
       icon: IconPackage,
     },
     {
-      title: "Fornecedores",
-      url: "/dashboard/suppliers",
-      icon: IconUserCog,
+      title: "Equipamentos",
+      url: "/dashboard/equipments",
+      icon: IconBarrel,
     },
     {
       title: "Financeiro",
@@ -116,6 +123,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} />
+        <NavDocumentsSidebar />
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>

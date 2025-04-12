@@ -31,6 +31,7 @@ interface Customer {
   number: string;         
   complement?: string;
   email?: string;
+  price_table_id?: string;
 }
 
 interface Product {
@@ -54,6 +55,7 @@ export default function AddOrder() {
   const [standardPrice, setStandardPrice] = useState<number | "">("");
   const [freight, setFreight] = useState<number>(0);
   const [items, setItems] = useState<any[]>([]);
+  const [catalogPrices, setCatalogPrices] = useState<Record<string, number>>({})
   const [appointment, setAppointment] = useState({
     date: undefined as Date | undefined,
     hour: "",
@@ -96,11 +98,31 @@ export default function AddOrder() {
       )
     : [];
 
-  const handleSelectCustomer = (customer: Customer) => {
+  const handleSelectCustomer = async (customer: Customer) => {
     setSelectedCustomer(customer);
     setOrder((prev) => ({ ...prev, customer_id: customer.id }));
     setSearchCustomer(customer.name);
     setShowCustomers(false);
+    if (customer.price_table_id) {
+      const { data, error } = await supabase
+        .from("price_table_products")
+        .select("product_id, price")
+        .eq("price_table_id", customer.price_table_id);
+  
+      if (error) {
+        console.error("Erro ao buscar preços do catálogo:", error.message);
+        toast.error("Erro ao buscar preços do catálogo");
+        setCatalogPrices({});
+      } else {
+        const pricesMap: Record<string, number> = {};
+        data.forEach((item) => {
+          pricesMap[item.product_id] = item.price;
+        });
+        setCatalogPrices(pricesMap);
+      }
+    } else {
+      setCatalogPrices({});
+    }
   };
 
   const addItem = () => {
@@ -165,6 +187,7 @@ export default function AddOrder() {
       appointment_date: appointment.date ? format(appointment.date, "yyyy-MM-dd") : null,
       appointment_hour: appointment.hour,
       appointment_local: appointment.location,
+      company_id: companyId,
       created_at: new Date().toISOString(),
     };
   
@@ -188,7 +211,7 @@ export default function AddOrder() {
       quantity: item.quantity,
       price: item.standard_price,
     }));
-  
+    console.log("🚀 Dados enviados para orders:", newOrder)
     const { error: itemError } = await supabase.from("order_items").insert(orderItems);
   
     if (itemError) {
@@ -259,9 +282,15 @@ export default function AddOrder() {
           />
         </div>
 
+        </CardContent>
+        </Card>
+
+        <Card className="mb-6">
+        <CardContent>
+
           {/* Customer Info */}
           <h2 className="text-xl font-bold mb-4">Customer Info</h2>
-          <div className="grid grid-cols-5 gap-4">
+          <div className="grid grid-cols-5 gap-4 mb-4">
           <div className="col-span-4 relative">
             <Input
               type="text"
@@ -318,7 +347,11 @@ export default function AddOrder() {
                 const product = products.find((p) => p.id.toString() === value);
                 if (product) {
                   setSelectedProduct(product);
-                  setStandardPrice(typeof product.standard_price === "number" ? product.standard_price : 0);
+
+                  const catalogPrice = catalogPrices[product.id];
+                  setStandardPrice(
+                    typeof catalogPrice === "number" ? catalogPrice : product.standard_price
+                  );
                 }
               }}
             >
@@ -433,9 +466,15 @@ export default function AddOrder() {
               ))}
             </TableBody>
           </Table>
+
+          </CardContent>
+          </Card>
   
+
           {/* Appointment Info */}
-          <div className="mt-20">
+          <Card>
+          <CardContent>
+          <div>
             <h2 className="text-xl font-bold mb-4">Delivery Appointment</h2>
             <div className="grid grid-cols-3 gap-4">
             <Popover>
@@ -446,14 +485,15 @@ export default function AddOrder() {
                   </Button>
                 </PopoverTrigger>
 
-                <PopoverContent className="w-[300px] shadow-lg rounded-md p-2 z-50 border border-gray-200" align="center" side="bottom">
+                <PopoverContent className="w-[260px] shadow-lg rounded-md p-2 z-50 border border-gray-200" align="center" side="bottom">
                   <DatePicker
                     selected={appointment.date}
                     onChange={(date: Date | null) =>
                       setAppointment((prev) => ({ ...prev, date: date || undefined }))
                     }
                     dateFormat="dd/MM/yyyy"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm"
+                    className="hidden"
+                    inline
                   />
                 </PopoverContent>
               </Popover>
@@ -474,7 +514,7 @@ export default function AddOrder() {
             </div>
           </div>
   
-          <div className="grid grid-cols-3 gap-4 items-center">
+          <div className="grid grid-cols-3 gap-4 items-center mt-4">
           <Input
               type="number"
               placeholder="Freight"
@@ -486,8 +526,8 @@ export default function AddOrder() {
               {loading ? "Saving..." : "Submit Order"}
             </Button>
           </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+          </Card>
     </div>
   );
   };

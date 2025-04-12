@@ -174,9 +174,9 @@ export default function AddProduct() {
                 <SelectValue placeholder="Classe do Material" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Beer">Chopp</SelectItem>
-                <SelectItem value="Equipment">Equipmento</SelectItem>
-                <SelectItem value="Accessory">Acessorio</SelectItem>
+                <SelectItem value="CHOPP">CHOPP</SelectItem>
+                <SelectItem value="EQUIPAMENTO">EQUIPAMENTO</SelectItem>
+                <SelectItem value="ACESSORIO">ACESSORIO</SelectItem>
               </SelectContent>
             </Select>
             <Input type="text" name="submaterial_class" value={product.submaterial_class} onChange={handleChange} placeholder="Sub Classe" />

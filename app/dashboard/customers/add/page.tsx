@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
@@ -8,6 +8,14 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
+import { Checkbox } from "@/components/ui/checkbox"
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select"
 
 const initialCliente = {
   type: "CPF",
@@ -120,7 +128,7 @@ export default function CreateClient() {
     try {
       const { data } = await axios.get(`/api/cnpj?cnpj=${cnpjLimpo}`);
   
-      if (data) {
+      if (data && (data.nome || data.razao_social)) {
         setCliente((prev) => ({
           ...prev,
           name: formatarMaiusculo(data.nome || "", "name"),
@@ -183,7 +191,6 @@ export default function CreateClient() {
       toast.error("Erro ao identificar a empresa do usuário!");
       return;
     }
-  
     // 🔹 Verificar duplicidade correta (ajustado para usar company_id)
     const { data: clienteExistente, error: consultaError } = await supabase
       .from("customers")
@@ -205,6 +212,7 @@ export default function CreateClient() {
     const { error } = await supabase.from("customers").insert([
       {
         ...cliente,
+        price_table_id: selectedCatalog || null,
         company_id: companyId, 
       },
     ]);
@@ -220,6 +228,28 @@ export default function CreateClient() {
       router.refresh();
     }
   };
+
+  const [catalogs, setCatalogs] = useState<{ id: string; name: string }[]>([])
+  const [selectedCatalog, setSelectedCatalog] = useState<string>("")
+
+  useEffect(() => {
+    const fetchCatalogs = async () => {
+      if (!companyId) return
+  
+      const { data, error } = await supabase
+        .from("price_tables")
+        .select("id, name")
+        .eq("company_id", companyId)
+  
+      if (error) {
+        toast.error("Erro ao buscar catálogos de preço")
+      } else {
+        setCatalogs(data || [])
+      }
+    }
+  
+    fetchCatalogs()
+  }, [companyId])
 
   return (
 <div className="max-w-3xl mx-auto w-full px-4 py-6 rounded-lg shadow-md">
@@ -256,18 +286,35 @@ export default function CreateClient() {
           />
         );
       })}
-
+            {/* check box  */}
+            <div className="mt-4">
+              <Select value={selectedCatalog} onValueChange={setSelectedCatalog}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Selecione um catálogo de preço" />
+                </SelectTrigger>
+                <SelectContent>
+                  {catalogs.map((catalog) => (
+                    <SelectItem key={catalog.id} value={catalog.id}>
+                      {catalog.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
       <Button className="mt-4 w-full" onClick={handleSubmit}>Cadastrar</Button>
     </div>
   );
 }
-
 function formatarTelefone(valor: string) {
-  const telefone = valor.replace(/\D/g, "").slice(0, 11); // Remove tudo que não for número e limita a 11 caracteres
+  const telefone = valor.replace(/^\+?55/, "") // Remove +55 se existir
+                        .replace(/\D/g, "")    // Remove tudo que não é número
+                        .slice(0, 11)          // Limita a 11 dígitos
 
-  if (telefone.length <= 10) {
-    return telefone.replace(/^(\d{2})(\d{4})(\d{4})$/, "($1) $2-$3"); // Formato (XX) XXXX-XXXX
-  } else {
-    return telefone.replace(/^(\d{2})(\d{5})(\d{4})$/, "($1) $2-$3"); // Formato (XX) XXXXX-XXXX
+  if (telefone.length === 11) {
+    return telefone.replace(/^(\d{2})(\d{5})(\d{4})$/, "($1) $2-$3") // (48) 99999-9999
+  } else if (telefone.length === 10) {
+    return telefone.replace(/^(\d{2})(\d{4})(\d{4})$/, "($1) $2-$3") // (48) 9999-9999
   }
+
+  return telefone // Se ainda incompleto, apenas retorna os números
 }

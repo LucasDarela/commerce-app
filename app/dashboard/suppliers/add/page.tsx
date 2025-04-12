@@ -9,6 +9,11 @@ import { useRouter } from "next/navigation";
 import axios from "axios";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 
+function getDocumentType(document: string): "CPF" | "CNPJ" {
+  const cleaned = document.replace(/\D/g, ""); // Remove pontos, traços, etc.
+  return cleaned.length === 11 ? "CPF" : "CNPJ";
+}
+
 export default function AddSupplier() {
   const router = useRouter();
   const inputRefs = useRef<HTMLInputElement[]>([]);
@@ -40,7 +45,7 @@ export default function AddSupplier() {
     neighborhood: "Bairro",
     city: "Cidade",
     state: "Estado",
-    number: "Numbero",
+    number: "Numero",
     complement: "Complemento",
     phone: "Telefone",
     email: "Email (Opcional)",
@@ -127,6 +132,8 @@ export default function AddSupplier() {
       return;
     }
 
+    const documentType = getDocumentType(supplier.document);
+
     const { data: existing } = await supabase
       .from("suppliers")
       .select("id")
@@ -140,7 +147,7 @@ export default function AddSupplier() {
     }
 
     const { error } = await supabase.from("suppliers").insert([
-      { ...supplier, company_id: companyId },
+      { ...supplier, company_id: companyId, type: documentType },
     ]);
 
     if (error) {

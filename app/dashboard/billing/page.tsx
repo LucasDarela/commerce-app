@@ -23,40 +23,40 @@ export default function BillingPage() {
 
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-8">
-      <h1 className="text-2xl font-bold">Billing & Payment</h1>
+      <h1 className="text-2xl font-bold">Gerenciador de Pagamentos</h1>
 
       {/* Card Section */}
       <Card>
         <CardHeader>
-          <CardTitle>Payment Method</CardTitle>
+          <CardTitle>Método de Pagamento</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Cardholder Name</Label>
-              <Input id="name" name="name" value={card.name} onChange={handleCardChange} placeholder="Full Name" />
+              <Label htmlFor="name">Nome do Cartão</Label>
+            <Input id="name" name="name" value={card.name} onChange={handleCardChange} placeholder="Nome como está no cartão" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="number">Card Number</Label>
+              <Label htmlFor="number">Número do Cartão</Label>
               <Input id="number" name="number" value={card.number} onChange={handleCardChange} placeholder="XXXX XXXX XXXX XXXX" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="expiry">Expiry Date</Label>
-              <Input id="expiry" name="expiry" value={card.expiry} onChange={handleCardChange} placeholder="MM/YY" />
+              <Input id="expiry" name="expiry" value={card.expiry} onChange={handleCardChange} placeholder="MM/AA" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="cvc">CVC</Label>
               <Input id="cvc" name="cvc" value={card.cvc} onChange={handleCardChange} placeholder="CVC" />
             </div>
           </div>
-          <Button className="mt-4">Save Card</Button>
+          <Button className="mt-4">Salvar Cartão</Button>
         </CardContent>
       </Card>
 
       {/* Payment History */}
       <Card>
         <CardHeader>
-          <CardTitle>Payment History</CardTitle>
+          <CardTitle>Histórico de Pagamento</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
@@ -89,11 +89,11 @@ export default function BillingPage() {
       {/* Cancel Subscription */}
       <Card>
         <CardHeader>
-          <CardTitle>Cancel Subscription</CardTitle>
+          <CardTitle>Cancelar Inscrição</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground mb-4">You can cancel your subscription at any time. Your access will remain until the end of the current billing period.</p>
-          <Button variant="destructive">Cancel Subscription</Button>
+          <Button variant="destructive">Cancelar Inscrição</Button>
         </CardContent>
       </Card>
     </div>

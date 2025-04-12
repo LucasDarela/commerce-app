@@ -10,14 +10,14 @@ export const orderSchema = z.object({
   phone: z.string(),
   amount: z.number(),
   products: z.string(),
-  delivery_status: z.enum(["Pending", "Deliver", "Collect"]), 
-  payment_method: z.enum(["Pix", "Cash", "Ticket", "Card"]),
-  payment_status: z.enum(["Pending", "Paid"]),
+  delivery_status: z.enum(["Entregar", "Coletar", "Coletado"]), 
+  payment_method: z.enum(["Pix", "Dinheiro", "Boleto", "Cartao"]),
+  payment_status: z.enum(["Pendente", "Pago"]),
   days_ticket: z.union([z.string(), z.number()]).optional(),
   freight: z.union([z.string(), z.number()]).optional(),
   note_number: z.string().optional(),
   document_type: z.string().optional(),
-  total: z.number().optional()
+  total: z.number()
 })
 
 export type Order = z.infer<typeof orderSchema>

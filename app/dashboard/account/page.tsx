@@ -122,7 +122,7 @@ export default function AccountPage() {
 
   return (
     <div className="max-w-3xl mx-auto w-full px-4 py-6">
-      <h1 className="text-2xl font-bold mb-4">Account Settings</h1>
+      <h1 className="text-2xl font-bold mb-4">Ajustes de Conta</h1>
 
       <Card className="mb-6">
         <CardContent className="flex flex-col items-center p-6 gap-4">
@@ -146,10 +146,10 @@ export default function AccountPage() {
 
       <Card className="mb-6">
         <CardContent className="space-y-4">
-        <label className="text-sm mb-1 block font-medium text-muted-foreground">User Name</label>
+        <label className="text-sm mb-1 block font-medium text-muted-foreground">Nome de Usuário</label>
           <Input
             type="text"
-            placeholder="User Name"
+            placeholder="Nome de Usuário"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
           />
@@ -160,10 +160,10 @@ export default function AccountPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
-                <label className="text-sm mb-1 block font-medium text-muted-foreground">Business Name</label>
+                <label className="text-sm mb-1 block font-medium text-muted-foreground">Nome da Empresa</label>
           <Input
             type="text"
-            placeholder="Business Name"
+            placeholder="Nome da Empresa"
             value={companyName}
             onChange={(e) => setCompanyName(e.target.value)}
           />

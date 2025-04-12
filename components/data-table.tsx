@@ -1,7 +1,8 @@
 "use client"
 
 import * as React from "react"
-import { format } from "date-fns"
+import { format, parseISO } from "date-fns"
+import { useEffect, useState } from "react"
 import {
   DndContext,
   KeyboardSensor,
@@ -116,31 +117,42 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet"
 import Link from "next/link"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 
 //New Schema
 export const schema = z.object({
   id: z.string(),
+  note_number: z.string().optional(),
+  document_type: z.string().optional(),
   appointment_date: z.string(),
   appointment_hour: z.string(),
   appointment_local: z.string(),
   customer: z.string(),
   phone: z.string(),
   products: z.string(),
+  freight: z.union([z.string(), z.number()]).optional().nullable(),
   amount: z.number(),
-  delivery_status: z.enum(["Pending", "Deliver" , "Collect"]),
-  payment_status: z.enum(["Pending", "Paid"]),
-  payment_method: z.enum(["Pix", "Cash", "Ticket", "Card"]),
+  total: z.number(),
+  delivery_status: z.enum(["Entregar", "Coletar", "Coletado"]),
+  payment_status: z.enum(["Pendente", "Pago"]),
+  payment_method: z.enum(["Pix", "Dinheiro", "Boleto", "Cartao"]),
+  order_index: z.number().nullable().optional(),
 })
 
 type Sale = z.infer<typeof schema>
 type Order = z.infer<typeof schema>
 
+type CustomColumnMeta = {
+  className?: string
+}
+
+type CustomColumnDef<T> = ColumnDef<T, unknown> & {
+  meta?: CustomColumnMeta
+}
 
 // Create a separate component for the drag handle
-function DragHandle({ id }: { id: number }) {
-  const { attributes, listeners } = useSortable({
-    id,
-  })
+function DragHandle({ id }: { id: string }) {
+  const { attributes, listeners } = useSortable({ id })
 
   return (
     <Button
@@ -148,7 +160,7 @@ function DragHandle({ id }: { id: number }) {
       {...listeners}
       variant="ghost"
       size="icon"
-      className="text-muted-foreground size-7 hover:bg-transparent"
+      className="cursor-grab active:cursor-grabbing text-muted-foreground size-7 hover:bg-transparent"
     >
       <IconGripVertical className="text-muted-foreground size-3" />
       <span className="sr-only">Drag to reorder</span>
@@ -156,29 +168,37 @@ function DragHandle({ id }: { id: number }) {
   )
 }
 
-function DraggableRow({ row }: { row: Row<z.infer<typeof schema>> }) {
+function DraggableRow({ row }: { row: Row<Order> }) {
   const { transform, transition, setNodeRef, isDragging } = useSortable({
     id: row.original.id,
-  })
+  });
 
   return (
     <TableRow
+      ref={setNodeRef}
       data-state={row.getIsSelected() && "selected"}
       data-dragging={isDragging}
-      ref={setNodeRef}
       className="relative z-0 data-[dragging=true]:z-10 data-[dragging=true]:opacity-80"
       style={{
         transform: CSS.Transform.toString(transform),
-        transition: transition,
+        transition,
       }}
     >
-      {row.getVisibleCells().map((cell) => (
-        <TableCell key={cell.id}>
-          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-        </TableCell>
-      ))}
+      {row.getVisibleCells().map((cell) => {
+        const isDragCell = cell.column.id === "drag";
+
+        return (
+          <TableCell key={cell.id} className={(cell.column.columnDef as CustomColumnDef<Order>)?.meta?.className}>
+          {isDragCell ? (
+              <DragHandle id={row.original.id} />
+            ) : (
+              flexRender(cell.column.columnDef.cell, cell.getContext())
+            )}
+          </TableCell>
+        );
+      })}
     </TableRow>
-  )
+  );
 }
 
 export function DataTable({
@@ -188,18 +208,51 @@ export function DataTable({
 }) {
   const [selectedCustomer, setSelectedCustomer] = React.useState<Sale | null>(null)
   const [sheetOpen, setSheetOpen] = React.useState(false)
+  const supabase = createClientComponentClient()
+  const [orders, setOrders] = useState<Order[]>([])
+  const [loading, setLoading] = useState(true)
+  const [isSavingOrder, setIsSavingOrder] = useState(false)
+
+  useEffect(() => {
+    async function fetchOrders() {
+      const { data, error } = await supabase
+        .from("orders")
+        .select("*")
+        .order("order_index", { ascending: true })
+
+      if (error) {
+        console.error("Erro ao buscar pedidos:", error)
+        return
+      }
+
+      const parsed = schema.array().safeParse(data)
+      if (parsed.success) {
+        setOrders(parsed.data)
+      } else {
+        console.error("Erro ao validar schema Zod:", parsed.error)
+      }
+
+      setLoading(false)
+    }
+
+    fetchOrders()
+  }, [])
 
   //const columns
-  const columns: ColumnDef<any>[] = [
+  const columns: CustomColumnDef<Order>[] = [
     {
       id: "drag",
       header: () => null,
-      cell: ({ row }) => <IconGripVertical className="cursor-move text-muted-foreground size-4" />,
+      size: 25,
+      meta: { className: "w-[25px]" },
+      cell: () => null,
       enableSorting: false,
       enableHiding: false,
     },
     {
       id: "select",
+      size: 35,
+      meta: { className: "w-[35px]" },
       header: ({ table }) => (
         <div className="flex items-center justify-center">
           <Checkbox
@@ -223,22 +276,28 @@ export function DataTable({
     },
     {
       accessorKey: "appointment_date",
-      header: "Date",
+      header: "Data",
+      size: 90,
+      meta: { className: "w-[90px]" },
       cell: ({ row }) => {
         const rawDate = row.original.appointment_date
         if (!rawDate) return "—"
-        const parsed = new Date(rawDate)
-        return format(parsed, "dd/MM/yyyy")
+        const [year, month, day] = rawDate.split("-")
+        return `${day}/${month}/${year}`
       },
     },
     {
       accessorKey: "appointment_hour",
-      header: "Hour",
+      header: "Hora",
+      size: 55,
+      meta: { className: "w-[55px]" },
       cell: ({ row }) => row.original.appointment_hour,
     },
     {
       accessorKey: "customer",
-      header: "Customer",
+      header: "Cliente",
+      size: 180,
+      meta: { className: "w-[180px] truncate" },
       cell: ({ row }) => {
         const sale = row.original
         return (
@@ -257,7 +316,9 @@ export function DataTable({
     },
     {
       accessorKey: "phone",
-      header: "Phone",
+      header: "Tel",
+      size: 50,
+      meta: { className: "w-[50px]" },
       cell: ({ row }) => {
         const raw = row.original.phone || ""
         const cleaned = raw.replace(/\D/g, "") // Remove ( ) - espaços
@@ -294,27 +355,54 @@ export function DataTable({
     },
     {
       accessorKey: "products",
-      header: "Products",
+      header: "Produtos",
+      size: 200,
+      meta: { className: "w-[200px] truncate" },
       cell: ({ row }) => row.original.products,
     },
     {
       accessorKey: "appointment_local",
-      header: "Location",
+      header: "Localização",
+      size: 150,
+      meta: { className: "w-[150px] truncate" },
       cell: ({ row }) => row.original.appointment_local,
     },
     {
       accessorKey: "delivery_status",
       header: "Delivery",
+      size: 80,
+      meta: { className: "w-[80px]" },
       cell: ({ row }) => row.original.delivery_status,
     },
     {
+      accessorKey: "payment_method",
+      header: "Método",
+      size: 60,
+      meta: { className: "w-[60px]" },
+      cell: ({ row }) => row.original.payment_method,
+    },
+    {
       accessorKey: "payment_status",
-      header: "Payment",
+      header: "Pagamento",
+      size: 80,
+      meta: { className: "w-[80px]" },
       cell: ({ row }) => row.original.payment_status,
+    },
+    {
+      accessorKey: "total",
+      header: "Total",
+      size: 100,
+      meta: { className: "w-[100px] text-right" },
+      cell: ({ row }) => {
+        const value = row.original.total
+        return `R$ ${value.toFixed(2).replace('.', ',')}`
+      },
     },
     {
       id: "actions",
       header: "",
+      size: 50,
+      meta: { className: "w-[50px]" },
       cell: ({ row }) => (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -323,10 +411,11 @@ export function DataTable({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem>View</DropdownMenuItem>
-            <DropdownMenuItem>Edit</DropdownMenuItem>
+            <DropdownMenuItem>Ver</DropdownMenuItem>
+            <DropdownMenuItem>Pagar</DropdownMenuItem>
+            <DropdownMenuItem>Editar</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem variant="destructive">Delete</DropdownMenuItem>
+            <DropdownMenuItem variant="destructive">Deletar</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       ),
@@ -357,8 +446,8 @@ export function DataTable({
     [data]
   )
 
-  const table = useReactTable({
-    data,
+  const table = useReactTable<Order>({
+    data: orders,
     columns,
     state: {
       sorting,
@@ -384,16 +473,59 @@ export function DataTable({
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
-    if (active && over && active.id !== over.id) {
-      setData((data) => {
-        const oldIndex = dataIds.indexOf(active.id)
-        const newIndex = dataIds.indexOf(over.id)
-        return arrayMove(data, oldIndex, newIndex)
+  
+    if (!active || !over || active.id === over.id) return
+  
+    const oldIndex = orders.findIndex((item) => item.id === active.id)
+    const newIndex = orders.findIndex((item) => item.id === over.id)
+  
+    const newData = arrayMove(orders, oldIndex, newIndex)
+  
+    setOrders(newData) // Atualiza visualmente imediatamente
+    setIsSavingOrder(true) // Ativa o spinner
+  
+    // Atualiza Supabase em paralelo
+    Promise.all(
+      newData.map((item, index) =>
+        supabase.from("orders").update({ order_index: index }).eq("id", item.id)
+      )
+    )
+      .then(() => {
+        console.log("Ordem salva com sucesso no Supabase")
+        setIsSavingOrder(false)
       })
-    }
+      .catch((err) => {
+        console.error("Erro ao atualizar ordem:", err)
+        setIsSavingOrder(false)
+      })
   }
 
   return (
+    <>
+    {isSavingOrder && (
+      <div className="fixed top-2 left-1/2 z-50 -translate-x-1/2 rounded-full bg-white p-2 shadow-lg border border-muted">
+        <svg
+          className="animate-spin h-4 w-4 text-primary"
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+        >
+          <circle
+            className="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            strokeWidth="4"
+          ></circle>
+          <path
+            className="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8z"
+          ></path>
+        </svg>
+      </div>
+    )}
     <Tabs
       defaultValue="outline"
       className="w-full flex-col justify-start gap-6"
@@ -412,7 +544,7 @@ export function DataTable({
             <SelectValue placeholder="Select a view" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="outline">Outline</SelectItem>
+            <SelectItem value="outline">Delivery</SelectItem>
             <SelectItem value="past-performance">Past Performance</SelectItem>
             <SelectItem value="key-personnel">Key Personnel</SelectItem>
             <SelectItem value="focus-documents">Focus Documents</SelectItem>
@@ -483,13 +615,18 @@ export function DataTable({
             sensors={sensors}
             id={sortableId}
           >
-            <Table>
+            <Table className="table-fixed w-full">
               <TableHeader className="bg-muted sticky top-0 z-10">
                 {table.getHeaderGroups().map((headerGroup) => (
                   <TableRow key={headerGroup.id}>
                     {headerGroup.headers.map((header) => {
                       return (
-                        <TableHead key={header.id} colSpan={header.colSpan}>
+
+                        <TableHead
+                            key={header.id}
+                            colSpan={header.colSpan}
+                            className={(header.column.columnDef as CustomColumnDef<Order>)?.meta?.className}
+                          >
                           {header.isPlaceholder
                             ? null
                             : flexRender(
@@ -505,7 +642,7 @@ export function DataTable({
               <TableBody className="**:data-[slot=table-cell]:first:w-8">
                 {table.getRowModel().rows?.length ? (
                   <SortableContext
-                    items={dataIds}
+                    items={table.getRowModel().rows.map((row) => row.original.id)}
                     strategy={verticalListSortingStrategy}
                   >
                     {table.getRowModel().rows.map((row) => (
@@ -527,22 +664,84 @@ export function DataTable({
             <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
             <SheetContent side="right">
               <SheetHeader>
-                <SheetTitle>Customer Details</SheetTitle>
+                <SheetTitle>Detalhes do Pedido</SheetTitle>
                 <SheetDescription>
-                  Details about <strong>{selectedCustomer?.customer}</strong>
+                  Detalhes sobre: <strong>{selectedCustomer?.customer}</strong><br/>
+                  Nota: <strong>{selectedCustomer?.note_number}</strong><br/>
+                  Tipo: <strong>{selectedCustomer?.document_type}</strong><br/>
                 </SheetDescription>
               </SheetHeader>
 
     {selectedCustomer && (
-      <div className="mt-4 flex flex-col gap-2 text-sm">
-        <div><strong>Date:</strong> {selectedCustomer.appointment_date}</div>
-        <div><strong>Hour:</strong> {selectedCustomer.appointment_hour}</div>
-        <div><strong>Phone:</strong> {selectedCustomer.phone}</div>
-        <div><strong>Amount:</strong> {selectedCustomer.amount}</div>
-        <div><strong>Location:</strong> {selectedCustomer.appointment_local}</div>
-        <div><strong>Products:</strong> {selectedCustomer.products}</div>
+      <div className="mt-4 ml-4 flex flex-col gap-2 text-sm">
+        <div>
+          <strong>Data:</strong>{" "}
+          {selectedCustomer?.appointment_date
+            ? format(parseISO(selectedCustomer.appointment_date), "dd/MM/yyyy")
+            : "—"}
+        </div>
+        <div><strong>Hora:</strong> {selectedCustomer.appointment_hour}</div>
+        <div><strong>Nome:</strong> {selectedCustomer.customer}</div>
+          {selectedCustomer?.phone && (
+              <div>
+                <strong>Telefone:</strong>{" "}
+                <a
+                  href={`https://wa.me/55${selectedCustomer.phone.replace(/\D/g, "")}?text=${encodeURIComponent("Olá, tudo bem? Sua entrega de chopp está a caminho.")}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  {selectedCustomer.phone}
+                </a>
+              </div>
+            )}
+        <div><strong>Produtos:</strong><br/> {selectedCustomer.products}</div>
+        <div><strong>Quantidade:</strong> {selectedCustomer.amount}</div>
+        <div><strong>Localização:</strong> {selectedCustomer.appointment_local}</div>
+        <div><strong>Frete:</strong> {selectedCustomer.freight}</div>
+        <div><strong>Total:</strong> {selectedCustomer.total}</div>
+        <div><strong>Forma de Pagamento:</strong> {selectedCustomer.payment_method}</div>
         <div><strong>Delivery:</strong> {selectedCustomer.delivery_status}</div>
-        <div><strong>Payment:</strong> {selectedCustomer.payment_status}</div>
+        <div><strong>Pagamento:</strong> {selectedCustomer.payment_status}</div>
+
+        <Button
+            className="mt-6"
+            variant={selectedCustomer?.delivery_status === "Coletado" ? "secondary" : "default"}
+            disabled={selectedCustomer?.delivery_status === "Coletado"}
+            onClick={async () => {
+              if (!selectedCustomer) return;
+
+              let nextStatus: "Coletar" | "Coletado" | null = null;
+
+              if (selectedCustomer.delivery_status === "Entregar") {
+                nextStatus = "Coletar";
+              } else if (selectedCustomer.delivery_status === "Coletar") {
+                nextStatus = "Coletado";
+              }
+
+              if (nextStatus) {
+                const { error } = await supabase
+                  .from("orders")
+                  .update({ delivery_status: nextStatus })
+                  .eq("id", selectedCustomer.id);
+
+                if (!error) {
+                  setSelectedCustomer({
+                    ...selectedCustomer,
+                    delivery_status: nextStatus,
+                  });
+                  toast.success(`Status atualizado para ${nextStatus}`);
+                } else {
+                  toast.error("Erro ao atualizar status.");
+                  console.error(error);
+                }
+              }
+            }}
+          >
+            {selectedCustomer?.delivery_status === "Entregar" && "Marcar como Entregue"}
+            {selectedCustomer?.delivery_status === "Coletar" && "Marcar como Coletado"}
+            {selectedCustomer?.delivery_status === "Coletado" && "Chopp já Coletado ✅"}
+          </Button>
       </div>
     )}
   </SheetContent>
@@ -650,184 +849,6 @@ export function DataTable({
         <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
       </TabsContent>
     </Tabs>
+    </>
   )
 }
-
-// const chartData = [
-//   { month: "January", desktop: 186, mobile: 80 },
-//   { month: "February", desktop: 305, mobile: 200 },
-//   { month: "March", desktop: 237, mobile: 120 },
-//   { month: "April", desktop: 73, mobile: 190 },
-//   { month: "May", desktop: 209, mobile: 130 },
-//   { month: "June", desktop: 214, mobile: 140 },
-// ]
-
-// const chartConfig = {
-//   desktop: {
-//     label: "Desktop",
-//     color: "var(--primary)",
-//   },
-//   mobile: {
-//     label: "Mobile",
-//     color: "var(--primary)",
-//   },
-// } satisfies ChartConfig
-
-// function TableCellViewer({ item }: { item: z.infer<typeof schema> }) {
-//   const isMobile = useIsMobile()
-
-//   return (
-//     <Drawer direction={isMobile ? "bottom" : "right"}>
-//       <DrawerTrigger asChild>
-//         <Button variant="link" className="text-foreground w-fit px-0 text-left">
-//           {item.header}
-//         </Button>
-//       </DrawerTrigger>
-//       <DrawerContent>
-//         <DrawerHeader className="gap-1">
-//           <DrawerTitle>{item.header}</DrawerTitle>
-//           <DrawerDescription>
-//             Showing total visitors for the last 6 months
-//           </DrawerDescription>
-//         </DrawerHeader>
-//         <div className="flex flex-col gap-4 overflow-y-auto px-4 text-sm">
-//           {!isMobile && (
-//             <>
-//               <ChartContainer config={chartConfig}>
-//                 <AreaChart
-//                   accessibilityLayer
-//                   data={chartData}
-//                   margin={{
-//                     left: 0,
-//                     right: 10,
-//                   }}
-//                 >
-//                   <CartesianGrid vertical={false} />
-//                   <XAxis
-//                     dataKey="month"
-//                     tickLine={false}
-//                     axisLine={false}
-//                     tickMargin={8}
-//                     tickFormatter={(value) => value.slice(0, 3)}
-//                     hide
-//                   />
-//                   <ChartTooltip
-//                     cursor={false}
-//                     content={<ChartTooltipContent indicator="dot" />}
-//                   />
-//                   <Area
-//                     dataKey="mobile"
-//                     type="natural"
-//                     fill="var(--color-mobile)"
-//                     fillOpacity={0.6}
-//                     stroke="var(--color-mobile)"
-//                     stackId="a"
-//                   />
-//                   <Area
-//                     dataKey="desktop"
-//                     type="natural"
-//                     fill="var(--color-desktop)"
-//                     fillOpacity={0.4}
-//                     stroke="var(--color-desktop)"
-//                     stackId="a"
-//                   />
-//                 </AreaChart>
-//               </ChartContainer>
-//               <Separator />
-//               <div className="grid gap-2">
-//                 <div className="flex gap-2 leading-none font-medium">
-//                   Trending up by 5.2% this month{" "}
-//                   <IconTrendingUp className="size-4" />
-//                 </div>
-//                 <div className="text-muted-foreground">
-//                   Showing total visitors for the last 6 months. This is just
-//                   some random text to test the layout. It spans multiple lines
-//                   and should wrap around.
-//                 </div>
-//               </div>
-//               <Separator />
-//             </>
-//           )}
-//           <form className="flex flex-col gap-4">
-//             <div className="flex flex-col gap-3">
-//               <Label htmlFor="header">Header</Label>
-//               <Input id="header" defaultValue={item.header} />
-//             </div>
-//             <div className="grid grid-cols-2 gap-4">
-//               <div className="flex flex-col gap-3">
-//                 <Label htmlFor="type">Type</Label>
-//                 <Select defaultValue={item.type}>
-//                   <SelectTrigger id="type" className="w-full">
-//                     <SelectValue placeholder="Select a type" />
-//                   </SelectTrigger>
-//                   <SelectContent>
-//                     <SelectItem value="Table of Contents">
-//                       Table of Contents
-//                     </SelectItem>
-//                     <SelectItem value="Executive Summary">
-//                       Executive Summary
-//                     </SelectItem>
-//                     <SelectItem value="Technical Approach">
-//                       Technical Approach
-//                     </SelectItem>
-//                     <SelectItem value="Design">Design</SelectItem>
-//                     <SelectItem value="Capabilities">Capabilities</SelectItem>
-//                     <SelectItem value="Focus Documents">
-//                       Focus Documents
-//                     </SelectItem>
-//                     <SelectItem value="Narrative">Narrative</SelectItem>
-//                     <SelectItem value="Cover Page">Cover Page</SelectItem>
-//                   </SelectContent>
-//                 </Select>
-//               </div>
-//               <div className="flex flex-col gap-3">
-//                 <Label htmlFor="status">Status</Label>
-//                 <Select defaultValue={item.status}>
-//                   <SelectTrigger id="status" className="w-full">
-//                     <SelectValue placeholder="Select a status" />
-//                   </SelectTrigger>
-//                   <SelectContent>
-//                     <SelectItem value="Done">Done</SelectItem>
-//                     <SelectItem value="In Progress">In Progress</SelectItem>
-//                     <SelectItem value="Not Started">Not Started</SelectItem>
-//                   </SelectContent>
-//                 </Select>
-//               </div>
-//             </div>
-//             <div className="grid grid-cols-2 gap-4">
-//               <div className="flex flex-col gap-3">
-//                 <Label htmlFor="target">Target</Label>
-//                 <Input id="target" defaultValue={item.target} />
-//               </div>
-//               <div className="flex flex-col gap-3">
-//                 <Label htmlFor="limit">Limit</Label>
-//                 <Input id="limit" defaultValue={item.limit} />
-//               </div>
-//             </div>
-//             <div className="flex flex-col gap-3">
-//               <Label htmlFor="reviewer">Reviewer</Label>
-//               <Select defaultValue={item.reviewer}>
-//                 <SelectTrigger id="reviewer" className="w-full">
-//                   <SelectValue placeholder="Select a reviewer" />
-//                 </SelectTrigger>
-//                 <SelectContent>
-//                   <SelectItem value="Eddie Lake">Eddie Lake</SelectItem>
-//                   <SelectItem value="Jamik Tashpulatov">
-//                     Jamik Tashpulatov
-//                   </SelectItem>
-//                   <SelectItem value="Emily Whalen">Emily Whalen</SelectItem>
-//                 </SelectContent>
-//               </Select>
-//             </div>
-//           </form>
-//         </div>
-//         <DrawerFooter>
-//           <Button>Submit</Button>
-//           <DrawerClose asChild>
-//             <Button variant="outline">Done</Button>
-//           </DrawerClose>
-//         </DrawerFooter>
-//       </DrawerContent>
-//     </Drawer>
-//   )
-// }

@@ -3,7 +3,7 @@
 import * as z from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form"
-
+import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
@@ -30,6 +30,9 @@ const formSchema = z.object ({
 });
 
 export function LoginAccountForm() {
+
+    const [isLoading, setIsLoading] = useState(false)
+
     const router = useRouter();
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -41,6 +44,9 @@ export function LoginAccountForm() {
 
     const onSubmit = async (values: z.infer<typeof 
     formSchema>) => {
+
+        setIsLoading(true)
+
         try{
             const supabase = createClientComponentClient();
             const {email, password} = values;
@@ -60,6 +66,9 @@ export function LoginAccountForm() {
             router.push("/dashboard");
         }catch(error){
             console.log("LoginAccountForm:onSubmit", error);
+        }
+        finally{
+            setIsLoading(false)
         }
     };
 
@@ -121,7 +130,10 @@ export function LoginAccountForm() {
                                 </FormItem>
                             )}
                         />
-                        <Button type="submit" className="my-4 w-full">Login</Button>
+                            <Button type="submit" disabled={isLoading}>
+                            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            {isLoading ? "Entrando..." : "Entrar"}
+                            </Button>
 
                         
 

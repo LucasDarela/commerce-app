@@ -7,13 +7,41 @@ import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { useRouter, useParams } from "next/navigation";
 import axios from "axios";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select"
+
+type Cliente = {
+  id?: string
+  created_at?: string
+  price_table_id?: string
+  type: string
+  document: string
+  name: string
+  fantasy_name?: string
+  zip_code: string
+  address: string
+  neighborhood: string
+  city: string
+  state: string
+  number: string
+  complement: string
+  phone: string
+  email: string
+  state_registration?: string
+}
 
 export default function EditClient() {
   const router = useRouter();
   const { id } = useParams();
   const inputRefs = useRef<HTMLInputElement[]>([]);
   const [loading, setLoading] = useState(true);
-  const [cliente, setCliente] = useState({
+  const [catalogs, setCatalogs] = useState<{ id: string; name: string }[]>([])
+  const [cliente, setCliente] = useState<Cliente>({
     type: "CPF",
     document: "",
     name: "",
@@ -69,6 +97,7 @@ export default function EditClient() {
           city: formatarMaiusculo(data.city || "", "city"),
           state: formatarMaiusculo(data.state || "", "state"),
           state_registration: formatarMaiusculo(data.state_registration || "", "state_registration"),
+          price_table_id: data.price_table_id || "",
         });
       }
       setLoading(false);
@@ -76,6 +105,22 @@ export default function EditClient() {
 
     fetchCliente();
   }, [id]);
+
+  useEffect(() => {
+    const fetchCatalogs = async () => {
+      const { data, error } = await supabase
+        .from("price_tables")
+        .select("id, name")
+  
+      if (error) {
+        toast.error("Erro ao buscar catálogos")
+      } else {
+        setCatalogs(data || [])
+      }
+    }
+  
+    fetchCatalogs()
+  }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value: rawValue } = e.target;
@@ -125,10 +170,18 @@ export default function EditClient() {
   };
 
   const handleUpdate = async () => {
-    const { error } = await supabase.from("customers").update(cliente).eq("id", id);
+    const clienteToUpdate = { ...cliente }
+    delete clienteToUpdate.id
+    delete clienteToUpdate.created_at // também pode dar conflito
+
+    const { error } = await supabase
+      .from("customers")
+      .update(clienteToUpdate)
+      .eq("id", id)
 
     if (error) {
       toast.error("Erro ao atualizar cliente: " + error.message);
+      console.log("Enviando dados:", cliente)
     } else {
       toast.success("Cliente atualizado com sucesso!");
       router.push("/dashboard/customers");
@@ -174,6 +227,26 @@ export default function EditClient() {
           />
         );
       })}
+
+      <div className="mt-4">
+      <Select
+        value={cliente.price_table_id || ""}
+        onValueChange={(value) =>
+          setCliente((prev) => ({ ...prev, price_table_id: value }))
+        }
+      >
+        <SelectTrigger className="w-full">
+          <SelectValue placeholder="Selecione um catálogo de produtos" />
+        </SelectTrigger>
+        <SelectContent>
+          {catalogs.map((catalog) => (
+            <SelectItem key={catalog.id} value={catalog.id}>
+              {catalog.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      </div>
 
       <Button className="mt-4 w-full" onClick={handleUpdate}>Atualizar</Button>
     </div>

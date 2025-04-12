@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { Card } from "@/components/ui/card";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
+import { PriceTableManager } from "@/components/price-table-manager";
 
 // 🔹 Product Type
 type Product = {
@@ -127,7 +128,8 @@ export default function ListProduct() {
 
   return (
     <div className="p-8">
-      <div className="mb-4 flex flex-col-2 gap-6">
+      <h2 className="text-xl font-bold mb-4">Produtos</h2>
+      <div className="mb-6 flex flex-col-2 gap-6">
         <Input
           type="text"
           placeholder="Search by Code or Name..."
@@ -147,7 +149,7 @@ export default function ListProduct() {
               <TableHead>Código</TableHead>
               <TableHead>Nome</TableHead>
               <TableHead>Categoria</TableHead>
-              <TableHead>Preço</TableHead>
+              <TableHead>Preço Compra</TableHead>
               <TableHead>Estoque</TableHead>
               <TableHead>Comodato</TableHead>
             </TableRow>
@@ -198,7 +200,7 @@ export default function ListProduct() {
               <p><strong>Codigo:</strong> {selectedProduct.code}</p>
               <p><strong>Nome:</strong> {selectedProduct.name}</p>
               <p><strong>Fabricante:</strong> {selectedProduct.manufacturer}</p>
-              <p><strong>Preço:</strong> {selectedProduct.standard_price}</p>
+              <p><strong>Preço Compra:</strong> {selectedProduct.standard_price}</p>
               <p><strong>Taxas:</strong> {selectedProduct.percentage_taxes}</p>
               <p><strong>Classe:</strong> {selectedProduct.material_class}</p>
               <p><strong>Subclasse:</strong> {selectedProduct.submaterial_class}</p>

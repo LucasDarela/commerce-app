@@ -27,6 +27,7 @@ type Cliente = {
   email: string;
   state_registration?: string;
   fantasy_name?: string;
+  price_table_id?: string;
 };
 
 export default function ListCustomers() {
@@ -36,6 +37,7 @@ export default function ListCustomers() {
   const [search, setSearch] = useState<string>("");
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [catalogName, setCatalogName] = useState<string | null>(null)
 
   useEffect(() => {
     if (!companyId || loading) return;
@@ -89,9 +91,27 @@ export default function ListCustomers() {
     );
   });
 
-  const openModal = (cliente: Cliente) => {
+  const openModal = async (cliente: Cliente) => {
     setSelectedCliente(cliente);
     setIsModalOpen(true);
+
+    // Buscar o nome do catálogo
+    if (cliente.price_table_id) {
+      const { data, error } = await supabase
+        .from("price_tables")
+        .select("name")
+        .eq("id", cliente.price_table_id)
+        .single();
+  
+      if (error) {
+        console.error("Erro ao buscar catálogo:", error.message);
+        setCatalogName(null);
+      } else {
+        setCatalogName(data?.name || null);
+      }
+    } else {
+      setCatalogName(null);
+    }
   };
 
   // 🔹 Fecha o modal
@@ -122,8 +142,8 @@ export default function ListCustomers() {
 
   return (
   <div className="p-8">
-      {/* 🔹 Campo de Pesquisa */}
-      <div className="mb-4 flex flex-col-2 gap-6">
+      <h2 className="text-xl font-bold mb-4">Clientes</h2>
+      <div className="mb-6 flex flex-col-2 gap-6">
         <Input
           type="text"
           placeholder="Pesquise por Nome, CPF ou telefone..."
@@ -205,6 +225,9 @@ export default function ListCustomers() {
               <p><strong>Estado:</strong> {selectedCliente.state}</p>
               <p><strong>Email:</strong> {selectedCliente.email || ""}</p>
               {selectedCliente.state_registration && <p><strong>Inscrição Estadual:</strong> {selectedCliente.state_registration}</p>}
+              {catalogName && (
+                <p><strong>Catálogo de Preço:</strong> {catalogName}</p>
+              )}
             </div>
             <DialogFooter className="flex justify-between">
               <Button onClick={handleEdit}>

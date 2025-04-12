@@ -24,7 +24,7 @@ import {
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
-import { Pencil, Trash } from "lucide-react";
+import { Pencil, Trash, Funnel } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -45,6 +45,12 @@ interface Invoice {
   status: "Paid" | "Unpaid";
   payment_method: string;
   notes?: string;
+}
+
+function formatToBrazilianDate(iso: string | null | undefined) {
+  if (!iso || !iso.includes("-")) return "";
+  const [yyyy, mm, dd] = iso.split("-");
+  return `${dd}/${mm}/${yyyy}`;
 }
 
 export default function FinancialPage() {
@@ -192,7 +198,8 @@ export default function FinancialPage() {
 
   return (
     <div className="p-8">
-      <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      <h2 className="text-xl font-bold mb-4">Financeiro</h2>
+      <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="w-full md:flex-1">
           <Input
             type="text"
@@ -206,8 +213,7 @@ export default function FinancialPage() {
         <div className="flex">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="sm">
-            Filtros de Data
+          <Button variant="outline" size="sm"><Funnel />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-56">
@@ -264,16 +270,16 @@ export default function FinancialPage() {
 
 
       <div className="p-4 rounded-lg shadow-md overflow-x-auto max-w-full">
-        <Table className="w-full">
+      <Table className="table-fixed w-full">
           <TableHeader>
             <TableRow>
-              <TableHead className="cursor-pointer" onClick={() => handleSort("due_date")}>Vencimento</TableHead>
-              <TableHead className="cursor-pointer" onClick={() => handleSort("supplier")}>Fornecedor</TableHead>
-              <TableHead className="cursor-pointer" onClick={() => handleSort("description")}>Descrição</TableHead>
-              <TableHead className="cursor-pointer" onClick={() => handleSort("category")}>Categoria</TableHead>
-              <TableHead className="cursor-pointer" onClick={() => handleSort("payment_method")}>Método</TableHead>
-              <TableHead className="cursor-pointer" onClick={() => handleSort("amount")}>Valor</TableHead>
-              <TableHead className="cursor-pointer" onClick={() => handleSort("status")}>Status</TableHead>
+              <TableHead className="cursor-pointer w-[40px]" onClick={() => handleSort("due_date")}>Vencimento</TableHead>
+              <TableHead className="cursor-pointer w-[90px] truncate" onClick={() => handleSort("supplier")}>Fornecedor</TableHead>
+              <TableHead className="cursor-pointer w-[80px] truncate" onClick={() => handleSort("description")}>Descrição</TableHead>
+              <TableHead className="cursor-pointer w-[60px]" onClick={() => handleSort("category")}>Categoria</TableHead>
+              <TableHead className="cursor-pointer w-[40px]" onClick={() => handleSort("payment_method")}>Método</TableHead>
+              <TableHead className="cursor-pointer w-[50px]" onClick={() => handleSort("amount")}>Valor</TableHead>
+              <TableHead className="cursor-pointer w-[80px]" onClick={() => handleSort("status")}>Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -287,15 +293,25 @@ export default function FinancialPage() {
                   }}
                   className="cursor-pointer hover:bg-gray-100 h-[50px]"
                 >
-                  <TableCell>{formatDate(invoice.due_date ?? '')}</TableCell>
-                  <TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {formatDate(invoice.due_date ?? '')}
+                    </TableCell>
+                  <TableCell className="truncate whitespace-nowrap">
                     {suppliers.find(s => s.id === invoice.supplier)?.name ?? invoice.supplier}
                   </TableCell>
-                  <TableCell>{invoice.description}</TableCell>
-                  <TableCell>{invoice.category.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}</TableCell>
-                  <TableCell>{invoice.payment_method}</TableCell>
-                  <TableCell>R$ {invoice.amount.toFixed(2).replace(".", ",")}</TableCell>
-                  <TableCell>
+                  <TableCell className="truncate whitespace-nowrap">{invoice.description}
+
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {invoice.category.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}
+                    </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {invoice.payment_method}
+                    </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    R$ {invoice.amount.toFixed(2).replace(".", ",")}
+                    </TableCell>
+                  <TableCell className="whitespace-nowrap">
                     {invoice.status === "Unpaid" ? (
                       <Button variant="outline" size="sm" onClick={(e) => {
                         e.stopPropagation();
