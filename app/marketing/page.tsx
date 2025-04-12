@@ -2,6 +2,7 @@ import { createServerComponentClient } from "@supabase/auth-helpers-nextjs";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import LandingLayout from "./sections/LandingLayout";
+import { RedirectIfAuthenticated } from "@/hooks/redirect-if-authenticated";
 
 export default async function LandingPage() {
   const supabase = createServerComponentClient({ cookies });
@@ -16,5 +17,9 @@ export default async function LandingPage() {
     console.log("Erro:", (error as { message?: string })?.message);
   }
 
-  return <LandingLayout />;
+  return (
+  <>
+  <RedirectIfAuthenticated />
+  <LandingLayout />
+  </>);
 }

@@ -4,10 +4,13 @@ import { redirect } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CreateAccountForm } from "@/components/auth/create-account-form";
 import { LoginAccountForm } from "@/components/auth/login-account-form"
+import { RedirectIfAuthenticated } from "@/hooks/redirect-if-authenticated";
 
 export default async function LogInSignIn() {
 
   return (
+    <>
+    <RedirectIfAuthenticated />
    <div className="flex flex-col h-screen w-full justify-center items-center">
 
          {/* Account Tabs and Password */}
@@ -28,5 +31,6 @@ export default async function LogInSignIn() {
 
     </Tabs>
    </div>
+   </>
   );
 }
