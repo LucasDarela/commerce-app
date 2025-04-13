@@ -176,8 +176,7 @@ export default function TeamManagementPage() {
   };
 
   return (
-    <Card>
-      <CardContent className="space-y-4">
+    <div className="space-y-6 p-8">
         <h2 className="text-xl font-bold">Team Management</h2>
         <div className="grid grid-cols-3 gap-4">
           <Input
@@ -261,7 +260,6 @@ export default function TeamManagementPage() {
             ))}
           </TableBody>
         </Table>
-      </CardContent>
-    </Card>
+      </div>
   );
 }

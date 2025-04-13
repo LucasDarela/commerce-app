@@ -215,13 +215,13 @@ export default function EditOrder() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6 bg-white rounded-lg shadow-md">
+    <div className="max-w-4xl mx-auto p-6  rounded-lg shadow-md">
 
       <div className="grid grid-cols-3 gap-4">
       <h1 className="text-2xl font-bold mb-4">Editar Venda</h1>
           <Input type="text" placeholder="Número da Nota" value={venda?.numeroNota} onChange={(e) => setVenda({ ...venda!, numeroNota: e.target.value })} />
             <Select onValueChange={(value) => setVenda({ ...venda, tipoDocumento: value })}>
-              <SelectTrigger className="bg-white border border-gray-300 rounded-md shadow-sm">
+              <SelectTrigger className=" border border-gray-300 rounded-md shadow-sm">
                 <SelectValue placeholder="Tipo de Nota" />
               </SelectTrigger>
               <SelectContent className="shadow-md rounded-md">

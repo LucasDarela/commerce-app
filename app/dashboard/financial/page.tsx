@@ -291,7 +291,7 @@ export default function FinancialPage() {
                     setSelectedInvoice(invoice);
                     setIsModalOpen(true);
                   }}
-                  className="cursor-pointer hover:bg-gray-100 h-[50px]"
+                  className="cursor-pointer h-[50px]"
                 >
                   <TableCell className="whitespace-nowrap">
                     {formatDate(invoice.due_date ?? '')}

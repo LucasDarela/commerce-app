@@ -2,10 +2,9 @@
 export default function Analytics() {
   
   return (
-<div className="p-8">
-      <div className="mb-4 flex flex-col-2 gap-6">
-        <h3>🚧 Em desenvolvimento... 🚧</h3>
+      <div className="space-y-6 p-8">
+      <h2 className="text-xl font-bold">Relatórios</h2>
+        <p>🚧 Em desenvolvimento... 🚧</p>
       </div>
-    </div>
   );
 }

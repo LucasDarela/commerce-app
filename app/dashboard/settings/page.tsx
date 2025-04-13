@@ -7,9 +7,9 @@ export default function SettingsPage() {
   const { user, companyId } = useAuthenticatedCompany();
 
   return (
-    <div className="max-w-3xl mx-auto w-full px-4 py-6">
-      <h1 className="text-2xl font-bold mb-4">General Settings</h1>
-    <TeamManagementPage />
+    <div className="space-y-6 p-8">
+            <h2 className="text-xl font-bold">Configurações</h2>
+            <p>🚧 Em desenvolvimento... 🚧</p>
     </div>
   );
 }

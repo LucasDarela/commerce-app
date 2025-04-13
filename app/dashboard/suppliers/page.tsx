@@ -135,7 +135,7 @@ export default function ListSuppliers() {
           <TableBody>
             {filteredSuppliers.length > 0 ? (
               filteredSuppliers.map((supplier) => (
-                <TableRow key={supplier.id} onClick={() => openModal(supplier)} className="cursor-pointer hover:bg-gray-100 h-[50px]">
+                <TableRow key={supplier.id} onClick={() => openModal(supplier)} className="cursor-pointer h-[50px]">
                   <TableCell>{supplier.name}</TableCell>
                   <TableCell className="hidden md:table-cell">{supplier.type}</TableCell>
                   <TableCell className="hidden md:table-cell">{supplier.document}</TableCell>

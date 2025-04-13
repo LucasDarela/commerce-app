@@ -1,8 +1,9 @@
 "use client"
 
 import * as React from "react"
-import { format, parseISO } from "date-fns"
 import { useEffect, useState } from "react"
+import { fetchEquipments } from "@/lib/fetchEquipments"
+import { format, parseISO } from "date-fns"
 import {
   DndContext,
   KeyboardSensor,
@@ -51,19 +52,11 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table"
-import { Area, AreaChart, CartesianGrid, XAxis } from "recharts"
 import { toast } from "sonner"
 import { z } from "zod"
-
 import { useIsMobile } from "@/hooks/use-mobile"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  ChartConfig,
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   Drawer,
@@ -118,38 +111,22 @@ import {
 } from "@/components/ui/sheet"
 import Link from "next/link"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
-import { supabase } from "@/lib/supabase"
 
 //New Schema
-export const schema = z.object({
-  id: z.string(),
-  note_number: z.string().optional(),
-  document_type: z.string().optional(),
-  appointment_date: z.string(),
-  appointment_hour: z.string(),
-  appointment_local: z.string(),
-  customer: z.string(),
-  phone: z.string(),
-  products: z.string(),
-  freight: z.union([z.string(), z.number()]).optional().nullable(),
-  amount: z.number(),
-  total: z.number(),
-  delivery_status: z.enum(["Entregar", "Coletar", "Coletado"]),
-  payment_status: z.enum(["Pendente", "Pago"]),
-  payment_method: z.enum(["Pix", "Dinheiro", "Boleto", "Cartao"]),
-  order_index: z.number().nullable().optional(),
-})
+export const equipmentSchema = z.object({
+    id: z.string(),
+    name: z.string(),
+    type: z.string(),
+    code: z.string(),
+    stock: z.number(),
+    value: z.number(),
+    company_id: z.string(),
+    is_available: z.boolean().default(true),
+    created_at: z.string(),
+  });
 
-type Sale = z.infer<typeof schema>
-type Order = z.infer<typeof schema>
+  type Equipment = z.infer<typeof equipmentSchema>
 
-type CustomColumnMeta = {
-  className?: string
-}
-
-type CustomColumnDef<T> = ColumnDef<T, unknown> & {
-  meta?: CustomColumnMeta
-}
 
 // Create a separate component for the drag handle
 function DragHandle({ id }: { id: string }) {
@@ -169,9 +146,7 @@ function DragHandle({ id }: { id: string }) {
   )
 }
 
-
-
-function DraggableRow({ row }: { row: Row<Order> }) {
+function DraggableRow({ row }: { row: Row<Equipment> }) {
   const { transform, transition, setNodeRef, isDragging } = useSortable({
     id: row.original.id,
   });
@@ -191,7 +166,7 @@ function DraggableRow({ row }: { row: Row<Order> }) {
         const isDragCell = cell.column.id === "drag";
 
         return (
-          <TableCell key={cell.id} className={(cell.column.columnDef as CustomColumnDef<Order>)?.meta?.className}>
+          <TableCell key={cell.id} className={(cell.column.columnDef as CustomColumnDef<Equipment>)?.meta?.className}>
           {isDragCell ? (
               <DragHandle id={row.original.id} />
             ) : (
@@ -204,247 +179,97 @@ function DraggableRow({ row }: { row: Row<Order> }) {
   );
 }
 
-export function DataTable({
+export function DataEquipments({
   data: initialData,
+  companyId,
 }: {
   data: z.infer<typeof schema>[]
 }) {
-  const [selectedCustomer, setSelectedCustomer] = React.useState<Sale | null>(null)
+    const [selectedEquipment, setSelectedEquipment] = React.useState<Equipment | null>(null)
   const [sheetOpen, setSheetOpen] = React.useState(false)
   const supabase = createClientComponentClient()
-  const [orders, setOrders] = useState<Order[]>([])
+  const [equipments, setEquipments] = useState<Equipment[]>([])
   const [loading, setLoading] = useState(true)
-  const [isSavingOrder, setIsSavingOrder] = useState(false)
-
-  const deleteOrderById = async (id: string) => {
-    const confirmDelete = confirm("Tem certeza que deseja excluir esta nota?");
-    if (!confirmDelete) return;
-  
-    const { error } = await supabase
-      .from("orders")
-      .delete()
-      .eq("id", id);
-  
-    if (error) {
-      toast.error("Erro ao deletar nota.");
-      return;
-    }
-  
-    toast.success("Nota excluída com sucesso!");
-    setOrders((prev) => prev.filter((order) => order.id !== id));
-  };
+  const [isSavingEquipment, setIsSavingEquipment] = useState(false)
 
   useEffect(() => {
-    async function fetchOrders() {
-      const { data, error } = await supabase
-        .from("orders")
-        .select("*")
-        .order("order_index", { ascending: true })
-
-      if (error) {
-        console.error("Erro ao buscar pedidos:", error)
-        return
-      }
-
-      const parsed = schema.array().safeParse(data)
-      if (parsed.success) {
-        setOrders(parsed.data)
-      } else {
-        console.error("Erro ao validar schema Zod:", parsed.error)
-      }
-
-      setLoading(false)
+    if (!companyId) return;
+  
+    async function loadEquipments() {
+      const data = await fetchEquipments(companyId);
+      setEquipments(data); 
+      setLoading(false);
     }
-
-    fetchOrders()
-  }, [])
+  
+    loadEquipments();
+  }, [companyId]);
 
   //const columns
-  const columns: CustomColumnDef<Order>[] = [
+  const columns: CustomColumnDef<Equipment>[] = [
     {
       id: "drag",
       header: () => null,
-      size: 25,
-      meta: { className: "w-[25px]" },
       cell: () => null,
       enableSorting: false,
       enableHiding: false,
     },
     {
-      id: "select",
-      size: 35,
-      meta: { className: "w-[35px]" },
-      header: ({ table }) => (
-        <div className="flex items-center justify-center">
-          <Checkbox
-            checked={table.getIsAllPageRowsSelected()}
-            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-            aria-label="Select all"
-          />
-        </div>
-      ),
-      cell: ({ row }) => (
-        <div className="flex items-center justify-center">
-          <Checkbox
-            checked={row.getIsSelected()}
-            onCheckedChange={(value) => row.toggleSelected(!!value)}
-            aria-label="Select row"
-          />
-        </div>
-      ),
-      enableSorting: false,
-      enableHiding: false,
-    },
-    {
-      accessorKey: "appointment_date",
-      header: "Data",
-      size: 90,
-      meta: { className: "w-[90px]" },
-      cell: ({ row }) => {
-        const rawDate = row.original.appointment_date
-        if (!rawDate) return "—"
-        const [year, month, day] = rawDate.split("-")
-        return `${day}/${month}/${year}`
+        accessorKey: "code",
+        header: "#",
+        meta: { className: "w-[120px]" },
       },
+    {
+      accessorKey: "name",
+      header: "Nome",
+      meta: { className: "w-[200px]" },
     },
     {
-      accessorKey: "appointment_hour",
-      header: "Hora",
-      size: 55,
-      meta: { className: "w-[55px]" },
-      cell: ({ row }) => row.original.appointment_hour,
+      accessorKey: "type",
+      header: "Tipo",
+      meta: { className: "w-[120px]" },
     },
     {
-      accessorKey: "customer",
-      header: "Cliente",
-      size: 180,
-      meta: { className: "w-[180px] truncate uppercase" },
+      accessorKey: "stock",
+      header: "Estoque",
+      meta: { className: "w-[100px] text-right" },
+      cell: ({ row }) => row.original.stock,
+    },
+    {
+      accessorKey: "value",
+      header: "Valor",
+      meta: { className: "w-[100px] text-right" },
       cell: ({ row }) => {
-        const sale = row.original
-        return (
-          <Button
-            variant="link"
-            className="p-0 text-left text-primary hover:underline"
+        const value = Number(row.original.value ?? 0);
+        return `R$ ${value.toFixed(2).replace(".", ",")}`;
+      }
+    },
+    {
+        id: "actions",
+        header: "",
+        size: 60,
+        meta: { className: "w-[60px]" },
+        cell: ({ row }) => (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="text-muted-foreground">
+                <IconDotsVertical size={16} />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+            <DropdownMenuItem
             onClick={() => {
-              setSelectedCustomer(sale)
-              setSheetOpen(true)
-            }}
-          >
-            {sale.customer}
-          </Button>
-        )
-      },
-    },
-    {
-      accessorKey: "phone",
-      header: "Tel",
-      size: 50,
-      meta: { className: "w-[50px]" },
-      cell: ({ row }) => {
-        const raw = row.original.phone || ""
-        const cleaned = raw.replace(/\D/g, "") // Remove ( ) - espaços
-        const message = "Olá, tudo bem? Sua entrega de chopp está a caminho."
-        const encodedMessage = encodeURIComponent(message)
-        const link = `https://wa.me/55${cleaned}?text=${encodedMessage}`
-    
-        return (
-          <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-          <a href={link} target="_blank" rel="noopener noreferrer">
-            <svg 
-            width="28"
-            height="28"
-            viewBox="0 0 32 32" 
-            className="text-primary hover:text-primary/80 fill-current transition-transform hover:scale-110"
-             xmlns="http://www.w3.org/2000/svg"
-            >
-              <path d=" M19.11 17.205c-.372 0-1.088 1.39-1.518 1.39a.63.63 0 0 1-.315-.1c-.802-.402-1.504-.817-2.163-1.447-.545-.516-1.146-1.29-1.46-1.963a.426.426 0 0 1-.073-.215c0-.33.99-.945.99-1.49 0-.143-.73-2.09-.832-2.335-.143-.372-.214-.487-.6-.487-.187 0-.36-.043-.53-.043-.302 0-.53.115-.746.315-.688.645-1.032 1.318-1.06 2.264v.114c-.015.99.472 1.977 1.017 2.78 1.23 1.82 2.506 3.41 4.554 4.34.616.287 2.035.888 2.722.888.817 0 2.15-.515 2.478-1.318.13-.33.244-.73.244-1.088 0-.058 0-.144-.03-.215-.1-.172-2.434-1.39-2.678-1.39zm-2.908 7.593c-1.747 0-3.48-.53-4.942-1.49L7.793 24.41l1.132-3.337a8.955 8.955 0 0 1-1.72-5.272c0-4.955 4.04-8.995 8.997-8.995S25.2 10.845 25.2 15.8c0 4.958-4.04 8.998-8.998 8.998zm0-19.798c-5.96 0-10.8 4.842-10.8 10.8 0 1.964.53 3.898 1.546 5.574L5 27.176l5.974-1.92a10.807 10.807 0 0 0 16.03-9.455c0-5.958-4.842-10.8-10.802-10.8z" 
-              fillRule="evenodd">
-              </path>
-            </svg>
-  
-          </a>
-          </TooltipTrigger>
-            <TooltipContent>
-              Send message via WhatsApp
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-        );
-      },
-    },
-    {
-      accessorKey: "products",
-      header: "Produtos",
-      size: 200,
-      meta: { className: "w-[200px] truncate uppercase" },
-      cell: ({ row }) => row.original.products,
-    },
-    {
-      accessorKey: "appointment_local",
-      header: "Localização",
-      size: 150,
-      meta: { className: "w-[150px] truncate uppercase" },
-      cell: ({ row }) => row.original.appointment_local,
-    },
-    {
-      accessorKey: "delivery_status",
-      header: "Delivery",
-      size: 80,
-      meta: { className: "w-[80px] uppercase" },
-      cell: ({ row }) => row.original.delivery_status,
-    },
-    {
-      accessorKey: "payment_method",
-      header: "Método",
-      size: 60,
-      meta: { className: "w-[60px] uppercase" },
-      cell: ({ row }) => row.original.payment_method,
-    },
-    {
-      accessorKey: "payment_status",
-      header: "Pagamento",
-      size: 80,
-      meta: { className: "w-[80px] uppercase" },
-      cell: ({ row }) => row.original.payment_status,
-    },
-    {
-      accessorKey: "total",
-      header: "Total",
-      size: 100,
-      meta: { className: "w-[100px] text-right uppercase" },
-      cell: ({ row }) => {
-        const value = row.original.total
-        return `R$ ${value.toFixed(2).replace('.', ',')}`
-      },
-    },
-    {
-      id: "actions",
-      header: "",
-      size: 50,
-      meta: { className: "w-[50px]" },
-      cell: ({ row }) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="text-muted-foreground">
-              <IconDotsVertical size={16} />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem>Ver</DropdownMenuItem>
-            <DropdownMenuItem>Pagar</DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href={`/dashboard/orders/${row.original.id}/edit`}>
-                Editar
-              </Link>
+                setSelectedEquipment(row.original)
+                setSheetOpen(true)
+            }}>
+            Ver
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem variant="destructive" onClick={() => deleteOrderById(row.original.id)}>Deletar</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ),
-    },
+              <DropdownMenuItem>Editar</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem variant="destructive">Deletar</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ),
+      },
   ]
 
   const [data, setData] = React.useState(() => initialData)
@@ -471,8 +296,8 @@ export function DataTable({
     [data]
   )
 
-  const table = useReactTable<Order>({
-    data: orders,
+  const table = useReactTable<Equipment>({
+    data: equipments,
     columns,
     state: {
       sorting,
@@ -501,33 +326,33 @@ export function DataTable({
   
     if (!active || !over || active.id === over.id) return
   
-    const oldIndex = orders.findIndex((item) => item.id === active.id)
-    const newIndex = orders.findIndex((item) => item.id === over.id)
+    const oldIndex = equipments.findIndex((item) => item.id === active.id)
+    const newIndex = equipments.findIndex((item) => item.id === over.id)
   
-    const newData = arrayMove(orders, oldIndex, newIndex)
+    const newData = arrayMove(equipments, oldIndex, newIndex)
   
-    setOrders(newData) // Atualiza visualmente imediatamente
-    setIsSavingOrder(true) // Ativa o spinner
+    setEquipments(newData) // Atualiza visualmente imediatamente
+    setIsSavingEquipment(true) // Ativa o spinner
   
     // Atualiza Supabase em paralelo
     Promise.all(
       newData.map((item, index) =>
-        supabase.from("orders").update({ order_index: index }).eq("id", item.id)
+        supabase.from("equipments").eq("id", item.id)
       )
     )
       .then(() => {
         console.log("Ordem salva com sucesso no Supabase")
-        setIsSavingOrder(false)
+        setIsSavingEquipment(false)
       })
       .catch((err) => {
         console.error("Erro ao atualizar ordem:", err)
-        setIsSavingOrder(false)
+        setIsSavingEquipment(false)
       })
   }
 
   return (
     <>
-    {isSavingOrder && (
+    {isSavingEquipment && (
       <div className="fixed top-2 left-1/2 z-50 -translate-x-1/2 rounded-full bg-white p-2 shadow-lg border border-muted">
         <svg
           className="animate-spin h-4 w-4 text-primary"
@@ -619,10 +444,10 @@ export function DataTable({
                 })}
             </DropdownMenuContent>
           </DropdownMenu>
-          <Link href={"/dashboard/orders/add"}>
+          <Link href={"/dashboard/equipments/add"}>
           <Button variant="default" size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground min-w-8 duration-200 ease-linear">
             <IconPlus />
-            <span className="hidden lg:inline">Add Order</span>
+            <span className="hidden lg:inline">Add Equipment</span>
           </Button>
           </Link>
         </div>
@@ -640,7 +465,7 @@ export function DataTable({
             sensors={sensors}
             id={sortableId}
           >
-            <Table className="table-fixed w-full uppercase">
+            <Table className="w-full uppercase">
               <TableHeader className="bg-muted sticky top-0 z-10">
                 {table.getHeaderGroups().map((headerGroup) => (
                   <TableRow key={headerGroup.id}>
@@ -650,7 +475,7 @@ export function DataTable({
                         <TableHead
                             key={header.id}
                             colSpan={header.colSpan}
-                            className={(header.column.columnDef as CustomColumnDef<Order>)?.meta?.className}
+                            className={(header.column.columnDef as CustomColumnDef<Equipment>)?.meta?.className}
                           >
                           {header.isPlaceholder
                             ? null
@@ -687,90 +512,46 @@ export function DataTable({
               </TableBody>
             </Table>
             <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-            <SheetContent side="right">
-              <SheetHeader>
-                <SheetTitle>Detalhes do Pedido</SheetTitle>
-                <SheetDescription>
-                  Detalhes sobre: <strong>{selectedCustomer?.customer}</strong><br/>
-                  Nota: <strong>{selectedCustomer?.note_number}</strong><br/>
-                  Tipo: <strong>{selectedCustomer?.document_type}</strong><br/>
-                </SheetDescription>
-              </SheetHeader>
+                <SheetContent side="right">
+                    <SheetHeader>
+                    <SheetTitle>Detalhes do Equipamento</SheetTitle>
+                    <SheetDescription>
+                        Informações sobre o equipamento cadastrado.
+                    </SheetDescription>
+                    </SheetHeader>
 
-    {selectedCustomer && (
-      <div className="mt-4 ml-4 flex flex-col gap-2 text-sm">
-        <div>
-          <strong>Data:</strong>{" "}
-          {selectedCustomer?.appointment_date
-            ? format(parseISO(selectedCustomer.appointment_date), "dd/MM/yyyy")
-            : "—"}
-        </div>
-        <div><strong>Hora:</strong> {selectedCustomer.appointment_hour}</div>
-        <div><strong>Nome:</strong> {selectedCustomer.customer}</div>
-          {selectedCustomer?.phone && (
-              <div>
-                <strong>Telefone:</strong>{" "}
-                <a
-                  href={`https://wa.me/55${selectedCustomer.phone.replace(/\D/g, "")}?text=${encodeURIComponent("Olá, tudo bem? Sua entrega de chopp está a caminho.")}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary hover:underline"
-                >
-                  {selectedCustomer.phone}
-                </a>
-              </div>
-            )}
-        <div><strong>Produtos:</strong><br/> {selectedCustomer.products}</div>
-        <div><strong>Quantidade:</strong> {selectedCustomer.amount}</div>
-        <div><strong>Localização:</strong> {selectedCustomer.appointment_local}</div>
-        <div><strong>Frete:</strong> {selectedCustomer.freight}</div>
-        <div><strong>Total:</strong> {selectedCustomer.total}</div>
-        <div><strong>Forma de Pagamento:</strong> {selectedCustomer.payment_method}</div>
-        <div><strong>Delivery:</strong> {selectedCustomer.delivery_status}</div>
-        <div><strong>Pagamento:</strong> {selectedCustomer.payment_status}</div>
-
-        <Button
-            className="mt-6"
-            variant={selectedCustomer?.delivery_status === "Coletado" ? "secondary" : "default"}
-            disabled={selectedCustomer?.delivery_status === "Coletado"}
-            onClick={async () => {
-              if (!selectedCustomer) return;
-
-              let nextStatus: "Coletar" | "Coletado" | null = null;
-
-              if (selectedCustomer.delivery_status === "Entregar") {
-                nextStatus = "Coletar";
-              } else if (selectedCustomer.delivery_status === "Coletar") {
-                nextStatus = "Coletado";
-              }
-
-              if (nextStatus) {
-                const { error } = await supabase
-                  .from("orders")
-                  .update({ delivery_status: nextStatus })
-                  .eq("id", selectedCustomer.id);
-
-                if (!error) {
-                  setSelectedCustomer({
-                    ...selectedCustomer,
-                    delivery_status: nextStatus,
-                  });
-                  toast.success(`Status atualizado para ${nextStatus}`);
-                } else {
-                  toast.error("Erro ao atualizar status.");
-                  console.error(error);
-                }
-              }
-            }}
-          >
-            {selectedCustomer?.delivery_status === "Entregar" && "Marcar como Entregue"}
-            {selectedCustomer?.delivery_status === "Coletar" && "Marcar como Coletado"}
-            {selectedCustomer?.delivery_status === "Coletado" && "Chopp já Coletado ✅"}
-          </Button>
-      </div>
-    )}
-  </SheetContent>
-</Sheet>
+                    {selectedEquipment && (
+                    <div className="mt-4 ml-4 flex flex-col gap-2 text-sm">
+                        <div>
+                        <strong>Nome:</strong> {selectedEquipment.name}
+                        </div>
+                        <div>
+                        <strong>Tipo:</strong> {selectedEquipment.type.toUpperCase()}
+                        </div>
+                        <div>
+                        <strong>Código:</strong> {selectedEquipment.code}
+                        </div>
+                        <div>
+                        <strong>Estoque:</strong> {selectedEquipment.stock}
+                        </div>
+                        <div>
+                        <strong>Valor:</strong>{" "}
+                        R$ {Number(selectedEquipment.value).toFixed(2).replace(".", ",")}
+                        </div>
+                        <div>
+                        <strong>Status:</strong>{" "}
+                        {selectedEquipment.is_available ? "Disponível" : "Indisponível"}
+                        </div>
+                        <div>
+                        <strong>Cadastro:</strong>{" "}
+                        {selectedEquipment.created_at
+                            ? format(parseISO(selectedEquipment.created_at), "dd/MM/yyyy")
+                            : "—"}
+                        </div>
+                    </div>
+                    )}
+                </SheetContent>
+                </Sheet>
           </DndContext>
         </div>
         <div className="flex items-center justify-between px-4">

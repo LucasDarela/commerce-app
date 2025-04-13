@@ -52,6 +52,12 @@ export default function NavDocumentsSidebar() {
             >
               Contas Bancárias
             </Link>
+            <Link
+              href="/dashboard/team-management"
+              className="block text-sm text-muted-foreground hover:text-foreground transition"
+            >
+              Usuários
+            </Link>
           </div>
         )}
         </SidebarMenu>

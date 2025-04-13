@@ -196,11 +196,9 @@ export default function BankManagement() {
     }
   }
 
-  
-
   return (
-    <Card className="max-w-3xl mx-auto p-6 rounded-lg shadow-md mt-4" >
-      <h2 className="text-xl font-bold mb-4">Register Bank Account</h2>
+      <div className="space-y-6 p-8">
+      <h2 className="text-xl font-bold mb-4">Registre uma Conta Bancária</h2>
       <div className="w-full flex justify-center gap-2 pb-4">
             <Input placeholder="Bank Code" value={newAccount.bankCode} onChange={(e) => setNewAccount({ ...newAccount, bankCode: e.target.value })} />
             <Input placeholder="Bank Name" value={newAccount.bankName} onChange={(e) => setNewAccount({ ...newAccount, bankName: e.target.value })} />
@@ -282,6 +280,6 @@ export default function BankManagement() {
               )}
             </TableBody>
         </Table>
-    </Card>
+    </div>
   );
 }

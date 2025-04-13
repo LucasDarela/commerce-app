@@ -160,7 +160,7 @@ export default function ListProduct() {
                 <TableRow
                   key={product.id}
                   onClick={() => openModal(product)}
-                  className="cursor-pointer hover:bg-gray-100 h-[50px]"
+                  className="cursor-pointer h-[50px]"
                 >
                   <TableCell>{product.code}</TableCell>
                   <TableCell>{product.name}</TableCell>
