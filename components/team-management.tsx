@@ -23,6 +23,13 @@ import {
 } from "@/components/ui/table"
 import { toast } from "sonner";
 
+type TeamMember = {
+  id: string;
+  email: string;
+  role: string;
+  isBlocked: boolean;
+};
+
 export default function TeamManagementPage() {
   const { user, companyId } = useAuthenticatedCompany();
   const [companyName, setCompanyName] = useState("");
@@ -47,23 +54,28 @@ export default function TeamManagementPage() {
     };
 
     const fetchTeam = async () => {
+      if (!companyId) return;
+    
       const { data, error } = await supabase
         .from("company_users")
-        .select("role, profiles(id, email)")
+        .select("role, user_id, profiles(id, email)")
         .eq("company_id", companyId);
-
-      if (!error && data) {
-        setTeamMembers(
-          data
-            .filter((item: any) => item.profiles) // opcional
-            .map((item: any) => ({
-              id: item.profiles?.id ?? "",
-              email: item.profiles?.email ?? "",
-              role: item.role,
-              isBlocked: false,
-            }))
-        );
+    
+      if (error) {
+        console.error("Erro ao buscar equipe:", error.message);
+        return;
       }
+    
+      const members: TeamMember[] = (data || [])
+        .filter((item: any) => item.profiles)
+        .map((item: any) => ({
+          id: item.user_id, // ← Importante para saber quem é o user
+          email: item.profiles.email,
+          role: item.role,
+          isBlocked: false,
+        }));
+    
+      setTeamMembers(members);
     };
 
     fetchCompany();
@@ -74,31 +86,76 @@ export default function TeamManagementPage() {
     if (!newMember.email || !newMember.password) {
       return toast.error("Please fill in email and password.");
     }
-
+  
     const { data, error } = await supabase.auth.signUp({
       email: newMember.email,
       password: newMember.password,
     });
-
-    if (error) return toast.error("Error creating user.");
-
+  
+    if (error) return toast.error("Erro ao criar usuário.");
+  
     const newUserId = data.user?.id;
-    if (newUserId) {
-      const { error: insertError } = await supabase.from("company_users").insert({
-        user_id: newUserId,
-        company_id: companyId,
-        role: newMember.role,
-      });
-
-      if (insertError) return toast.error("Failed to add member to company_users.");
-
-      setTeamMembers([
-        ...teamMembers,
-        { id: newUserId, email: newMember.email, role: newMember.role },
-      ]);
-      setNewMember({ email: "", password: "", role: "normal" });
-      toast.success("Team member added.");
+    if (!newUserId) return toast.error("Usuário não foi criado corretamente.");
+  
+    // ✅ Aguarda o profile ser criado pela trigger (se necessário)
+    let profileReady = false;
+    let attempts = 0;
+    while (!profileReady && attempts < 10) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("id", newUserId)
+        .maybeSingle();
+  
+      if (profile) {
+        profileReady = true;
+      } else {
+        await new Promise((res) => setTimeout(res, 500)); // espera 500ms
+        attempts++;
+      }
     }
+  
+    // ✅ Atualiza o company_id corretamente no profile do novo usuário
+    const { error: profileUpdateError } = await supabase
+      .from("profiles")
+      .update({ company_id: companyId })
+      .eq("id", newUserId);
+  
+    if (profileUpdateError) {
+      console.error("Erro ao atualizar company_id no perfil:", profileUpdateError);
+      return toast.error("Erro ao atualizar empresa no perfil.");
+    }
+  
+    // ⛔ Verifica se já está em company_users
+    const { data: existing } = await supabase
+      .from("company_users")
+      .select("id")
+      .eq("user_id", newUserId)
+      .eq("company_id", companyId)
+      .maybeSingle();
+  
+    // ✅ Vincula o user à company_users (caso ainda não esteja)
+    if (!existing) {
+      const { error: insertError } = await supabase
+        .from("company_users")
+        .insert({
+          user_id: newUserId,
+          company_id: companyId,
+          role: newMember.role,
+        });
+  
+      if (insertError) {
+        return toast.error("Erro ao vincular o usuário à empresa.");
+      }
+    }
+  
+    // ✅ Atualiza UI
+    setTeamMembers([
+      ...teamMembers,
+      { id: newUserId, email: newMember.email, role: newMember.role },
+    ]);
+    setNewMember({ email: "", password: "", role: "normal" });
+    toast.success("Team member added.");
   };
 
   const handleToggleBlock = (id: string, blocked: boolean) => {

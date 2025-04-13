@@ -10,6 +10,12 @@ import { toast } from "sonner";
 import { Pencil, Trash } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
+import {
+  IconChevronLeft,
+  IconChevronRight,
+  IconChevronsLeft,
+  IconChevronsRight,
+} from "@tabler/icons-react"
 
 type Cliente = {
   id: number;
@@ -38,6 +44,8 @@ export default function ListCustomers() {
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [catalogName, setCatalogName] = useState<string | null>(null)
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   useEffect(() => {
     if (!companyId || loading) return;
@@ -90,6 +98,13 @@ export default function ListCustomers() {
       telefone.includes(search.replace(/\D/g, ""))
     );
   });
+
+  const paginatedClientes = filteredClientes.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+  
+  const totalPages = Math.ceil(filteredClientes.length / itemsPerPage);
 
   const openModal = async (cliente: Cliente) => {
     setSelectedCliente(cliente);
@@ -148,7 +163,10 @@ export default function ListCustomers() {
           type="text"
           placeholder="Pesquise por Nome, CPF ou telefone..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setCurrentPage(1);
+          }}
           className="w-full h-8 p-2 border rounded-md"
         />
                 <Button size="sm" onClick={() => router.push("/dashboard/customers/add")} className="w-full sm:w-auto">
@@ -170,13 +188,13 @@ export default function ListCustomers() {
           </TableHeader>
           <TableBody>
             {filteredClientes.length > 0 ? (
-              filteredClientes.map((cliente) => (
+              paginatedClientes.map((cliente) => (
             <TableRow
               key={cliente.id}
               onClick={() => {
                 openModal(cliente);
               }}
-              className="cursor-pointer hover:bg-gray-100 h-[50px]"
+              className="cursor-pointer h-[50px]"
             >
                   <TableCell>{cliente.name}</TableCell>
                   <TableCell className="hidden md:table-cell">{cliente.type}</TableCell>
@@ -195,6 +213,32 @@ export default function ListCustomers() {
           </TableBody>
         </Table>
       </div>
+
+      {/* Paginação */}
+<div className="flex items-center justify-between mt-4">
+  <span className="text-sm">
+    Página {currentPage} de {totalPages}
+  </span>
+  <div className="flex gap-2">
+    <Button
+      size="sm"
+      variant="outline"
+      onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+      disabled={currentPage === 1}
+    >
+      <IconChevronsLeft />
+    </Button>
+    <Button
+      size="sm"
+      variant="outline"
+      onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+      disabled={currentPage === totalPages}
+    >
+      <IconChevronsRight />
+    </Button>
+  </div>
+</div>
+
 
       {/* 🔹 Modal de Detalhes do Cliente */}
       {isModalOpen && selectedCliente && (

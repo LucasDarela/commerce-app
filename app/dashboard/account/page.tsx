@@ -13,7 +13,7 @@ import { toast } from "sonner";
 export default function AccountPage() {
   const { user, companyId } = useAuthenticatedCompany();
   const [profile, setProfile] = useState<any>(null);
-  const [username, setUsername] = useState("");
+  const [username, setUsername] = useState("User");
   const [email, setEmail] = useState("");
   const [avatar, setAvatar] = useState<string | null>(null);
   const [companyName, setCompanyName] = useState("");
@@ -43,6 +43,7 @@ export default function AccountPage() {
         .from("companies")
         .select("name")
         .eq("id", companyId)
+        .limit(1)
         .single();
 
       if (!error && data) setCompanyName(data.name);

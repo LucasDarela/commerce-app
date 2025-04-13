@@ -42,35 +42,38 @@ export function LoginAccountForm() {
         },
     });
 
-    const onSubmit = async (values: z.infer<typeof 
-    formSchema>) => {
-
-        setIsLoading(true)
-
-        try{
-            const supabase = createClientComponentClient();
-            const {email, password} = values;
-            const {error, data: { session },
-        } = await supabase.auth.signInWithPassword({
-                email,
-                password,
-            });
-
-            if(error){
-                console.log("Login error:", error.message);
-                return;
-            }
-
+    const onSubmit = async (values: z.infer<typeof formSchema>) => {
+        setIsLoading(true);
+      
+        try {
+          const supabase = createClientComponentClient();
+          const { email, password } = values;
+      
+          const {
+            error,
+            data: { session },
+          } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+          });
+      
+          if (error?.status === 429) {
+            toast.error("Too many tries. Try again in a few minutes.");
+          } else if (error) {
+            toast.error("Login error: " + error.message);
+          } else if (session) {
+            toast.success("Login successfully!");
             form.reset();
             router.refresh();
             router.push("/dashboard");
-        }catch(error){
-            console.log("LoginAccountForm:onSubmit", error);
+          }
+        } catch (error) {
+          console.error("LoginAccountForm:onSubmit", error);
+          toast.error("Unexpected error while trying to log in.");
+        } finally {
+          setIsLoading(false);
         }
-        finally{
-            setIsLoading(false)
-        }
-    };
+      };
 
     const [showReset, setShowReset] = useState(false);
     const [resetEmail, setResetEmail] = useState("");
@@ -83,9 +86,9 @@ export function LoginAccountForm() {
     });
 
     if (error) {
-        toast.error("Erro ao enviar e-mail de recuperação.");
+        toast.error("Error sending recovery email.");
     } else {
-        toast.success("Verifique seu e-mail para redefinir a senha.");
+        toast.success("Check your email to reset your password.");
         setShowReset(false);
         setResetEmail("");
     }
@@ -132,7 +135,7 @@ export function LoginAccountForm() {
                         />
                             <Button type="submit" disabled={isLoading}>
                             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            {isLoading ? "Entrando..." : "Entrar"}
+                            {isLoading ? "Login in..." : "Login"}
                             </Button>
 
                         

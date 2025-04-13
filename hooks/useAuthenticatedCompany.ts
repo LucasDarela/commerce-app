@@ -29,7 +29,8 @@ export function useAuthenticatedCompany() {
         .from("company_users")
         .select("company_id")
         .eq("user_id", currentUser.id)
-        .maybeSingle();
+        .limit(1)
+        .single();
 
       if (companyError || !companyUser) {
         console.error("❌ Erro ao buscar empresa:", companyError?.message);

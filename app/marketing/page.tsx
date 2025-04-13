@@ -5,7 +5,8 @@ import LandingLayout from "./sections/LandingLayout";
 import { RedirectIfAuthenticated } from "@/hooks/redirect-if-authenticated";
 
 export default async function LandingPage() {
-  const supabase = createServerComponentClient({ cookies });
+  const cookieStore = cookies(); 
+  const supabase = createServerComponentClient({ cookies: () => cookieStore });
 
   try {
     const { data: { user } } = await supabase.auth.getUser();
