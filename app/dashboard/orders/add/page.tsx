@@ -225,7 +225,7 @@ export default function AddOrder() {
             body: JSON.stringify({
               nome: selectedCustomer?.name,
               email: selectedCustomer?.email || "email@placeholder.com",
-              cpf: selectedCustomer?.document?.replace(/\D/g, ""),
+              document: selectedCustomer?.document?.replace(/\D/g, ""),
               total,
             }),
           });

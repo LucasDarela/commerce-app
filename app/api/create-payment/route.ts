@@ -2,35 +2,52 @@ import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
   const body = await req.json();
-  const isCPF = body.cpf_cnpj.length === 11;
 
-  const response = await fetch("https://api.mercadopago.com/v1/payments", {
+  // Verifica se é CPF ou CNPJ com base no número (11 ou 14 dígitos)
+  const cleanDoc = body.document.replace(/\D/g, "");
+  const docType = cleanDoc.length === 11 ? "CPF" : "CNPJ";
+
+  const [first_name, ...rest] = (body.nome || "Cliente").split(" ");
+  const last_name = rest.join(" ") || "Sobrenome";
+
+  const response = await fetch("https://api.mercadopago.com/checkout/preferences", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      transaction_amount: body.total,
-      description: "Pagamento de pedido Boleto Chopp Hub",
-      payment_method_id: "bolbradesco", // boleto
+      items: [
+        {
+          title: "Pedido no Chopp Hub",
+          quantity: 1,
+          currency_id: "BRL",
+          unit_price: Number(body.total),
+        },
+      ],
       payer: {
         email: body.email,
-        first_name: body.nome,
+        first_name,
+        last_name,
         identification: {
-          type: isCPF ? "CPF" : "CNPJ",
-        number: body.cpf_cnpj,
+          type: docType,
+          number: cleanDoc,
         },
       },
+      payment_methods: {
+        // agora permite boleto também
+        excluded_payment_types: [], // permite todos
+      },
+      back_urls: {
+        success: "https://chopphub.com/sucesso",
+        failure: "https://chopphub.com/falha",
+        pending: "https://chopphub.com/pendente",
+      },
+      auto_return: "approved",
     }),
   });
 
   const data = await response.json();
-
-  if (!response.ok) {
-    console.error("Erro ao gerar pagamento:", data);
-    return NextResponse.json({ error: data }, { status: 400 });
-  }
 
   return NextResponse.json(data);
 }
