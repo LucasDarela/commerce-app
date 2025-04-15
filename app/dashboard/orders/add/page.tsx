@@ -557,6 +557,31 @@ export default function AddOrder() {
             <Button variant="default" onClick={handleSubmit} disabled={loading}>
               {loading ? "Saving..." : "Submit Order"}
             </Button>
+            <Button
+  onClick={async () => {
+    const response = await fetch("/api/create-payment", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nome: selectedCustomer?.name,
+        email: selectedCustomer?.email || "email@placeholder.com",
+        cpf: selectedCustomer?.document?.replace(/\D/g, ""),
+        total,
+      }),
+    });
+
+    const data = await response.json();
+    console.log("🚀 Retorno boleto:", data);
+
+    if (data.transaction_details?.external_resource_url) {
+      window.open(data.transaction_details.external_resource_url, "_blank");
+    } else {
+      toast.error("Erro ao gerar boleto.");
+    }
+  }}
+>
+  Gerar Boleto
+</Button>
           </div>
           </CardContent>
           </Card>
