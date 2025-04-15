@@ -111,21 +111,26 @@ import {
 } from "@/components/ui/sheet"
 import Link from "next/link"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { Equipment } from "@/components/types/equipments";
 
 //New Schema
 export const equipmentSchema = z.object({
-    id: z.string(),
-    name: z.string(),
-    type: z.string(),
-    code: z.string(),
-    stock: z.number(),
-    value: z.number(),
-    company_id: z.string(),
-    is_available: z.boolean().default(true),
-    created_at: z.string(),
-  });
+  id: z.string(),
+  name: z.string(),
+  type: z.string().nullable().optional(),
+  code: z.string().nullable().optional(),
+  stock: z.number(),
+  value: z.number().nullable().optional(),
+  company_id: z.string(),
+  is_available: z.boolean().default(true),
+  created_at: z.string(),
+})
 
-  type Equipment = z.infer<typeof equipmentSchema>
+  export type CustomColumnDef<TData> = ColumnDef<TData> & {
+    meta?: {
+      className?: string
+    }
+  }
 
 
 // Create a separate component for the drag handle
@@ -183,7 +188,8 @@ export function DataEquipments({
   data: initialData,
   companyId,
 }: {
-  data: z.infer<typeof schema>[]
+  data: Equipment[]
+  companyId: string
 }) {
     const [selectedEquipment, setSelectedEquipment] = React.useState<Equipment | null>(null)
   const [sheetOpen, setSheetOpen] = React.useState(false)
@@ -337,7 +343,10 @@ export function DataEquipments({
     // Atualiza Supabase em paralelo
     Promise.all(
       newData.map((item, index) =>
-        supabase.from("equipments").eq("id", item.id)
+        supabase
+                .from("equipments")
+                .update({ order_index: index })
+                .eq("id", item.id)
       )
     )
       .then(() => {
@@ -526,7 +535,7 @@ export function DataEquipments({
                         <strong>Nome:</strong> {selectedEquipment.name}
                         </div>
                         <div>
-                        <strong>Tipo:</strong> {selectedEquipment.type.toUpperCase()}
+                        <strong>Tipo:</strong> {(selectedEquipment.type ?? "").toUpperCase()}
                         </div>
                         <div>
                         <strong>Código:</strong> {selectedEquipment.code}

@@ -179,11 +179,11 @@ export default function AddOrder() {
       note_number: order.note_number,
       document_type: order.document_type,
       payment_method: capitalize(order.payment_method),
-      payment_status: "Pending",
-      days_ticket: ["Pix", "Cash"].includes(capitalize(order.payment_method)) ? "1" : order.days_ticket || "1",
+      payment_status: "Pendente",
+      days_ticket: ["Pix", "Dinheiro"].includes(capitalize(order.payment_method)) ? "1" : order.days_ticket || "1",
       total: getTotal(),
       freight,
-      delivery_status: "Pending",
+      delivery_status: "Entregar",
       appointment_date: appointment.date ? format(appointment.date, "yyyy-MM-dd") : null,
       appointment_hour: appointment.hour,
       appointment_local: appointment.location,
@@ -192,10 +192,15 @@ export default function AddOrder() {
     };
   
     const { data: insertedOrder, error } = await supabase
-      .from("orders")
-      .insert([newOrder])
-      .select()
-      .single();
+    .from("orders")
+    .insert([
+      {
+        ...newOrder,
+        order_index: 0,
+      },
+    ])
+    .select()
+    .single();
   
     if (error) {
       toast.error("Failed to create order.");
@@ -211,7 +216,6 @@ export default function AddOrder() {
       quantity: item.quantity,
       price: item.standard_price,
     }));
-    console.log("🚀 Dados enviados para orders:", newOrder)
     const { error: itemError } = await supabase.from("order_items").insert(orderItems);
   
     if (itemError) {

@@ -2,7 +2,7 @@ export type Equipment = {
   id: string;
   company_id: string;
   name: string;
-  type?: string | null;
+  type?: string | null | undefined;
   category?: string | null;
   brand?: string | null;
   model?: string | null;
@@ -24,7 +24,7 @@ export type EquipmentLoan = {
   quantity: number;
   start_date: string;
   end_date?: string | null;
-  status: "active" | "returned";
+  status: "Deposito" | "Cliente";
   notes?: string | null;
   created_at: string;
 };

@@ -4,11 +4,11 @@ import { useEffect, useState } from "react"
 import { fetchEquipments } from "@/lib/fetchEquipments"
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany"
 import { DataEquipments } from "@/components/data-equipments"
-import { Equipments } from "@/components/types/equipments"
+import { Equipment } from "@/components/types/equipments"
 
 export default function EquipmentsPage() {
   const { companyId, loading } = useAuthenticatedCompany()
-  const [equipments, setEquipments] = useState<Equipments[]>([])
+  const [equipments, setEquipments] = useState<Equipment[]>([])
   const [isFetching, setIsFetching] = useState(true)
 
   useEffect(() => {
