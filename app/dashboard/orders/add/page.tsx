@@ -70,6 +70,10 @@ export default function AddOrder() {
     payment_method: "Pix",
     days_ticket: "1",
   });
+
+  const [first_name, ...rest] = selectedCustomer?.name?.split(" ") || ["Cliente"];
+  const last_name = rest.length > 0 ? rest.join(" ") : "Sobrenome";
+
   const [loading, setLoading] = useState<boolean>(false);
 
   useEffect(() => {
@@ -223,12 +227,14 @@ export default function AddOrder() {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              nome: selectedCustomer?.name,
+              first_name,
+              last_name,
               email: selectedCustomer?.email || "email@placeholder.com",
               document: selectedCustomer?.document?.replace(/\D/g, ""),
               total,
             }),
           });
+         
   
           const data = await response.json();
   

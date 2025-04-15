@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 export async function POST(req: Request) {
   const body = await req.json();
 
+  console.log("📦 Dados recebidos para gerar boleto:", body);
+
   // Verifica se é CPF ou CNPJ com base no número (11 ou 14 dígitos)
   const cleanDoc = body.document.replace(/\D/g, "");
   const docType = cleanDoc.length === 11 ? "CPF" : "CNPJ";
@@ -27,11 +29,11 @@ export async function POST(req: Request) {
       ],
       payer: {
         email: body.email,
-        first_name,
-        last_name,
+        first_name: body.first_name,
+        last_name: body.last_name,
         identification: {
-          type: docType,
-          number: cleanDoc,
+          type: body.document.length === 11 ? "CPF" : "CNPJ",
+          number: body.document,
         },
       },
       payment_methods: {
