@@ -566,7 +566,7 @@ export default function AddOrder() {
         nome: selectedCustomer?.name,
         email: selectedCustomer?.email || "email@placeholder.com",
         cpf: selectedCustomer?.document?.replace(/\D/g, ""),
-        total,
+        total: getTotal(),
       }),
     });
 
