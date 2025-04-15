@@ -162,26 +162,25 @@ export default function AddOrder() {
   
     setLoading(true);
   
-    // Calcular dados derivados
     const amount = items.reduce((acc, item) => acc + item.quantity, 0);
     const productsDescription = items.map((item) => `${item.name} (${item.quantity}x)`).join(", ");
     const total = getTotal();
-
+  
     const capitalize = (text: string) =>
-      text.charAt(0).toUpperCase() + text.slice(1).toLowerCase()
+      text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
   
     const newOrder = {
       customer_id: order.customer_id,
       customer: selectedCustomer?.name ?? "N/A",
       phone: selectedCustomer?.phone ?? "N/A",
-      products: items.length > 0 ? items.map(item => `${item.name} (${item.quantity}x)`).join(", ") : "No products",
-      amount: items.reduce((sum, item) => sum + item.quantity, 0),
+      products: productsDescription,
+      amount,
       note_number: order.note_number,
       document_type: order.document_type,
       payment_method: capitalize(order.payment_method),
       payment_status: "Pendente",
       days_ticket: ["Pix", "Dinheiro"].includes(capitalize(order.payment_method)) ? "1" : order.days_ticket || "1",
-      total: getTotal(),
+      total,
       freight,
       delivery_status: "Entregar",
       appointment_date: appointment.date ? format(appointment.date, "yyyy-MM-dd") : null,
@@ -192,15 +191,10 @@ export default function AddOrder() {
     };
   
     const { data: insertedOrder, error } = await supabase
-    .from("orders")
-    .insert([
-      {
-        ...newOrder,
-        order_index: 0,
-      },
-    ])
-    .select()
-    .single();
+      .from("orders")
+      .insert([{ ...newOrder, order_index: 0 }])
+      .select()
+      .single();
   
     if (error) {
       toast.error("Failed to create order.");
@@ -209,19 +203,47 @@ export default function AddOrder() {
       return;
     }
   
-    // 🔹 Inserir os itens na tabela `order_items`
     const orderItems = items.map((item) => ({
       order_id: insertedOrder.id,
       product_id: item.id,
       quantity: item.quantity,
       price: item.standard_price,
     }));
+  
     const { error: itemError } = await supabase.from("order_items").insert(orderItems);
   
     if (itemError) {
       toast.error("Order created but failed to insert items.");
       console.error("❌ Error inserting order items:", itemError);
     } else {
+      // 🔸 Gera boleto se o método for boleto
+      if (capitalize(order.payment_method) === "Boleto") {
+        try {
+          const response = await fetch("/api/create-payment", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              nome: selectedCustomer?.name,
+              email: selectedCustomer?.email || "email@placeholder.com",
+              cpf: selectedCustomer?.document?.replace(/\D/g, ""),
+              total,
+            }),
+          });
+  
+          const data = await response.json();
+  
+          if (data.transaction_details?.external_resource_url) {
+            window.open(data.transaction_details.external_resource_url, "_blank");
+          } else {
+            console.error("Erro ao gerar boleto:", data);
+            toast.error("Erro ao gerar boleto. Verifique os dados do cliente.");
+          }
+        } catch (err) {
+          console.error("Erro na integração com Mercado Pago:", err);
+          toast.error("Erro ao gerar boleto.");
+        }
+      }
+  
       toast.success("Order created successfully!");
       router.push("/dashboard/orders");
     }
@@ -255,13 +277,13 @@ export default function AddOrder() {
   return (
     <div className="max-w-4xl mx-auto p-6 rounded-lg shadow-md">
       <div className="grid grid-cols-3 gap-4">
-        <h1 className="text-2xl font-bold mb-4">Create Order</h1>
+        <h1 className="text-2xl font-bold mb-4">Criar Venda</h1>
       </div>
   
     {/* Select Document Type */}
     <Card className="mb-6">
       <CardContent className="space-y-4">
-        <h2 className="text-xl font-bold mb-4">Document Info</h2>
+        <h2 className="text-xl font-bold mb-4">Informações do Documento</h2>
         <div className="flex flex-col-2 w-full h-auto gap-4">
           <Select
             onValueChange={(value) => {
@@ -270,17 +292,17 @@ export default function AddOrder() {
             }}
           >
             <SelectTrigger className="border border-gray-300 rounded-md shadow-sm w-full">
-              <SelectValue placeholder="Document Type" />
+              <SelectValue placeholder="Tipo de Documento" />
             </SelectTrigger>
             <SelectContent className="shadow-md rounded-md">
-              <SelectItem value="internal">Internal</SelectItem>
-              <SelectItem value="invoice">Invoice</SelectItem>
+              <SelectItem value="internal">Interno</SelectItem>
+              <SelectItem value="invoice">Fiscal</SelectItem>
             </SelectContent>
           </Select>
 
           <Input
             type="text"
-            placeholder="Document Number"
+            placeholder="Numero do Documento"
             value={order.note_number}
             onChange={(e) => setOrder((prev) => ({ ...prev, note_number: e.target.value }))}
           />
@@ -293,12 +315,12 @@ export default function AddOrder() {
         <CardContent>
 
           {/* Customer Info */}
-          <h2 className="text-xl font-bold mb-4">Customer Info</h2>
+          <h2 className="text-xl font-bold mb-4">Informações do Cliente</h2>
           <div className="grid grid-cols-5 gap-4 mb-4">
           <div className="col-span-4 relative">
             <Input
               type="text"
-              placeholder="Search Customer..."
+              placeholder="Procurar Cliente..."
               value={searchCustomer}
               onChange={(e) => {
                 setSearchCustomer(e.target.value);
@@ -323,20 +345,20 @@ export default function AddOrder() {
             )}
           </div>
             <Link href="/dashboard/customers/add">
-              <Button variant="default" className="w-full">Add</Button>
+              <Button variant="default" className="w-full">Adicionar</Button>
             </Link>
           </div>
 
           {/* Display selected customer fields */}
           <div className="grid grid-cols-2 gap-4">
-            <Input value={selectedCustomer?.document ?? ""} readOnly placeholder="Document" className="bg-muted" />
-            <Input value={selectedCustomer?.phone ?? ""} readOnly placeholder="Phone" className="bg-muted" />
-            <Input value={selectedCustomer?.address ?? ""} readOnly placeholder="Address" className="bg-muted" />
-            <Input value={selectedCustomer?.zip_code ?? ""} readOnly placeholder="Postal Code" className="bg-muted" />
-            <Input value={selectedCustomer?.neighborhood ?? ""} readOnly placeholder="Neighborhood" className="bg-muted" />
-            <Input value={selectedCustomer?.city ?? ""} readOnly placeholder="City" className="bg-muted" />
-            <Input value={selectedCustomer?.state ?? ""} readOnly placeholder="State" className="bg-muted" />
-            <Input value={selectedCustomer?.number ?? ""} readOnly placeholder="Number" className="bg-muted" />
+            <Input value={selectedCustomer?.document ?? ""} readOnly placeholder="Documento" className="bg-muted" />
+            <Input value={selectedCustomer?.phone ?? ""} readOnly placeholder="Telefone" className="bg-muted" />
+            <Input value={selectedCustomer?.address ?? ""} readOnly placeholder="Endereço" className="bg-muted" />
+            <Input value={selectedCustomer?.zip_code ?? ""} readOnly placeholder="CEP" className="bg-muted" />
+            <Input value={selectedCustomer?.neighborhood ?? ""} readOnly placeholder="Bairro" className="bg-muted" />
+            <Input value={selectedCustomer?.city ?? ""} readOnly placeholder="Cidade" className="bg-muted" />
+            <Input value={selectedCustomer?.state ?? ""} readOnly placeholder="Estado" className="bg-muted" />
+            <Input value={selectedCustomer?.number ?? ""} readOnly placeholder="Número" className="bg-muted" />
           </div>
       </CardContent>
     </Card>
@@ -344,7 +366,7 @@ export default function AddOrder() {
       {/* Products */}
       <Card className="mb-6">
         <CardContent className="space-y-4">
-        <h2 className="text-xl font-bold mb-4">Select Products</h2>
+        <h2 className="text-xl font-bold mb-4">Selecione os Produtos</h2>
           <div className="grid grid-cols-4 gap-4 items-center">
             <Select
               onValueChange={(value) => {
@@ -377,14 +399,14 @@ export default function AddOrder() {
 
             <Input
               type="number"
-              placeholder="Quantity"
+              placeholder="Quantidade"
               value={quantity === 0 ? "" : quantity}
               onChange={(e) => setQuantity(Number(e.target.value))}
             />
 
             <Input
               type="number"
-              placeholder="Price"
+              placeholder="Preço"
               value={standardPrice ?? ""}
               onChange={(e) => {
                 const value = e.target.value;
@@ -433,28 +455,28 @@ export default function AddOrder() {
               </SelectTrigger>
               <SelectContent className="w-full shadow-md rounded-md">
               <SelectItem value="Pix">Pix</SelectItem>
-              <SelectItem value="Cash">Cash</SelectItem>
-              <SelectItem value="Card">Card</SelectItem>
-              <SelectItem value="Ticket">Ticket</SelectItem>
+              <SelectItem value="Dinheiro">Dinheiro</SelectItem>
+              <SelectItem value="Cartao">Cartão</SelectItem>
+              <SelectItem value="Boleto">Boleto</SelectItem>
               </SelectContent>
             </Select>
             <Input
               type="number"
-              placeholder="Days"
+              placeholder="Dias"
               value={order.days_ticket}
               onChange={(e) => setOrder((prev) => ({ ...prev, days_ticket: e.target.value }))}
-              disabled={["pix", "cash"].includes(order.payment_method)}
-              className={`w-full border border-gray-300 rounded-md shadow-sm ${["Pix", "Cash"].includes(order.payment_method) ? "cursor-not-allowed bg-gray-100 text-gray-500" : ""}`}
+              disabled={["pix", "dinheiro"].includes(order.payment_method)}
+              className={`w-full border border-gray-300 rounded-md shadow-sm ${["Pix", "Dinheiro"].includes(order.payment_method) ? "cursor-not-allowed bg-gray-100 text-gray-500" : ""}`}
             />
           </div>
 
           <Table className="mt-4">
             <TableHeader>
               <TableRow>
-                <TableHead>Product</TableHead>
-                <TableHead>Qty</TableHead>
-                <TableHead>Price</TableHead>
-                <TableHead>Actions</TableHead>
+                <TableHead>Produtos</TableHead>
+                <TableHead>Quantidade</TableHead>
+                <TableHead>Preço</TableHead>
+                <TableHead>Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

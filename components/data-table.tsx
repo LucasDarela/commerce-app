@@ -169,8 +169,6 @@ function DragHandle({ id }: { id: string }) {
   )
 }
 
-
-
 function DraggableRow({ row }: { row: Row<Order> }) {
   const { transform, transition, setNodeRef, isDragging } = useSortable({
     id: row.original.id,
@@ -342,7 +340,7 @@ export function DataTable({
       meta: { className: "w-[50px]" },
       cell: ({ row }) => {
         const raw = row.original.phone || ""
-        const cleaned = raw.replace(/\D/g, "") // Remove ( ) - espaços
+        const cleaned = raw.replace(/\D/g, "")
         const message = "Olá, tudo bem? Sua entrega de chopp está a caminho."
         const encodedMessage = encodeURIComponent(message)
         const link = `https://wa.me/55${cleaned}?text=${encodedMessage}`
@@ -425,24 +423,44 @@ export function DataTable({
       size: 50,
       meta: { className: "w-[50px]" },
       cell: ({ row }) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="text-muted-foreground">
-              <IconDotsVertical size={16} />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem>Ver</DropdownMenuItem>
-            <DropdownMenuItem>Pagar</DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href={`/dashboard/orders/${row.original.id}/edit`}>
-                Editar
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem variant="destructive" onClick={() => deleteOrderById(row.original.id)}>Deletar</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+<DropdownMenu>
+  <DropdownMenuTrigger asChild>
+    <Button variant="ghost" size="icon" className="text-muted-foreground">
+      <IconDotsVertical size={16} />
+    </Button>
+  </DropdownMenuTrigger>
+
+  <DropdownMenuContent align="end">
+    <DropdownMenuItem asChild>
+      <button
+        className="w-full text-left"
+        onClick={() => {
+          setSelectedCustomer(row.original);
+          setSheetOpen(true);
+        }}
+      >
+        Ver
+      </button>
+    </DropdownMenuItem>
+
+    <DropdownMenuItem>Pagar</DropdownMenuItem>
+
+    <DropdownMenuItem asChild>
+      <Link href={`/dashboard/orders/${row.original.id}/edit`}>
+        Editar
+      </Link>
+    </DropdownMenuItem>
+
+    <DropdownMenuSeparator />
+
+    <DropdownMenuItem
+      variant="destructive"
+      onClick={() => deleteOrderById(row.original.id)}
+    >
+      Deletar
+    </DropdownMenuItem>
+  </DropdownMenuContent>
+</DropdownMenu>
       ),
     },
   ]
