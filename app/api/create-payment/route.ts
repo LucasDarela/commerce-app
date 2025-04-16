@@ -1,55 +1,69 @@
 import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
-  const body = await req.json();
+  try {
+    const body = await req.json();
 
-  console.log("📦 Dados recebidos para gerar boleto:", body);
+    console.log("📦 Dados recebidos para gerar boleto:", body);
 
-  // Verifica se é CPF ou CNPJ com base no número (11 ou 14 dígitos)
-  const cleanDoc = body.document.replace(/\D/g, "");
-  const docType = cleanDoc.length === 11 ? "CPF" : "CNPJ";
+    // Verificação de campos obrigatórios
+    if (!body.document || !body.nome || !body.total) {
+      console.error("❌ Dados obrigatórios ausentes");
+      return NextResponse.json({ error: "Dados obrigatórios ausentes" }, { status: 400 });
+    }
 
-  const [first_name, ...rest] = (body.nome || "Cliente").split(" ");
-  const last_name = rest.join(" ") || "Sobrenome";
+    const cleanDoc = body.document.replace(/\D/g, "");
+    const docType = cleanDoc.length === 11 ? "CPF" : "CNPJ";
 
-  const response = await fetch("https://api.mercadopago.com/checkout/preferences", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      items: [
-        {
-          title: "Pedido no Chopp Hub",
-          quantity: 1,
-          currency_id: "BRL",
-          unit_price: Number(body.total),
+    const [first_name, ...rest] = (body.nome || "Cliente").split(" ");
+    const last_name = rest.join(" ") || "Sobrenome";
+
+    const response = await fetch("https://api.mercadopago.com/checkout/preferences", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        items: [
+          {
+            title: "Pedido no Chopp Hub",
+            quantity: 1,
+            currency_id: "BRL",
+            unit_price: Number(body.total),
+          },
+        ],
+        payer: {
+          email: body.email || "sememail@chopphub.com",
+          first_name,
+          last_name,
+          identification: {
+            type: docType,
+            number: cleanDoc,
+          },
         },
-      ],
-      payer: {
-        email: body.email,
-        first_name: body.first_name,
-        last_name: body.last_name,
-        identification: {
-          type: body.document.length === 11 ? "CPF" : "CNPJ",
-          number: body.document,
+        payment_methods: {
+          excluded_payment_types: [], // permite todos os métodos
         },
-      },
-      payment_methods: {
-        // agora permite boleto também
-        excluded_payment_types: [], // permite todos
-      },
-      back_urls: {
-        success: "https://chopphub.com/sucesso",
-        failure: "https://chopphub.com/falha",
-        pending: "https://chopphub.com/pendente",
-      },
-      auto_return: "approved",
-    }),
-  });
+        back_urls: {
+          success: "https://chopphub.com/sucess",
+          failure: "https://chopphub.com/failure",
+          pending: "https://chopphub.com/pending",
+        },
+        auto_return: "approved",
+      }),
+    });
 
-  const data = await response.json();
+    const data = await response.json();
 
-  return NextResponse.json(data);
+    if (!response.ok) {
+      console.error("❌ Erro na API do Mercado Pago:", data);
+      return NextResponse.json({ error: "Erro ao gerar pagamento", details: data }, { status: 500 });
+    }
+
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error("❌ Erro inesperado ao gerar boleto:", error);
+    return NextResponse.json({ error: "Erro interno ao gerar boleto" }, { status: 500 });
+  }
 }
