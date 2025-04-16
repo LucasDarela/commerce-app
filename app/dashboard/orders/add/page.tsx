@@ -545,7 +545,13 @@ export default function AddOrder() {
                   document: selectedCustomer?.document?.replace(/\D/g, ""),
                   total: getTotal(),
                   days_ticket: order.days_ticket,
-                }),
+                  zip_code: selectedCustomer?.zip_code,
+                  address: selectedCustomer?.address,
+                  number: selectedCustomer?.number,
+                  neighborhood: selectedCustomer?.neighborhood,
+                  city: selectedCustomer?.city,
+                  state: selectedCustomer?.state,
+                })
               });
 
               const data = await response.json();

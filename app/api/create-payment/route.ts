@@ -43,7 +43,15 @@ export async function POST(req: Request) {
             type: docType,
             number: cleanDoc,
           },
-        },
+          address: {
+            zip_code: body.zip_code ?? "",
+            street_name: body.address ?? "",
+            street_number: body.number ?? "",
+            neighborhood: body.neighborhood ?? "",
+            city: body.city ?? "",
+            federal_unit: body.state ?? "", // ← o campo exigido
+          },
+        }
       }),
     });
 
