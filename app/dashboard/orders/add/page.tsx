@@ -220,45 +220,6 @@ export default function AddOrder() {
       toast.error("Order created but failed to insert items.");
       console.error("❌ Error inserting order items:", itemError);
     } else {
-      // 🔸 Gera boleto se o método for boleto
-      if (capitalize(order.payment_method) === "Boleto") {
-        try {
-          const response = await fetch("/api/create-payment", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              transaction_amount: Number(body.total),
-              payment_method_id: "bolbradesco",
-              payer: {
-                email: body.email,
-                first_name,
-                last_name,
-                identification: {
-                  type: docType,
-                  number: cleanDoc,
-                },
-              },
-              description: "Pedido no Chopp Hub",
-              statement_descriptor: "CHOPPHUB",
-              date_of_expiration: formattedDueDate, // <- aqui define o vencimento
-            }),
-          });
-         
-  
-          const data = await response.json();
-  
-          if (data.transaction_details?.external_resource_url) {
-            window.open(data.transaction_details.external_resource_url, "_blank");
-          } else {
-            toast.error("Não foi possível gerar o boleto.");
-            console.error("🔍 Retorno sem link de boleto:", data);
-          }
-        } catch (err) {
-          console.error("Erro na integração com Mercado Pago:", err);
-          toast.error("Erro ao gerar boleto.");
-        }
-      }
-  
       toast.success("Order created successfully!");
       router.push("/dashboard/orders");
     }
@@ -566,42 +527,42 @@ export default function AddOrder() {
             <Button variant="default" onClick={handleSubmit} disabled={loading}>
               {loading ? "Saving..." : "Submit Order"}
             </Button>
+
+                      {/* gerar boleto  */}
             <Button
-  onClick={async () => {
-    const response = await fetch("/api/create-payment", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        transaction_amount: Number(body.total),
-        payment_method_id: "bolbradesco",
-        payer: {
-          email: body.email,
-          first_name,
-          last_name,
-          identification: {
-            type: docType,
-            number: cleanDoc,
-          },
-        },
-        description: "Pedido no Chopp Hub",
-        statement_descriptor: "CHOPPHUB",
-        date_of_expiration: formattedDueDate, // <- aqui define o vencimento
-      }),
-    });
+            onClick={async () => {
+              if (!selectedCustomer) {
+                toast.error("Selecione um cliente para gerar o boleto.");
+                return;
+              }
 
-    const data = await response.json();
-    console.log("🚀 Retorno boleto:", data);
+              const response = await fetch("/api/create-payment", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  nome: selectedCustomer?.name,
+                  email: selectedCustomer?.email || "email@placeholder.com",
+                  document: selectedCustomer?.document?.replace(/\D/g, ""),
+                  total: getTotal(),
+                  days_ticket: order.days_ticket,
+                }),
+              });
 
-    if (data.transaction_details?.external_resource_url) {
-      window.open(data.transaction_details.external_resource_url, "_blank");
-    } else {
-      toast.error("Não foi possível gerar o boleto.");
-      console.error("🔍 Retorno sem link de boleto:", data);
-    }
-  }}
->
-  Gerar Boleto
-</Button>
+              const data = await response.json();
+              console.log("🚀 Retorno boleto:", data);
+
+              if (data.transaction_details?.external_resource_url) {
+                window.open(data.transaction_details.external_resource_url, "_blank");
+              } else {
+                toast.error("Não foi possível gerar o boleto.");
+                console.error("🔍 Retorno sem link de boleto:", data);
+              }
+            }}
+          >
+            Gerar Boleto
+          </Button>
+
+
           </div>
           </CardContent>
           </Card>
