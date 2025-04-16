@@ -227,11 +227,20 @@ export default function AddOrder() {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              first_name,
-              last_name,
-              email: selectedCustomer?.email || "email@placeholder.com",
-              document: selectedCustomer?.document?.replace(/\D/g, ""),
-              total,
+              transaction_amount: Number(body.total),
+              payment_method_id: "bolbradesco",
+              payer: {
+                email: body.email,
+                first_name,
+                last_name,
+                identification: {
+                  type: docType,
+                  number: cleanDoc,
+                },
+              },
+              description: "Pedido no Chopp Hub",
+              statement_descriptor: "CHOPPHUB",
+              date_of_expiration: formattedDueDate, // <- aqui define o vencimento
             }),
           });
          
@@ -241,8 +250,8 @@ export default function AddOrder() {
           if (data.transaction_details?.external_resource_url) {
             window.open(data.transaction_details.external_resource_url, "_blank");
           } else {
-            console.error("Erro ao gerar boleto:", data);
-            toast.error("Erro ao gerar boleto. Verifique os dados do cliente.");
+            toast.error("Não foi possível gerar o boleto.");
+            console.error("🔍 Retorno sem link de boleto:", data);
           }
         } catch (err) {
           console.error("Erro na integração com Mercado Pago:", err);
@@ -563,10 +572,20 @@ export default function AddOrder() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        nome: selectedCustomer?.name,
-        email: selectedCustomer?.email || "email@placeholder.com",
-        document: selectedCustomer?.document?.replace(/\D/g, ""),
-        total: getTotal(),
+        transaction_amount: Number(body.total),
+        payment_method_id: "bolbradesco",
+        payer: {
+          email: body.email,
+          first_name,
+          last_name,
+          identification: {
+            type: docType,
+            number: cleanDoc,
+          },
+        },
+        description: "Pedido no Chopp Hub",
+        statement_descriptor: "CHOPPHUB",
+        date_of_expiration: formattedDueDate, // <- aqui define o vencimento
       }),
     });
 
@@ -576,7 +595,8 @@ export default function AddOrder() {
     if (data.transaction_details?.external_resource_url) {
       window.open(data.transaction_details.external_resource_url, "_blank");
     } else {
-      toast.error("Erro ao gerar boleto.");
+      toast.error("Não foi possível gerar o boleto.");
+      console.error("🔍 Retorno sem link de boleto:", data);
     }
   }}
 >

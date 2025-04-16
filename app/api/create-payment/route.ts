@@ -4,6 +4,11 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
 
+    const daysToExpire = parseInt(body.days_ticket) || 1;
+    const today = new Date();
+    const dueDate = new Date(today.setDate(today.getDate() + daysToExpire));
+    const formattedDueDate = dueDate.toISOString().split("T")[0];
+
     console.log("📦 Dados recebidos para gerar boleto:", body);
 
     // Verificação de campos obrigatórios
@@ -18,39 +23,18 @@ export async function POST(req: Request) {
     const [first_name, ...rest] = (body.nome || "Cliente").split(" ");
     const last_name = rest.join(" ") || "Sobrenome";
 
-    const response = await fetch("https://api.mercadopago.com/checkout/preferences", {
+    const response = await fetch("https://api.mercadopago.com/v1/payments", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        items: [
-          {
-            title: "Pedido no Chopp Hub",
-            quantity: 1,
-            currency_id: "BRL",
-            unit_price: Number(body.total),
-          },
-        ],
-        payer: {
-          email: body.email || "sememail@chopphub.com",
-          first_name,
-          last_name,
-          identification: {
-            type: docType,
-            number: cleanDoc,
-          },
-        },
-        payment_methods: {
-          excluded_payment_types: [], // permite todos os métodos
-        },
-        back_urls: {
-          success: "https://chopphub.com/sucess",
-          failure: "https://chopphub.com/failure",
-          pending: "https://chopphub.com/pending",
-        },
-        auto_return: "approved",
+        nome: selectedCustomer?.name,
+        email: selectedCustomer?.email || "email@placeholder.com",
+        document: selectedCustomer?.document?.replace(/\D/g, ""),
+        total: getTotal(),
+        days_ticket: order.days_ticket,
       }),
     });
 
