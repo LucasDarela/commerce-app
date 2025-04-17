@@ -527,48 +527,6 @@ export default function AddOrder() {
             <Button variant="default" onClick={handleSubmit} disabled={loading}>
               {loading ? "Saving..." : "Submit Order"}
             </Button>
-
-                      {/* gerar boleto  */}
-            <Button
-            onClick={async () => {
-              if (!selectedCustomer) {
-                toast.error("Selecione um cliente para gerar o boleto.");
-                return;
-              }
-
-              const response = await fetch("/api/create-payment", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  nome: selectedCustomer?.name,
-                  email: selectedCustomer?.email || "email@placeholder.com",
-                  document: selectedCustomer?.document?.replace(/\D/g, ""),
-                  total: getTotal(),
-                  days_ticket: order.days_ticket,
-                  zip_code: selectedCustomer?.zip_code,
-                  address: selectedCustomer?.address,
-                  number: selectedCustomer?.number,
-                  neighborhood: selectedCustomer?.neighborhood,
-                  city: selectedCustomer?.city,
-                  state: selectedCustomer?.state,
-                })
-              });
-
-              const data = await response.json();
-              console.log("🚀 Retorno boleto:", data);
-
-              if (data.transaction_details?.external_resource_url) {
-                window.open(data.transaction_details.external_resource_url, "_blank");
-              } else {
-                toast.error("Não foi possível gerar o boleto.");
-                console.error("🔍 Retorno sem link de boleto:", data);
-              }
-            }}
-          >
-            Gerar Boleto
-          </Button>
-
-
           </div>
           </CardContent>
           </Card>

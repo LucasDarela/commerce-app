@@ -117,6 +117,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet"
 import Link from "next/link"
+import { useRouter } from "next/navigation";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { supabase } from "@/lib/supabase"
 
@@ -213,6 +214,7 @@ export function DataTable({
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [isSavingOrder, setIsSavingOrder] = useState(false)
+  const router = useRouter();
 
   const deleteOrderById = async (id: string) => {
     const confirmDelete = confirm("Tem certeza que deseja excluir esta nota?");
@@ -439,10 +441,17 @@ export function DataTable({
           setSheetOpen(true);
         }}
       >
-        Ver
+        Ver Nota
       </button>
     </DropdownMenuItem>
-
+    <DropdownMenuItem>
+        <button
+      onClick={() => router.push(`/dashboard/orders/${row.original.id}/boleto`)}
+      disabled={row.original.payment_method.toLowerCase() !== "boleto"}
+    >
+      Gerar Boleto
+    </button>
+    </DropdownMenuItem>
     <DropdownMenuItem>Pagar</DropdownMenuItem>
 
     <DropdownMenuItem asChild>
