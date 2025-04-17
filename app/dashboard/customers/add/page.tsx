@@ -16,7 +16,6 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select"
-
 const initialCliente = {
   type: "CPF",
   document: "",
@@ -33,14 +32,11 @@ const initialCliente = {
   email: "",
   state_registration: "",
 };
-
 export default function CreateClient() {
   const router = useRouter();
   const inputRefs = useRef<HTMLInputElement[]>([]);
   const { user, companyId, loading } = useAuthenticatedCompany();
-
   const [cliente, setCliente] = useState(initialCliente);
-
   const placeholdersMap: Record<string, string> = {
     document: "CPF/CNPJ",
     name: "Nome Completo / Razão Social",
@@ -56,11 +52,9 @@ export default function CreateClient() {
     email: "Email (Opcional)",
     state_registration: "Inscrição Estadual",
   };
-
   const formatarMaiusculo = (valor: string, campo: string) => {
     return campo === "email" ? valor : valor.toUpperCase();
   };
-
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value: rawValue } = e.target;
     const formattedValue =
@@ -75,7 +69,6 @@ export default function CreateClient() {
       [name]: formattedValue,
     }));
   };
-
   const setTipoCliente = (tipo: "CPF" | "CNPJ") => {
     setCliente({
       type: tipo,
@@ -94,13 +87,10 @@ export default function CreateClient() {
       state_registration: "",
     });
   };
-
   const buscarEndereco = async () => {
     if (!cliente.zip_code || cliente.zip_code.length !== 8) return;
-  
     try {
       const { data } = await axios.get(`https://viacep.com.br/ws/${cliente.zip_code}/json/`);
-  
       if (data.erro) {
         toast.error("CEP inválido!");
       } else {
@@ -116,7 +106,6 @@ export default function CreateClient() {
       toast.error("Erro ao buscar endereço!");
     }
   };
-
   const buscarCNPJ = async () => {
     const cnpjLimpo = cliente.document.replace(/\D/g, "");
   
@@ -128,11 +117,11 @@ export default function CreateClient() {
     try {
       const { data } = await axios.get(`/api/cnpj?cnpj=${cnpjLimpo}`);
   
-      if (data && (data.nome || data.razao_social)) {
+      if (data && (data.nome_fantasia || data.razao_social)) {
         setCliente((prev) => ({
           ...prev,
-          name: formatarMaiusculo(data.nome || "", "name"),
-          fantasy_name: formatarMaiusculo(data.fantasia || "", "fantasy_name"),
+          name: formatarMaiusculo(data.razao_social || "", "name"),
+          fantasy_name: formatarMaiusculo(data.nome_fantasia || "", "fantasy_name"),
           address: formatarMaiusculo(data.logradouro || "", "address"),
           neighborhood: formatarMaiusculo(data.bairro || "", "neighborhood"),
           city: formatarMaiusculo(data.municipio || "", "city"),
@@ -142,15 +131,16 @@ export default function CreateClient() {
           complement: data.complemento || "",
           phone: formatarTelefone(data.telefone || ""),
           email: data.email || "",
-          state_registration: "", // a API usada não retorna isso diretamente
+          state_registration: "", // se vier de outra API, preenche aqui
         }));
+      } else {
+        toast.error("Dados não encontrados para esse CNPJ.");
       }
     } catch (error) {
       console.error("Erro ao buscar CNPJ:", error);
       toast.error("Erro ao buscar CNPJ!");
     }
   };
-  
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
     if (e.key === "Enter") {
       e.preventDefault();
@@ -160,7 +150,6 @@ export default function CreateClient() {
       }
     }
   };
-
   const validarCPF = (cpf: string): boolean => {
     cpf = cpf.replace(/\D/g, "");
     if (cpf.length !== 11 || /^([0-9])\1+$/.test(cpf)) return false;
@@ -175,7 +164,6 @@ export default function CreateClient() {
     if (resto === 10 || resto === 11) resto = 0;
     return resto === parseInt(cpf[10]);
   };
-
   const handleSubmit = async () => {
     if (!cliente.name || !cliente.document) {
       toast.error("Preencha os campos obrigatórios!");
@@ -228,10 +216,8 @@ export default function CreateClient() {
       router.refresh();
     }
   };
-
   const [catalogs, setCatalogs] = useState<{ id: string; name: string }[]>([])
   const [selectedCatalog, setSelectedCatalog] = useState<string>("")
-
   useEffect(() => {
     const fetchCatalogs = async () => {
       if (!companyId) return
@@ -250,7 +236,6 @@ export default function CreateClient() {
   
     fetchCatalogs()
   }, [companyId])
-
   return (
 <div className="max-w-3xl mx-auto w-full px-4 py-6 rounded-lg shadow-md">
   <div  className="flex gap-2 items-center justify-center">
@@ -265,7 +250,6 @@ export default function CreateClient() {
           Pessoa Jurídica
         </Button>
       </div>
-
       {/* 🔹 Campos do formulário */}
       {Object.keys(placeholdersMap).map((campo, index) => {
         if (cliente.type === "CPF" && ["fantasy_name", "state_registration"].includes(campo)) return null;
@@ -309,12 +293,10 @@ function formatarTelefone(valor: string) {
   const telefone = valor.replace(/^\+?55/, "") // Remove +55 se existir
                         .replace(/\D/g, "")    // Remove tudo que não é número
                         .slice(0, 11)          // Limita a 11 dígitos
-
   if (telefone.length === 11) {
     return telefone.replace(/^(\d{2})(\d{5})(\d{4})$/, "($1) $2-$3") // (48) 99999-9999
   } else if (telefone.length === 10) {
     return telefone.replace(/^(\d{2})(\d{4})(\d{4})$/, "($1) $2-$3") // (48) 9999-9999
   }
-
   return telefone // Se ainda incompleto, apenas retorna os números
 }

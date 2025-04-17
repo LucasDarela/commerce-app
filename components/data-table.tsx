@@ -433,17 +433,16 @@ export function DataTable({
   </DropdownMenuTrigger>
 
   <DropdownMenuContent align="end">
-    <DropdownMenuItem asChild>
-      <button
-        className="w-full text-left"
-        onClick={() => {
-          setSelectedCustomer(row.original);
-          setSheetOpen(true);
-        }}
-      >
-        Ver Nota
-      </button>
-    </DropdownMenuItem>
+  <DropdownMenuItem asChild>
+  <a
+  href={`/dashboard/orders/${row.original.id}/view`}
+  target="_blank"
+  rel="noopener noreferrer"
+  className="w-full text-left"
+>
+  Ver Espelho
+</a>
+</DropdownMenuItem>
     <DropdownMenuItem>
         <button
       onClick={() => router.push(`/dashboard/orders/${row.original.id}/boleto`)}

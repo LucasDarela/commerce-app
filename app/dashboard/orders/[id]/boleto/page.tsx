@@ -95,8 +95,7 @@ export default function OrderBoletoPage() {
   const [order, setOrder] = useState<any>(null);
   const [signatureData, setSignatureData] = useState<string | null>(null);
   const [sigPad, setSigPad] = useState<SignatureCanvas | null>(null);
-
-
+  const [isMobileFullscreen, setIsMobileFullscreen] = useState(false);
 
   const fetchOrder = async () => {
     const { data, error } = await supabase
@@ -151,27 +150,108 @@ export default function OrderBoletoPage() {
   const vencimentoStr = vencimento.toLocaleDateString("pt-BR");
 
   return (
-    <div className="max-w-3xl mx-auto p-6">
+    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6">
       <h1 className="text-2xl font-bold mb-4">Boleto do Pedido #{order.note_number}</h1>
       <p className="mb-2">Cliente: {order.customer}</p>
       <p className="mb-2">Valor total: R$ {order.total?.toFixed(2)}</p>
       <p className="mb-4">Vencimento: {vencimentoStr}</p>
 
-      <div className="border border-dashed border-gray-400 rounded p-4">
+        {/* Assinatura do Cliente */}
+        <div className="border border-dashed border-gray-400 rounded p-4">
         <p className="mb-2 font-semibold">Assinatura do cliente:</p>
-        <SignatureCanvas
-          penColor="black"
-          canvasProps={{ width: 500, height: 200, className: "border rounded bg-white" }}
-          ref={(ref) => setSigPad(ref)}
-        />
-        <Button
-        onClick={handleSaveSignature}
-        className="mt-2"
-        disabled={!!signatureData} 
-        >
-        Salvar Assinatura
-        </Button>
-      </div>
+
+        <div className="relative">
+            <SignatureCanvas
+            penColor="black"
+            canvasProps={{
+                width: 0, 
+                height: 0,
+                className: "w-full h-[200px] sm:h-[240px] border rounded bg-white",
+            }}
+            ref={(ref) => setSigPad(ref)}
+            />
+            
+            <div className="mt-2 flex flex-wrap gap-2 sm:flex-nowrap">
+            <Button
+                variant="secondary"
+                onClick={() => sigPad?.clear()}
+                type="button"
+            >
+                Limpar
+            </Button>
+
+            <Button
+            variant="outline"
+            onClick={() => {
+                const canvas = sigPad?.getCanvas();
+                const container = canvas?.parentElement;
+
+                if (window.innerWidth < 768) {
+                setIsMobileFullscreen(true); // abre modal para mobile
+                } else if (document.fullscreenElement) {
+                document.exitFullscreen();
+                } else if (container?.requestFullscreen) {
+                container.requestFullscreen();
+                } else {
+                toast.error("Seu navegador não suporta tela cheia.");
+                }
+            }}
+            type="button"
+            >
+            Tela cheia
+            </Button>
+
+            <Button
+                onClick={handleSaveSignature}
+                className="ml-auto"
+                disabled={!!signatureData}
+                type="button"
+            >
+                Salvar Assinatura
+            </Button>
+            </div>
+        </div>
+        </div>
+
+        {isMobileFullscreen && (
+  <div className="fixed inset-0 bg-white z-50 flex flex-col justify-center items-center p-4 sm:hidden">
+    <p className="text-lg font-semibold mb-2">Assinatura do Cliente</p>
+    <SignatureCanvas
+      penColor="black"
+      canvasProps={{
+        width: window.innerWidth - 40,
+        height: 200,
+        className: "border rounded bg-white w-full",
+      }}
+      ref={(ref) => setSigPad(ref)}
+    />
+    <div className="flex gap-2 mt-4 w-full">
+      <Button
+        variant="secondary"
+        onClick={() => sigPad?.clear()}
+        className="w-full"
+      >
+        Limpar
+      </Button>
+      <Button
+        onClick={async () => {
+          await handleSaveSignature();
+          setIsMobileFullscreen(false);
+        }}
+        className="w-full"
+      >
+        Salvar
+      </Button>
+    </div>
+    <Button
+      variant="ghost"
+      className="absolute top-4 right-4"
+      onClick={() => setIsMobileFullscreen(false)}
+    >
+      Fechar
+    </Button>
+  </div>
+)}
 
       {signatureData && (
         <div className="mt-6 space-y-4">

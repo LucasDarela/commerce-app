@@ -34,6 +34,7 @@ export function PriceTableManager() {
   const [availableProducts, setAvailableProducts] = useState<Product[]>([])
   const { companyId } = useAuthenticatedCompany()
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null)
+  const [editingCatalogIndex, setEditingCatalogIndex] = useState<number | null>(null);
   
   useEffect(() => {
     const fetchProducts = async () => {
@@ -214,22 +215,29 @@ export function PriceTableManager() {
       <TableCell>{catalog.name}</TableCell>
       <TableCell>{catalog.products.length}</TableCell>
       <TableCell className="flex gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() =>
-            setExpandedIndex((prev) => (prev === idx ? null : idx))
-          }
-        >
-          {expandedIndex === idx ? "Ocultar" : "Ver Produtos"}
-        </Button>
-        <Button
-          variant="destructive"
-          size="sm"
-          onClick={() => handleDeleteCatalog(idx)}
-        >
-          Delete
-        </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setEditingCatalogIndex(idx)}
+      >
+        Editar
+      </Button>
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={() =>
+          setExpandedIndex((prev) => (prev === idx ? null : idx))
+        }
+      >
+        {expandedIndex === idx ? "Ocultar" : "Ver Produtos"}
+      </Button>
+      <Button
+        variant="destructive"
+        size="sm"
+        onClick={() => handleDeleteCatalog(idx)}
+      >
+        Delete
+      </Button>
       </TableCell>
     </TableRow>
 
@@ -317,6 +325,100 @@ export function PriceTableManager() {
               Salvar Catálogo no Banco de Dados
             </Button>
           )}
+
+{editingCatalogIndex !== null && (
+  <Card className="p-4 space-y-4 mt-4">
+    <h2 className="text-lg font-semibold">Editando: {savedCatalogs[editingCatalogIndex].name}</h2>
+
+    {availableProducts.map((product) => {
+      const catalog = savedCatalogs[editingCatalogIndex]!;
+      const selectedProduct = catalog.products.find(
+        (p) => p.product_id === product.id
+      );
+
+      return (
+        <div
+          key={product.id}
+          className="grid grid-cols-2 items-center gap-4"
+        >
+          <span>{product.name}</span>
+          <Input
+            placeholder="R$"
+            type="number"
+            step="0.01"
+            value={selectedProduct?.price ?? ''}
+            onChange={(e) => {
+              const price = parseFloat(e.target.value);
+              const updatedProducts = catalog.products.filter(
+                (p) => p.product_id !== product.id
+              );
+
+              if (!isNaN(price)) {
+                updatedProducts.push({ product_id: product.id, price });
+              }
+
+              const updatedCatalog = {
+                ...catalog,
+                products: updatedProducts,
+              };
+
+              const updatedSaved = [...savedCatalogs];
+              updatedSaved[editingCatalogIndex] = updatedCatalog;
+              setSavedCatalogs(updatedSaved);
+            }}
+          />
+        </div>
+      );
+    })}
+
+    <div className="flex gap-2">
+      <Button
+        onClick={async () => {
+          const catalog = savedCatalogs[editingCatalogIndex];
+          if (!catalog.id) return;
+
+          const cleanedProducts = catalog.products.filter(p => !isNaN(p.price) && p.price > 0);
+
+          const { error: deleteError } = await supabase
+            .from("price_table_products")
+            .delete()
+            .eq("price_table_id", catalog.id);
+
+          if (deleteError) {
+            toast.error("Erro ao limpar catálogo antigo.");
+            return;
+          }
+
+          const { error: insertError } = await supabase
+            .from("price_table_products")
+            .insert(
+              cleanedProducts.map((p) => ({
+                price_table_id: catalog.id,
+                product_id: p.product_id,
+                price: p.price,
+              }))
+            );
+
+          if (insertError) {
+            toast.error("Erro ao atualizar produtos.");
+            return;
+          }
+
+          toast.success("Catálogo atualizado com sucesso.");
+          setEditingCatalogIndex(null);
+        }}
+      >
+        Salvar Alterações
+      </Button>
+      <Button
+        variant="outline"
+        onClick={() => setEditingCatalogIndex(null)}
+      >
+        Cancelar
+      </Button>
+    </div>
+  </Card>
+)}
           </div>
           )
           }
