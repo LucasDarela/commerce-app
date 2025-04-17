@@ -43,9 +43,11 @@ const styles = StyleSheet.create({
     <Document>
       <Page size="A4" style={styles.page}>
         {/* Logomarca da empresa */}
-        {order.company_logo && (
-          <Image src={order.company_logo} style={styles.logo} />
-        )}
+        {order.company_logo ? (
+            <Image src={order.company_logo} style={styles.logo} />
+            ) : (
+            <Text style={{ marginBottom: 20 }}>Darela Chopp</Text>
+            )}
   
         {/* Título */}
         <Text style={styles.title}>Boleto - Pedido #{order.note_number}</Text>
@@ -88,25 +90,33 @@ const styles = StyleSheet.create({
   );
 
 export default function OrderBoletoPage() {
-  const { id } = useParams();
+    const params = useParams<{ id: string }>();
+    const id = params.id;
   const [order, setOrder] = useState<any>(null);
   const [signatureData, setSignatureData] = useState<string | null>(null);
   const [sigPad, setSigPad] = useState<SignatureCanvas | null>(null);
 
+
+
+  const fetchOrder = async () => {
+    const { data, error } = await supabase
+      .from("orders")
+      .select("*")
+      .eq("id", id as string)
+      .single();
+  
+    if (error) {
+      toast.error("Erro ao carregar pedido.");
+    } else {
+      setOrder(data);
+      if (data.customer_signature) {
+        setSignatureData(data.customer_signature);
+      }
+    }
+  };
+
   useEffect(() => {
-    const fetchOrder = async () => {
-        const { data, error } = await supabase
-          .from("orders")
-          .select("*")
-          .eq("id", id)
-          .single();
-        if (error) {
-          toast.error("Erro ao carregar pedido.");
-        } else {
-          setOrder(data);
-        }
-      };
-    if (id) fetchOrder();
+    fetchOrder();
   }, [id]);
 
   const handleSaveSignature = async () => {
@@ -114,14 +124,10 @@ export default function OrderBoletoPage() {
       toast.error("Assinatura obrigatória.");
       return;
     }
+    await fetchOrder(); 
   
     const dataUrl = sigPad.getTrimmedCanvas().toDataURL("image/png");
     setSignatureData(dataUrl);
-
-    const fetchOrder = async () => {
-        const { data, error } = await supabase.from("orders").select("*").eq("id", id).single();
-        if (!error) setOrder(data);
-      };
   
     // Atualiza no Supabase
     const { error } = await supabase
@@ -158,7 +164,13 @@ export default function OrderBoletoPage() {
           canvasProps={{ width: 500, height: 200, className: "border rounded bg-white" }}
           ref={(ref) => setSigPad(ref)}
         />
-        <Button onClick={handleSaveSignature} className="mt-2">Salvar Assinatura</Button>
+        <Button
+        onClick={handleSaveSignature}
+        className="mt-2"
+        disabled={!!signatureData} 
+        >
+        Salvar Assinatura
+        </Button>
       </div>
 
       {signatureData && (
