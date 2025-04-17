@@ -5,7 +5,7 @@ import { useParams } from "next/navigation"
 import { fetchOrderDetails } from "@/lib/fetchOrderDetails"
 import { toast } from "sonner"
 import { PDFDownloadLink } from "@react-pdf/renderer"
-import { SaleMirrorPDF } from "@/components/pdf/sale-mirror"
+import { ItemRelationPDF } from "@/components/pdf/item-relation-pdf"
 import { Button } from "@/components/ui/button"
 
 export default function ViewOrderPage() {
@@ -36,7 +36,7 @@ export default function ViewOrderPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Espelho da Venda</h1>
         <PDFDownloadLink
-          document={<SaleMirrorPDF company={company} customer={customer} items={items} />}
+          document={<ItemRelationPDF company={company} customer={customer} items={items} />}
           fileName={`espelho-pedido-${order.note_number}.pdf`}
         >
           {({ loading }) => (
@@ -50,31 +50,27 @@ export default function ViewOrderPage() {
       {/* Fornecedor */}
       <section>
         <h2 className="font-semibold">Fornecedor</h2>
-        <p><strong>{company.name}</strong></p>
-        <p>{company.document}</p>
+        <p><strong>{company.name}</strong> - {company.document}</p>
         <p>{company.address}, {company.number} - {company.neighborhood}</p>
         <p>{company.city} - {company.state}, {company.zip_code}</p>
-        <p>📞 {company.phone}</p>
-        <p>✉️ {company.email}</p>
+        <p>📞 {company.phone} | ✉️ {company.email}</p>
       </section>
 
       {/* Cliente */}
       <section>
         <h2 className="font-semibold">Cliente</h2>
-        <p><strong>{customer.name}</strong></p>
-        <p>{customer.document}</p>
+        <p><strong>{customer.name}</strong> - {customer.document}</p>
         <p>{customer.address}, {customer.number} - {customer.neighborhood}</p>
         <p>{customer.city} - {customer.state}, {customer.zip_code}</p>
-        <p>📞 {customer.phone}</p>
-        <p>✉️ {customer.email}</p>
+        <p>📞 {customer.phone} | ✉️ {customer.email?.trim() ? customer.email : "N/A"}</p>
       </section>
 
       {/* Itens */}
       <section>
         <h2 className="font-semibold">Itens da Venda</h2>
-        <table className="w-full text-sm border border-gray-300">
+        <table className="w-full text-sm border">
           <thead>
-            <tr className="bg-gray-100 text-left">
+            <tr className="text-left">
               <th className="p-2">Produto</th>
               <th className="p-2">Qtd</th>
               <th className="p-2">V. Unitário</th>
@@ -84,11 +80,11 @@ export default function ViewOrderPage() {
           <tbody>
             {items.map((item: any) => (
               <tr key={item.id} className="border-t">
-                <td className="p-2">{item.product?.name}</td>
+                <td className="p-2">{item.name}</td>
                 <td className="p-2">{item.quantity}</td>
-                <td className="p-2">R$ {Number(item.price).toFixed(2)}</td>
+                <td className="p-2">R$ {item.unit_price.toFixed(2)}</td>
                 <td className="p-2 font-semibold">
-                  R$ {(item.quantity * item.price).toFixed(2)}
+                R$ {(item.quantity * item.unit_price).toFixed(2)}
                 </td>
               </tr>
             ))}

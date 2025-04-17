@@ -436,7 +436,6 @@ export function DataTable({
   <DropdownMenuItem asChild>
   <a
   href={`/dashboard/orders/${row.original.id}/view`}
-  target="_blank"
   rel="noopener noreferrer"
   className="w-full text-left"
 >
