@@ -132,7 +132,7 @@ export default function EditProduct() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto p-6 bg-white rounded-lg shadow-md">
+    <div className="max-w-3xl mx-auto p-6 rounded-lg shadow-md">
       <h1 className="text-2xl font-bold mb-4">Editar Produto</h1>
 
       <Card className="mb-6">
@@ -193,7 +193,7 @@ export default function EditProduct() {
           <Textarea name="aplication" value={product.aplication} onChange={handleChange} placeholder="Product Application" />
           <Input type="text" name="loan_product_code" value={product.loan_product_code ?? ""} onChange={handleChange} placeholder="Loan Product Code" />
 
-          <Button className="w-full bg-black text-white hover:bg-gray-800" onClick={handleSubmit} disabled={loading}>
+          <Button onClick={handleSubmit} disabled={loading}>
             {loading ? "Salvando..." : "Salvar Produto"}
           </Button>
         </CardContent>

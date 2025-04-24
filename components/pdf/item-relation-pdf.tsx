@@ -88,7 +88,7 @@ const RelationSection = ({ company, customer, items, note }: any) => {
       <View style={styles.header}>
         <Image src={logo.src} style={styles.logo} />
         <View>
-          <Text>Nota: <Text style={styles.bold}>{note?.number ?? "000000"}</Text></Text>
+          <Text>Nota: <Text style={styles.bold}>{note ?? "000000"}</Text></Text>
           <Text>Data: {dayjs().format("DD/MM/YYYY HH:mm")}</Text>
         </View>
       </View>
@@ -144,7 +144,7 @@ const RelationSection = ({ company, customer, items, note }: any) => {
 
       {/* Rodapé */}
       <Text style={styles.footer}>
-        ASS:______________________________________________
+        Assinatura:______________________________________________
       </Text>
     </View>
   )

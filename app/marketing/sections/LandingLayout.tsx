@@ -51,7 +51,7 @@ export default function LandingLayout(){
         {/* Navbar Responsiva */}
         <nav className="shadow-md p-4 flex items-center z-50 relative">
           {/* Logo */}
-          <h1 className="text-2xl font-bold">Chopp SaaS</h1>
+          <h1 className="text-2xl font-bold">Chopp Hub</h1>
 
           {/* Links Centralizados */}
           <ul className="hidden md:flex flex-1 justify-center space-x-6">

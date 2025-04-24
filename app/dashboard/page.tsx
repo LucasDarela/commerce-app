@@ -14,7 +14,7 @@ import data from "./data.json"
 
 export default async function DashboardPage() {
 
-  const supabase = createServerComponentClient({ cookies });
+  const supabase = await createServerComponentClient({ cookies });
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {

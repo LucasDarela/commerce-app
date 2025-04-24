@@ -123,21 +123,25 @@ export default function OrderBoletoPage() {
       toast.error("Assinatura obrigatória.");
       return;
     }
-    await fetchOrder(); 
+  
+    await fetchOrder();
   
     const dataUrl = sigPad.getTrimmedCanvas().toDataURL("image/png");
+    console.log("🖊️ Assinatura gerada (base64):", dataUrl.slice(0, 100)); // Mostra só o início para não travar
+  
     setSignatureData(dataUrl);
   
     // Atualiza no Supabase
     const { error } = await supabase
-        .from("orders")
-        .update({ customer_signature: dataUrl }) 
-        .eq("id", id);
+      .from("orders")
+      .update({ customer_signature: dataUrl })
+      .eq("id", id);
   
     if (error) {
       toast.error("Erro ao salvar assinatura no banco.");
       console.error("❌ Supabase error:", error);
     } else {
+      console.log("✅ Assinatura salva com sucesso no Supabase.");
       toast.success("Assinatura salva com sucesso!");
       await fetchOrder();
     }
@@ -161,15 +165,15 @@ export default function OrderBoletoPage() {
         <p className="mb-2 font-semibold">Assinatura do cliente:</p>
 
         <div className="relative">
-            <SignatureCanvas
-            penColor="black"
-            canvasProps={{
-                width: 0, 
-                height: 0,
-                className: "w-full h-[200px] sm:h-[240px] border rounded bg-white",
-            }}
-            ref={(ref) => setSigPad(ref)}
-            />
+        <SignatureCanvas
+        penColor="black"
+        canvasProps={{
+          width: 600,
+          height: 240,
+          className: "w-full h-[200px] sm:h-[240px] border rounded bg-white",
+        }}
+        ref={(ref) => setSigPad(ref)}
+      />
             
             <div className="mt-2 flex flex-wrap gap-2 sm:flex-nowrap">
             <Button
@@ -214,7 +218,7 @@ export default function OrderBoletoPage() {
         </div>
 
         {isMobileFullscreen && (
-  <div className="fixed inset-0 bg-white z-50 flex flex-col justify-center items-center p-4 sm:hidden">
+  <div className="fixed inset-0 z-50 flex flex-col justify-center items-center p-4 sm:hidden">
     <p className="text-lg font-semibold mb-2">Assinatura do Cliente</p>
     <SignatureCanvas
       penColor="black"

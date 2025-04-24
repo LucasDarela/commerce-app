@@ -120,6 +120,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { supabase } from "@/lib/supabase"
+import { PaymentModal } from "@/components/payment-modal"
 
 //New Schema
 export const schema = z.object({
@@ -214,6 +215,8 @@ export function DataTable({
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [isSavingOrder, setIsSavingOrder] = useState(false)
+  const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const router = useRouter();
 
   const deleteOrderById = async (id: string) => {
@@ -425,33 +428,95 @@ export function DataTable({
       size: 50,
       meta: { className: "w-[50px]" },
       cell: ({ row }) => (
-<DropdownMenu>
-  <DropdownMenuTrigger asChild>
-    <Button variant="ghost" size="icon" className="text-muted-foreground">
-      <IconDotsVertical size={16} />
-    </Button>
-  </DropdownMenuTrigger>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="text-muted-foreground">
+          <IconDotsVertical size={16} />
+        </Button>
+      </DropdownMenuTrigger>
 
-  <DropdownMenuContent align="end">
+      <DropdownMenuContent align="end">
   <DropdownMenuItem asChild>
   <a
-  href={`/dashboard/orders/${row.original.id}/view`}
-  rel="noopener noreferrer"
-  className="w-full text-left"
->
-  Ver Espelho
-</a>
-</DropdownMenuItem>
+      href={`/dashboard/orders/${row.original.id}/view`}
+      rel="noopener noreferrer"
+      className="w-full text-left"
+    >
+      Ver Espelho
+    </a>
+    </DropdownMenuItem>
     <DropdownMenuItem>
-        <button
-      onClick={() => router.push(`/dashboard/orders/${row.original.id}/boleto`)}
+    <button
+      onClick={async () => {
+        try {
+         // 1. Buscar os dados do pedido completo
+    const { data: order } = await supabase
+    .from("orders")
+    .select(`
+      *,
+      customers:customers(*)
+    `)
+    .eq("id", row.original.id)
+    .single();
+
+  if (!order || !order.customers) {
+    toast.error("Dados do cliente não encontrados.");
+    return;
+  }
+
+  const cliente = order.customers;
+
+  // 2. Enviar para o create-payment com os dados corretos
+  const payload = {
+    nome: cliente.name,
+    document: cliente.document,
+    email: cliente.email,
+    total: order.total,
+    days_ticket: order.days_ticket,
+    order_id: order.id,
+    zip_code: cliente.zip_code,
+    address: cliente.address,
+    number: cliente.number,
+    neighborhood: cliente.neighborhood,
+    city: cliente.city,
+    state: cliente.state,
+  };
+
+  console.log("📦 Enviando payload corrigido:", payload);
+
+  const res = await fetch("/api/create-payment", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const error = await res.json();
+    toast.error("Erro ao gerar boleto");
+    console.error("❌ Erro:", error);
+    return;
+  }
+
+  toast.success("Boleto gerado!");
+  router.push(`/dashboard/orders/${row.original.id}/boleto`);
+} catch (err) {
+  toast.error("Erro inesperado");
+  console.error("❌ Erro inesperado:", err);
+}
+      }}
       disabled={row.original.payment_method.toLowerCase() !== "boleto"}
     >
       Gerar Boleto
     </button>
     </DropdownMenuItem>
-    <DropdownMenuItem>Pagar</DropdownMenuItem>
-
+    <DropdownMenuItem
+      onClick={() => {
+        setSelectedOrder(row.original)
+        setIsPaymentOpen(true)
+      }}
+    >
+      Pagar
+    </DropdownMenuItem>
     <DropdownMenuItem asChild>
       <Link href={`/dashboard/orders/${row.original.id}/edit`}>
         Editar
@@ -466,8 +531,8 @@ export function DataTable({
     >
       Deletar
     </DropdownMenuItem>
-  </DropdownMenuContent>
-</DropdownMenu>
+      </DropdownMenuContent>
+    </DropdownMenu>
       ),
     },
   ]
@@ -899,6 +964,14 @@ export function DataTable({
         <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
       </TabsContent>
     </Tabs>
+    {selectedOrder && (
+  <PaymentModal
+    order={selectedOrder}
+    open={isPaymentOpen}
+    onClose={() => setIsPaymentOpen(false)}
+    onSuccess={() => {/* atualizar estado se necessário */}}
+  />
+)}
     </>
   )
 }
