@@ -136,6 +136,7 @@ export const schema = z.object({
   freight: z.union([z.string(), z.number()]).optional().nullable(),
   amount: z.number(),
   total: z.number(),
+  total_payed: z.number().optional().nullable(),
   delivery_status: z.enum(["Entregar", "Coletar", "Coletado"]),
   payment_status: z.enum(["Pendente", "Pago"]),
   payment_method: z.enum(["Pix", "Dinheiro", "Boleto", "Cartao"]),
@@ -217,7 +218,56 @@ export function DataTable({
   const [isSavingOrder, setIsSavingOrder] = useState(false)
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [dateInput, setDateInput] = useState("")
   const router = useRouter();
+
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("orders_column_visibility")
+      return stored ? JSON.parse(stored) : {}
+    }
+    return {}
+  })
+
+  function handleDateInput(e: React.ChangeEvent<HTMLInputElement>) {
+    let value = e.target.value.replace(/\D/g, "") // remove tudo que não é número
+    if (value.length > 8) value = value.slice(0, 8)
+  
+    const parts = []
+    if (value.length > 0) parts.push(value.slice(0, 2))
+    if (value.length > 2) parts.push(value.slice(2, 4))
+    if (value.length > 4) parts.push(value.slice(4, 8))
+  
+    const formatted = parts.join("/")
+    setDateInput(formatted)
+  
+    if (formatted.length === 10) {
+      const [day, month, year] = formatted.split("/")
+      const isoDate = `${year}-${month}-${day}`
+      table.getColumn("appointment_date")?.setFilterValue(isoDate)
+    } else {
+      table.getColumn("appointment_date")?.setFilterValue(undefined)
+    }
+  }
+
+  const refreshOrders = async () => {
+    const { data, error } = await supabase
+      .from("orders")
+      .select("*")
+      .order("order_index", { ascending: true })
+  
+    if (error) {
+      console.error("Erro ao buscar pedidos:", error)
+      return
+    }
+  
+    const parsed = schema.array().safeParse(data)
+    if (parsed.success) {
+      setOrders(parsed.data)
+    } else {
+      console.error("Erro ao validar schema Zod:", parsed.error)
+    }
+  }
 
   const deleteOrderById = async (id: string) => {
     const confirmDelete = confirm("Tem certeza que deseja excluir esta nota?");
@@ -236,6 +286,12 @@ export function DataTable({
     toast.success("Nota excluída com sucesso!");
     setOrders((prev) => prev.filter((order) => order.id !== id));
   };
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("orders_column_visibility", JSON.stringify(columnVisibility))
+    }
+  }, [columnVisibility])
 
   useEffect(() => {
     async function fetchOrders() {
@@ -274,35 +330,13 @@ export function DataTable({
       enableHiding: false,
     },
     {
-      id: "select",
-      size: 35,
-      meta: { className: "w-[35px]" },
-      header: ({ table }) => (
-        <div className="flex items-center justify-center">
-          <Checkbox
-            checked={table.getIsAllPageRowsSelected()}
-            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-            aria-label="Select all"
-          />
-        </div>
-      ),
-      cell: ({ row }) => (
-        <div className="flex items-center justify-center">
-          <Checkbox
-            checked={row.getIsSelected()}
-            onCheckedChange={(value) => row.toggleSelected(!!value)}
-            aria-label="Select row"
-          />
-        </div>
-      ),
-      enableSorting: false,
-      enableHiding: false,
-    },
-    {
       accessorKey: "appointment_date",
       header: "Data",
       size: 90,
       meta: { className: "w-[90px]" },
+      filterFn: (row, columnId, filterValue) => {
+        return row.getValue(columnId) === filterValue
+      },
       cell: ({ row }) => {
         const rawDate = row.original.appointment_date
         if (!rawDate) return "—"
@@ -394,13 +428,13 @@ export function DataTable({
     {
       accessorKey: "delivery_status",
       header: "Delivery",
-      size: 80,
-      meta: { className: "w-[80px] uppercase" },
+      size: 90,
+      meta: { className: "w-[90px] uppercase" },
       cell: ({ row }) => row.original.delivery_status,
     },
     {
       accessorKey: "payment_method",
-      header: "Método",
+      header: "Tipo",
       size: 60,
       meta: { className: "w-[60px] uppercase" },
       cell: ({ row }) => row.original.payment_method,
@@ -408,9 +442,20 @@ export function DataTable({
     {
       accessorKey: "payment_status",
       header: "Pagamento",
-      size: 80,
-      meta: { className: "w-[80px] uppercase" },
+      size: 90,
+      meta: { className: "w-[90px] uppercase" },
       cell: ({ row }) => row.original.payment_status,
+    },
+    {
+      accessorKey: "remaining",
+      header: "Restante",
+      size: 100,
+      meta: { className: "w-[100px] text-right uppercase" },
+      cell: ({ row }) => {
+        const { total, total_payed } = row.original
+        const remaining = total - (total_payed ?? 0)
+        return `R$ ${remaining.toFixed(2).replace(".", ",")}`
+      },
     },
     {
       accessorKey: "total",
@@ -482,8 +527,6 @@ export function DataTable({
     state: cliente.state,
   };
 
-  console.log("📦 Enviando payload corrigido:", payload);
-
   const res = await fetch("/api/create-payment", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -539,8 +582,6 @@ export function DataTable({
 
   const [data, setData] = React.useState(() => initialData)
   const [rowSelection, setRowSelection] = React.useState({})
-  const [columnVisibility, setColumnVisibility] =
-    React.useState<VisibilityState>({})
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
   )
@@ -606,7 +647,6 @@ export function DataTable({
       )
     )
       .then(() => {
-        console.log("Ordem salva com sucesso no Supabase")
         setIsSavingOrder(false)
       })
       .catch((err) => {
@@ -641,40 +681,129 @@ export function DataTable({
         </svg>
       </div>
     )}
+<div className="grid gap-3 px-2 sm:px-4 py-2
+  grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7
+  items-center"
+>
+  {/* Filtro por data */}
+  <Input
+    type="text"
+    inputMode="numeric"
+    placeholder="Data"
+    value={dateInput}
+    onChange={handleDateInput}
+    maxLength={10}
+    className="min-w-[70px] w-full"
+  />
+
+  {/* Nome do cliente */}
+  <Input
+    placeholder="Buscar cliente..."
+    value={(table.getColumn("customer")?.getFilterValue() as string) ?? ""}
+    onChange={(e) => table.getColumn("customer")?.setFilterValue(e.target.value)}
+    className="min-w-[100px] w-full"
+  />
+
+  {/* Status de entrega */}
+  <Select
+    value={(table.getColumn("delivery_status")?.getFilterValue() as string) ?? ""}
+    onValueChange={(value) =>
+      table.getColumn("delivery_status")?.setFilterValue(value === "all" ? undefined : value)
+    }
+  >
+    <SelectTrigger className="min-w-[90px] w-full">
+      <SelectValue placeholder="Entrega" />
+    </SelectTrigger>
+    <SelectContent>
+      <SelectItem value="all">Todos</SelectItem>
+      <SelectItem value="Entregar">Entregar</SelectItem>
+      <SelectItem value="Coletar">Coletar</SelectItem>
+      <SelectItem value="Coletado">Coletado</SelectItem>
+    </SelectContent>
+  </Select>
+
+  {/* Tipo de pagamento */}
+  <Select
+    value={(table.getColumn("payment_method")?.getFilterValue() as string) ?? ""}
+    onValueChange={(value) =>
+      table.getColumn("payment_method")?.setFilterValue(value === "all" ? undefined : value)
+    }
+  >
+    <SelectTrigger className="min-w-[90px] w-full">
+      <SelectValue placeholder="Pagamento" />
+    </SelectTrigger>
+    <SelectContent>
+      <SelectItem value="all">Todos</SelectItem>
+      <SelectItem value="Pix">Pix</SelectItem>
+      <SelectItem value="Dinheiro">Dinheiro</SelectItem>
+      <SelectItem value="Boleto">Boleto</SelectItem>
+      <SelectItem value="Cartao">Cartão</SelectItem>
+    </SelectContent>
+  </Select>
+
+  {/* Status de pagamento */}
+  <Select
+    value={(table.getColumn("payment_status")?.getFilterValue() as string) ?? ""}
+    onValueChange={(value) =>
+      table.getColumn("payment_status")?.setFilterValue(value === "all" ? undefined : value)
+    }
+  >
+    <SelectTrigger className="min-w-[90px] w-full">
+      <SelectValue placeholder="Status" />
+    </SelectTrigger>
+    <SelectContent>
+      <SelectItem value="all">Todos</SelectItem>
+      <SelectItem value="Pendente">Pendente</SelectItem>
+      <SelectItem value="Pago">Pago</SelectItem>
+    </SelectContent>
+  </Select>
+
+  {/* Colunas */}
+  <DropdownMenu>
+    <DropdownMenuTrigger asChild>
+      <Button variant="outline" size="sm" className="min-w-[100px] w-full">
+        <IconLayoutColumns />
+        <span className="hidden sm:inline">Colunas</span>
+        <IconChevronDown />
+      </Button>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent align="end" className="w-56">
+      {table
+        .getAllColumns()
+        .filter((col) => typeof col.accessorFn !== "undefined" && col.getCanHide())
+        .map((column) => (
+          <DropdownMenuCheckboxItem
+            key={column.id}
+            className="capitalize"
+            checked={column.getIsVisible()}
+            onCheckedChange={(value) => column.toggleVisibility(!!value)}
+          >
+            {column.id}
+          </DropdownMenuCheckboxItem>
+        ))}
+    </DropdownMenuContent>
+  </DropdownMenu>
+
+  {/* Botão Adicionar */}
+  <Link href="/dashboard/orders/add">
+    <Button
+      variant="default"
+      size="sm"
+      className="min-w-[100px] w-full bg-primary text-primary-foreground hover:bg-primary/90"
+    >
+      <IconPlus className="mr-1" />
+      <span className="hidden sm:inline">Add Venda</span>
+    </Button>
+  </Link>
+</div>
+
+
     <Tabs
       defaultValue="outline"
       className="w-full flex-col justify-start gap-6"
     >
       {/* Selector  */}
-      <div className="flex items-center justify-between px-4 lg:px-6">
-        <Label htmlFor="view-selector" className="sr-only">
-          View
-        </Label>
-        <Select defaultValue="outline">
-          <SelectTrigger
-            className="flex w-fit @4xl/main:hidden"
-            size="sm"
-            id="view-selector"
-          >
-            <SelectValue placeholder="Select a view" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="outline">Delivery</SelectItem>
-            <SelectItem value="past-performance">Past Performance</SelectItem>
-            <SelectItem value="key-personnel">Key Personnel</SelectItem>
-            <SelectItem value="focus-documents">Focus Documents</SelectItem>
-          </SelectContent>
-        </Select>
-        <TabsList className="**:data-[slot=badge]:bg-muted-foreground/30 hidden **:data-[slot=badge]:size-5 **:data-[slot=badge]:rounded-full **:data-[slot=badge]:px-1 @4xl/main:flex">
-          <TabsTrigger value="outline">Delivery</TabsTrigger>
-          <TabsTrigger value="past-performance">
-            Collect <Badge variant="secondary">3</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="key-personnel">
-            Pending Payment <Badge variant="secondary">2</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="focus-documents">Focus Documents</TabsTrigger>
-        </TabsList>
+      {/* <div className="flex items-center justify-between px-4 lg:px-6">
         <div className="flex items-center gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -712,11 +841,11 @@ export function DataTable({
           <Link href={"/dashboard/orders/add"}>
           <Button variant="default" size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground min-w-8 duration-200 ease-linear">
             <IconPlus />
-            <span className="hidden lg:inline">Add Order</span>
+            <span className="hidden lg:inline">Adicionar Venda</span>
           </Button>
           </Link>
         </div>
-      </div>
+      </div> */}
       {/* Delivery Tabs  */}
       <TabsContent
         value="outline"
@@ -966,10 +1095,16 @@ export function DataTable({
     </Tabs>
     {selectedOrder && (
   <PaymentModal
-    order={selectedOrder}
+    order={{
+      ...selectedOrder,
+      total_payed: selectedOrder.total_payed ?? 0,
+    }}
     open={isPaymentOpen}
     onClose={() => setIsPaymentOpen(false)}
-    onSuccess={() => {/* atualizar estado se necessário */}}
+    onSuccess={() => {
+      refreshOrders()
+      setIsPaymentOpen(false)
+    }}
   />
 )}
     </>

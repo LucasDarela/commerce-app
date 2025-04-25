@@ -7,7 +7,6 @@ import { Database } from "@/components/types/supabase"
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    console.log("📥 Dados recebidos no update-payment:", body)
 
     const {
       order_id,
@@ -22,36 +21,36 @@ export async function POST(req: Request) {
     if (!order_id || typeof total_payed !== "number") {
       return NextResponse.json({ error: "Parâmetros inválidos" }, { status: 400 })
     }
+    const cookieStore = cookies()
 
-    const supabase = createServerComponentClient<Database>({ cookies })
+    const supabase = createServerComponentClient<Database>({ cookies: () => cookieStore })
 
     const { data: order, error: orderError } = await supabase
       .from("orders")
       .select("id, total, total_payed")
       .eq("id", order_id)
       .single()
-      console.log("📦 Dados do pedido:", order)
 
     if (orderError || !order) {
+      console.error("❌ Pedido não encontrado:", orderError)
       return NextResponse.json({ error: "Pedido não encontrado" }, { status: 404 })
     }
 
-    const oldPayed = typeof order.total_payed === "number" ? order.total_payed : 0
+    const oldPayed = Number(order.total_payed) || 0
     const newTotalPayed = oldPayed + total_payed
-    const newStatus = newTotalPayed >= order.total ? "Pago" : "Pendente"
+    const newStatus = newTotalPayed >= Number(order.total) ? "Pago" : "Pendente"
 
     const { error: updateError } = await supabase
       .from("orders")
       .update({
-        total_payed: newTotalPayed,
+        total_payed: newTotalPayed.toString(), // garante compatibilidade com numeric
         payment_status: newStatus,
         ...(payment_method && { payment_method }),
       })
       .eq("id", order_id)
-      console.log("💰 Novo total pago:", newTotalPayed)
-      console.log("📄 Novo status:", newStatus)
 
     if (updateError) {
+      console.error("❌ Erro ao atualizar pagamento:", updateError)
       return NextResponse.json({ error: "Erro ao atualizar pagamento" }, { status: 500 })
     }
 

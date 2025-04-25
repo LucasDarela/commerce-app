@@ -366,7 +366,13 @@ export default function FinancialPage() {
               <Button onClick={() => router.push(`/dashboard/financial/${selectedInvoice.id}/edit`)}>
                 <Pencil className="h-4 w-4" /> Editar Nota
               </Button>
-              <Button variant="destructive" onClick={() => handleDelete(selectedInvoice.id)}>
+              <Button
+                variant="destructive"
+                onClick={async () => {
+                  await handleDelete(selectedInvoice.id);
+                  setIsModalOpen(false);
+                }}
+              >
                 <Trash className="h-4 w-4" />
               </Button>
             </DialogFooter>
