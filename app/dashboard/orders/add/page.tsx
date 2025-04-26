@@ -42,6 +42,21 @@ interface Product {
   stock: number;
 }
 
+interface Order {
+  document_type?: string;
+  note_number?: string;
+  payment_method?: string;
+  days_ticket?: string;
+  freight?: number;
+  total?: number;
+  amount?: number;
+  products?: string;
+  appointment_date?: string | null;
+  appointment_hour?: string;
+  appointment_local?: string;
+  customer_id?: string;
+}
+
 export default function AddOrder() {
   const router = useRouter();
   const { companyId } = useAuthenticatedCompany();
@@ -61,15 +76,7 @@ export default function AddOrder() {
     hour: "",
     location: "",
   });
-  const [order, setOrder] = useState({
-    customer_id: "",
-    note_number: "",
-    document_type: "internal",
-    customer: "",
-    standard_price: "",
-    payment_method: "Pix",
-    days_ticket: "1",
-  });
+  const [order, setOrder] = useState<Order | null>(null);
 
   const [first_name, ...rest] = selectedCustomer?.name?.split(" ") || ["Cliente"];
   const last_name = rest.length > 0 ? rest.join(" ") : "Sobrenome";
@@ -151,6 +158,44 @@ export default function AddOrder() {
     setItems(items.filter((_, i) => i !== index));
   };
 
+  const handleEditProduct = (index: number, productId: string) => {
+    const product = products.find((p) => p.id.toString() === productId);
+    if (!product) return;
+  
+    setItems((prevItems) => {
+      const updatedItems = [...prevItems];
+      updatedItems[index] = {
+        ...updatedItems[index],
+        id: product.id,
+        name: product.name,
+        standard_price: product.standard_price,
+      };
+      return updatedItems;
+    });
+  };
+  
+  const handleEditQuantity = (index: number, quantity: string) => {
+    setItems((prevItems) => {
+      const updatedItems = [...prevItems];
+      updatedItems[index] = {
+        ...updatedItems[index],
+        quantity: Number(quantity) || 0,
+      };
+      return updatedItems;
+    });
+  };
+  
+  const handleEditPrice = (index: number, price: string) => {
+    setItems((prevItems) => {
+      const updatedItems = [...prevItems];
+      updatedItems[index] = {
+        ...updatedItems[index],
+        standard_price: Number(price) || 0,
+      };
+      return updatedItems;
+    });
+  };
+
   const getTotal = () => items.reduce((acc, item) => acc + item.standard_price * item.quantity, 0) + freight;
 
   const generateNoteNumber = (type: string) => {
@@ -159,11 +204,10 @@ export default function AddOrder() {
   };
 
   const handleSubmit = async () => {
-    if (!order.customer_id || items.length === 0) {
+    if (!order || !order.customer_id || items.length === 0) {
       toast.error("Select a customer and at least one product.");
       return;
     }
-  
     setLoading(true);
   
     const amount = items.reduce((acc, item) => acc + item.quantity, 0);
@@ -174,16 +218,16 @@ export default function AddOrder() {
       text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
   
     const newOrder = {
-      customer_id: order.customer_id,
+      customer_id: order!.customer_id,
       customer: selectedCustomer?.name ?? "N/A",
       phone: selectedCustomer?.phone ?? "N/A",
       products: productsDescription,
       amount,
       note_number: order.note_number,
-      document_type: order.document_type,
-      payment_method: capitalize(order.payment_method),
+      document_type: order!.document_type,
+      payment_method: capitalize(order?.payment_method || ""),
       payment_status: "Pendente",
-      days_ticket: ["Pix", "Dinheiro"].includes(capitalize(order.payment_method)) ? "1" : order.days_ticket || "1",
+      days_ticket: ["Pix", "Dinheiro"].includes(capitalize(order?.payment_method || "")) ? "1" : order?.days_ticket || "1",
       total,
       freight,
       delivery_status: "Entregar",
@@ -251,10 +295,8 @@ export default function AddOrder() {
     }, []);
 
   return (
-    <div className="max-w-4xl mx-auto p-6 rounded-lg shadow-md">
-      <div className="grid grid-cols-3 gap-4">
-        <h1 className="text-2xl font-bold mb-4">Criar Venda</h1>
-      </div>
+    <div className="w-full max-w-4xl mx-auto p-6 rounded-lg shadow-md">
+      <h1 className="text-2xl font-bold mb-4">Criar Venda</h1>
   
     {/* Select Document Type */}
     <Card className="mb-6">
@@ -267,7 +309,7 @@ export default function AddOrder() {
               setOrder((prev) => ({ ...prev, document_type: value, note_number: generatedNoteNumber }));
             }}
           >
-            <SelectTrigger className="border border-gray-300 rounded-md shadow-sm w-full">
+            <SelectTrigger className="border rounded-md shadow-sm w-full">
               <SelectValue placeholder="Tipo de Documento" />
             </SelectTrigger>
             <SelectContent className="shadow-md rounded-md">
@@ -275,21 +317,18 @@ export default function AddOrder() {
               <SelectItem value="invoice">Fiscal</SelectItem>
             </SelectContent>
           </Select>
-
           <Input
             type="text"
             placeholder="Numero do Documento"
-            value={order.note_number}
+            value={order?.note_number || ""}
             onChange={(e) => setOrder((prev) => ({ ...prev, note_number: e.target.value }))}
           />
         </div>
-
         </CardContent>
         </Card>
 
         <Card className="mb-6">
         <CardContent>
-
           {/* Customer Info */}
           <h2 className="text-xl font-bold mb-4">Informações do Cliente</h2>
           <div className="grid grid-cols-5 gap-4 mb-4">
@@ -306,7 +345,7 @@ export default function AddOrder() {
             {showCustomers && customersFiltered.length > 0 && (
               <div
                 ref={dropdownRef}
-                className="absolute z-10 mt-1 w-full border border-gray-300 rounded-md shadow-md max-h-40 overflow-y-auto bg-muted"
+                className="absolute z-10 mt-1 w-full border rounded-md shadow-md max-h-40 overflow-y-auto bg-muted"
               >
                 {customersFiltered.map((customer) => (
                   <div
@@ -341,153 +380,188 @@ export default function AddOrder() {
   
       {/* Products */}
       <Card className="mb-6">
-        <CardContent className="space-y-4">
-        <h2 className="text-xl font-bold mb-4">Selecione os Produtos</h2>
-          <div className="grid grid-cols-4 gap-4 items-center">
-            <Select
-              onValueChange={(value) => {
-                const product = products.find((p) => p.id.toString() === value);
-                if (product) {
-                  setSelectedProduct(product);
+  <CardContent className="space-y-4">
+    <h2 className="text-xl font-bold mb-4">Selecione os Produtos</h2>
 
-                  const catalogPrice = catalogPrices[product.id];
-                  setStandardPrice(
-                    typeof catalogPrice === "number" ? catalogPrice : product.standard_price
-                  );
-                }
-              }}
-            >
-              <SelectTrigger className="border border-gray-300 rounded-md shadow-sm w-full">
-                <SelectValue placeholder="Select Product" />
-              </SelectTrigger>
-              <SelectContent className="shadow-md rounded-md z-50">
-                {products.map((product) => (
-                  <SelectItem
-                    key={product.id}
-                    value={product.id.toString()}
-                    className="hover:bg-gray-100 cursor-pointer"
-                  >
-                    {product.code} - {product.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Input
-              type="number"
-              placeholder="Quantidade"
-              value={quantity === 0 ? "" : quantity}
-              onChange={(e) => setQuantity(Number(e.target.value))}
-            />
-
-            <Input
-              type="number"
-              placeholder="Preço"
-              value={standardPrice ?? ""}
-              onChange={(e) => {
-                const value = e.target.value;
-                setStandardPrice(value === "" ? "" : Number(value));
-              }}
-            />
-
-            <Button
-              onClick={() => {
-                if (selectedProduct && standardPrice !== "") {
-                  setItems([
-                    ...items,
-                    {
-                      ...selectedProduct,
-                      quantity,
-                      standard_price: Number(standardPrice),
-                    },
-                  ]);
-                  setSelectedProduct(null);
-                  setQuantity(1);
-                  setStandardPrice("");
-                } else {
-                  toast.error("Select a product and price.");
-                }
-              }}
+    {/* Seção para Adicionar Novo Produto */}
+    <div className="grid grid-cols-4 gap-4 items-center">
+      <Select
+        onValueChange={(value) => {
+          const product = products.find((p) => p.id.toString() === value);
+          if (product) {
+            setSelectedProduct(product);
+            const catalogPrice = catalogPrices[product.id];
+            setStandardPrice(
+              typeof catalogPrice === "number" ? catalogPrice : product.standard_price
+            );
+          }
+        }}
+      >
+        <SelectTrigger className="border rounded-md shadow-sm w-full col-span-2 truncate ">
+          <SelectValue placeholder="Selecionar Produto" />
+        </SelectTrigger>
+        <SelectContent className="shadow-md rounded-md z-50">
+          {products.map((product) => (
+            <SelectItem
+              key={product.id}
+              value={product.id.toString()}
               className="cursor-pointer"
             >
-              Add
-            </Button>
-          </div>
+              {product.code} - {product.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
 
-          {/* Payment & Products Table */}
-          <div className="grid grid-cols-4 gap-4 items-center">
-            <Select
-              value={order.payment_method}
-              onValueChange={(value) => {
-                setOrder((prev) => ({
-                  ...prev,
-                  payment_method: value,
-                  days_ticket: value === "boleto" ? "12" : value === "cartao" ? "1" : prev.days_ticket,
-                }));
-              }}
-            >
-              <SelectTrigger className="w-full border border-gray-300 rounded-md shadow-sm">
-                <SelectValue placeholder="Payment Method" />
-              </SelectTrigger>
-              <SelectContent className="w-full shadow-md rounded-md">
-              <SelectItem value="Pix">Pix</SelectItem>
-              <SelectItem value="Dinheiro">Dinheiro</SelectItem>
-              <SelectItem value="Cartao">Cartão</SelectItem>
-              <SelectItem value="Boleto">Boleto</SelectItem>
-              </SelectContent>
-            </Select>
+      {/* <Input
+        className="col-span-1"
+        type="number"
+        placeholder="Quantidade"
+        value={quantity === 0 ? "" : quantity}
+        onChange={(e) => setQuantity(Number(e.target.value))}
+      />
             <Input
-              type="number"
-              placeholder="Dias"
-              value={order.days_ticket}
-              onChange={(e) => setOrder((prev) => ({ ...prev, days_ticket: e.target.value }))}
-              disabled={["pix", "dinheiro"].includes(order.payment_method)}
-              className={`w-full border border-gray-300 rounded-md shadow-sm ${["Pix", "Dinheiro"].includes(order.payment_method) ? "cursor-not-allowed bg-gray-100 text-gray-500" : ""}`}
-            />
-          </div>
+                    className="col-span-1"
+        placeholder="Preço"
+        value={standardPrice || ""}
+        onChange={(e) => setStandardPrice(Number(e.target.value) || 0)}
+      /> */}
+          <Button
+        className="col-span-2 w-full cursor-pointer"
+        onClick={() => {
+          if (selectedProduct && standardPrice !== "") {
+            setItems([
+              ...items,
+              {
+                id: selectedProduct.id,
+                name: selectedProduct.name,
+                quantity,
+                standard_price: Number(standardPrice),
+              },
+            ]);
+            setSelectedProduct(null);
+            setQuantity(1);
+            setStandardPrice("");
+          } else {
+            toast.error("Selecione um produto e defina o preço.");
+          }
+        }}
+      >
+        Adicionar
+      </Button>
+    </div>
 
-          <Table className="mt-4">
-            <TableHeader>
-              <TableRow>
-                <TableHead>Produtos</TableHead>
-                <TableHead>Quantidade</TableHead>
-                <TableHead>Preço</TableHead>
-                <TableHead>Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {items.map((item, index) => (
-                <TableRow key={index}>
-                  <TableCell>{item.name}</TableCell>
-                  <TableCell>{item.quantity}</TableCell>
-                  <TableCell>R$ {item.standard_price?.toFixed(2)}</TableCell>
-                  <TableCell>
-                    <Trash className="cursor-pointer text-red-500" onClick={() => removeItem(index)} />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
 
-          </CardContent>
-          </Card>
+    {/* Seção Forma de Pagamento */}
+    <div className="grid grid-cols-2 gap-4 items-center">
+    <Select
+        value={order?.payment_method || ""}
+        onValueChange={(value) =>
+          setOrder((prev) => ({
+            ...prev,
+            payment_method: value,
+            days_ticket: value.toLowerCase() === "boleto" ? "12" : value.toLowerCase() === "cartao" ? "1" : prev?.days_ticket,
+          }))
+        }
+      >
+        <SelectTrigger className="w-full border rounded-md shadow-sm">
+          <SelectValue placeholder="Forma de Pagamento" />
+        </SelectTrigger>
+        <SelectContent className="w-full shadow-md rounded-md">
+          <SelectItem value="Pix">Pix</SelectItem>
+          <SelectItem value="Dinheiro">Dinheiro</SelectItem>
+          <SelectItem value="Cartao">Cartão</SelectItem>
+          <SelectItem value="Boleto">Boleto</SelectItem>
+        </SelectContent>
+      </Select>
+
+      <Input
+        type="number"
+        placeholder="Dias"
+        value={order?.days_ticket || ""}
+        onChange={(e) => setOrder((prev) => ({ ...prev, days_ticket: e.target.value }))}
+        disabled={["pix", "dinheiro"].includes(order?.payment_method?.toLowerCase() || "")}
+        className={`w-full border rounded-md shadow-sm ${
+          ["Pix", "Dinheiro"].includes((order?.payment_method || "").toLowerCase())
+            ? "cursor-not-allowed bg-gray-100 text-gray-500"
+            : ""
+        }`}
+      />
+
+    </div>
+
+    {/* Seção da Tabela Editável */}
+    <Table className="mt-4">
+      <TableHeader>
+        <TableRow>
+          <TableHead>Produto</TableHead>
+          <TableHead>Quantidade</TableHead>
+          <TableHead>Preço</TableHead>
+          <TableHead>Excluir</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {items.map((item, index) => (
+          <TableRow key={index}>
+            <TableCell>
+              <Select
+                value={item.id}
+                onValueChange={(value) => handleEditProduct(index, value)}
+              >
+                <SelectTrigger className="w-[300px] truncate border rounded-md shadow-sm">
+                  <SelectValue
+                    placeholder="Produto"
+                    defaultValue={item.name}
+                  />
+                </SelectTrigger>
+                <SelectContent className="shadow-md rounded-md">
+                  {products.map((product) => (
+                    <SelectItem key={product.id} value={product.id.toString()}>
+                      {product.code} - {product.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </TableCell>
+            <TableCell>
+              <Input
+                type="number"
+                value={item.quantity}
+                onChange={(e) => handleEditQuantity(index, e.target.value)}
+              />
+            </TableCell>
+            <TableCell>
+              <Input
+                type="number"
+                value={item.standard_price}
+                onChange={(e) => handleEditPrice(index, e.target.value)}
+              />
+            </TableCell>
+            <TableCell>
+              <Trash className="cursor-pointer text-red-500" onClick={() => removeItem(index)} />
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  </CardContent>
+</Card>
   
-
           {/* Appointment Info */}
           <Card>
           <CardContent>
           <div>
-            <h2 className="text-xl font-bold mb-4">Delivery Appointment</h2>
+            <h2 className="text-xl font-bold mb-4">Agendamento de Entrega</h2>
             <div className="grid grid-cols-3 gap-4">
             <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full flex justify-between cursor-pointer hover:bg-gray-100">
-                    {appointment.date ? format(appointment.date, "dd/MM/yyyy") : "Select Date"}
+                    {appointment.date ? format(appointment.date, "dd/MM/yyyy") : "Escolher Data"}
                     <CalendarIcon className="h-5 w-5" />
                   </Button>
                 </PopoverTrigger>
 
-                <PopoverContent className="w-[260px] shadow-lg rounded-md p-2 z-50 border border-gray-200" align="center" side="bottom">
+                <PopoverContent className="w-[260px] shadow-lg rounded-md p-2 z-50 border" align="center" side="bottom">
                   <DatePicker
                     selected={appointment.date}
                     onChange={(date: Date | null) =>
@@ -502,14 +576,14 @@ export default function AddOrder() {
 
               <Input
                 type="time"
-                placeholder="Hour"
+                placeholder="Horário"
                 value={appointment.hour}
                 onChange={(e) => setAppointment({ ...appointment, hour: e.target.value })}
               />
 
               <Input
                 type="text"
-                placeholder="Delivery Location"
+                placeholder="Local de Entrega"
                 value={appointment.location}
                 onChange={(e) => setAppointment({ ...appointment, location: e.target.value })}
               />
@@ -519,13 +593,13 @@ export default function AddOrder() {
           <div className="grid grid-cols-3 gap-4 items-center mt-4">
           <Input
               type="number"
-              placeholder="Freight"
+              placeholder="Frete"
               value={freight ?? ""}
               onChange={(e) => setFreight(Number(e.target.value) || 0)}
             />
-            <div className="font-bold">Order Total: R$ {getTotal().toFixed(2)}</div>
+            <div className="font-bold">Total: R$ {getTotal().toFixed(2)}</div>
             <Button variant="default" onClick={handleSubmit} disabled={loading}>
-              {loading ? "Saving..." : "Submit Order"}
+              {loading ? "Salvando..." : "Salvar"}
             </Button>
           </div>
           </CardContent>

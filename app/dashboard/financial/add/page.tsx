@@ -71,6 +71,8 @@ export default function AddFinancialRecord() {
   const [productEntries, setProductEntries] = useState<ProductEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [noteType, setNoteType] = useState<"input" | "output">("input");
+  const [entities, setEntities] = useState<{ id: string; name: string }[]>([]);
+  const [showEntityDropdown, setShowEntityDropdown] = useState(false);
   const router = useRouter();
 
   const handleAddProduct = () => {
@@ -166,11 +168,17 @@ export default function AddFinancialRecord() {
   };
 
   useEffect(() => {
-    const fetchSuppliers = async () => {
-      const { data, error } = await supabase.from("suppliers").select("id, name");
-      if (!error) setSuppliers(data || []);
+    const fetchEntities = async () => {
+      const { data: suppliersData } = await supabase.from("suppliers").select("id, name");
+      const { data: customersData } = await supabase.from("customers").select("id, name");
+      if (suppliersData && customersData) {
+        setEntities([
+          ...suppliersData.map((s) => ({ id: s.id, name: s.name })),
+          ...customersData.map((c) => ({ id: c.id, name: c.name })),
+        ]);
+      }
     };
-    fetchSuppliers();
+    fetchEntities();
   }, []);
 
   useEffect(() => {
@@ -296,18 +304,35 @@ export default function AddFinancialRecord() {
   <div className="grid grid-cols-4 gap-4 mt-4">
   {/* Fornecedor (metade da linha) */}
   <div className="col-span-2">
-    <Select value={selectedSupplier} onValueChange={setSelectedSupplier}>
-      <SelectTrigger className="w-full">
-        <SelectValue placeholder="Selecione um Fornecedor" />
-      </SelectTrigger>
-      <SelectContent>
-        {suppliers.map((supplier) => (
-          <SelectItem key={supplier.id} value={supplier.id}>
-            {supplier.name}
-          </SelectItem>
+  <div className="relative">
+  <Input
+    placeholder="Buscar Fornecedor ou Cliente..."
+    value={selectedSupplier}
+    onChange={(e) => {
+      setSelectedSupplier(e.target.value);
+      setShowEntityDropdown(true); // 🔥 Abre o dropdown enquanto digita
+    }}
+    className="w-full"
+  />
+  {showEntityDropdown && selectedSupplier.length > 0 && (
+    <div className="absolute z-10 mt-1 w-full border rounded-md shadow-md max-h-40 overflow-y-auto bg-muted">
+      {entities
+        .filter((entity) => entity.name.toLowerCase().includes(selectedSupplier.toLowerCase()))
+        .map((entity) => (
+          <div
+            key={entity.id}
+            className="p-2 cursor-pointer"
+            onClick={() => {
+              setSelectedSupplier(entity.name);
+              setShowEntityDropdown(false); // 🔥 Fecha o dropdown ao selecionar
+            }}
+          >
+            {entity.name}
+          </div>
         ))}
-      </SelectContent>
-    </Select>
+    </div>
+  )}
+</div>
   </div>
 
   {/* Método de Pagamento (1/4) */}
