@@ -3,5 +3,5 @@ import { Database } from "@/components/types/supabase";
 import { cookies } from "next/headers";
 
 export const supabaseServer = createServerComponentClient<Database>({
-  cookies: async () => cookies(),
+  cookies,
 });
