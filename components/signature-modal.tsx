@@ -6,9 +6,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import { useRef } from "react";
-
-// Importação dinâmica para evitar problemas de SSR
-const SignatureCanvas = dynamic(() => import("react-signature-canvas"), { ssr: false })
+import SignatureCanvas from "react-signature-canvas";
+const DynamicSignatureCanvas = dynamic(() => import("react-signature-canvas") as any, { ssr: false });
 
 interface SignatureModalProps {
   open: boolean
@@ -20,14 +19,20 @@ export function SignatureModal({ open, onSave, onClose }: SignatureModalProps) {
     const sigPadRef = useRef<any>(null);
     const [isMobile, setIsMobile] = useState(false)
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      setIsMobile(window.innerWidth < 768)
-    }
-  }, [])
+    const [canvasWidth, setCanvasWidth] = useState(500);
+    const [canvasHeight, setCanvasHeight] = useState(200);
+
+    useEffect(() => {
+      if (typeof window !== "undefined") {
+        if (isMobile) {
+          setCanvasWidth(window.innerWidth - 40); 
+          setCanvasHeight(window.innerHeight - 200);
+        }
+      }
+    }, [isMobile]);
 
   const handleClear = () => {
-    sigPad?.clear()
+    sigPadRef.current?.clear();
   }
 
   const handleSave = () => {
@@ -52,13 +57,13 @@ export function SignatureModal({ open, onSave, onClose }: SignatureModalProps) {
         <div className="flex flex-col items-center gap-4 mt-4">
           {/* Canvas de Assinatura */}
           <SignatureCanvas
-            penColor="black"
-            canvasProps={{
-                width: isMobile ? window.innerWidth : 500,
-                height: isMobile ? window.innerHeight - 200 : 200, // Ajuste de altura para mobile
+              penColor="black"
+              canvasProps={{
+                width: canvasWidth,
+                height: canvasHeight,
                 className: "border rounded bg-white w-full h-full",
-            }}
-            ref={sigPadRef}
+              }}
+              ref={sigPadRef}
             />
 
           {/* Botões */}

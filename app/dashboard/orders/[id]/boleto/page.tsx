@@ -131,9 +131,15 @@ export default function OrderBoletoPage() {
     const canvas = sigPad?.getCanvas();
     const trimmed = canvas ? getTrimmedCanvas(canvas) : null;
     const dataUrl = trimmed?.toDataURL("image/png");
-    console.log("🖊️ Assinatura gerada (base64):", dataUrl.slice(0, 100));
+
+    if (dataUrl) {
+      console.log("🖊️ Assinatura gerada (base64):", dataUrl.slice(0, 100));
+      setSignatureData(dataUrl);
+    } else {
+      console.error("⚠️ Erro: dataUrl indefinido ao salvar assinatura.");
+    }
   
-    setSignatureData(dataUrl);
+    setSignatureData(dataUrl ?? null);
   
     // Atualiza no Supabase
     const { error } = await supabase

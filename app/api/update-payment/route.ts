@@ -21,24 +21,25 @@ export async function POST(req: Request) {
     if (!order_id || typeof total_payed !== "number") {
       return NextResponse.json({ error: "Parâmetros inválidos" }, { status: 400 })
     }
-    const cookieStore = await cookies()
 
-    const supabase = createServerComponentClient<Database>({ cookies: () => cookieStore })
+    const supabase = createServerComponentClient<Database>({
+      cookies, 
+    });
 
     const { data: order, error: orderError } = await supabase
       .from("orders")
       .select("id, total, total_payed")
-      .eq("id", order_id)
+      .eq("id", order_id as any)
       .single()
 
-    if (orderError || !order) {
+      if (!order || "code" in order) {
       console.error("❌ Pedido não encontrado:", orderError)
       return NextResponse.json({ error: "Pedido não encontrado" }, { status: 404 })
     }
-
-    const oldPayed = Number(order.total_payed) || 0
+    const safeOrder = order as { id: string; total: number; total_payed: number };
+    const oldPayed = Number(safeOrder.total_payed) || 0
     const newTotalPayed = oldPayed + total_payed
-    const newStatus = newTotalPayed >= Number(order.total) ? "Pago" : "Pendente"
+    const newStatus = newTotalPayed >= Number(safeOrder.total) ? "Pago" : "Pendente"
 
     const { error: updateError } = await supabase
       .from("orders")

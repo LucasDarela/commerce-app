@@ -84,6 +84,11 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     alignItems: "center",
   },
+  label: {
+    fontWeight: "bold",
+    fontSize: 10,
+    marginBottom: 2,
+  },
 })
 
 interface ItemRelationPDFProps {

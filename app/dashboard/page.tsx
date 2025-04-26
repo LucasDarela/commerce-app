@@ -4,10 +4,10 @@ import { redirect } from "next/navigation";
 import { ChartAreaInteractive } from "@/components/chart-area-interactive"
 import { SectionCards } from "@/components/section-cards"
 import { Database } from "@/components/types/supabase";
-import { createServerSupabaseClient } from "@/lib/supabaseServer";
+import { supabaseServer } from "@/lib/supabaseServer";
 
 export default async function DashboardPage() {
-  const supabase = await createServerSupabaseClient();
+  const supabase = supabaseServer;
   
   const {
     data: { user },

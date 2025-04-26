@@ -76,9 +76,18 @@ export function GenerateBoletoButton({ orderId, paymentMethod, signatureData }: 
 
       toast.success("🎉 Boleto gerado com sucesso!");
 
+      const deliveryDate = new Date();
+      const vencimento = new Date(deliveryDate.setDate(deliveryDate.getDate() + parseInt(order.days_ticket || "12")));
+      const vencimentoStr = vencimento.toLocaleDateString("pt-BR");
+  
+
       // Agora gerar o PDF local usando o signatureData
       const pdfBlob = await pdf(
-        <BoletoPDF order={order} signatureData={signatureData} />
+        <BoletoPDF 
+        order={order} 
+        signatureData={signatureData} 
+        vencimentoStr={vencimentoStr} 
+      />
       ).toBlob();
 
       saveAs(pdfBlob, `boleto-pedido-${order.note_number}.pdf`);

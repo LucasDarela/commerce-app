@@ -35,6 +35,9 @@ const styles = StyleSheet.create({
     height: 80,
     marginTop: 6,
   },
+  section: {
+    marginBottom: 10,
+  },
 })
 
 interface BoletoPDFProps {
