@@ -17,7 +17,7 @@ interface SignatureModalProps {
 }
 
 export function SignatureModal({ open, onSave, onClose }: SignatureModalProps) {
-    const sigPadRef = useRef<SignatureCanvas>(null);
+    const sigPadRef = useRef<any>(null);
     const [isMobile, setIsMobile] = useState(false)
 
   useEffect(() => {

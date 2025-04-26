@@ -4,9 +4,9 @@ import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { BoletoPDF } from "@/components/pdf/boleto-pdf"; // precisa ter esse componente pronto
+import { BoletoPDF } from "@/components/pdf/boleto-pdf"; 
 import { pdf } from "@react-pdf/renderer";
-import { saveAs } from "file-saver"; // npm install file-saver
+import { saveAs } from "file-saver"; 
 import { useRouter } from "next/navigation";
 
 interface GenerateBoletoButtonProps {

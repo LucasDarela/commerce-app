@@ -74,9 +74,27 @@ const styles = StyleSheet.create({
     marginVertical: 20,
     borderTop: "1pt dashed #999",
   },
+  signature: { 
+    width: 200, 
+    height: 100 
+  },
+  signatureBox: {
+    marginTop: 20,
+    borderTop: "1px solid #000",
+    paddingTop: 10,
+    alignItems: "center",
+  },
 })
 
-const RelationSection = ({ company, customer, items, note }: any) => {
+interface ItemRelationPDFProps {
+  company: any;
+  note: any;
+  customer: any;
+  items: any[];
+  signature?: string | null;
+}
+
+const RelationSection = ({ company, customer, items, note, signature }: any) => {
   const total = items.reduce(
     (sum: number, item: any) => sum + item.unit_price * item.quantity,
     0
@@ -142,26 +160,22 @@ const RelationSection = ({ company, customer, items, note }: any) => {
         <Text style={styles.bold}>Total: R$ {total.toFixed(2)}</Text>
       </View>
 
-      {/* Rodapé */}
-      <Text style={styles.footer}>
-        Assinatura:______________________________________________
-      </Text>
+      {signature && (
+          <View style={styles.signatureBox}>
+            <Text style={styles.label}>Assinatura do Cliente:</Text>
+            <Image src={signature} style={styles.signature} />
+          </View>
+        )}
     </View>
   )
 }
 
-export function ItemRelationPDF({ company, customer, items, note }: any) {
+export function ItemRelationPDF({ company, customer, items, note, signature }: ItemRelationPDFProps) {
   return (
     <Document>
       <Page size="A4" style={styles.page}>
         {/* Parte de cima */}
-        <RelationSection company={company} customer={customer} items={items} note={note} />
-
-        {/* Separador */}
-        <View style={styles.separator} />
-
-        {/* Parte de baixo (duplicada) */}
-        <RelationSection company={company} customer={customer} items={items} note={note} />
+        <RelationSection company={company} customer={customer} items={items} note={note} signature={signature} />
       </Page>
     </Document>
   )

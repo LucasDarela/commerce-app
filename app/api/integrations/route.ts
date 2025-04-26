@@ -6,7 +6,9 @@ import { Database } from "@/components/types/supabase"
 
 export async function POST(req: NextRequest) {
   const cookieStore = await cookies()
-  const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore })
+  const supabase = createRouteHandlerClient<Database>({
+    cookies: () => cookies(), 
+  });
 
   const {
     data: { user },

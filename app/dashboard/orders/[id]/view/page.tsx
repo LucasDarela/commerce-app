@@ -9,6 +9,7 @@ import { ItemRelationPDF } from "@/components/pdf/item-relation-pdf"
 import { Button } from "@/components/ui/button"
 import { GenerateBoletoButton } from "@/components/generate-boleto-button"
 import { SignatureModal } from "@/components/signature-modal"
+import { supabase } from "@/lib/supabase";
 
 export default function ViewOrderPage() {
   const { id } = useParams()
@@ -16,11 +17,26 @@ export default function ViewOrderPage() {
   const [openSignature, setOpenSignature] = useState(false)
   const [signatureData, setSignatureData] = useState<string | null>(null)
 
-  const handleSaveSignature = (dataUrl: string) => {
-    if (!dataUrl) return
-
-    setSignatureData(dataUrl)
-    setOpenSignature(false)
+  const handleSaveSignature = async (dataUrl: string) => {
+    if (!dataUrl) return;
+  
+    // Salvar assinatura no banco (Supabase)
+    const { error } = await supabase
+      .from("orders")
+      .update({ customer_signature: dataUrl })
+      .eq("id", id);
+  
+    if (error) {
+      toast.error("Erro ao salvar assinatura no banco.");
+      console.error("Erro ao atualizar assinatura:", error);
+      return;
+    }
+  
+    toast.success("Assinatura salva com sucesso!");
+  
+    // Atualiza localmente o estado
+    setSignatureData(dataUrl);
+    setOpenSignature(false);
   }
 
   useEffect(() => {
@@ -28,6 +44,11 @@ export default function ViewOrderPage() {
         try {
             const data = await fetchOrderDetails(id as string)
             setOrder(data)
+
+            if (data?.customer_signature) {
+              setSignatureData(data.customer_signature)
+            }
+
           } catch (err) {
             console.error("Erro no fetchOrderDetails:", err)
             toast.error("Erro ao carregar espelho da venda.")
@@ -106,6 +127,16 @@ export default function ViewOrderPage() {
         Assinar
       </Button>
         </div>
+        {signatureData && (
+            <div className="flex flex-col items-center mt-4">
+              <p className="text-sm text-gray-600 mb-2">Assinatura capturada:</p>
+              <img
+                src={signatureData}
+                alt="Assinatura do cliente"
+                className="border rounded w-64 h-auto"
+              />
+            </div>
+          )}
       </section>
         {/* Modal de Assinatura */}
         <SignatureModal
@@ -121,6 +152,7 @@ export default function ViewOrderPage() {
               company={company}
               customer={customer}
               items={items}
+              note={order.note_number}
             />} fileName="nota.pdf">
             {({ loading }) => (
               <Button variant="default">
