@@ -104,10 +104,12 @@ export default function CompanySettingsForm() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="p-6 space-y-4">
+      <h2 className="text-xl font-bold">Configure os dados da sua empresa</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      
         <div>
-          <Label>CNPJ</Label>
+          <Label className="mb-2">CNPJ</Label>
           <div className="flex gap-2">
             <Input
               name="document"
@@ -121,51 +123,51 @@ export default function CompanySettingsForm() {
           </div>
         </div>
         <div>
-          <Label>Nome Completo / Razão Social</Label>
+          <Label className="mb-2">Nome Completo / Razão Social</Label>
           <Input name="corporate_name" value={formData.corporate_name} onChange={handleChange} />
         </div>
         <div>
-          <Label>Nome Fantasia</Label>
+          <Label className="mb-2">Nome Fantasia</Label>
           <Input name="trade_name" value={formData.trade_name} onChange={handleChange} />
         </div>
         <div>
-          <Label>CEP</Label>
+          <Label className="mb-2">CEP</Label>
           <Input name="zip_code" value={formData.zip_code} onChange={handleChange} />
         </div>
         <div>
-          <Label>Endereço</Label>
+          <Label className="mb-2">Endereço</Label>
           <Input name="address" value={formData.address} onChange={handleChange} />
         </div>
         <div>
-          <Label>Bairro</Label>
+          <Label className="mb-2">Bairro</Label>
           <Input name="neighborhood" value={formData.neighborhood} onChange={handleChange} />
         </div>
         <div>
-          <Label>Cidade</Label>
+          <Label className="mb-2">Cidade</Label>
           <Input name="city" value={formData.city} onChange={handleChange} />
         </div>
         <div>
-          <Label>Estado</Label>
+          <Label className="mb-2">Estado</Label>
           <Input name="state" value={formData.state} onChange={handleChange} maxLength={2} />
         </div>
         <div>
-          <Label>Número</Label>
+          <Label className="mb-2">Número</Label>
           <Input name="number" value={formData.number} onChange={handleChange} />
         </div>
         <div>
-          <Label>Complemento</Label>
+          <Label className="mb-2">Complemento</Label>
           <Input name="complement" value={formData.complement} onChange={handleChange} />
         </div>
         <div>
-          <Label>Telefone</Label>
+          <Label className="mb-2">Telefone</Label>
           <Input name="phone" value={formData.phone} onChange={handleChange} />
         </div>
         <div>
-          <Label>Email (Opcional)</Label>
+          <Label className="mb-2">Email (Opcional)</Label>
           <Input name="email" value={formData.email} onChange={handleChange} />
         </div>
         <div>
-          <Label>Inscrição Estadual</Label>
+          <Label className="mb-2">Inscrição Estadual</Label>
           <Input
             name="state_registration"
             value={formData.state_registration}

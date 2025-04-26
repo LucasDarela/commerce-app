@@ -1,6 +1,8 @@
-import { MercadoPagoConfig } from 'mercadopago'
+import { MercadoPagoConfig, Payment } from 'mercadopago';
 
-// ✅ Criação da instância com token diretamente
-export const mercadopago = new MercadoPagoConfig({
-  accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN!,
-})
+const client = new MercadoPagoConfig({ accessToken: .env.MP_ACCESS_TOKEN });
+
+const payment = new Payment(client);
+payment.create({ body: req.body })
+.then(console.log)
+.catch(console.log);

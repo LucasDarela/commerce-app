@@ -5,8 +5,10 @@ import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import SignatureCanvas from "react-signature-canvas";
+import dynamic from "next/dynamic";
 import { toast } from "sonner";
 import { PDFDownloadLink, Document, Page, Text, View, Image, StyleSheet } from "@react-pdf/renderer";
+import { getTrimmedCanvas } from "@/lib/getTrimmedCanvasManually";
 
 const styles = StyleSheet.create({
     page: { padding: 40, fontSize: 12, fontFamily: "Helvetica" },
@@ -126,8 +128,10 @@ export default function OrderBoletoPage() {
   
     await fetchOrder();
   
-    const dataUrl = sigPad.getTrimmedCanvas().toDataURL("image/png");
-    console.log("🖊️ Assinatura gerada (base64):", dataUrl.slice(0, 100)); // Mostra só o início para não travar
+    const canvas = sigPad?.getCanvas();
+    const trimmed = canvas ? getTrimmedCanvas(canvas) : null;
+    const dataUrl = trimmed?.toDataURL("image/png");
+    console.log("🖊️ Assinatura gerada (base64):", dataUrl.slice(0, 100));
   
     setSignatureData(dataUrl);
   
@@ -187,7 +191,7 @@ export default function OrderBoletoPage() {
             <Button
             variant="outline"
             onClick={() => {
-                const canvas = sigPad?.getCanvas();
+              const canvas = sigPad?.getTrimmedCanvas?.(); 
                 const container = canvas?.parentElement;
 
                 if (window.innerWidth < 768) {
@@ -270,11 +274,11 @@ export default function OrderBoletoPage() {
               </Button>
             )}
           </PDFDownloadLink>
-          <div className="flex gap-4">
+          {/* <div className="flex gap-4">
             <Button onClick={() => window.print()}>Imprimir</Button>
             <Button variant="outline">Enviar por WhatsApp</Button>
             <Button variant="outline">Enviar por Email</Button>
-          </div>
+          </div> */}
         </div>
       )}
     </div>

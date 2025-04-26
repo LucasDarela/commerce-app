@@ -21,7 +21,7 @@ export async function POST(req: Request) {
     if (!order_id || typeof total_payed !== "number") {
       return NextResponse.json({ error: "Parâmetros inválidos" }, { status: 400 })
     }
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
 
     const supabase = createServerComponentClient<Database>({ cookies: () => cookieStore })
 

@@ -1,26 +1,21 @@
 import { createServerComponentClient } from "@supabase/auth-helpers-nextjs";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { AppSidebar } from "@/components/app-sidebar"
 import { ChartAreaInteractive } from "@/components/chart-area-interactive"
-import { DataTable } from "@/components/data-table"
 import { SectionCards } from "@/components/section-cards"
-import { SiteHeader } from "@/components/site-header"
-import {
-  SidebarInset,
-  SidebarProvider,
-} from "@/components/ui/sidebar"
-import data from "./data.json"
+import { Database } from "@/components/types/supabase";
+import { createServerSupabaseClient } from "@/lib/supabaseServer";
 
 export default async function DashboardPage() {
-
-  const supabase = await createServerComponentClient({ cookies });
-  const { data: { user } } = await supabase.auth.getUser();
+  const supabase = await createServerSupabaseClient();
+  
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (!user) {
     redirect("/login-signin");
   }
-
   return (
         <div className="flex flex-1 flex-col">
           <div className="@container/main flex flex-1 flex-col gap-2">

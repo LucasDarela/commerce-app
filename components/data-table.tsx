@@ -3,6 +3,7 @@
 import * as React from "react"
 import { format, parseISO } from "date-fns"
 import { useEffect, useState } from "react"
+import { useCompanyIntegration } from "@/hooks/use-company-integration"
 import {
   DndContext,
   KeyboardSensor,
@@ -219,6 +220,7 @@ export function DataTable({
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [dateInput, setDateInput] = useState("")
+  const { accessToken, loading: loadingIntegration, error: integrationError } = useCompanyIntegration('mercado_pago')
   const router = useRouter();
 
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
@@ -489,68 +491,6 @@ export function DataTable({
     >
       Ver Espelho
     </a>
-    </DropdownMenuItem>
-    <DropdownMenuItem>
-    <button
-      onClick={async () => {
-        try {
-         // 1. Buscar os dados do pedido completo
-    const { data: order } = await supabase
-    .from("orders")
-    .select(`
-      *,
-      customers:customers(*)
-    `)
-    .eq("id", row.original.id)
-    .single();
-
-  if (!order || !order.customers) {
-    toast.error("Dados do cliente não encontrados.");
-    return;
-  }
-
-  const cliente = order.customers;
-
-  // 2. Enviar para o create-payment com os dados corretos
-  const payload = {
-    nome: cliente.name,
-    document: cliente.document,
-    email: cliente.email,
-    total: order.total,
-    days_ticket: order.days_ticket,
-    order_id: order.id,
-    zip_code: cliente.zip_code,
-    address: cliente.address,
-    number: cliente.number,
-    neighborhood: cliente.neighborhood,
-    city: cliente.city,
-    state: cliente.state,
-  };
-
-  const res = await fetch("/api/create-payment", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-
-  if (!res.ok) {
-    const error = await res.json();
-    toast.error("Erro ao gerar boleto");
-    console.error("❌ Erro:", error);
-    return;
-  }
-
-  toast.success("Boleto gerado!");
-  router.push(`/dashboard/orders/${row.original.id}/boleto`);
-} catch (err) {
-  toast.error("Erro inesperado");
-  console.error("❌ Erro inesperado:", err);
-}
-      }}
-      disabled={row.original.payment_method.toLowerCase() !== "boleto"}
-    >
-      Gerar Boleto
-    </button>
     </DropdownMenuItem>
     <DropdownMenuItem
       onClick={() => {

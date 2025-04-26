@@ -35,7 +35,9 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const cookieStore = await cookies();
-  const activeThemeValue = cookieStore.get("active_theme")?.value;
+
+  const activeThemeCookie = await cookieStore.get("active_theme"); 
+  const activeThemeValue = activeThemeCookie?.value;
   const isScaled = activeThemeValue?.endsWith("-scaled");
 
   return (

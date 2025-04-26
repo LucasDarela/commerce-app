@@ -41,6 +41,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",
     "dayjs": "^1.11.13",
+    "file-saver": "^2.0.5",
     "lottie-react": "^2.4.1",
     "lucide-react": "^0.484.0",
     "mercadopago": "^2.4.0",
@@ -63,6 +64,7 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
+    "@types/json-schema": "^7.0.15",
     "@types/node": "20.17.30",
     "@types/react": "19.1.0",
     "@types/react-dom": "^19",

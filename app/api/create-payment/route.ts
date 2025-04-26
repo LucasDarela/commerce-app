@@ -1,46 +1,34 @@
-import { NextResponse } from "next/server"
-import { createServerClient } from "@supabase/ssr"
-import { cookies } from "next/headers"
-import { Database } from "@/components/types/supabase"
-import { type ReadonlyRequestCookies } from "next/dist/server/web/spec-extension/adapters/request-cookies"
-import { MercadoPagoConfig, Payment } from 'mercadopago'
-import { mercadopago } from '@/lib/mercadoPago'
-
-type PaymentRequest = {
-  nome: string
-  document: string
-  email: string
-  total: number
-  days_ticket: string
-  order_id: string
-  zip_code: string
-  address: string
-  number: string | number
-  neighborhood: string
-  city: string
-  state: string
-}
+import { cookies } from "next/headers";
+import { createServerComponentClient } from "@supabase/auth-helpers-nextjs";
+import { NextResponse } from "next/server";
+import { Database } from "@/components/types/supabase"; // Ajuste o caminho se precisar
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json() as Record<string, any>
-    const cookieStore = await cookies()
+    const supabase = createServerComponentClient<Database>({ cookies });
 
-    const supabase = createServerClient<Database>(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get(name) {
-            return cookieStore.get(name)?.value
-          },
-          set() {},
-          remove() {}
-        }
-      }
-    )
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-    // 🔍 Validação dos campos obrigatórios
+    console.log("👤 User:", user);
+
+    const body = await req.json();
+
+    console.log("🧪 USER LOGADO:", user)
+    const { data: companyUser, error: companyError } = await supabase
+      .from("company_users")
+      .select("company_id")
+      .eq("user_id", user?.id)
+      .single()
+
+      console.log("🧪 RESULTADO companyUser:", companyUser, companyError)
+
+    if (!companyUser) {
+      return NextResponse.json({ error: "Empresa não encontrada" }, { status: 400 })
+    }
+
+    // Valida campos obrigatórios
     const requiredFields = [
       "nome", "document", "email", "total", "days_ticket", "order_id",
       "zip_code", "address", "number", "neighborhood", "city", "state"
@@ -48,16 +36,27 @@ export async function POST(req: Request) {
 
     for (const field of requiredFields) {
       if (!body[field]) {
-        return NextResponse.json(
-          { error: `Campo obrigatório ausente: ${field}` },
-          { status: 400 }
-        )
+        return NextResponse.json({ error: `Campo obrigatório ausente: ${field}` }, { status: 400 })
       }
     }
 
+    const { data: integration } = await supabase
+      .from("company_integrations")
+      .select("access_token")
+      .eq("company_id", companyUser.company_id)
+      .eq("provider", "mercado_pago")
+      .single()
+
+    if (!integration || !integration.access_token) {
+      return NextResponse.json({ error: "Access Token não configurado" }, { status: 400 })
+    }
+
+    const accessToken = integration.access_token
+
+    // Dados para API Mercado Pago
     const cleanDoc = body.document.replace(/\D/g, "")
     const docType = cleanDoc.length === 11 ? "CPF" : "CNPJ"
-    const [first_name, ...rest] = (body.nome || "Cliente").split(" ")
+    const [first_name, ...rest] = body.nome.split(" ")
     const last_name = rest.join(" ") || "Sobrenome"
 
     const daysToExpire = parseInt(body.days_ticket) || 1
@@ -65,53 +64,17 @@ export async function POST(req: Request) {
     dueDate.setDate(dueDate.getDate() + daysToExpire)
     const formattedDueDate = dueDate.toISOString()
 
-    const idempotencyKey = `${cleanDoc}-${Date.now()}`
-
-    // const response = await fetch("https://api.mercadopago.com/v1/payments", {
-    //   method: "POST",
-    //   headers: {
-    //     Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`,
-    //     "Content-Type": "application/json",
-    //     "X-Idempotency-Key": idempotencyKey,
-    //   },
-    //   body: JSON.stringify({
-    //     transaction_amount: Number(body.total),
-    //     payment_method_id: "bolbradesco"
-    //     payment_type_id: "ticket"
-    //     description: "Pedido no Chopp Hub",
-    //     statement_descriptor: "CHOPPHUB",
-    //     date_of_expiration: formattedDueDate,
-    //     external_reference: body.order_id,
-    //     payer: {
-    //       email: body.email,
-    //       first_name,
-    //       last_name,
-    //       identification: {
-    //         type: docType,
-    //         number: cleanDoc,
-    //       },
-    //       address: {
-    //         zip_code: body.zip_code,
-    //         street_name: body.address,
-    //         street_number: body.number,
-    //         neighborhood: body.neighborhood,
-    //         city: body.city,
-    //         federal_unit: body.state,
-    //       },
-    //     },
-    //   }),
-    // })
+    const idempotencyKey = `${cleanDoc}-${body.order_id}`
 
     const paymentData = {
       transaction_amount: Number(body.total),
-      payment_method_id: "bolbradesco",
-      payment_type_id: "ticket",
+      payment_method_id: "bolbradesco", // ou outro banco que desejar
       description: "Pedido no Chopp Hub",
       date_of_expiration: formattedDueDate,
       external_reference: body.order_id,
       payer: {
         email: body.email,
-        first_name: first_name,
+        first_name,
         last_name,
         identification: {
           type: docType,
@@ -126,39 +89,42 @@ export async function POST(req: Request) {
           federal_unit: body.state,
         },
       },
-      items: [
-        {
-          title: "Pedido no Chopp Hub",
-          quantity: 1,
-          unit_price: Number(body.total),
-        },
-      ],
-    };
-    
-    const payments = new Payment(mercadopago)
-    const payment = await payments.create({ body: paymentData })
-    const data = payment;
-    
-    console.log("🧾 Dados do boleto:", JSON.stringify(data.transaction_details, null, 2));
-    
-    if (!data.transaction_details?.barcode?.content) {
-      console.error("❌ Erro ao gerar boleto: resposta inválida", data);
-      return NextResponse.json({ error: "Erro ao gerar boleto", details: data }, { status: 500 });
     }
 
-    await supabase
-    .from("orders")
-    .update({
-      boleto_url: data.transaction_details?.external_resource_url,
-      boleto_barcode_number: data.transaction_details?.barcode?.content,
-      boleto_id: data.id,
-      boleto_expiration_date: data.date_of_expiration,
+    // 🔥 Enviar para o Mercado Pago
+    const response = await fetch("https://api.mercadopago.com/v1/payments", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+        "X-Idempotency-Key": idempotencyKey,
+      },
+      body: JSON.stringify(paymentData),
     })
-    .eq("id", body.order_id)
 
-    return NextResponse.json(data)
-  } catch (error) {
-    console.error("❌ Erro interno:", error)
-    return NextResponse.json({ error: "Erro interno ao gerar boleto" }, { status: 500 })
+    const data = await response.json()
+
+    if (!response.ok || !data.transaction_details?.barcode?.content) {
+      console.error("❌ Erro ao gerar boleto:", data)
+      return NextResponse.json({ error: "Erro ao gerar boleto", details: data }, { status: 500 })
+    }
+
+    // Atualizar pedido no Supabase
+    await supabase
+      .from("orders")
+      .update({
+        boleto_url: data.transaction_details.external_resource_url,
+        boleto_barcode_number: data.transaction_details.barcode.content,
+        boleto_id: data.id,
+        boleto_expiration_date: data.date_of_expiration,
+      })
+      .eq("id", body.order_id)
+
+
+      return NextResponse.json({ success: true });
+
+    } catch (error) {
+      console.error("❌ Erro interno:", error);
+      return NextResponse.json({ error: "Erro interno ao gerar boleto" }, { status: 500 });
+    }
   }
-}

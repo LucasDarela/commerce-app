@@ -7,10 +7,21 @@ import { toast } from "sonner"
 import { PDFDownloadLink } from "@react-pdf/renderer"
 import { ItemRelationPDF } from "@/components/pdf/item-relation-pdf"
 import { Button } from "@/components/ui/button"
+import { GenerateBoletoButton } from "@/components/generate-boleto-button"
+import { SignatureModal } from "@/components/signature-modal"
 
 export default function ViewOrderPage() {
   const { id } = useParams()
   const [order, setOrder] = useState<any>(null)
+  const [openSignature, setOpenSignature] = useState(false)
+  const [signatureData, setSignatureData] = useState<string | null>(null)
+
+  const handleSaveSignature = (dataUrl: string) => {
+    if (!dataUrl) return
+
+    setSignatureData(dataUrl)
+    setOpenSignature(false)
+  }
 
   useEffect(() => {
     const fetch = async () => {
@@ -33,29 +44,26 @@ export default function ViewOrderPage() {
 
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Espelho da Venda</h1>
-        <PDFDownloadLink
+    <div className="flex items-start justify-between">
+      <h1 className="text-2xl font-bold">Espelho da Venda</h1>
+      <div className="flex flex-col gap-2">
+
+        {/* <PDFDownloadLink
           document={<ItemRelationPDF company={company} customer={customer} items={items} />}
           fileName={`espelho-pedido-${order.note_number}.pdf`}
         >
           {({ loading }) => (
-            <Button variant="outline">
+            <Button >
               {loading ? "Gerando PDF..." : "Exportar PDF"}
             </Button>
           )}
         </PDFDownloadLink>
+        <GenerateBoletoButton
+          orderId={order.id}
+          paymentMethod={order.payment_method}
+        /> */}
       </div>
-
-      {/* Fornecedor */}
-      <section>
-        <h2 className="font-semibold">Fornecedor</h2>
-        <p><strong>{company.name}</strong> - {company.document}</p>
-        <p>{company.address}, {company.number} - {company.neighborhood}</p>
-        <p>{company.city} - {company.state}, {company.zip_code}</p>
-        <p>📞 {company.phone} | ✉️ {company.email}</p>
-      </section>
-
+    </div>
       {/* Cliente */}
       <section>
         <h2 className="font-semibold">Cliente</h2>
@@ -64,7 +72,10 @@ export default function ViewOrderPage() {
         <p>{customer.city} - {customer.state}, {customer.zip_code}</p>
         <p>📞 {customer.phone} | ✉️ {customer.email?.trim() ? customer.email : "N/A"}</p>
       </section>
-
+      {/* Forma de Pagamento */}
+      <section>
+        <h2 className="font-semibold">Forma de Pagamento: <span>{order.payment_method ? order.payment_method : "N/A"}</span></h2>
+      </section>
       {/* Itens */}
       <section>
         <h2 className="font-semibold">Itens da Venda</h2>
@@ -73,8 +84,8 @@ export default function ViewOrderPage() {
             <tr className="text-left">
               <th className="p-2">Produto</th>
               <th className="p-2">Qtd</th>
-              <th className="p-2">V. Unitário</th>
-              <th className="p-2">V. Total</th>
+              <th className="p-2">Un</th>
+              <th className="p-2">Total</th>
             </tr>
           </thead>
           <tbody>
@@ -90,7 +101,44 @@ export default function ViewOrderPage() {
             ))}
           </tbody>
         </table>
+        <div className="w-full mt-6">
+        <Button onClick={() => setOpenSignature(true)}>
+        Assinar
+      </Button>
+        </div>
       </section>
+        {/* Modal de Assinatura */}
+        <SignatureModal
+        open={openSignature}
+        onClose={() => setOpenSignature(false)}
+        onSave={handleSaveSignature}
+      />
+                  {/* Só aparece depois que assinar */}
+                  {signatureData && (
+        <div className="flex flex-col gap-2 mt-4">
+          <PDFDownloadLink document={    <ItemRelationPDF
+              signature={signatureData}
+              company={company}
+              customer={customer}
+              items={items}
+            />} fileName="nota.pdf">
+            {({ loading }) => (
+              <Button variant="default">
+                {loading ? "Gerando PDF..." : "Download PDF"}
+              </Button>
+            )}
+          </PDFDownloadLink>
+
+          {order.payment_method?.toLowerCase() === "boleto" && (
+            <GenerateBoletoButton 
+            orderId={order.id} 
+            paymentMethod={order.payment_method} 
+            signatureData={signatureData} 
+            />
+          )}
+        </div>
+      )}
     </div>
+    
   )
 }
