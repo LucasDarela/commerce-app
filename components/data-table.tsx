@@ -597,6 +597,7 @@ export function DataTable({
 
   return (
     <>
+    
     {isSavingOrder && (
       <div className="fixed top-2 left-1/2 z-50 -translate-x-1/2 rounded-full bg-white p-2 shadow-lg border border-muted">
         <svg
@@ -621,10 +622,7 @@ export function DataTable({
         </svg>
       </div>
     )}
-<div className="grid gap-3 px-2 sm:px-4 py-2
-  grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7
-  items-center"
->
+<div className="grid gap-2 px-4 lg:px-6 py-2 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 items-center">
   {/* Filtro por data */}
   <Input
     type="text"
@@ -732,7 +730,7 @@ export function DataTable({
       className="min-w-[100px] w-full bg-primary text-primary-foreground hover:bg-primary/90"
     >
       <IconPlus className="mr-1" />
-      <span className="hidden sm:inline">Add Venda</span>
+      <span className="hidden sm:inline">Venda</span>
     </Button>
   </Link>
 </div>
@@ -742,51 +740,6 @@ export function DataTable({
       defaultValue="outline"
       className="w-full flex-col justify-start gap-6"
     >
-      {/* Selector  */}
-      {/* <div className="flex items-center justify-between px-4 lg:px-6">
-        <div className="flex items-center gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                <IconLayoutColumns />
-                <span className="hidden lg:inline">Customize Columns</span>
-                <span className="lg:hidden">Columns</span>
-                <IconChevronDown />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              {table
-                .getAllColumns()
-                .filter(
-                  (column) =>
-                    typeof column.accessorFn !== "undefined" &&
-                    column.getCanHide()
-                )
-                .map((column) => {
-                  return (
-                    <DropdownMenuCheckboxItem
-                      key={column.id}
-                      className="capitalize"
-                      checked={column.getIsVisible()}
-                      onCheckedChange={(value) =>
-                        column.toggleVisibility(!!value)
-                      }
-                    >
-                      {column.id}
-                    </DropdownMenuCheckboxItem>
-                  )
-                })}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Link href={"/dashboard/orders/add"}>
-          <Button variant="default" size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground min-w-8 duration-200 ease-linear">
-            <IconPlus />
-            <span className="hidden lg:inline">Adicionar Venda</span>
-          </Button>
-          </Link>
-        </div>
-      </div> */}
-      {/* Delivery Tabs  */}
       <TabsContent
         value="outline"
         className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6"

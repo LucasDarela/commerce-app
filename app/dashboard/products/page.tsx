@@ -25,6 +25,8 @@ import {
 import { Card } from "@/components/ui/card";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import { PriceTableManager } from "@/components/price-table-manager";
+import Link from "next/link";
+import { IconPlus } from "@tabler/icons-react";
 
 // 🔹 Product Type
 type Product = {
@@ -137,9 +139,16 @@ export default function ListProduct() {
           onChange={(e) => setSearch(e.target.value)}
           className="w-full h-8 p-2 border rounded-md"
         />
-        <Button size="sm" onClick={() => router.push("/dashboard/products/add")} className="w-full sm:w-auto">
-          Adicionar Produto
-        </Button>
+        <Link href="/dashboard/product/add">
+          <Button
+            variant="default"
+            size="sm"
+            className="min-w-[100px] w-full bg-primary text-primary-foreground hover:bg-primary/90"
+          >
+            <IconPlus className="mr-1" />
+            <span className="hidden sm:inline">Produto</span>
+          </Button>
+        </Link>
       </div>
 
       <div className="p-6 rounded-lg shadow-md overflow-x-auto max-w-full">

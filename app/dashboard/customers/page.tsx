@@ -15,7 +15,9 @@ import {
   IconChevronRight,
   IconChevronsLeft,
   IconChevronsRight,
+  IconPlus,
 } from "@tabler/icons-react"
+import Link from "next/link";
 
 type Cliente = {
   id: number;
@@ -151,6 +153,7 @@ export default function ListCustomers() {
       } else {
         toast.success("Cliente excluído com sucesso!");
         setClientes(clientes.filter((cliente) => cliente.id !== id));
+        closeModal(); 
       }
     }
   };
@@ -169,9 +172,16 @@ export default function ListCustomers() {
           }}
           className="w-full h-8 p-2 border rounded-md"
         />
-                <Button size="sm" onClick={() => router.push("/dashboard/customers/add")} className="w-full sm:w-auto">
-          Adicionar Cliente
-        </Button>
+        <Link href="/dashboard/customersadd">
+          <Button
+            variant="default"
+            size="sm"
+            className="min-w-[100px] w-full bg-primary text-primary-foreground hover:bg-primary/90"
+          >
+            <IconPlus className="mr-1" />
+            <span className="hidden sm:inline">Cliente</span>
+          </Button>
+        </Link>
       </div>
 
       {/* 🔹 Tabela de Clientes Responsiva */}

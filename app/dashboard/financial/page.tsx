@@ -33,6 +33,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
+import Link from "next/link";
+import { IconPlus } from "@tabler/icons-react";
 
 interface Invoice {
   id: string;
@@ -257,13 +259,16 @@ export default function FinancialPage() {
       </div>
 
         <div className="w-full md:w-auto">
+        <Link href="/dashboard/financial/add">
           <Button
+            variant="default"
             size="sm"
-            onClick={() => router.push("/dashboard/financial/add")}
-            className="w-full md:w-auto"
+            className="min-w-[100px] w-full bg-primary text-primary-foreground hover:bg-primary/90"
           >
-            Adicionar Nota
+            <IconPlus className="mr-1" />
+            <span className="hidden sm:inline">Financeiro</span>
           </Button>
+        </Link>
         </div>
       </div>
 

@@ -10,6 +10,8 @@ import { toast } from "sonner";
 import { Pencil, Trash } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
+import Link from "next/link";
+import { IconPlus } from "@tabler/icons-react";
 
 // 🔹 Supplier Type
 type Supplier = {
@@ -116,9 +118,16 @@ export default function ListSuppliers() {
           onChange={(e) => setSearch(e.target.value)}
           className="w-full h-8 p-2 border rounded-md"
         />
-        <Button size="sm" onClick={() => router.push("/dashboard/suppliers/add")} className="w-full sm:w-auto">
-          Adicionar Fornecedor
-        </Button>
+        <Link href="/dashboard/supplier/add">
+          <Button
+            variant="default"
+            size="sm"
+            className="min-w-[100px] w-full bg-primary text-primary-foreground hover:bg-primary/90"
+          >
+            <IconPlus className="mr-1" />
+            <span className="hidden sm:inline">Fornecedor</span>
+          </Button>
+        </Link>
       </div>
 
       <div className="p-4 rounded-lg shadow-md overflow-x-auto max-w-full">
