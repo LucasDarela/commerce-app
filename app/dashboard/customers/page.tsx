@@ -172,7 +172,7 @@ export default function ListCustomers() {
           }}
           className="w-full h-8 p-2 border rounded-md"
         />
-        <Link href="/dashboard/customersadd">
+        <Link href="/dashboard/customers/add">
           <Button
             variant="default"
             size="sm"

@@ -133,7 +133,7 @@ export function LoginAccountForm() {
                                 </FormItem>
                             )}
                         />
-                            <Button type="submit" disabled={isLoading}>
+                            <Button className="my-4" type="submit" disabled={isLoading}>
                             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             {isLoading ? "Login in..." : "Login"}
                             </Button>

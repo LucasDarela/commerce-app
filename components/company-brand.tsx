@@ -21,13 +21,13 @@ const iconMap: Record<string, React.ElementType> = {
 }
 
 export function CompanyBrand() {
-  const { companyId } = useAuthenticatedCompany()
+  const { companyId, loading } = useAuthenticatedCompany();
   const [companyName, setCompanyName] = useState("My Company")
   const [iconKey, setIconKey] = useState("IconBeerFilled")
 
   useEffect(() => {
     const fetchCompany = async () => {
-      if (!companyId) return
+      if (loading || !companyId) return;
       const { data, error } = await supabase
         .from("companies")
         .select("name, icon")

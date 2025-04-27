@@ -245,22 +245,24 @@ export function PriceTableManager() {
       <TableRow>
         <TableCell colSpan={4}>
           <div className="space-y-2 pl-4">
-            {catalog.products.map((product) => {
-              const productInfo = availableProducts.find(
-                (p) => p.id === product.product_id
-              )
-              return (
-                <div
-                  key={product.product_id}
-                  className="flex justify-between"
-                >
-                  <span>{productInfo?.name || "Produto desconhecido"}</span>
-                  <span>
-                    R$ {Number(product.price).toFixed(2)}
-                  </span>
-                </div>
-              )
-            })}
+          {[...new Map(
+            catalog.products.map(p => [p.product_id, p])
+          ).values()].map((product) => {
+            const productInfo = availableProducts.find(
+              (p) => p.id === product.product_id
+            )
+            return (
+              <div
+                key={product.product_id}
+                className="flex justify-between"
+              >
+                <span>{productInfo?.name || "Produto desconhecido"}</span>
+                <span>
+                  R$ {Number(product.price).toFixed(2)}
+                </span>
+              </div>
+            )
+          })}
           </div>
         </TableCell>
       </TableRow>
@@ -299,19 +301,38 @@ export function PriceTableManager() {
                       step="0.01"
                       value={selectedProduct?.price ?? ''}
                       onChange={(e) => {
-                        const price = parseFloat(e.target.value)
-                        const updatedProducts = catalog.products.filter(
-                          (p) => p.product_id !== product.id
-                        )
-
-                        if (!isNaN(price)) {
-                          updatedProducts.push({ product_id: product.id, price })
+                        const price = parseFloat(e.target.value);
+                        
+                        if (editingCatalogIndex === null) return; // Não precisa retornar null, só sair
+                      
+                        const catalog = savedCatalogs[editingCatalogIndex];
+                        
+                        const updatedProducts = [...catalog.products];
+                      
+                        const existingProductIndex = updatedProducts.findIndex(
+                          (p) => p.product_id === product.id
+                        );
+                      
+                        if (existingProductIndex >= 0) {
+                          updatedProducts[existingProductIndex] = {
+                            ...updatedProducts[existingProductIndex],
+                            price,
+                          };
+                        } else if (!isNaN(price) && price > 0) {
+                          updatedProducts.push({
+                            product_id: product.id,
+                            price,
+                          });
                         }
-
-                        updateCatalog(index, {
+                      
+                        const updatedCatalog = {
                           ...catalog,
                           products: updatedProducts,
-                        })
+                        };
+                      
+                        const updatedSaved = [...savedCatalogs];
+                        updatedSaved[editingCatalogIndex] = updatedCatalog;
+                        setSavedCatalogs(updatedSaved);
                       }}
                     />
                   </div>
@@ -349,19 +370,22 @@ export function PriceTableManager() {
             value={selectedProduct?.price ?? ''}
             onChange={(e) => {
               const price = parseFloat(e.target.value);
-              const updatedProducts = catalog.products.filter(
-                (p) => p.product_id !== product.id
-              );
-
-              if (!isNaN(price)) {
+            
+              const catalog = savedCatalogs[editingCatalogIndex]!;
+              const existingProductIndex = catalog.products.findIndex(p => p.product_id === product.id);
+              let updatedProducts = [...catalog.products];
+            
+              if (existingProductIndex >= 0) {
+                updatedProducts[existingProductIndex] = { ...updatedProducts[existingProductIndex], price };
+              } else if (!isNaN(price) && price > 0) {
                 updatedProducts.push({ product_id: product.id, price });
               }
-
+            
               const updatedCatalog = {
                 ...catalog,
                 products: updatedProducts,
               };
-
+            
               const updatedSaved = [...savedCatalogs];
               updatedSaved[editingCatalogIndex] = updatedCatalog;
               setSavedCatalogs(updatedSaved);
@@ -372,44 +396,58 @@ export function PriceTableManager() {
     })}
 
     <div className="flex gap-2">
-      <Button
-        onClick={async () => {
-          const catalog = savedCatalogs[editingCatalogIndex];
-          if (!catalog.id) return;
+    <Button
+  onClick={async () => {
+    const catalog = savedCatalogs[editingCatalogIndex];
+    if (!catalog.id) return;
 
-          const cleanedProducts = catalog.products.filter(p => !isNaN(p.price) && p.price > 0);
+    const cleanedProducts = Array.from(
+      new Map(
+        catalog.products
+          .filter((p) => !isNaN(p.price) && p.price > 0)
+          .map((p) => [p.product_id, p])
+      ).values()
+    );
 
-          const { error: deleteError } = await supabase
-            .from("price_table_products")
-            .delete()
-            .eq("price_table_id", catalog.id);
+    const { error: deleteError } = await supabase
+      .from("price_table_products")
+      .delete()
+      .eq("price_table_id", catalog.id);
 
-          if (deleteError) {
-            toast.error("Erro ao limpar catálogo antigo.");
-            return;
-          }
+    if (deleteError) {
+      toast.error("Erro ao limpar catálogo antigo.");
+      return;
+    }
 
-          const { error: insertError } = await supabase
-            .from("price_table_products")
-            .insert(
-              cleanedProducts.map((p) => ({
-                price_table_id: catalog.id,
-                product_id: p.product_id,
-                price: p.price,
-              }))
-            );
+    const { error: insertError } = await supabase
+      .from("price_table_products")
+      .insert(
+        cleanedProducts.map((p) => ({
+          price_table_id: catalog.id,
+          product_id: p.product_id,
+          price: p.price,
+        }))
+      );
 
-          if (insertError) {
-            toast.error("Erro ao atualizar produtos.");
-            return;
-          }
+    if (insertError) {
+      toast.error("Erro ao atualizar produtos.");
+      return;
+    }
 
-          toast.success("Catálogo atualizado com sucesso.");
-          setEditingCatalogIndex(null);
-        }}
-      >
-        Salvar Alterações
-      </Button>
+    toast.success("Catálogo atualizado com sucesso.");
+
+    const updatedCatalogs = [...savedCatalogs];
+    updatedCatalogs[editingCatalogIndex] = {
+      ...catalog,
+      products: cleanedProducts,
+    };
+    setSavedCatalogs(updatedCatalogs);
+
+    setEditingCatalogIndex(null);
+  }}
+>
+  Salvar Alterações
+</Button>
       <Button
         variant="outline"
         onClick={() => setEditingCatalogIndex(null)}

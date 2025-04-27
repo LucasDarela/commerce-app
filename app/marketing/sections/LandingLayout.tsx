@@ -43,60 +43,64 @@ export default function LandingLayout(){
         slidesToScroll: 1,
         autoplay: true,
         autoplaySpeed: 3000,
-        arrows: true,
+        arrows: false,
       };
 
     return (
-        <div>
-        {/* Navbar Responsiva */}
-        <nav className="shadow-md p-4 flex items-center z-50 relative">
-          {/* Logo */}
-          <h1 className="text-2xl font-bold">Chopp Hub</h1>
+<div>
+  {/* Navbar Responsiva */}
+  <nav className="shadow-md p-4 flex items-center justify-between relative z-50">
+    
+    {/* Logo */}
+    <div className="flex items-center gap-2">
+      <h1 className="md:text-1xl lg:text-2xl font-bold">Chopp Hub</h1>
+    </div>
 
-          {/* Links Centralizados */}
-          <ul className="hidden md:flex flex-1 justify-center space-x-6">
-            <li><Link href="#features">Funcionalidades</Link></li>
-            <li><Link href="#pricing">Preços</Link></li>
-            <li><Link href="#testimonials">Clientes</Link></li>
-            <li><Link href="#contact">Contato</Link></li>
-          </ul>
+    {/* Links Centralizados (somente em desktop) */}
+    <ul className="hidden md:flex flex-1 justify-center md:gap-2 lg:gap-8 xl:gap-10 text-sm font-medium">
+      <li><Link href="#features">Funcionalidades</Link></li>
+      <li><Link href="#pricing">Preços</Link></li>
+      <li><Link href="#testimonials">Clientes</Link></li>
+      <li><Link href="#contact">Contato</Link></li>
+    </ul>
 
-          {/* Botões à Direita */}
-          <div className="hidden md:flex items-center space-x-4 ml-auto">
-          
-          <ThemeSelector />
-            <ModeToggle />
+    {/* Botões Sempre na Direita */}
+    <div className="flex items-center gap-4">
+      <ThemeSelector />
+      <ModeToggle />
 
-            <Button asChild className="px-4 py-2 text-white rounded-md hover:bg-blue-700">
-              <Link href="/login-signin">Log In</Link>
-            </Button>
-          </div>
+      {/* Log In Button só em desktop */}
+      <div className="hidden md:block">
+        <Button asChild>
+          <Link href="/login-signin">Log In</Link>
+        </Button>
+      </div>
 
-          {/* Menu Mobile */}
-          <div className="md:hidden ml-auto">
-            <Button variant="ghost" onClick={toggleMenu}>
-              {menuOpen ? <X size={24} /> : <Menu size={24} />}
-            </Button>
-          </div>
-        </nav>
-      
-      {/* Menu Mobile */}
-      {menuOpen && (
-        <ul className="bg-white md:hidden shadow-md absolute w-full flex flex-col items-center p-4 space-y-4 z-10">
-          <li><Link href="#features" onClick={toggleMenu}>Funcionalidades</Link></li>
-          <li><Link href="#pricing" onClick={toggleMenu}>Preços</Link></li>
-          <li><Link href="#testimonials" onClick={toggleMenu}>Clientes</Link></li>
-          <li><Link href="#contact" onClick={toggleMenu}>Contato</Link></li>
-          <li>
-            <Button asChild className="hover:bg-blue-700">
-              <Link href="/login-signin" onClick={toggleMenu}>Log In</Link>
-            </Button>
-          </li>
-        </ul>
-      )}
-      
+      {/* Menu Mobile Button só em mobile */}
+      <div className="block md:hidden">
+        <Button variant="ghost" size="icon" onClick={toggleMenu}>
+          {menuOpen ? <X size={24} /> : <Menu size={24} />}
+        </Button>
+      </div>
+    </div>
+  </nav>
+
+  {/* Dropdown do Mobile Menu */}
+  {menuOpen && (
+    <ul className="bg-muted shadow-md absolute top-full left-0 w-full flex flex-col items-center p-4 space-y-4 z-40">
+      <li><Link href="#features" onClick={toggleMenu}>Funcionalidades</Link></li>
+      <li><Link href="#pricing" onClick={toggleMenu}>Preços</Link></li>
+      <li><Link href="#testimonials" onClick={toggleMenu}>Clientes</Link></li>
+      <li><Link href="#contact" onClick={toggleMenu}>Contato</Link></li>
+      <li>
+        <Button asChild>
+          <Link href="/login-signin" onClick={toggleMenu}>Log In</Link>
+        </Button>
+      </li>
+    </ul>
+  )}  
       {/* Hero com Carrossel */}
-      <section className="text-center py-20 bg-gradient-to-r from-blue-500 to-blue-700 text-white">
+      <section className="text-center py-20 bg-gradient-to-r from-primary to-primary/90 text-primary-foreground">
         <Slider {...sliderSettings} className="max-w-4xl mx-auto">
           <div className="p-10">
             <h2 className="text-4xl font-bold">Sitema Responsivo para sua Distribuidora</h2>

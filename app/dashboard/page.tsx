@@ -7,7 +7,7 @@ import { Database } from "@/components/types/supabase";
 import { supabaseServer } from "@/lib/supabaseServer";
 
 export default async function DashboardPage() {
-  const supabase = supabaseServer;
+  const supabase = supabaseServer();
   
   const {
     data: { user },

@@ -40,6 +40,12 @@ export default function NavDocumentsSidebar() {
 
         {openDropdown === "more" && (
           <div className="ml-6 mt-1 space-y-1">
+                        <Link
+              href="/dashboard/barrel-control"
+              className="block text-sm text-muted-foreground hover:text-foreground transition"
+            >
+              Controle de Barril
+            </Link>
             <Link
               href="/dashboard/price-tables"
               className="block text-sm text-muted-foreground hover:text-foreground transition"

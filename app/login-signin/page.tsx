@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CreateAccountForm } from "@/components/auth/create-account-form";
 import { LoginAccountForm } from "@/components/auth/login-account-form"
 import { RedirectIfAuthenticated } from "@/hooks/redirect-if-authenticated";
+import Link from "next/link";
 
 export default async function LogInSignIn() {
 
@@ -28,8 +29,8 @@ export default async function LogInSignIn() {
       <TabsContent value="create-account">
         <CreateAccountForm />
       </TabsContent>
-
     </Tabs>
+    <Link href="/" className="mt-4 text-muted-foreground text-sm">Voltar para Home</Link>
    </div>
    </>
   );

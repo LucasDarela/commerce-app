@@ -198,6 +198,27 @@ export function DataEquipments({
   const [loading, setLoading] = useState(true)
   const [isSavingEquipment, setIsSavingEquipment] = useState(false)
 
+  const handleDeleteEquipment = async (equipmentId: string) => {
+    if (!confirm("Tem certeza que deseja excluir este equipamento?")) return;
+  
+    const { error } = await supabase
+      .from("equipments")
+      .delete()
+      .eq("id", equipmentId.toString()); // Garante que é string
+  
+    if (error) {
+      console.error("Erro ao deletar equipamento:", error);
+      toast.error("Erro ao excluir equipamento: " + error.message);
+    } else {
+      toast.success("Equipamento excluído com sucesso!");
+      setEquipments((prev) => prev.filter((eq) => eq.id !== equipmentId));
+      if (selectedEquipment?.id === equipmentId) {
+        setSelectedEquipment(null);
+        setSheetOpen(false);
+      }
+    }
+  };
+
   useEffect(() => {
     if (!companyId) return;
   
@@ -269,9 +290,18 @@ export function DataEquipments({
             }}>
             Ver
             </DropdownMenuItem>
-              <DropdownMenuItem>Editar</DropdownMenuItem>
+            <Link href={`/dashboard/equipments/${row.original.id}/edit`} passHref legacyBehavior>
+                <DropdownMenuItem asChild>
+                  <span>Editar</span>
+                </DropdownMenuItem>
+              </Link>
               <DropdownMenuSeparator />
-              <DropdownMenuItem variant="destructive">Deletar</DropdownMenuItem>
+              <DropdownMenuItem
+                variant="destructive"
+                onClick={() => handleDeleteEquipment(row.original.id)}
+              >
+                Deletar
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         ),
@@ -424,7 +454,7 @@ export function DataEquipments({
                 })}
             </DropdownMenuContent>
           </DropdownMenu>
-          <Link href="/dashboard/orders/add">
+          <Link href="/dashboard/equipments/add">
             <Button
               variant="default"
               size="sm"
