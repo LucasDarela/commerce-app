@@ -26,6 +26,7 @@ export default function BarrelControl() {
   const [loadingSuppliers, setLoadingSuppliers] = useState(false);
   const [tabToDelete, setTabToDelete] = useState<string | null>(null);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [confirmDeleteSupplier, setConfirmDeleteSupplier] = useState<string | null>(null);
 
   // Busca inicial dos dados
   useEffect(() => {
@@ -51,7 +52,7 @@ export default function BarrelControl() {
           suppliersMap[supplierId] = {
             supplier: {
               id: supplierId,
-              name: record.suppliers?.name || "Fornecedor desconhecido",
+              name: record.suppliers?.[0]?.name || "Fornecedor desconhecido",
             },
             rows: [],
           };
@@ -341,7 +342,7 @@ function downloadCSV(filename: string, rows: any[]) {
       <div className="flex justify-end mr-4 -mt-6">
         <Button onClick={handleSave}>Salvar Tudo</Button>
       </div>
-      <div className="flex gap-2 justify-end mr-4">
+      <div className="flex gap-2 justify-end mr-4 -mt-2">
         <Button
           onClick={() => {
             const currentTab = tabs.find((tab) => tab.supplier.id === selectedTab);

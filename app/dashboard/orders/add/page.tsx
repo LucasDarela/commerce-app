@@ -55,6 +55,7 @@ interface Order {
   appointment_hour?: string;
   appointment_local?: string;
   customer_id?: string;
+  issue_date?: string;
 }
 
 export default function AddOrder() {
@@ -76,10 +77,21 @@ export default function AddOrder() {
     hour: "",
     location: "",
   });
-  const [order, setOrder] = useState<Order | null>(null);
+  const [order, setOrder] = useState<Order>({
+    issue_date: new Date().toISOString().split("T")[0],
+  });
 
   const [first_name, ...rest] = selectedCustomer?.name?.split(" ") || ["Cliente"];
   const last_name = rest.length > 0 ? rest.join(" ") : "Sobrenome";
+
+  const issueDate = order?.issue_date ?? new Date().toISOString().split("T")[0]
+const daysTicket = Number(order?.days_ticket ?? 0)
+
+// Converter issueDate para Date
+const dueDate = format(
+  new Date(new Date(issueDate).getTime() + daysTicket * 24 * 60 * 60 * 1000),
+  "dd/MM/yyyy"
+)
 
   const [loading, setLoading] = useState<boolean>(false);
 
@@ -236,6 +248,8 @@ export default function AddOrder() {
       appointment_local: appointment.location,
       company_id: companyId,
       created_at: new Date().toISOString(),
+      issue_date: new Date().toISOString().split("T")[0],
+      due_date: new Date(Date.now() + Number(order?.days_ticket || 1) * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
     };
   
     const { data: insertedOrder, error } = await supabase
@@ -302,7 +316,7 @@ export default function AddOrder() {
     <Card className="mb-6">
       <CardContent className="space-y-4">
         <h2 className="text-xl font-bold mb-4">Informações do Documento</h2>
-        <div className="flex flex-col-2 w-full h-auto gap-4">
+        <div className="flex flex-cols w-full h-auto gap-4">
           <Select
             onValueChange={(value) => {
               const generatedNoteNumber = generateNoteNumber(value);
@@ -322,6 +336,12 @@ export default function AddOrder() {
             placeholder="Numero do Documento"
             value={order?.note_number || ""}
             onChange={(e) => setOrder((prev) => ({ ...prev, note_number: e.target.value }))}
+          />
+          <Input
+            id="issue_date"
+            value={order?.issue_date ? format(new Date(order.issue_date), "dd/MM/yyyy") : ""}
+            readOnly
+            className="cursor-not-allowed bg-muted"
           />
         </div>
         </CardContent>
@@ -412,20 +432,6 @@ export default function AddOrder() {
           ))}
         </SelectContent>
       </Select>
-
-      {/* <Input
-        className="col-span-1"
-        type="number"
-        placeholder="Quantidade"
-        value={quantity === 0 ? "" : quantity}
-        onChange={(e) => setQuantity(Number(e.target.value))}
-      />
-            <Input
-                    className="col-span-1"
-        placeholder="Preço"
-        value={standardPrice || ""}
-        onChange={(e) => setStandardPrice(Number(e.target.value) || 0)}
-      /> */}
           <Button
         className="col-span-2 w-full cursor-pointer"
         onClick={() => {
@@ -453,7 +459,7 @@ export default function AddOrder() {
 
 
     {/* Seção Forma de Pagamento */}
-    <div className="grid grid-cols-2 gap-4 items-center">
+    <div className="grid grid-cols-3 gap-4 items-center">
     <Select
         value={order?.payment_method || ""}
         onValueChange={(value) =>
@@ -487,6 +493,12 @@ export default function AddOrder() {
             : ""
         }`}
       />
+        <Input
+    id="due_date"
+    value={dueDate}
+    readOnly
+    className="cursor-not-allowed bg-muted"
+  />
 
     </div>
 

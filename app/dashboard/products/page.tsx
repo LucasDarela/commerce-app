@@ -139,7 +139,7 @@ export default function ListProduct() {
           onChange={(e) => setSearch(e.target.value)}
           className="w-full h-8 p-2 border rounded-md"
         />
-        <Link href="/dashboard/product/add">
+        <Link href="/dashboard/products/add">
           <Button
             variant="default"
             size="sm"

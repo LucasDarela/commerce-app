@@ -14,7 +14,6 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
-import Link from "next/link";
 
 interface BankAccount {
   id: string;
@@ -31,6 +30,7 @@ interface Supplier {
 interface Product {
   id: string;
   name: string;
+  price: number;
 }
 
 interface ProductEntry {
@@ -54,12 +54,11 @@ export default function AddFinancialRecord() {
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [newEntries, setNewEntries] = useState<Entry[]>([])
   const [selectedAccount, setSelectedAccount] = useState<string>("");
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [customCategory, setCustomCategory] = useState<string>("");
   const [selectedSupplier, setSelectedSupplier] = useState<string>("");
-  const [paymentMethod, setPaymentMethod] = useState<string>("PIX");
+  const [paymentMethod, setPaymentMethod] = useState<string>("Pix");
   const [paymentDays, setPaymentDays] = useState<number | "">("");
   const [amount, setAmount] = useState<number | "">("");
   const [description, setDescription] = useState<string>("");
@@ -89,16 +88,27 @@ export default function AddFinancialRecord() {
     value: string | number
   ) => {
     setProductEntries((prev) =>
-      prev.map((entry, i) =>
-        i === index
-          ? {
-              ...entry,
-              [field]: field === "quantity" || field === "unitPrice"
-                ? Number(value)
-                : value,
-            }
-          : entry
-      )
+      prev.map((entry, i) => {
+        if (i !== index) return entry;
+  
+        // Quando mudar o produto selecionado
+        if (field === "productId") {
+          const selectedProduct = products.find(p => p.id === value);
+          return {
+            ...entry,
+            productId: value as string,
+            unitPrice: selectedProduct?.price || 0, // aqui já puxa o preço
+          };
+        }
+  
+        // Atualiza normalmente se mudar quantidade ou unitPrice
+        return {
+          ...entry,
+          [field]: field === "quantity" || field === "unitPrice"
+            ? Number(value)
+            : value,
+        };
+      })
     );
   };
 
@@ -106,66 +116,150 @@ export default function AddFinancialRecord() {
     ? productEntries.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0)
     : amount;
 
-  const handleSubmit = async () => {
-    if (!issueDate || !dueDate || !paymentMethod) {
-      toast.error("Please fill in all required fields.");
-      return;
-    }
+    const handleSubmit = async () => {
+      if (!companyId) {
+        toast.error("Empresa não encontrada. Tente novamente em alguns segundos.");
+        return;
+      }
 
-    const record = {
-      company_id: companyId,
-      issue_date: issueDate ? toISODate(issueDate) : new Date().toISOString().split("T")[0],
-      due_date: dueDate ? toISODate(dueDate) : null,
-      invoice_number: invoiceNumber,
-      supplier: selectedSupplier,
-      description,
-      category: selectedCategory || customCategory || "others",
-      amount: totalAmount,
-      notes,
-      status: "Unpaid",
-      created_at: new Date().toISOString(),
-      bank_account_id: selectedAccount || null,
-      type: noteType,
-    };
-
-    setLoading(true);
-
-    const { data: inserted, error } = await supabase
-      .from("financial_records")
-      .insert([record])
-      .select()
-      .maybeSingle();
-
-    if (error || !inserted) {
-      toast.error("Failed to create record: " + error?.message);
-      setLoading(false);
-      return;
-    }
-
-    if (selectedCategory === "product_purchase") {
-      for (const entry of productEntries) {
-        if (!entry.productId || entry.quantity <= 0 || entry.unitPrice <= 0) continue;
-
-        const { error: stockError } = await supabase.from("stock").insert({
+      if (!issueDate || !dueDate || !paymentMethod) {
+        toast.error("Por favor, preencha todos os campos obrigatórios.");
+        return;
+      }
+    
+      let calculatedAmount = 0;
+    
+      if (selectedCategory === "compra_produto" || selectedCategory === "compra_equipamento") {
+        calculatedAmount = productEntries.reduce(
+          (sum, item) => sum + (item.quantity * item.unitPrice),
+          0
+        );
+      } else {
+        calculatedAmount = Number(amount) || 0;
+      }
+    
+      const record = {
+        company_id: companyId!,
+        issue_date: issueDate ? toISODate(issueDate) : new Date().toISOString().split("T")[0],
+        due_date: dueDate ? toISODate(dueDate) : null,
+        invoice_number: invoiceNumber,
+        supplier: selectedSupplier,
+        description,
+        category: selectedCategory || customCategory || "others",
+        amount: calculatedAmount,
+        notes,
+        status: "Unpaid",
+        created_at: new Date().toISOString(),
+        bank_account_id: selectedAccount || null,
+        type: noteType,
+        payment_method: paymentMethod,
+      };
+    
+      setLoading(true);
+    
+      const { data: inserted, error } = await supabase
+        .from("financial_records")
+        .insert([record])
+        .select()
+        .maybeSingle();
+    
+      if (error || !inserted) {
+        toast.error("Erro ao salvar: " + error?.message || "Erro desconhecido");
+        setLoading(false);
+        return;
+      }
+    
+      if (selectedCategory === "compra_produto") {
+        for (const entry of productEntries) {
+          if (!entry.productId || entry.quantity <= 0) continue;
+    
+          const { data: productData, error: productError } = await supabase
+            .from("products")
+            .select("stock")
+            .eq("id", entry.productId)
+            .maybeSingle();
+    
+          if (productError || !productData) {
+            console.error("Erro buscando produto:", productError);
+            continue;
+          }
+    
+          const currentStock = Number(productData.stock) || 0;
+    
+          const { error: updateError } = await supabase
+            .from("products")
+            .update({ stock: currentStock + entry.quantity })
+            .eq("id", entry.productId);
+    
+          if (updateError) {
+            console.error("Erro atualizando estoque de produto:", updateError);
+          }
+        }
+    
+        const entriesToSave = productEntries.map((entry) => ({
           company_id: companyId,
+          note_id: inserted.id,
           product_id: entry.productId,
           quantity: entry.quantity,
           unit_price: entry.unitPrice,
-          total_price: entry.quantity * entry.unitPrice,
-          created_at: new Date().toISOString(),
-          note_id: inserted.id,
-        });
-
-        if (stockError) {
-          toast.error("Erro ao registrar estoque: " + stockError.message);
+        }));
+    
+        const { error: insertError } = await supabase
+          .from("financial_products")
+          .insert(entriesToSave);
+    
+        if (insertError) {
+          console.error("Erro ao salvar produtos da nota:", insertError);
         }
       }
-    }
-
-    toast.success("Nota salva com sucesso!");
-    setLoading(false);
-    router.push("/dashboard/financial");
-  };
+    
+      if (selectedCategory === "compra_equipamento") {
+        for (const entry of productEntries) {
+          if (!entry.productId || entry.quantity <= 0) continue;
+    
+          const { data: equipmentData, error: equipmentError } = await supabase
+            .from("equipments")
+            .select("stock")
+            .eq("id", entry.productId)
+            .maybeSingle();
+    
+          if (equipmentError || !equipmentData) {
+            console.error("Erro buscando equipamento:", equipmentError);
+            continue;
+          }
+    
+          const currentStock = Number(equipmentData.stock) || 0;
+    
+          const { error: updateError } = await supabase
+            .from("equipments")
+            .update({ stock: currentStock + entry.quantity })
+            .eq("id", entry.productId);
+    
+          if (updateError) {
+            console.error("Erro atualizando estoque de equipamento:", updateError);
+          }
+        }
+    
+        const entriesToSave = productEntries.map((entry) => ({
+          financial_record_id: inserted.id,
+          equipment_id: entry.productId,
+          quantity: entry.quantity,
+          unit_price: entry.unitPrice,
+        }));
+    
+        const { error: insertError } = await supabase
+          .from("financial_equipments")
+          .insert(entriesToSave);
+    
+        if (insertError) {
+          console.error("Erro ao salvar equipamentos da nota:", insertError);
+        }
+      }
+    
+      toast.success("Nota salva com sucesso!");
+      setLoading(false);
+      router.push("/dashboard/financial");
+    };
 
   useEffect(() => {
     const fetchEntities = async () => {
@@ -182,16 +276,41 @@ export default function AddFinancialRecord() {
   }, []);
 
   useEffect(() => {
-    const fetchProducts = async () => {
+    const fetchItems = async () => {
       if (!companyId) return;
-      const { data, error } = await supabase
-        .from("products")
-        .select("id, name")
-        .eq("company_id", companyId);
-      if (!error) setProducts(data || []);
+  
+      if (selectedCategory === "compra_produto") {
+        const { data, error } = await supabase
+          .from("products")
+          .select("id, name, standard_price");
+  
+        if (!error && data) {
+          setProducts(data.map((p) => ({
+            id: p.id,
+            name: p.name,
+            price: p.standard_price,
+          })));
+        }
+      }
+  
+      if (selectedCategory === "compra_equipamento") {
+        const { data, error } = await supabase
+          .from("equipments")
+          .select("id, name, value");
+  
+        if (!error && data) {
+          setProducts(data.map((e) => ({
+            id: e.id,
+            name: e.name,
+            price: e.value,
+          })));
+        }
+      }
     };
-    fetchProducts();
-  }, [companyId]);
+  
+    fetchItems();
+  }, [companyId, selectedCategory]);
+  
 
   useEffect(() => {
     const fetchBankAccounts = async () => {
@@ -248,7 +367,7 @@ export default function AddFinancialRecord() {
 
   return (
     <div className="max-w-3xl mx-auto p-6 rounded-lg shadow-md">
-  <h1 className="text-2xl font-bold mb-4">Adicionar Nota</h1>
+    <h1 className="text-2xl font-bold mb-4">Adicionar Nota</h1>
 
   <div className="grid grid-cols-2 gap-4 mt-4">
   <Select value={noteType} onValueChange={(val) => setNoteType(val as "input" | "output")}>
@@ -267,12 +386,13 @@ export default function AddFinancialRecord() {
       </SelectTrigger>
       <SelectContent>
         <SelectItem value="compra_produto">Compra de Produto</SelectItem>
+        <SelectItem value="compra_equipamento">Compra de Equipamento</SelectItem>
         <SelectItem value="pgto_funcionario">Pagamento Funcionário</SelectItem>
         <SelectItem value="vale_funcionario">Vale Funcionário</SelectItem>
         <SelectItem value="utilidades">Utilidades</SelectItem>
         <SelectItem value="aluguel">Aluguel</SelectItem>
         <SelectItem value="veiculo">Gastos com Veículos</SelectItem>
-        <SelectItem value="outros">+ Personalizado</SelectItem>
+        <SelectItem value="outros">+ Outros</SelectItem>
       </SelectContent>
     </Select>
 
@@ -342,10 +462,10 @@ export default function AddFinancialRecord() {
         <SelectValue placeholder="Método de pagamento" />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="DINHEIRO">Dinheiro</SelectItem>
-        <SelectItem value="PIX">Pix</SelectItem>
-        <SelectItem value="CARTAO">Cartão</SelectItem>
-        <SelectItem value="BOLETO">Boleto</SelectItem>
+        <SelectItem value="Dinheiro">Dinheiro</SelectItem>
+        <SelectItem value="Pix">Pix</SelectItem>
+        <SelectItem value="Cartao">Cartão</SelectItem>
+        <SelectItem value="Boleto">Boleto</SelectItem>
       </SelectContent>
     </Select>
   </div>
@@ -356,7 +476,7 @@ export default function AddFinancialRecord() {
       type="number"
       placeholder="Dias para Pagar"
       value={paymentDays}
-      disabled={paymentMethod !== "BOLETO" && paymentMethod !== "CARTAO"}
+      disabled={paymentMethod !== "Boleto" && paymentMethod !== "Cartao"}
       onChange={(e) => setPaymentDays(Number(e.target.value) || "")}
     />
   </div>
@@ -372,17 +492,17 @@ export default function AddFinancialRecord() {
   )}
 
       {/* Tabela de Produtos */}
-{selectedCategory === "product_purchase" && (
+      {(selectedCategory === "compra_produto" || selectedCategory === "compra_equipamento") && (
   <div className="mb-4 w-full">
-    <h4 className="text-sm font-semibold mt-3">Produtos</h4>
+    <h4 className="text-sm font-semibold mt-3">{selectedCategory === "compra_produto" ? "Produtos" : "Equipamentos"}</h4>
     {productEntries.map((entry, index) => (
       <div key={index} className="flex flex-cols-4 gap-4 my-2 items-center justify-evenly">
         <Select
           value={entry.productId}
           onValueChange={(val) => handleProductChange(index, "productId", val)}
         >
-          <SelectTrigger>
-            <SelectValue placeholder="Produto" />
+          <SelectTrigger className="w-[350px]">
+            <SelectValue placeholder="Produto ou Equipamento" />
           </SelectTrigger>
           <SelectContent>
             {products.map((p) => (
@@ -417,27 +537,35 @@ export default function AddFinancialRecord() {
       </div>
     ))}
     <Button variant="outline" onClick={handleAddProduct} className="mt-2">
-      <Plus className="h-4 w-4 mr-2" /> Adicionar Produto
+      <Plus className="h-4 w-4 mr-2" /> Adicionar
     </Button>
   </div>
 )}
 
-  {/* Pagamento + Valor */}
-  <div className="grid grid-cols-2 gap-4 mt-4">
-
+{/* Pagamento + Valor */}
+<div className="grid grid-cols-2 gap-4 mt-4">
   <Input
     placeholder="Descrição"
     value={description}
     onChange={(e) => setDescription(e.target.value)}
   />
-    <Input
-      placeholder="Valor Total"
-      type="number"
-      value={amount}
-      onChange={(e) => setAmount(Number(e.target.value) || "")}
-    />
 
-  </div>
+  <Input
+    placeholder="Valor Total"
+    type="number"
+    value={
+      selectedCategory === "compra_produto" || selectedCategory === "compra_equipamento"
+        ? productEntries.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0)
+        : amount
+    }
+    onChange={(e) => {
+      if (selectedCategory !== "compra_produto" && selectedCategory !== "compra_equipamento") {
+        setAmount(Number(e.target.value) || "");
+      }
+    }}
+    disabled={selectedCategory === "compra_produto" || selectedCategory === "compra_equipamento"}
+  />
+</div>
 
   {/* Notas */}
   <textarea
@@ -448,7 +576,7 @@ export default function AddFinancialRecord() {
   ></textarea>
 
   {/* Botão */}
-  <Button className="mt-4 w-full" onClick={handleSubmit} disabled={loading}>
+  <Button className="mt-4 w-full" onClick={handleSubmit} disabled={loading || !companyId}>
   {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
   {loading ? "Salvando..." : "Salvar Nota"}
   </Button>

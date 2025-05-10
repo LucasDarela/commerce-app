@@ -64,6 +64,11 @@ const data = {
       icon: IconUserCog,
     },
     {
+      title: "Financeiro",
+      url: "/dashboard/financial",
+      icon: IconBuildingBank,
+    },
+    {
       title: "Produtos",
       url: "/dashboard/products",
       icon: IconPackage,
@@ -72,11 +77,6 @@ const data = {
       title: "Equipamentos",
       url: "/dashboard/equipments",
       icon: IconBarrel,
-    },
-    {
-      title: "Financeiro",
-      url: "/dashboard/financial",
-      icon: IconBuildingBank,
     },
     {
       title: "Vendas",

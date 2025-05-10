@@ -89,6 +89,7 @@ export default function EditOrderPage() {
   
       if (productsError || customersError || orderError || itemsError) {
         toast.error("Erro ao carregar dados.");
+        console.error({ productsError, customersError, orderError, itemsError });
         return;
       }
   
@@ -109,11 +110,12 @@ export default function EditOrderPage() {
   
       const customer = customersData?.find((c) => c.id === orderData.customer_id);
       if (customer) {
-        setSelectedCustomer(customer); 
+        setSelectedCustomer(customer);
         setSearchCustomer(customer.name);
       }
   
-      setItems(orderItemsData.map((item) => {
+      // Produtos vinculados ao pedido
+      const parsedItems = orderItemsData.map((item) => {
         const product = productsData?.find((p) => p.id === item.product_id);
         return {
           id: item.product_id,
@@ -121,10 +123,12 @@ export default function EditOrderPage() {
           standard_price: item.price,
           name: product?.name || "Produto não encontrado",
         };
-      }));
+      });
+  
+      setItems(parsedItems);
     };
   
-    fetchData(); // 🔥 apenas 1 chamada aqui
+    fetchData();
   }, [id]);
 
   const handleSelectCustomer = (customer: Customer) => {

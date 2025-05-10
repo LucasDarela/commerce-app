@@ -118,7 +118,7 @@ export default function ListSuppliers() {
           onChange={(e) => setSearch(e.target.value)}
           className="w-full h-8 p-2 border rounded-md"
         />
-        <Link href="/dashboard/supplier/add">
+        <Link href="/dashboard/suppliers/add">
           <Button
             variant="default"
             size="sm"

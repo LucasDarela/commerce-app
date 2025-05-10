@@ -645,28 +645,6 @@ export function DataEquipments({
           </div>
         </div>
       </TabsContent>
-      {/* To Collect Tabs  */}
-      <TabsContent
-        value="past-performance"
-        className="flex flex-col px-4 lg:px-6"
-      >
-        <div className="aspect-video w-full flex-1 rounded-lg border border-dashed">
-          <h1>To Collect</h1>
-        </div>
-      </TabsContent>
-      {/* Pendign Payment Tabs */}
-      <TabsContent value="key-personnel" className="flex flex-col px-4 lg:px-6">
-        <div className="aspect-video w-full flex-1 rounded-lg border border-dashed">
-        <h1>To Payment</h1>
-        </div>
-      </TabsContent>
-      {/* Focus Document Tabs  */}
-      <TabsContent
-        value="focus-documents"
-        className="flex flex-col px-4 lg:px-6"
-      >
-        <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
-      </TabsContent>
     </Tabs>
     </>
   )

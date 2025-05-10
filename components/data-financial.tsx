@@ -33,9 +33,7 @@ import {
   IconDotsVertical,
   IconGripVertical,
   IconLayoutColumns,
-  IconLoader,
   IconPlus,
-  IconTrendingUp,
 } from "@tabler/icons-react"
 import {
   ColumnDef,
@@ -52,30 +50,10 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table"
-import { Area, AreaChart, CartesianGrid, XAxis } from "recharts"
 import { toast } from "sonner"
 import { z } from "zod"
-
-import { useIsMobile } from "@/hooks/use-mobile"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  ChartConfig,
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart"
 import { Checkbox } from "@/components/ui/checkbox"
-import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerDescription,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerTrigger,
-} from "@/components/ui/drawer"
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -122,32 +100,51 @@ import { useRouter } from "next/navigation";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { supabase } from "@/lib/supabase"
 import { PaymentModal } from "@/components/payment-modal"
+import { YourFinancialRecords } from "@/components/your-financial-modal"
 
 //New Schema
 export const schema = z.object({
-  id: z.string(),
-  note_number: z.string().optional(),
-  document_type: z.string().optional(),
-  appointment_date: z.string(),
-  appointment_hour: z.string(),
-  appointment_local: z.string(),
-  customer: z.string(),
-  phone: z.string(),
-  products: z.string(),
-  freight: z.union([z.string(), z.number()]).optional().nullable(),
-  amount: z.number(),
-  total: z.number(),
-  total_payed: z.number().optional().nullable(),
-  delivery_status: z.enum(["Entregar", "Coletar", "Coletado"]),
-  payment_status: z.enum(["Pendente", "Pago"]),
-  payment_method: z.enum(["Pix", "Dinheiro", "Boleto", "Cartao"]),
-  order_index: z.number().nullable().optional(),
-  issue_date: z.string().optional().nullable(),
-  due_date: z.string().optional().nullable(),
+    id: z.string(),
+    appointment_date: z.string(),      
+    appointment_hour: z.string(),
+    appointment_local: z.string(),
+    customer: z.string(),
+    phone: z.string(),
+    amount: z.number(),
+    products: z.string(),
+    delivery_status: z.enum(["Entregar", "Coletar", "Coletado"]), 
+    payment_method: z.enum(["Pix", "Dinheiro", "Boleto", "Cartao"]),
+    payment_status: z.enum(["Pendente", "Pago"]),
+    days_ticket: z.union([z.string(), z.number()]).optional(),
+    freight: z.union([z.string(), z.number()]).optional(),
+    note_number: z.string().optional(),
+    document_type: z.string().optional(),
+    total: z.number(),
+    total_payed: z.number().optional(),
+    issue_date: z.string().nullable().optional(),
+    due_date: z.string().nullable().optional()
 })
 
+const financialSchema = z.object({
+    id: z.string(),
+    supplier_id: z.string().uuid(),
+    supplier: z.string(),
+    company_id: z.string(),
+    issue_date: z.string(),
+    due_date: z.string().nullable().optional(),
+    description: z.string().optional(),
+    category: z.string(),
+    amount: z.preprocess((val) => Number(val), z.number()),
+    status: z.enum(["Paid", "Unpaid"]),
+    payment_method: z.enum(["Pix", "Cash", "Card", "Ticket"]),
+    invoice_number: z.string().optional(),
+    type: z.enum(["input", "output"]),
+    notes: z.string().optional(),
+  })
+
 type Sale = z.infer<typeof schema>
-type Order = z.infer<typeof schema>
+type Order = z.infer<typeof schema> & { source: "order"}
+type FinancialRecord = z.infer<typeof financialSchema> & { source: "order" | "financial" }
 
 type CustomColumnMeta = {
   className?: string
@@ -155,6 +152,21 @@ type CustomColumnMeta = {
 
 type CustomColumnDef<T> = ColumnDef<T, unknown> & {
   meta?: CustomColumnMeta
+}
+
+function mapToFinancialPaymentMethod(
+  method: "Pix" | "Dinheiro" | "Boleto" | "Cartao"
+): "Pix" | "Cash" | "Card" | "Ticket" {
+  switch (method) {
+    case "Dinheiro":
+      return "Cash"
+    case "Cartao":
+      return "Card"
+    case "Boleto":
+      return "Ticket"
+    default:
+      return method
+  }
 }
 
 // Create a separate component for the drag handle
@@ -175,7 +187,7 @@ function DragHandle({ id }: { id: string }) {
   )
 }
 
-function DraggableRow({ row }: { row: Row<Order> }) {
+function DraggableRow({ row }: { row: Row<FinancialRecord> }) {
   const { transform, transition, setNodeRef, isDragging } = useSortable({
     id: row.original.id,
   });
@@ -208,15 +220,20 @@ function DraggableRow({ row }: { row: Row<Order> }) {
   );
 }
 
-export function DataTable({
-  data: initialData,
-}: {
-  data: z.infer<typeof schema>[]
-}) {
+function isOrder(record: any): record is Order {
+  return record?.source === "order"
+}
+
+function isFinancial(record: any): record is FinancialRecord {
+  return record.source === "financial"
+}
+
+export default function DataFinancialTable() {
   const [selectedCustomer, setSelectedCustomer] = React.useState<Sale | null>(null)
   const [sheetOpen, setSheetOpen] = React.useState(false)
   const supabase = createClientComponentClient()
-  const [orders, setOrders] = useState<Order[]>([])
+  const [orders, setOrders] = useState<(Order & { source: "order" })[]>([])
+  const [financialRecords, setFinancialRecords] = useState<FinancialRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [isSavingOrder, setIsSavingOrder] = useState(false)
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
@@ -224,17 +241,48 @@ export function DataTable({
   const [dateInput, setDateInput] = useState("")
   const { accessToken, loading: loadingIntegration, error: integrationError } = useCompanyIntegration('mercado_pago')
   const router = useRouter();
+  const [issueDateInput, setIssueDateInput] = useState("")
+  const [dueDateInput, setDueDateInput] = useState("")
+  const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
+  const [selectedFinancial, setSelectedFinancial] = useState<FinancialRecord | null>(null)
+  const [isFinancialPaymentOpen, setIsFinancialPaymentOpen] = useState(false)
 
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem("orders_column_visibility")
-      return stored ? JSON.parse(stored) : {}
+      return stored
+        ? JSON.parse(stored)
+        : {
+          issue_date: true,
+          due_date: true,
+          customer_or_supplier: true,
+          phone: false,
+          source: false,
+          category: false,
+          type: true,
+          payment_method: true,
+          payment_status: true,
+          remaining: true,
+          total: true,
+          }
     }
-    return {}
+    return {
+      issue_date: true,
+      due_date: true,
+      customer_or_supplier: true,
+      phone: false,
+      source: false,
+      category: false,
+      type: true,
+      payment_method: true,
+      payment_status: true,
+      remaining: true,
+      total: true,
+    }
   })
 
   function handleDateInput(e: React.ChangeEvent<HTMLInputElement>) {
-    let value = e.target.value.replace(/\D/g, "") // remove tudo que não é número
+    let value = e.target.value.replace(/\D/g, "")
     if (value.length > 8) value = value.slice(0, 8)
   
     const parts = []
@@ -248,36 +296,16 @@ export function DataTable({
     if (formatted.length === 10) {
       const [day, month, year] = formatted.split("/")
       const isoDate = `${year}-${month}-${day}`
-      table.getColumn("appointment_date")?.setFilterValue(isoDate)
+      table.getColumn("due_date")?.setFilterValue(isoDate)
     } else {
-      table.getColumn("appointment_date")?.setFilterValue(undefined)
+      table.getColumn("due_date")?.setFilterValue(undefined)
     }
   }
 
   const refreshOrders = async () => {
     const { data, error } = await supabase
       .from("orders")
-      .select(`
-        id,
-        note_number,
-        document_type,
-        appointment_date,
-        appointment_hour,
-        appointment_local,
-        customer,
-        phone,
-        products,
-        freight,
-        amount,
-        total,
-        total_payed,
-        delivery_status,
-        payment_status,
-        payment_method,
-        order_index,
-        issue_date,
-        due_date
-      `)
+      .select("*")
       .order("order_index", { ascending: true })
   
     if (error) {
@@ -287,7 +315,7 @@ export function DataTable({
   
     const parsed = schema.array().safeParse(data)
     if (parsed.success) {
-      setOrders(parsed.data)
+      setOrders(parsed.data.map((o) => ({ ...o, source: "order"})));
     } else {
       console.error("Erro ao validar schema Zod:", parsed.error)
     }
@@ -317,195 +345,232 @@ export function DataTable({
     }
   }, [columnVisibility])
 
-  useEffect(() => {
-    async function fetchOrders() {
-      const { data, error } = await supabase
-        .from("orders")
-        .select("*")
-        .order("order_index", { ascending: true })
 
-      if (error) {
-        console.error("Erro ao buscar pedidos:", error)
-        return
-      }
-
-      const parsed = schema.array().safeParse(data)
-      if (parsed.success) {
-        setOrders(parsed.data)
-      } else {
-        console.error("Erro ao validar schema Zod:", parsed.error)
-      }
-
-      setLoading(false)
+  const fetchAll = async () => {
+    const [ordersRes, financialRes, suppliersRes] = await Promise.all([
+      supabase.from("orders").select("*").order("order_index", { ascending: true }),
+      supabase.from("financial_records").select("*").order("issue_date", { ascending: false }),
+      supabase.from("suppliers").select("id, name"),
+    ]);
+  
+    // Parse dos pedidos
+    const parsedOrders = schema.array().safeParse(ordersRes.data);
+    if (parsedOrders.success) {
+      setOrders(parsedOrders.data.map((o) => ({ ...o, source: "order" })));
+    } else {
+      console.error("Erro ao validar orders com Zod:", parsedOrders.error);
     }
+  
+    // Parse das notas financeiras
+    const parsedFinancials = financialSchema.array().safeParse(financialRes.data);
+    if (parsedFinancials.success) {
+      const financialsWithSource: FinancialRecord[] = parsedFinancials.data.map((f) => ({
+        ...f,
+        source: "financial",
+      }));
+      setFinancialRecords(financialsWithSource);
+    } else {
+      console.error("Erro ao validar financials com Zod:", parsedFinancials.error);
+    }
+  
+    setSuppliers(suppliersRes.data || []);
+    setLoading(false);
+  };
 
-    fetchOrders()
+  useEffect(() => {
+    fetchAll()
   }, [])
 
+  const combinedData: FinancialRecord[] = [
+    ...orders.map((o): FinancialRecord => ({
+      id: o.id,
+      issue_date: o.issue_date || "", 
+      due_date: o.due_date || null,
+      amount: o.total,
+      status: o.payment_status === "Pago" ? "Paid" : "Unpaid" as "Paid",
+      payment_method: mapToFinancialPaymentMethod(o.payment_method),
+      supplier_id: "", 
+      supplier: o.customer || "Cliente",
+      company_id: "", 
+      category: "order",
+      description: o.customer || "Pedido",
+      type: "output" as const,
+      notes: "",
+      source: "order",
+    })),
+    ...financialRecords,
+  ]
+
+  useEffect(() => {
+    const stored = localStorage.getItem("orders_column_visibility")
+    if (stored) {
+      setColumnVisibility(JSON.parse(stored))
+    }
+  }, [])
+  
+  useEffect(() => {
+    localStorage.setItem("orders_column_visibility", JSON.stringify(columnVisibility))
+  }, [columnVisibility])
+
   //const columns
-  const columns: CustomColumnDef<Order>[] = [
+  const columns: CustomColumnDef<FinancialRecord>[] = [
     {
       id: "drag",
       header: () => null,
-      size: 25,
-      meta: { className: "w-[25px]" },
+      size: 50,
+      meta: { className: "w-[50px]" },
       cell: () => null,
       enableSorting: false,
       enableHiding: false,
     },
     {
-      accessorKey: "appointment_date",
-      header: "Data",
-      size: 90,
-      meta: { className: "w-[90px]" },
-      filterFn: (row, columnId, filterValue) => {
-        return row.getValue(columnId) === filterValue
-      },
-      cell: ({ row }) => {
-        const rawDate = row.original.appointment_date
-        if (!rawDate) return "—"
-        const [year, month, day] = rawDate.split("-")
-        return `${day}/${month}/${year}`
-      },
-    },
-    {
-      accessorKey: "appointment_hour",
-      header: "Hora",
-      size: 55,
-      meta: { className: "w-[55px]" },
-      cell: ({ row }) => row.original.appointment_hour,
-    },
-    {
-      accessorKey: "customer",
-      header: "Cliente",
-      size: 180,
-      meta: { className: "w-[180px] truncate uppercase" },
-      cell: ({ row }) => {
-        const sale = row.original
-        return (
-          <Button
-            variant="link"
-            className="p-0 text-left text-primary hover:underline"
-            onClick={() => {
-              setSelectedCustomer(sale)
-              setSheetOpen(true)
-            }}
-          >
-            {sale.customer}
-          </Button>
-        )
-      },
-    },
-    {
-      accessorKey: "phone",
-      header: "Tel",
-      size: 50,
-      meta: { className: "w-[50px]" },
-      cell: ({ row }) => {
-        const raw = row.original.phone || ""
-        const cleaned = raw.replace(/\D/g, "")
-        const message = "Olá, tudo bem? Sua entrega de chopp está a caminho."
-        const encodedMessage = encodeURIComponent(message)
-        const link = `https://wa.me/55${cleaned}?text=${encodedMessage}`
-    
-        return (
-          <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-          <a href={link} target="_blank" rel="noopener noreferrer">
-            <svg 
-            width="28"
-            height="28"
-            viewBox="0 0 32 32" 
-            className="text-primary hover:text-primary/80 fill-current transition-transform hover:scale-110"
-             xmlns="http://www.w3.org/2000/svg"
-            >
-              <path d=" M19.11 17.205c-.372 0-1.088 1.39-1.518 1.39a.63.63 0 0 1-.315-.1c-.802-.402-1.504-.817-2.163-1.447-.545-.516-1.146-1.29-1.46-1.963a.426.426 0 0 1-.073-.215c0-.33.99-.945.99-1.49 0-.143-.73-2.09-.832-2.335-.143-.372-.214-.487-.6-.487-.187 0-.36-.043-.53-.043-.302 0-.53.115-.746.315-.688.645-1.032 1.318-1.06 2.264v.114c-.015.99.472 1.977 1.017 2.78 1.23 1.82 2.506 3.41 4.554 4.34.616.287 2.035.888 2.722.888.817 0 2.15-.515 2.478-1.318.13-.33.244-.73.244-1.088 0-.058 0-.144-.03-.215-.1-.172-2.434-1.39-2.678-1.39zm-2.908 7.593c-1.747 0-3.48-.53-4.942-1.49L7.793 24.41l1.132-3.337a8.955 8.955 0 0 1-1.72-5.272c0-4.955 4.04-8.995 8.997-8.995S25.2 10.845 25.2 15.8c0 4.958-4.04 8.998-8.998 8.998zm0-19.798c-5.96 0-10.8 4.842-10.8 10.8 0 1.964.53 3.898 1.546 5.574L5 27.176l5.974-1.92a10.807 10.807 0 0 0 16.03-9.455c0-5.958-4.842-10.8-10.802-10.8z" 
-              fillRule="evenodd">
-              </path>
-            </svg>
-  
-          </a>
-          </TooltipTrigger>
-            <TooltipContent>
-              Send message via WhatsApp
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-        );
-      },
-    },
-    {
-      accessorKey: "products",
-      header: "Produtos",
-      size: 200,
-      meta: { className: "w-[200px] truncate uppercase" },
-      cell: ({ row }) => row.original.products,
-    },
-    {
-      accessorKey: "appointment_local",
-      header: "Localização",
-      size: 150,
-      meta: { className: "w-[150px] truncate uppercase" },
-      cell: ({ row }) => row.original.appointment_local,
-    },
-    {
-      accessorKey: "delivery_status",
-      header: "Delivery",
-      size: 90,
-      meta: { className: "w-[90px] uppercase" },
-      cell: ({ row }) => row.original.delivery_status,
-    },
-    {
-      accessorKey: "issue_date",
-      header: "Emissão",
-      size: 100,
-      meta: { className: "w-[100px]" },
-      cell: ({ row }) => row.original.issue_date
-        ? format(parseISO(row.original.issue_date), "dd/MM/yyyy")
-        : "—",
+        accessorKey: "issue_date",
+        header: "Emissão",
+        meta: { className: "truncate" },
+        filterFn: (row, columnId, filterValue) => {
+          const value = row.getValue(columnId);
+          if (typeof value !== "string") return false;
+          const formatted = format(parseISO(value), "yyyy-MM-dd");
+          return formatted === filterValue;
+        },
+        cell: ({ row }) => {
+          const rawDate = row.original.issue_date
+          if (!rawDate) return "—"
+          const [year, month, day] = rawDate.split("-")
+          return `${day}/${month}/${year}`
+        },
     },
     {
       accessorKey: "due_date",
       header: "Vencimento",
-      size: 100,
-      meta: { className: "w-[100px]" },
-      cell: ({ row }) => row.original.due_date
-        ? format(parseISO(row.original.due_date), "dd/MM/yyyy")
-        : "—",
+      meta: { className: " truncate" },
+      filterFn: (row, columnId, filterValue) => {
+        const value = row.getValue(columnId);
+        if (typeof value !== "string") return false;
+        const formatted = format(parseISO(value), "yyyy-MM-dd");
+        return formatted === filterValue;
+      },
+      cell: ({ row }) => {
+        const rawDate = row.original.due_date
+        if (!rawDate) return "—"
+        const [year, month, day] = rawDate.split("-")
+        return `${day}/${month}/${year}`
+      },
+  },
+    {
+        id: "customer_or_supplier",
+        header: "Fornecedor / Cliente",
+        size: 250,
+        accessorFn: (row) => isOrder(row) ? row.customer : row.supplier,
+        meta: { className: "w-[250px] truncate uppercase" },
+        cell: ({ row }) => {
+          if (row.original.source === "financial") {
+            const supplierName = suppliers.find(s => s.id === row.original.supplier_id)?.name
+            return supplierName || "—"
+          } else {
+            return isOrder(row.original) ? row.original.customer : "-"
+          }
+        }
     },
     {
+      accessorKey: "phone",
+      header: "Telefone",
+      accessorFn: (row) => isOrder(row) ? row.phone : "", 
+      meta: { className: "truncate" },
+      cell: ({ row }) => {
+        if (row.original.source !== "order") return "—"
+      
+        const phone = isOrder(row.original) ? row.original.phone : ""
+        const cleaned = phone.replace(/\D/g, "")
+        const message = "Olá, tudo bem?"
+        const encodedMessage = encodeURIComponent(message)
+        const link = `https://wa.me/55${cleaned}?text=${encodedMessage}`
+      
+        return (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <a href={link} target="_blank" rel="noopener noreferrer">
+                  <svg
+                    width="28"
+                    height="28"
+                    viewBox="0 0 32 32"
+                    className="text-primary hover:text-primary/80 fill-current transition-transform hover:scale-110"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path d="M19.11 17.205... (svg completo) ..." fillRule="evenodd" />
+                  </svg>
+                </a>
+              </TooltipTrigger>
+              <TooltipContent>
+                Send message via WhatsApp
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )
+      }
+    },
+    {
+        accessorKey: "source",
+        header: "Origem",
+        meta: { className: "truncate"},
+        cell: ({ row }) =>
+          row.original.source === "order" ? "Pedido" : "Nota Financeira",
+    },
+    {
+        accessorKey: "category",
+        header: "Categoria",
+        meta: { className: " uppercase truncate" },
+        cell: ({ row }) => row.original.category,
+      },
+      {
+        accessorKey: "type",
+        header: "Tipo", 
+        meta: { className: " uppercase truncate" },
+        cell: ({ row }) => {
+            const type = row.original.type
+            return type === "input" ? "Nota de Entrada" : "Nota de Saída"
+        },
+      },
+    {
       accessorKey: "payment_method",
-      header: "Tipo",
-      size: 60,
-      meta: { className: "w-[60px] uppercase" },
+      header: "Método",
+      meta: { className: "uppercase truncate" },
       cell: ({ row }) => row.original.payment_method,
     },
     {
       accessorKey: "payment_status",
       header: "Pagamento",
-      size: 90,
-      meta: { className: "w-[90px] uppercase" },
-      cell: ({ row }) => row.original.payment_status,
+      meta: { className: "uppercase truncate" },
+      cell: ({ row }) => {
+        const data = row.original as Order | FinancialRecord
+        if (isFinancial(data)) {
+          return data.status === "Paid" ? "Pago" : "Pendente"
+        } else if (isOrder(data)) {
+          return data.payment_status
+        }
+        return "—"
+      },
     },
     {
       accessorKey: "remaining",
       header: "Restante",
-      size: 100,
-      meta: { className: "w-[100px] text-right uppercase" },
+      meta: { className: "text-right uppercase truncate" },
       cell: ({ row }) => {
-        const { total, total_payed } = row.original
-        const remaining = total - (total_payed ?? 0)
+        const total = isOrder(row.original) ? row.original.total : row.original.amount
+        const total_payed = isOrder(row.original) ? row.original.total_payed ?? 0 : 0
+        const remaining = (Number(total) || 0) - (Number(total_payed) || 0)
         return `R$ ${remaining.toFixed(2).replace(".", ",")}`
       },
     },
     {
       accessorKey: "total",
       header: "Total",
-      size: 100,
-      meta: { className: "w-[100px] text-right uppercase" },
+      meta: { className: "text-right uppercase" },
       cell: ({ row }) => {
-        const value = row.original.total
+        const value =
+            isOrder(row.original) ? row.original.total : (row.original as FinancialRecord).amount
+    
         return `R$ ${value.toFixed(2).replace('.', ',')}`
       },
     },
@@ -533,18 +598,30 @@ export function DataTable({
     </a>
     </DropdownMenuItem>
     <DropdownMenuItem
-      onClick={() => {
-        setSelectedOrder(row.original)
-        setIsPaymentOpen(true)
-      }}
-    >
-      Pagar
-    </DropdownMenuItem>
-    <DropdownMenuItem asChild>
-      <Link href={`/dashboard/orders/${row.original.id}/edit`}>
-        Editar
-      </Link>
-    </DropdownMenuItem>
+onClick={() => {
+  const record = row.original;
+  if (record.source === "financial" && record.type === "input") {
+    setSelectedFinancial(record as FinancialRecord);
+    setIsFinancialPaymentOpen(true);
+  } else if (record.source === "order") {
+    if (isOrder(record)) setSelectedOrder(record)
+    setIsPaymentOpen(true);
+  }
+}}
+>
+  Pagar
+</DropdownMenuItem>
+<DropdownMenuItem asChild>
+  <Link
+    href={
+      row.original.source === "financial"
+        ? `/dashboard/financial/${row.original.id}/edit`
+        : `/dashboard/orders/${row.original.id}/edit`
+    }
+  >
+    Editar
+  </Link>
+</DropdownMenuItem>
 
     <DropdownMenuSeparator />
 
@@ -560,7 +637,6 @@ export function DataTable({
     },
   ]
 
-  const [data, setData] = React.useState(() => initialData)
   const [rowSelection, setRowSelection] = React.useState({})
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
@@ -578,12 +654,12 @@ export function DataTable({
   )
 
   const dataIds = React.useMemo<UniqueIdentifier[]>(
-    () => data?.map(({ id }) => id) || [],
-    [data]
+    () => orders?.map(({ id }) => id) || [],
+    [orders]
   )
 
-  const table = useReactTable<Order>({
-    data: orders,
+  const table = useReactTable<FinancialRecord>({
+    data: combinedData,
     columns,
     state: {
       sorting,
@@ -662,43 +738,136 @@ export function DataTable({
         </svg>
       </div>
     )}
-<div className="grid gap-2 px-4 lg:px-6 py-2 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 items-center">
-  {/* Filtro por data */}
+
+<div className="w-full flex justify-between items-center px-4 lg:px-6 py-1">
+  {/* Título à esquerda */}
+  <h2 className="text-xl font-bold">Financeiro</h2>
+
+  {/* Botões à direita */}
+  <div className="flex gap-2">
+    {/* Colunas */}
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm" className="min-w-[100px]">
+          <IconLayoutColumns />
+          <span className="hidden sm:inline">Colunas</span>
+          <IconChevronDown />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        {table
+          .getAllColumns()
+          .filter((col) => typeof col.accessorFn !== "undefined" && col.getCanHide())
+          .map((column) => (
+            <DropdownMenuCheckboxItem
+              key={column.id}
+              className="capitalize"
+              checked={column.getIsVisible()}
+              onCheckedChange={(value) => column.toggleVisibility(!!value)}
+            >
+              {column.id}
+            </DropdownMenuCheckboxItem>
+          ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+
+    {/* Botão Adicionar */}
+    <Link href="/dashboard/financial/add">
+      <Button
+        variant="default"
+        size="sm"
+        className="min-w-[100px] bg-primary text-primary-foreground hover:bg-primary/90"
+      >
+        <IconPlus className="mr-1" />
+        <span className="hidden sm:inline">Financeiro</span>
+      </Button>
+    </Link>
+  </div>
+</div>
+
+<div className="grid gap-2 px-4 py-1 lg:px-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 items-center">
   <Input
-    type="text"
-    inputMode="numeric"
-    placeholder="Data"
-    value={dateInput}
-    onChange={handleDateInput}
-    maxLength={10}
-    className="min-w-[70px] w-full"
-  />
+  type="text"
+  inputMode="numeric"
+  placeholder="Emissão"
+  value={issueDateInput}
+  onChange={(e) => {
+    let value = e.target.value.replace(/\D/g, "")
+    if (value.length > 8) value = value.slice(0, 8)
+
+    const parts = []
+    if (value.length > 0) parts.push(value.slice(0, 2))
+    if (value.length > 2) parts.push(value.slice(2, 4))
+    if (value.length > 4) parts.push(value.slice(4, 8))
+
+    const formatted = parts.join("/")
+    setIssueDateInput(formatted)
+
+    if (formatted.length === 10) {
+      const [day, month, year] = formatted.split("/")
+      const isoDate = `${year}-${month}-${day}`
+      table.getColumn("issue_date")?.setFilterValue(isoDate)
+    } else {
+      table.getColumn("issue_date")?.setFilterValue(undefined)
+    }
+  }}
+  maxLength={10}
+  className="min-w-[70px] w-full"
+/>
+
+<Input
+  type="text"
+  inputMode="numeric"
+  placeholder="Vencimento"
+  value={dueDateInput}
+  onChange={(e) => {
+    let value = e.target.value.replace(/\D/g, "")
+    if (value.length > 8) value = value.slice(0, 8)
+
+    const parts = []
+    if (value.length > 0) parts.push(value.slice(0, 2))
+    if (value.length > 2) parts.push(value.slice(2, 4))
+    if (value.length > 4) parts.push(value.slice(4, 8))
+
+    const formatted = parts.join("/")
+    setDueDateInput(formatted)
+
+    if (formatted.length === 10) {
+      const [day, month, year] = formatted.split("/")
+      const isoDate = `${year}-${month}-${day}`
+      table.getColumn("due_date")?.setFilterValue(isoDate)
+    } else {
+      table.getColumn("due_date")?.setFilterValue(undefined)
+    }
+  }}
+  maxLength={10}
+  className="min-w-[70px] w-full"
+/>
 
   {/* Nome do cliente */}
   <Input
-    placeholder="Buscar cliente..."
-    value={(table.getColumn("customer")?.getFilterValue() as string) ?? ""}
-    onChange={(e) => table.getColumn("customer")?.setFilterValue(e.target.value)}
+    placeholder="Buscar por Nome"
+    value={(table.getColumn("customer_or_supplier")?.getFilterValue() as string) ?? ""}
+    onChange={(e) => table.getColumn("customer_or_supplier")?.setFilterValue(e.target.value)}
     className="min-w-[100px] w-full"
   />
 
-  {/* Status de entrega */}
-  <Select
-    value={(table.getColumn("delivery_status")?.getFilterValue() as string) ?? ""}
-    onValueChange={(value) =>
-      table.getColumn("delivery_status")?.setFilterValue(value === "all" ? undefined : value)
-    }
-  >
-    <SelectTrigger className="min-w-[90px] w-full">
-      <SelectValue placeholder="Entrega" />
-    </SelectTrigger>
-    <SelectContent>
-      <SelectItem value="all">Todos</SelectItem>
-      <SelectItem value="Entregar">Entregar</SelectItem>
-      <SelectItem value="Coletar">Coletar</SelectItem>
-      <SelectItem value="Coletado">Coletado</SelectItem>
-    </SelectContent>
-  </Select>
+<Select
+  value={(table.getColumn("type")?.getFilterValue() as string) ?? ""}
+  onValueChange={(value) =>
+    table.getColumn("type")?.setFilterValue(value === "all" ? undefined : value)
+  }
+>
+  <SelectTrigger className="min-w-[100px] w-full">
+    <SelectValue placeholder="Tipo de nota" />
+  </SelectTrigger>
+  <SelectContent>
+    <SelectItem value="all">Todas</SelectItem>
+    <SelectItem value="input">Entrada</SelectItem>
+    <SelectItem value="output">Saída</SelectItem>
+  </SelectContent>
+</Select>
+
 
   {/* Tipo de pagamento */}
   <Select
@@ -708,7 +877,7 @@ export function DataTable({
     }
   >
     <SelectTrigger className="min-w-[90px] w-full">
-      <SelectValue placeholder="Pagamento" />
+      <SelectValue placeholder="Método Pagamento" />
     </SelectTrigger>
     <SelectContent>
       <SelectItem value="all">Todos</SelectItem>
@@ -727,7 +896,7 @@ export function DataTable({
     }
   >
     <SelectTrigger className="min-w-[90px] w-full">
-      <SelectValue placeholder="Status" />
+      <SelectValue placeholder="Status Pagamento" />
     </SelectTrigger>
     <SelectContent>
       <SelectItem value="all">Todos</SelectItem>
@@ -735,47 +904,7 @@ export function DataTable({
       <SelectItem value="Pago">Pago</SelectItem>
     </SelectContent>
   </Select>
-
-  {/* Colunas */}
-  <DropdownMenu>
-    <DropdownMenuTrigger asChild>
-      <Button variant="outline" size="sm" className="min-w-[100px] w-full">
-        <IconLayoutColumns />
-        <span className="hidden sm:inline">Colunas</span>
-        <IconChevronDown />
-      </Button>
-    </DropdownMenuTrigger>
-    <DropdownMenuContent align="end" className="w-56">
-      {table
-        .getAllColumns()
-        .filter((col) => typeof col.accessorFn !== "undefined" && col.getCanHide())
-        .map((column) => (
-          <DropdownMenuCheckboxItem
-            key={column.id}
-            className="capitalize"
-            checked={column.getIsVisible()}
-            onCheckedChange={(value) => column.toggleVisibility(!!value)}
-          >
-            {column.id}
-          </DropdownMenuCheckboxItem>
-        ))}
-    </DropdownMenuContent>
-  </DropdownMenu>
-
-  {/* Botão Adicionar */}
-  <Link href="/dashboard/orders/add">
-    <Button
-      variant="default"
-      size="sm"
-      className="min-w-[100px] w-full bg-primary text-primary-foreground hover:bg-primary/90"
-    >
-      <IconPlus className="mr-1" />
-      <span className="hidden sm:inline">Venda</span>
-    </Button>
-  </Link>
 </div>
-
-
     <Tabs
       defaultValue="outline"
       className="w-full flex-col justify-start gap-6"
@@ -846,15 +975,13 @@ export function DataTable({
                   Detalhes sobre: <strong>{selectedCustomer?.customer}</strong><br/>
                   Nota: <strong>{selectedCustomer?.note_number}</strong><br/>
                   Tipo: <strong>{selectedCustomer?.document_type}</strong><br/>
-                  Emissão: <strong>{selectedCustomer?.issue_date}</strong><br/>
-                  Vencimento: <strong>{selectedCustomer?.due_date}</strong><br/>
                 </SheetDescription>
               </SheetHeader>
 
     {selectedCustomer && (
-      <div className="ml-4 flex flex-col gap-2 text-sm">
+      <div className="mt-4 ml-4 flex flex-col gap-2 text-sm">
         <div>
-          <strong>Data de Agendamento:</strong>{" "}
+          <strong>Data:</strong>{" "}
           {selectedCustomer?.appointment_date
             ? format(parseISO(selectedCustomer.appointment_date), "dd/MM/yyyy")
             : "—"}
@@ -1019,6 +1146,19 @@ export function DataTable({
       setIsPaymentOpen(false)
     }}
   />
+)}
+{selectedFinancial && (
+  <YourFinancialRecords
+  open={isFinancialPaymentOpen}
+  financial={selectedFinancial}
+  onClose={() => setIsFinancialPaymentOpen(false)}
+  onSuccess={async () => {
+    await fetchAll()
+    setIsFinancialPaymentOpen(false)
+    setSelectedFinancial(null)
+    toast.success("Nota marcada como paga!")
+  }}
+/>
 )}
     </>
   )

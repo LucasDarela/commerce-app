@@ -54,23 +54,34 @@ export function BarrelTable({
 
   const handleInputChange = (index: number, field: keyof BarrelEntry, value: string) => {
     const updated = [...rows];
-    let finalValue: any = value;
-
+    let finalValue: BarrelEntry[typeof field];
+  
     if (field === "date") {
-      finalValue = formatDate(value);
-    } else if (field !== "note") {
-      finalValue = parseInt(value) || 0;
+      finalValue = formatDate(value) as BarrelEntry[typeof field];
+    } else if (field === "note") {
+      finalValue = value as BarrelEntry[typeof field];
+    } else {
+      finalValue = (parseInt(value) || 0) as BarrelEntry[typeof field];
     }
-
-    updated[index][field] = finalValue;
-
+  
+    if (finalValue !== undefined) {
+      (updated[index] as any)[field] = finalValue;
+    }
+  
     if (["arrived_30", "returned_30", "had_30"].includes(field)) {
-      updated[index].total_30 = (updated[index].had_30 || 0) + (updated[index].arrived_30 || 0) - (updated[index].returned_30 || 0);
+      updated[index].total_30 =
+        (updated[index].had_30 || 0) +
+        (updated[index].arrived_30 || 0) -
+        (updated[index].returned_30 || 0);
     }
+  
     if (["arrived_50", "returned_50", "had_50"].includes(field)) {
-      updated[index].total_50 = (updated[index].had_50 || 0) + (updated[index].arrived_50 || 0) - (updated[index].returned_50 || 0);
+      updated[index].total_50 =
+        (updated[index].had_50 || 0) +
+        (updated[index].arrived_50 || 0) -
+        (updated[index].returned_50 || 0);
     }
-
+  
     setRows(updated);
   };
 

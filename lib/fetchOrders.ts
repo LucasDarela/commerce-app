@@ -17,7 +17,9 @@ export const orderSchema = z.object({
   freight: z.union([z.string(), z.number()]).optional(),
   note_number: z.string().optional(),
   document_type: z.string().optional(),
-  total: z.number()
+  total: z.number(),
+  issue_date: z.string().nullable().optional(),
+  due_date: z.string().nullable().optional()
 })
 
 export type Order = z.infer<typeof orderSchema>
@@ -43,7 +45,9 @@ export async function fetchOrders(companyId: string): Promise<Order[]> {
     freight,
     note_number,
     document_type,
-    total
+    total,
+    issue_date,
+    due_date
   `)
   .eq("company_id", companyId)
   .order("appointment_date", { ascending: false })
