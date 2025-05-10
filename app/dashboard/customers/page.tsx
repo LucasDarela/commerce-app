@@ -54,59 +54,61 @@ export default function ListCustomers() {
   
     const fetchCustomers = async () => {
       try {
-        const { data: clientes, error: clientesError } = await supabase
+        let query = supabase
           .from("customers")
           .select("*")
           .eq("company_id", companyId)
           .order("name", { ascending: true });
   
-        if (clientesError) {
-          console.error("Erro ao buscar clientes:", clientesError.message);
+          if (search.trim()) {
+            const normalizedSearch = search.trim().toLowerCase();
+            const numericSearch = search.replace(/\D/g, "");
+          
+            const filters = [`name.ilike.%${normalizedSearch}%`];
+            if (numericSearch) {
+              filters.push(`document.ilike.%${numericSearch}%`);
+              filters.push(`phone.ilike.%${numericSearch}%`);
+            }
+          
+            query = query.or(filters.join(","));
+          }
+  
+        const { data: clientes, error } = await query;
+  
+        if (error) {
+          console.error("Erro ao buscar clientes:", error.message);
           toast.error("Erro ao carregar clientes.");
           return;
         }
   
         setClientes(clientes || []);
-      } catch (error) {
-        console.error("❌ Erro inesperado ao buscar clientes:", error);
+        setCurrentPage(1);
+      } catch (err) {
+        console.error("❌ Erro inesperado ao buscar clientes:", err);
         toast.error("Erro inesperado ao carregar clientes.");
       }
     };
   
-    if (typeof window !== "undefined") {
-      fetchCustomers();
-    }
-  }, [companyId, loading]);
+    fetchCustomers();
+  }, [companyId, loading, search]);
 
   // 🔹 Normaliza texto (remove acentos e converte para minúsculas)
   const normalizeText = (text: string) => {
     return text
       .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .trim();
+      .normalize("NFD") // remove acentos
+      .replace(/[\u0300-\u036f]/g, "") // remove caracteres especiais
+      .replace(/\s+/g, " ") // substitui múltiplos espaços por um único espaço
+      .replace(/\n/g, "") // remove quebras de linha
+      .trim(); // remove espaços no começo e fim
   };
 
-  // 🔹 Filtrar clientes diretamente no momento da renderização
-  const filteredClientes = clientes.filter((cliente) => {
-    const searchTerm = normalizeText(search);
-    const nomeCliente = normalizeText(cliente.name || "");
-    const cpfCnpj = cliente.document ? cliente.document.replace(/\D/g, "") : "";
-    const telefone = cliente.phone ? cliente.phone.replace(/\D/g, "") : "";
-  
-    return (
-      nomeCliente.includes(searchTerm) ||
-      cpfCnpj.includes(search.replace(/\D/g, "")) ||
-      telefone.includes(search.replace(/\D/g, ""))
-    );
-  });
-
-  const paginatedClientes = filteredClientes.slice(
+  const paginatedClientes = clientes.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
   
-  const totalPages = Math.ceil(filteredClientes.length / itemsPerPage);
+  const totalPages = Math.ceil(clientes.length / itemsPerPage);
 
   const openModal = async (cliente: Cliente) => {
     setSelectedCliente(cliente);
@@ -197,7 +199,7 @@ export default function ListCustomers() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredClientes.length > 0 ? (
+            {clientes.length > 0 ? (
               paginatedClientes.map((cliente) => (
             <TableRow
               key={cliente.id}

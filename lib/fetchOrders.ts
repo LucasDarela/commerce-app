@@ -11,7 +11,7 @@ export const orderSchema = z.object({
   amount: z.number(),
   products: z.string(),
   delivery_status: z.enum(["Entregar", "Coletar", "Coletado"]), 
-  payment_method: z.enum(["Pix", "Dinheiro", "Boleto", "Cartao"]),
+  payment_method: z.enum(["Pix", "Dinheiro", "Boleto", "Cartao"]).default("Pix"),
   payment_status: z.enum(["Pendente", "Pago"]),
   days_ticket: z.union([z.string(), z.number()]).optional(),
   freight: z.union([z.string(), z.number()]).optional(),

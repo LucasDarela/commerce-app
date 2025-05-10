@@ -131,13 +131,13 @@ export default function AddSupplier() {
       toast.error("Please fill in all required fields.");
       return;
     }
-
+    const cleanedDocument = supplier.document.replace(/\D/g, "");
     const documentType = getDocumentType(supplier.document);
 
     const { data: existing } = await supabase
       .from("suppliers")
       .select("id")
-      .eq("document", supplier.document)
+      .eq("document", cleanedDocument)
       .eq("company_id", companyId)
       .maybeSingle();
 
@@ -147,7 +147,12 @@ export default function AddSupplier() {
     }
 
     const { error } = await supabase.from("suppliers").insert([
-      { ...supplier, company_id: companyId, type: documentType },
+      {
+        ...supplier,
+        document: cleanedDocument, // <--- DOCUMENTO LIMPO
+        company_id: companyId,
+        type: documentType,
+      },
     ]);
 
     if (error) {

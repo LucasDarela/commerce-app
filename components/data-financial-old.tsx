@@ -101,6 +101,7 @@ import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { supabase } from "@/lib/supabase"
 import { PaymentModal } from "@/components/payment-modal"
 import { YourFinancialRecords } from "@/components/your-financial-modal"
+import { ActionsCell } from "@/components/actions-cell"
 
 //New Schema
 export const schema = z.object({
@@ -144,7 +145,10 @@ const financialSchema = z.object({
 
 type Sale = z.infer<typeof schema>
 type Order = z.infer<typeof schema> & { source: "order"}
-type FinancialRecord = z.infer<typeof financialSchema> & { source: "order" | "financial" }
+type FinancialRecord = z.infer<typeof financialSchema> & { 
+  source: "order" | "financial" 
+  phone?: string
+}
 
 type CustomColumnMeta = {
   className?: string
@@ -352,7 +356,7 @@ export default function DataFinancialTable() {
       supabase.from("financial_records").select("*").order("issue_date", { ascending: false }),
       supabase.from("suppliers").select("id, name"),
     ]);
-  
+    console.log("📦 Fornecedores:", suppliersRes.data)
     // Parse dos pedidos
     const parsedOrders = schema.array().safeParse(ordersRes.data);
     if (parsedOrders.success) {
@@ -397,20 +401,10 @@ export default function DataFinancialTable() {
       type: "output" as const,
       notes: "",
       source: "order",
+      phone: o.phone || "", 
     })),
     ...financialRecords,
   ]
-
-  useEffect(() => {
-    const stored = localStorage.getItem("orders_column_visibility")
-    if (stored) {
-      setColumnVisibility(JSON.parse(stored))
-    }
-  }, [])
-  
-  useEffect(() => {
-    localStorage.setItem("orders_column_visibility", JSON.stringify(columnVisibility))
-  }, [columnVisibility])
 
   //const columns
   const columns: CustomColumnDef<FinancialRecord>[] = [
@@ -457,21 +451,26 @@ export default function DataFinancialTable() {
         return `${day}/${month}/${year}`
       },
   },
-    {
-        id: "customer_or_supplier",
-        header: "Fornecedor / Cliente",
-        size: 250,
-        accessorFn: (row) => isOrder(row) ? row.customer : row.supplier,
-        meta: { className: "w-[250px] truncate uppercase" },
-        cell: ({ row }) => {
-          if (row.original.source === "financial") {
-            const supplierName = suppliers.find(s => s.id === row.original.supplier_id)?.name
-            return supplierName || "—"
-          } else {
-            return isOrder(row.original) ? row.original.customer : "-"
-          }
-        }
+  {
+    id: "customer_or_supplier",
+    header: "Fornecedor / Cliente",
+    accessorFn: (row) => {
+      if (isOrder(row)) return row.customer
+      if (isFinancial(row)) return suppliers.find(s => s.id === row.supplier_id)?.name || row.supplier
+      return "—"
     },
+    filterFn: "includesString", // <- ESSENCIAL para funcionar com filtro
+    meta: { className: "w-[250px] truncate uppercase" },
+    cell: ({ row }) => {
+      const record = row.original
+      if (isOrder(record)) return record.customer || "—"
+      if (isFinancial(record)) {
+        const name = suppliers.find((s) => s.id === record.supplier_id)?.name
+        return name || record.supplier || "—"
+      }
+      return "—"
+    },
+  },
     {
       accessorKey: "phone",
       header: "Telefone",
@@ -480,11 +479,12 @@ export default function DataFinancialTable() {
       cell: ({ row }) => {
         if (row.original.source !== "order") return "—"
       
-        const phone = isOrder(row.original) ? row.original.phone : ""
-        const cleaned = phone.replace(/\D/g, "")
+const rawPhone = isOrder(row.original) ? row.original.phone : ""
+const phoneClean = typeof rawPhone === "string" ? rawPhone.replace(/\D/g, "") : ""
         const message = "Olá, tudo bem?"
         const encodedMessage = encodeURIComponent(message)
-        const link = `https://wa.me/55${cleaned}?text=${encodedMessage}`
+        console.log(phoneClean)
+const link = `https://wa.me/55${phoneClean}?text=${encodedMessage}`
       
         return (
           <TooltipProvider>
@@ -536,7 +536,17 @@ export default function DataFinancialTable() {
       accessorKey: "payment_method",
       header: "Método",
       meta: { className: "uppercase truncate" },
-      cell: ({ row }) => row.original.payment_method,
+      cell: ({ row }) => {
+        const method = row.original.payment_method
+        const methodMap: Record<string, string> = {
+          Pix: "Pix",
+          Cash: "Dinheiro",
+          Ticket: "Boleto",
+          Card: "Cartão"
+        }
+      
+        return methodMap[method] || method
+      },
     },
     {
       accessorKey: "payment_status",
@@ -557,9 +567,9 @@ export default function DataFinancialTable() {
       header: "Restante",
       meta: { className: "text-right uppercase truncate" },
       cell: ({ row }) => {
-        const total = isOrder(row.original) ? row.original.total : row.original.amount
-        const total_payed = isOrder(row.original) ? row.original.total_payed ?? 0 : 0
-        const remaining = (Number(total) || 0) - (Number(total_payed) || 0)
+        const total = Number(isOrder(row.original) ? row.original.total : row.original.amount) || 0
+        const total_payed = isOrder(row.original) ? Number(row.original.total_payed ?? 0) : 0
+        const remaining = total - total_payed
         return `R$ ${remaining.toFixed(2).replace(".", ",")}`
       },
     },
@@ -568,9 +578,11 @@ export default function DataFinancialTable() {
       header: "Total",
       meta: { className: "text-right uppercase" },
       cell: ({ row }) => {
-        const value =
-            isOrder(row.original) ? row.original.total : (row.original as FinancialRecord).amount
-    
+        const raw = isOrder(row.original)
+          ? row.original.total
+          : (row.original as FinancialRecord).amount
+      
+        const value = Number(raw) || 0
         return `R$ ${value.toFixed(2).replace('.', ',')}`
       },
     },
@@ -579,61 +591,9 @@ export default function DataFinancialTable() {
       header: "",
       size: 50,
       meta: { className: "w-[50px]" },
-      cell: ({ row }) => (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="text-muted-foreground">
-          <IconDotsVertical size={16} />
-        </Button>
-      </DropdownMenuTrigger>
-
-      <DropdownMenuContent align="end">
-  <DropdownMenuItem asChild>
-  <a
-      href={`/dashboard/orders/${row.original.id}/view`}
-      rel="noopener noreferrer"
-      className="w-full text-left"
-    >
-      Ver Espelho
-    </a>
-    </DropdownMenuItem>
-    <DropdownMenuItem
-onClick={() => {
-  const record = row.original;
-  if (record.source === "financial" && record.type === "input") {
-    setSelectedFinancial(record as FinancialRecord);
-    setIsFinancialPaymentOpen(true);
-  } else if (record.source === "order") {
-    if (isOrder(record)) setSelectedOrder(record)
-    setIsPaymentOpen(true);
-  }
-}}
->
-  Pagar
-</DropdownMenuItem>
-<DropdownMenuItem asChild>
-  <Link
-    href={
-      row.original.source === "financial"
-        ? `/dashboard/financial/${row.original.id}/edit`
-        : `/dashboard/orders/${row.original.id}/edit`
-    }
-  >
-    Editar
-  </Link>
-</DropdownMenuItem>
-
-    <DropdownMenuSeparator />
-
-    <DropdownMenuItem
-      variant="destructive"
-      onClick={() => deleteOrderById(row.original.id)}
-    >
-      Deletar
-    </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-      ),
+      cell: ({ row }) => {
+        // return <ActionsCell row={row} onDelete={deleteOrderById} />
+      },
     },
   ]
 
@@ -921,7 +881,7 @@ onClick={() => {
             sensors={sensors}
             id={sortableId}
           >
-            <Table className="table-fixed w-full uppercase">
+            <Table className="w-full uppercase">
               <TableHeader className="bg-muted sticky top-0 z-10">
                 {table.getHeaderGroups().map((headerGroup) => (
                   <TableRow key={headerGroup.id}>

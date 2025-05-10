@@ -121,9 +121,14 @@ export default function AddFinancialRecord() {
         toast.error("Empresa não encontrada. Tente novamente em alguns segundos.");
         return;
       }
-
-      if (!issueDate || !dueDate || !paymentMethod) {
+      
+      if (!issueDate || !dueDate) {
         toast.error("Por favor, preencha todos os campos obrigatórios.");
+        return;
+      }
+      
+      if (!paymentMethod || paymentMethod === "") {
+        toast.error("Selecione um método de pagamento antes de salvar.");
         return;
       }
     

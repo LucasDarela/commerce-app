@@ -45,38 +45,42 @@ export default function ListSuppliers() {
     const fetchSuppliers = async () => {
       try {
         if (!companyId) return;
-
-        const { data, error } = await supabase
+  
+        let query = supabase
           .from("suppliers")
           .select("*")
           .eq("company_id", companyId)
           .order("name", { ascending: true });
-
+  
+          if (search.trim()) {
+            const raw = search.trim();
+            const cleaned = raw.replace(/\D/g, "");
+          
+            query = query.or(
+              `name.ilike.%${raw.toUpperCase()}%,document.ilike.%${cleaned}%,phone.ilike.%${cleaned}%`
+            );
+          }
+  
+        const { data, error } = await query;
+  
         if (error) {
-          console.error("❌ Error fetching suppliers:", error.message);
-          toast.error("Failed to load suppliers.");
+          console.error("❌ Erro ao buscar fornecedores:", error.message);
+          toast.error("Erro ao carregar fornecedores.");
         } else {
           setSuppliers(data ?? []);
         }
       } catch (error) {
-        console.error("❌ Unexpected error fetching suppliers:", error);
-        toast.error("Unexpected error loading suppliers.");
+        console.error("❌ Erro inesperado:", error);
+        toast.error("Erro inesperado ao carregar fornecedores.");
       }
     };
-
-    if (!loading && companyId) fetchSuppliers();
-  }, [companyId, loading]);
+  
+    if (!loading && companyId) {
+      fetchSuppliers();
+    }
+  }, [companyId, loading, search]);
 
   const normalizeText = (text: string) => text.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
-
-  const filteredSuppliers = suppliers.filter((supplier) => {
-    const searchTerm = normalizeText(search);
-    return (
-      normalizeText(supplier.name).includes(searchTerm) ||
-      supplier.document.replace(/\D/g, "").includes(search.replace(/\D/g, "")) ||
-      supplier.phone.replace(/\D/g, "").includes(search.replace(/\D/g, ""))
-    );
-  });
 
   const openModal = (supplier: Supplier) => {
     setSelectedSupplier(supplier);
@@ -142,8 +146,8 @@ export default function ListSuppliers() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredSuppliers.length > 0 ? (
-              filteredSuppliers.map((supplier) => (
+            {suppliers.length > 0 ? (
+              suppliers.map((supplier) => (
                 <TableRow key={supplier.id} onClick={() => openModal(supplier)} className="cursor-pointer h-[50px]">
                   <TableCell>{supplier.name}</TableCell>
                   <TableCell className="hidden md:table-cell">{supplier.type}</TableCell>

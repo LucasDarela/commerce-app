@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { fetchOrders } from "@/lib/fetchOrders"
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany"
-import DataFinancialTable from "@/components/data-financial";
+import DataFinancialTable from "@/components/financial/DataFinancialTable";
 import { Order } from "@/components/types/order"
 
 export default function DataFinancial () {
@@ -17,7 +17,14 @@ export default function DataFinancial () {
     const getData = async () => {
       setLoading(true)
       const data = await fetchOrders(companyId)
-      setOrders(data)
+      setOrders(
+        data
+          .filter((o) => !!o.payment_method) // garante que só pega os com método definido
+          .map((o) => ({
+            ...o,
+            payment_method: o.payment_method ?? "Pix", // valor padrão, se necessário
+          }))
+      )
       setLoading(false)
     }
 
