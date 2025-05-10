@@ -39,4 +39,5 @@ export const financialSchema = z.object({
   type: z.enum(["input", "output"]),
   notes: z.string().optional(),
   source: z.literal("financial"),
+  phone: z.string().optional(),
 })

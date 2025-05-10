@@ -47,6 +47,28 @@ export default function DataFinancialTable() {
   
   const router = useRouter()
 
+  const deleteOrderById = async (id: string) => {
+    const confirmDelete = confirm("Tem certeza que deseja excluir esta nota?")
+    if (!confirmDelete) return
+  
+    const { error } = await supabase.from("orders").delete().eq("id", id)
+  
+    if (error) {
+      toast.error("Erro ao deletar nota.")
+      return
+    }
+  
+    toast.success("Nota excluída com sucesso!")
+    setOrders((prev) => prev.filter((order) => order.id !== id))
+  }
+
+  const columns = React.useMemo(() => financialColumns({
+    suppliers,
+    onDelete: deleteOrderById,
+    setSelectedOrder: setSelectedOrder as Dispatch<SetStateAction<CombinedRecord | null>>,
+    setIsPaymentOpen,
+  }), [suppliers])
+
   const fetchAll = async () => {
     const [ordersRes, financialRes, suppliersRes] = await Promise.all([
       supabase.from("orders").select("*").order("order_index", { ascending: true }),
@@ -100,26 +122,15 @@ export default function DataFinancialTable() {
       type: "output",
       notes: "",
       total_payed: Number(o.total_payed ?? 0),
+      phone: o.phone,
     })),
-    ...financialRecords,
+    ...financialRecords.map((f) => ({
+      ...f,
+      source: "financial" as const,
+    })),
   ]
 
   type CombinedRecord = (Order & { source: "order" }) | (FinancialRecord & { source: "financial" })
-
-  const deleteOrderById = async (id: string) => {
-    const confirmDelete = confirm("Tem certeza que deseja excluir esta nota?")
-    if (!confirmDelete) return
-  
-    const { error } = await supabase.from("orders").delete().eq("id", id)
-  
-    if (error) {
-      toast.error("Erro ao deletar nota.")
-      return
-    }
-  
-    toast.success("Nota excluída com sucesso!")
-    setOrders((prev) => prev.filter((order) => order.id !== id))
-  }
 
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
@@ -132,12 +143,7 @@ const [pagination, setPagination] = React.useState({
 
 const table = useReactTable<CombinedRecord>({
   data: combinedData,
-  columns: financialColumns({
-    suppliers,
-    onDelete: deleteOrderById,
-    setSelectedOrder: setSelectedOrder as Dispatch<SetStateAction<CombinedRecord | null>>,
-    setIsPaymentOpen,
-  }),
+  columns,
   state: {
     sorting,
     columnVisibility,
@@ -170,12 +176,7 @@ const table = useReactTable<CombinedRecord>({
         <DataTableConfig<Order | FinancialRecord>
           table={table}
           data={combinedData}
-          columns={financialColumns({
-            suppliers,
-            onDelete: deleteOrderById,
-            setSelectedOrder,
-            setIsPaymentOpen,
-          })}
+          columns={columns}
         />
       </div>
 

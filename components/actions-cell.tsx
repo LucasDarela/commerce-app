@@ -33,49 +33,50 @@ export function ActionsCell({
   onDelete,
 }: Props) {
   return (
-      <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="text-muted-foreground">
-          <IconDotsVertical size={16} />
-        </Button>
-      </DropdownMenuTrigger>
+    null
+  //     <DropdownMenu>
+  //     <DropdownMenuTrigger asChild>
+  //       <Button variant="ghost" size="icon" className="text-muted-foreground">
+  //         <IconDotsVertical size={16} />
+  //       </Button>
+  //     </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end">
-  <DropdownMenuItem asChild>
-  <a
-      href={`/dashboard/orders/${row.original.id}/view`}
-      rel="noopener noreferrer"
-      className="w-full text-left"
-    >
-      Ver Espelho
-    </a>
-    </DropdownMenuItem>
-    <DropdownMenuItem
-      onClick={() => {
-        if (isOrder(row.original)) {
-          setSelectedOrder(row.original)
-          setIsPaymentOpen(true)
-        }
-      }}
-    >
-      Pagar
-    </DropdownMenuItem>
-    <DropdownMenuItem asChild>
-      <Link href={`/dashboard/orders/${row.original.id}/edit`}>
-        Editar
-      </Link>
-    </DropdownMenuItem>
+  //     <DropdownMenuContent align="end">
+  // <DropdownMenuItem asChild>
+  // <a
+  //     href={`/dashboard/orders/${row.original.id}/view`}
+  //     rel="noopener noreferrer"
+  //     className="w-full text-left"
+  //   >
+  //     Ver Espelho
+  //   </a>
+  //   </DropdownMenuItem>
+  //   <DropdownMenuItem
+  //     onClick={() => {
+  //       if (isOrder(row.original)) {
+  //         setSelectedOrder(row.original)
+  //         setIsPaymentOpen(true)
+  //       }
+  //     }}
+  //   >
+  //     Pagar
+  //   </DropdownMenuItem>
+  //   <DropdownMenuItem asChild>
+  //     <Link href={`/dashboard/orders/${row.original.id}/edit`}>
+  //       Editar
+  //     </Link>
+  //   </DropdownMenuItem>
 
-    <DropdownMenuSeparator />
+  //   <DropdownMenuSeparator />
 
-    <DropdownMenuItem
-      variant="destructive"
-      onClick={() => onDelete(row.original.id)}
-    >
-      Deletar
-    </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+  //   <DropdownMenuItem
+  //     variant="destructive"
+  //     onClick={() => onDelete(row.original.id)}
+  //   >
+  //     Deletar
+  //   </DropdownMenuItem>
+  //     </DropdownMenuContent>
+  //   </DropdownMenu>
     )
   }
 
