@@ -34,8 +34,10 @@ export function DataTableConfig<T extends { id: string }>({ data, columns, table
       <UITable className="w-full uppercase">
         <TableHeader className="bg-muted sticky top-0 z-10">
           {table.getHeaderGroups().map((headerGroup) => (
-            <TableRow key={headerGroup.id}>
-              {headerGroup.headers.map((header) => (
+            <TableRow className="h-10" key={headerGroup.id}>
+              {headerGroup.headers
+              .filter((header) => header.column.getIsVisible())
+              .map((header) => (
                 <TableHead key={header.id}>
                   {header.isPlaceholder
                     ? null
@@ -46,22 +48,15 @@ export function DataTableConfig<T extends { id: string }>({ data, columns, table
           ))}
         </TableHeader>
         <TableBody>
-          {table.getRowModel().rows.length ? (
-            <SortableContext
-              items={ReactTable.getRowModel().rows.map((row) => row.original.id)}
-              strategy={verticalListSortingStrategy}
-            >
-              {table.getRowModel().rows.map((row) => (
-                <DraggableRow key={row.id} row={row} />
-              ))}
-            </SortableContext>
-          ) : (
-            <TableRow>
-              <TableCell colSpan={columns.length} className="h-24 text-center">
-                Nenhum resultado encontrado.
-              </TableCell>
-            </TableRow>
-          )}
+        {table.getRowModel().rows.map((row) => (
+        <TableRow key={row.id}>
+          {row.getVisibleCells().map((cell) => (
+            <TableCell className="h-13" key={cell.id}>
+              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+            </TableCell>
+          ))}
+        </TableRow>
+      ))}
         </TableBody>
       </UITable>
     </div>

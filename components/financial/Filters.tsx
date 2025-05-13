@@ -52,7 +52,7 @@ export function FinancialFilters<T>({
   }
 
   return (
-    <div className="grid gap-2 px-4 py-1 lg:px-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 items-center">
+    <div className="grid gap-2 px-4 py-1 lg:px-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-8 items-center">
       <Input
         type="text"
         inputMode="numeric"
@@ -79,6 +79,21 @@ export function FinancialFilters<T>({
         onChange={(e) => table.getColumn("customer_or_supplier")?.setFilterValue(e.target.value)}
         className="min-w-[100px] w-full"
       />
+      <Select
+  value={(table.getColumn("source")?.getFilterValue() as string) ?? ""}
+  onValueChange={(value) =>
+    table.getColumn("source")?.setFilterValue(value === "all" ? undefined : value)
+  }
+>
+  <SelectTrigger className="min-w-[110px] w-full">
+    <SelectValue placeholder="Origem" />
+  </SelectTrigger>
+  <SelectContent>
+    <SelectItem value="all">Todas</SelectItem>
+    <SelectItem value="order">Pedido</SelectItem>
+    <SelectItem value="financial">Nota Financeira</SelectItem>
+  </SelectContent>
+</Select>
 
       <Select
         value={(table.getColumn("type")?.getFilterValue() as string) ?? ""}
@@ -95,6 +110,25 @@ export function FinancialFilters<T>({
           <SelectItem value="output">Saída</SelectItem>
         </SelectContent>
       </Select>
+
+      <Select
+  value={(table.getColumn("category")?.getFilterValue() as string) ?? ""}
+  onValueChange={(value) =>
+    table.getColumn("category")?.setFilterValue(value === "all" ? undefined : value)
+  }
+>
+  <SelectTrigger className="min-w-[120px] w-full">
+    <SelectValue placeholder="Categoria da Nota" />
+  </SelectTrigger>
+  <SelectContent>
+    <SelectItem value="all">Todas</SelectItem>
+    <SelectItem value="order">Pedido</SelectItem>
+    <SelectItem value="compra_produto">Compra Produto</SelectItem>
+    <SelectItem value="compra_equipamento">Compra Equipamento</SelectItem>
+    <SelectItem value="vale_funcionario">Vale Funcionário</SelectItem>
+    <SelectItem value="outros">Outros</SelectItem>
+  </SelectContent>
+</Select>
 
       <Select
         value={(table.getColumn("payment_method")?.getFilterValue() as string) ?? ""}

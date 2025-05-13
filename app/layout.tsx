@@ -6,6 +6,7 @@ import { ActiveThemeProvider } from "@/components/active-theme";
 import { cookies } from "next/headers";
 import { cn } from "@/lib/utils";
 import { Toaster } from "sonner";
+import React from "react";
 
 const META_THEME_COLORS = {
   light: "#ffffff",
@@ -57,7 +58,9 @@ export default async function RootLayout({
           enableColorScheme
         >
           <ActiveThemeProvider initialTheme={activeThemeValue}>
+          <React.StrictMode>
             {children}
+          </React.StrictMode>
             <Toaster richColors /> 
           </ActiveThemeProvider>
         </ThemeProvider>

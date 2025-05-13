@@ -33,7 +33,7 @@ export function HeaderActions<T>({ table }: HeaderActionsProps<T>) {
           <DropdownMenuContent align="end" className="w-56">
             {table
               .getAllColumns()
-              .filter((col) => typeof col.accessorFn !== "undefined" && col.getCanHide())
+              .filter((col) => col.getCanHide())
               .map((column) => (
                 <DropdownMenuCheckboxItem
                   key={column.id}

@@ -97,20 +97,13 @@ export function financialColumns({
         id: "source",
         header: "Origem",
         meta: { className: "truncate"},
+        enableHiding: false,
         accessorFn: (row) => {
           if ("source" in row) return row.source
           return "unknown"
         },
         cell: ({ row }) =>
           isOrder(row.original) ? "Pedido" : "Nota Financeira",
-    },
-    {
-      id: "category",
-      header: "Categoria",
-      accessorFn: (row) =>
-        isFinancial(row) ? row.category : "pedido",
-      cell: ({ row }) =>
-        isFinancial(row.original) ? row.original.category : "Pedido",
     },
     {
       id: "type",
@@ -125,6 +118,14 @@ export function financialColumns({
         }
         return "Pedido"
       },
+    },
+    {
+      id: "category",
+      header: "Categoria",
+      accessorFn: (row) =>
+        isFinancial(row) ? row.category : "pedido",
+      cell: ({ row }) =>
+        isFinancial(row.original) ? row.original.category : "Pedido",
     },
     {
       id: "payment_method",
