@@ -189,9 +189,7 @@ export function financialColumns({
       header: "",
       size: 50,
       meta: { className: "w-[50px]" },
-      cell: ({ row }) => {
-        if (!onDelete) return null
-    
+      cell: ({ row }) => {    
         return (
           <ActionsCell
             row={row}

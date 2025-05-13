@@ -23,6 +23,7 @@ import { Order as OrderType } from "@/components/types/orders"
 import type { SortingState, ColumnFiltersState } from "@tanstack/react-table"
 import { isOrder } from "./utils"
 import { getInitialColumnVisibility, persistColumnVisibility } from "./table-config"
+import { FinancialPaymentModal } from "./PaymentModal"
 
 
 export type Sale = z.infer<typeof orderSchema>
@@ -172,6 +173,7 @@ const table = useReactTable<CombinedRecord>({
   getSortedRowModel: getSortedRowModel(),
 })
 
+
 const { totalReceber, totalPagar } = React.useMemo(() => {
   let totalReceber = 0
   let totalPagar = 0
@@ -208,14 +210,7 @@ const { totalReceber, totalPagar } = React.useMemo(() => {
         dueDateInput={dueDateInput}
         setDueDateInput={setDueDateInput}
         />
-      <div className="overflow-hidden rounded-lg border mt-4 mx-4">
-        <DataTableConfig<Order | FinancialRecord>
-          table={table}
-          data={table.getRowModel().rows.map(row => row.original)}
-          columns={columns}
-        />
-      </div>
-      <div className="flex flex-col items-end gap-2 px-6 text-sm font-medium text-muted-foreground mt-4">
+        <div className="flex justify-end gap-2 px-6 text-sm font-medium text-muted-foreground ">
         <div>
           <span className="">Total a Pagar: </span>
           <span className="text-red-600 font-semibold">R$ {totalPagar.toFixed(2).replace(".", ",")}</span>
@@ -224,6 +219,13 @@ const { totalReceber, totalPagar } = React.useMemo(() => {
           <span className="">Total a Receber: </span>
           <span className="text-green-600 font-semibold">R$ {totalReceber.toFixed(2).replace(".", ",")}</span>
         </div>
+      </div>
+      <div className="overflow-hidden rounded-lg border mx-4">
+        <DataTableConfig<Order | FinancialRecord>
+          table={table}
+          data={table.getRowModel().rows.map(row => row.original)}
+          columns={columns}
+        />
       </div>
 
       <TablePagination table={table} />
@@ -265,6 +267,14 @@ const { totalReceber, totalPagar } = React.useMemo(() => {
         refreshOrders={refreshOrders}
         fetchAll={fetchAll}
       />
+        {selectedOrder?.source === "financial" && (
+          <FinancialPaymentModal
+            order={selectedOrder as FinancialRecord}
+            open={isPaymentOpen}
+            onClose={() => setIsPaymentOpen(false)}
+            onSuccess={fetchAll}
+          />
+        )}
 
     </>
   )

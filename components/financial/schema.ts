@@ -25,7 +25,7 @@ export const orderSchema = z.object({
 
 export const financialSchema = z.object({
   id: z.string(),
-  supplier_id: z.string().uuid(),
+  supplier_id: z.string().uuid().optional().nullable(),
   supplier: z.string(),
   company_id: z.string(),
   issue_date: z.string(),
