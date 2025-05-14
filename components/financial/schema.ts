@@ -40,4 +40,5 @@ export const financialSchema = z.object({
   notes: z.string().optional(),
   source: z.literal("financial"),
   phone: z.string().optional(),
+  total_payed: z.preprocess((val) => Number(val ?? 0), z.number().optional()),
 })

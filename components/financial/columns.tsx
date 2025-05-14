@@ -109,14 +109,14 @@ export function financialColumns({
       id: "type",
       header: "Tipo",
       accessorFn: (row) =>
-        isFinancial(row) ? row.type : "order", // <- valor padrão para pedidos
+        isFinancial(row) ? row.type : "output", 
       cell: ({ row }) => {
         if (isFinancial(row.original)) {
           return row.original.type === "input"
-            ? "Nota de Entrada"
-            : "Nota de Saída"
+            ? "Entrada"
+            : "Saída"
         }
-        return "Pedido"
+        return "Saída"
       },
     },
     {
@@ -161,12 +161,18 @@ export function financialColumns({
       meta: { className: "text-right uppercase truncate" },
       accessorFn: (row) => {
         const total = isOrder(row) ? row.total : row.amount
-        const total_payed = isOrder(row) ? row.total_payed ?? 0 : 0
-        return (Number(total) - Number(total_payed))
+        const total_payed = isOrder(row)
+          ? row.total_payed ?? 0
+          : (row as FinancialRecord).total_payed ?? 0
+    
+        return Number(total) - Number(total_payed)
       },
       cell: ({ row }) => {
         const total = Number(isOrder(row.original) ? row.original.total : row.original.amount) || 0
-        const total_payed = isOrder(row.original) ? Number(row.original.total_payed ?? 0) : 0
+        const total_payed = isOrder(row.original)
+          ? Number(row.original.total_payed ?? 0)
+          : Number((row.original as FinancialRecord).total_payed ?? 0)
+    
         const remaining = total - total_payed
         return `R$ ${remaining.toFixed(2).replace(".", ",")}`
       },

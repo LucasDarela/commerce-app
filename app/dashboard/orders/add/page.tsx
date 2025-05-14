@@ -16,6 +16,7 @@ import { format } from "date-fns";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
+import { getReservedStock } from "@/lib/stock/getReservedStock"
 
 interface Customer {
   id: string;
@@ -72,6 +73,7 @@ export default function AddOrder() {
   const [freight, setFreight] = useState<number>(0);
   const [items, setItems] = useState<any[]>([]);
   const [catalogPrices, setCatalogPrices] = useState<Record<string, number>>({})
+  const [reservedStock, setReservedStock] = useState<number>(0)
   const [appointment, setAppointment] = useState({
     date: undefined as Date | undefined,
     hour: "",
@@ -94,6 +96,7 @@ const dueDate = format(
 )
 
   const [loading, setLoading] = useState<boolean>(false);
+  const isSubmittingRef = useRef(false)
 
   useEffect(() => {
     const fetchCustomers = async () => {
@@ -147,6 +150,7 @@ const dueDate = format(
       setCatalogPrices({});
     }
   };
+
 
   const addItem = () => {
     if (selectedProduct && standardPrice !== "") {
@@ -216,10 +220,15 @@ const dueDate = format(
   };
 
   const handleSubmit = async () => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+  
     if (!order || !order.customer_id || items.length === 0) {
       toast.error("Select a customer and at least one product.");
+      isSubmittingRef.current = false;
       return;
     }
+  
     setLoading(true);
   
     const amount = items.reduce((acc, item) => acc + item.quantity, 0);
@@ -283,6 +292,7 @@ const dueDate = format(
     }
   
     setLoading(false);
+    isSubmittingRef.current = false;
   };
 
   const customersFiltered = searchCustomer.trim()
@@ -307,6 +317,25 @@ const dueDate = format(
         document.removeEventListener("mousedown", handleClickOutside);
       };
     }, []);
+
+    useEffect(() => {
+      const fetchReservedStock = async () => {
+        if (!selectedProduct) return
+    
+        const reserved = await getReservedStock(selectedProduct.id)
+        const available = selectedProduct.stock - reserved
+    
+        // Você pode guardar isso num state ou mostrar direto
+        setReservedStock(reserved)
+    
+        // Se quiser, pode emitir alerta
+        if (quantity > available) {
+          toast.warning("Atenção: quantidade maior que o estoque disponível para a data.")
+        }
+      }
+    
+      fetchReservedStock()
+    }, [selectedProduct, quantity])
 
   return (
     <div className="w-full max-w-4xl mx-auto p-6 rounded-lg shadow-md">
@@ -614,6 +643,12 @@ const dueDate = format(
               {loading ? "Salvando..." : "Salvar"}
             </Button>
           </div>
+
+          {selectedProduct && (
+            <p className="text-sm text-muted-foreground">
+              Estoque atual: {selectedProduct.stock} — Reservado: {reservedStock}
+            </p>
+          )}
           </CardContent>
           </Card>
     </div>

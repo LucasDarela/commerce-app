@@ -16,7 +16,7 @@ type HeaderActionsProps<T> = {
 
 export function HeaderActions<T>({ table }: HeaderActionsProps<T>) {
   return (
-    <div className="w-full flex justify-between items-center px-4 lg:px-6 py-1">
+    <div className="w-full flex justify-between items-center px-4 lg:px-6 my-2">
       {/* Título à esquerda */}
       <h2 className="text-xl font-bold">Financeiro</h2>
 

@@ -208,6 +208,49 @@ function DraggableRow({ row }: { row: Row<Order> }) {
   );
 }
 
+async function updateStockBasedOnOrder(order: Order) {
+  const items = await parseProductsWithIds(order.products)
+  for (const item of items) {
+    await supabase.rpc("decrement_stock", {
+      product_id: item.id,
+      quantity: item.quantity
+    })
+  }
+}
+
+type ParsedProduct = {
+  name: string
+  quantity: number
+}
+
+async function parseProductsWithIds(products: string): Promise<{ id: number, quantity: number }[]> {
+  if (!products) return []
+
+  const parsed = products.split(",").map((entry) => {
+    const match = entry.trim().match(/^(.+?) \((\d+)x\)$/)
+    if (!match) return { name: entry.trim(), quantity: 1 }
+
+    const [, name, quantity] = match
+    return { name: name.trim(), quantity: Number(quantity) }
+  })
+
+  const names = parsed.map((p) => p.name)
+  const { data, error } = await supabase
+    .from("products")
+    .select("id, name")
+    .in("name", names)
+
+  if (error || !data) {
+    console.error("Erro ao buscar IDs dos produtos:", error)
+    return []
+  }
+
+  return parsed.map((p) => {
+    const match = data.find((d) => d.name === p.name)
+    return { id: match?.id ?? 0, quantity: p.quantity }
+  }).filter(p => p.id !== 0)
+}
+
 export function DataTable({
   data: initialData,
 }: {
@@ -406,7 +449,7 @@ export function DataTable({
         const cleaned = raw.replace(/\D/g, "")
         const message = "Olá, tudo bem? Sua entrega de chopp está a caminho."
         const encodedMessage = encodeURIComponent(message)
-        const link = `https://wa.me/55${cleaned}?text=${encodedMessage}`
+        const link = `https://wa.me/${cleaned}?text=${encodedMessage}`
     
         return (
           <TooltipProvider>
@@ -634,6 +677,14 @@ export function DataTable({
         setIsSavingOrder(false)
       })
   }
+
+  const futureReservations = React.useMemo(() => {
+    return orders.filter((order) => {
+      const orderDate = new Date(order.appointment_date)
+      const today = new Date()
+      return orderDate > today
+    })
+  }, [orders])
 
   return (
     <>
@@ -909,6 +960,11 @@ export function DataTable({
                     ...selectedCustomer,
                     delivery_status: nextStatus,
                   });
+                  // ✅ ADICIONE ESTA VERIFICAÇÃO AQUI:
+                  if (nextStatus === "Coletado") {
+                    await updateStockBasedOnOrder(selectedCustomer);
+                  }
+
                   toast.success(`Status atualizado para ${nextStatus}`);
                 } else {
                   toast.error("Erro ao atualizar status.");

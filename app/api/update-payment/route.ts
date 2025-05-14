@@ -1,4 +1,3 @@
-// app/api/update-payment/route.ts
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { createServerComponentClient } from "@supabase/auth-helpers-nextjs"
@@ -36,15 +35,18 @@ export async function POST(req: Request) {
       console.error("❌ Pedido não encontrado:", orderError)
       return NextResponse.json({ error: "Pedido não encontrado" }, { status: 404 })
     }
-    const safeOrder = order as { id: string; total: number; total_payed: number };
-    const oldPayed = Number(safeOrder.total_payed) || 0
-    const newTotalPayed = oldPayed + total_payed
-    const newStatus = newTotalPayed >= Number(safeOrder.total) ? "Pago" : "Pendente"
+    const safeOrder = order as { id: string; total: number; total_payed: number | null };
+
+    const oldPayed = Number(safeOrder.total_payed) || 0;
+    const rawNewPayed = oldPayed + total_payed;
+    const cappedPayed = Math.min(rawNewPayed, Number(safeOrder.total));
+    
+    const newStatus = cappedPayed >= Number(safeOrder.total) ? "Pago" : "Pendente";
 
     const { error: updateError } = await supabase
       .from("orders")
       .update({
-        total_payed: newTotalPayed.toString(), // garante compatibilidade com numeric
+        total_payed: cappedPayed.toString(), // garante compatibilidade com numeric
         payment_status: newStatus,
         ...(payment_method && { payment_method }),
       })
@@ -57,7 +59,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      total_payed: newTotalPayed,
+      total_payed,
       payment_status: newStatus,
     })
   } catch (err) {

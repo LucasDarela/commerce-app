@@ -13,18 +13,20 @@ import { DataTableConfig } from "./DataTableConfig"
 import { FinancialFilters as Filters } from "./Filters"
 import { HeaderActions } from "./HeaderActions"
 import { PaymentSheet } from "./PaymentSheet"
-import { mapToFinancialPaymentMethod } from "./utils"
+import { mapToFinancialPaymentMethod, groupByDueMonth } from "./utils"
 import { orderSchema, financialSchema } from "./schema"
 import { useReactTable, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, getSortedRowModel } from "@tanstack/react-table"
 import { financialColumns } from "./columns"
-import { TablePagination } from "@/components/ui/pagination"
 import { FinancialRecord as FinancialRecordType } from "@/components/types/financial"
 import { Order as OrderType } from "@/components/types/orders"
 import type { SortingState, ColumnFiltersState } from "@tanstack/react-table"
 import { isOrder } from "./utils"
 import { getInitialColumnVisibility, persistColumnVisibility } from "./table-config"
 import { FinancialPaymentModal } from "./PaymentModal"
-
+import { exportTableToCSV } from "@/lib/exportCsv" 
+import { Button } from "../ui/button"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "../ui/tabs"
+import { MonthlyFinancialTable } from "./MonthlyFinancialTable"
 
 export type Sale = z.infer<typeof orderSchema>
 export type Order = z.infer<typeof orderSchema>
@@ -44,7 +46,6 @@ export default function DataFinancialTable() {
   const [selectedFinancial, setSelectedFinancial] = useState<FinancialRecord | null>(null)
   const [isPaymentOpen, setIsPaymentOpen] = useState(false)
   const [isFinancialPaymentOpen, setIsFinancialPaymentOpen] = useState(false)
-  const [data, setData] = useState<CombinedRecord[]>([])
   const [columnVisibility, setColumnVisibility] = useState(getInitialColumnVisibility)
   const supabase = createClientComponentClient()
   const { accessToken } = useCompanyIntegration("mercado_pago")
@@ -53,20 +54,39 @@ export default function DataFinancialTable() {
   
   const router = useRouter()
 
-  const deleteOrderById = useCallback(async (id: string) => {
-    const confirmDelete = confirm("Tem certeza que deseja excluir esta nota?")
-    if (!confirmDelete) return
+  const deleteOrderById = useCallback(
+    async (id: string) => {
+      const confirmDelete = confirm("Tem certeza que deseja excluir esta nota?")
+      if (!confirmDelete) return
   
-    const { error } = await supabase.from("orders").delete().eq("id", id)
+      const record = [...orders, ...financialRecords].find((r) => r.id === id)
+      if (!record) {
+        toast.error("Registro não encontrado.")
+        return
+      }
   
-    if (error) {
-      toast.error("Erro ao deletar nota.")
-      return
-    }
+      const source = (record as CombinedRecord).source
+      const tableName = source === "financial" ? "financial_records" : "orders"
   
-    toast.success("Nota excluída com sucesso!")
-    setOrders((prev) => prev.filter((order) => order.id !== id))
-  }, [supabase])
+      const { error } = await supabase.from(tableName).delete().eq("id", id)
+  
+      if (error) {
+        console.error("❌ Erro ao deletar:", error)
+        toast.error("Erro ao deletar a nota.")
+        return
+      }
+  
+      toast.success("Nota excluída com sucesso!")
+  
+      // Atualiza o estado local
+      if (source === "financial") {
+        setFinancialRecords((prev) => prev.filter((r) => r.id !== id))
+      } else {
+        setOrders((prev) => prev.filter((r) => r.id !== id))
+      }
+    },
+    [supabase, orders, financialRecords]
+  )
   
   const columns = useMemo(() =>
     financialColumns({
@@ -142,15 +162,30 @@ export default function DataFinancialTable() {
       })),
     ]
   }, [orders, financialRecords])
+  
+  // ✅ Calcular agrupamento e ordenar os meses
+  const groupedByMonth = useMemo(() => groupByDueMonth(combinedData), [combinedData])
+  
+  const monthKeysSorted = useMemo(() => {
+    return Object.keys(groupedByMonth).sort((a, b) => {
+      const [aMonth, aYear] = a.split("/").map(Number)
+      const [bMonth, bYear] = b.split("/").map(Number)
+      return new Date(aYear, aMonth - 1).getTime() - new Date(bYear, bMonth - 1).getTime()
+    })
+  }, [groupedByMonth])
+  
+  // ✅ Inicializar diretamente com o último mês disponível
+  const [selectedMonth, setSelectedMonth] = useState("")
+
+  useEffect(() => {
+    if (!selectedMonth && monthKeysSorted.length > 0) {
+      setSelectedMonth(monthKeysSorted[monthKeysSorted.length - 1])
+    }
+  }, [monthKeysSorted, selectedMonth])
 
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
   const [rowSelection, setRowSelection] = React.useState({})
-  const [pagination, setPagination] = React.useState({
-    pageIndex: 0,
-    pageSize: 10,
-  })
-
 
 const table = useReactTable<CombinedRecord>({
   data: combinedData,
@@ -160,27 +195,36 @@ const table = useReactTable<CombinedRecord>({
     columnVisibility,
     rowSelection,
     columnFilters,
-    pagination,
   },
   onSortingChange: setSorting,
   onRowSelectionChange: setRowSelection,
   onColumnFiltersChange: setColumnFilters,
   onColumnVisibilityChange: setColumnVisibility,
-  onPaginationChange: setPagination,
   getCoreRowModel: getCoreRowModel(),
   getFilteredRowModel: getFilteredRowModel(),
   getPaginationRowModel: getPaginationRowModel(),
   getSortedRowModel: getSortedRowModel(),
 })
 
+const currentMonthRows = useMemo(() => {
+  return table.getFilteredRowModel().rows.filter((row) => {
+    const record = row.original
+    const dueDate = isOrder(record) ? record.due_date : record.due_date
+    if (!dueDate) return false
 
-const { totalReceber, totalPagar } = React.useMemo(() => {
+    const [year, month] = dueDate.split("-")
+    const formattedKey = `${month}/${year}`
+
+    return formattedKey === selectedMonth
+  })
+}, [selectedMonth, table.getFilteredRowModel().rows])
+
+const { totalReceber, totalPagar } = useMemo(() => {
   let totalReceber = 0
   let totalPagar = 0
 
-  for (const item of table.getFilteredRowModel().rows) {
+  for (const item of currentMonthRows) {
     const record = item.original
-
     const value = isOrder(record)
       ? Number(record.total ?? 0)
       : Number(record.amount ?? 0)
@@ -192,13 +236,12 @@ const { totalReceber, totalPagar } = React.useMemo(() => {
         totalReceber += value
       }
     } else {
-      // Se quiser considerar pedidos como saída
       totalReceber += value
     }
   }
 
   return { totalReceber, totalPagar }
-}, [table.getFilteredRowModel().rows])
+}, [currentMonthRows])
 
   return (
     <>
@@ -220,15 +263,37 @@ const { totalReceber, totalPagar } = React.useMemo(() => {
           <span className="text-green-600 font-semibold">R$ {totalReceber.toFixed(2).replace(".", ",")}</span>
         </div>
       </div>
-      <div className="overflow-hidden rounded-lg border mx-4">
-        <DataTableConfig<Order | FinancialRecord>
-          table={table}
-          data={table.getRowModel().rows.map(row => row.original)}
-          columns={columns}
-        />
-      </div>
+      <Tabs value={selectedMonth} onValueChange={setSelectedMonth} className="overflow-hidden rounded-lg mx-6">
+        <TabsList className="mb-4">
+          {Object.keys(groupedByMonth).map((monthKey) => (
+            <TabsTrigger key={monthKey} value={monthKey}>
+              {monthKey}
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
-      <TablePagination table={table} />
+        {Object.entries(groupedByMonth).map(([monthKey, records]) => (
+          <TabsContent key={monthKey} value={monthKey}>
+            <MonthlyFinancialTable
+              records={
+                monthKey === selectedMonth
+                  ? currentMonthRows.map((row) => row.original)
+                  : []
+              }
+              columns={columns}
+            />
+          </TabsContent>
+        ))}
+      </Tabs>
+
+      <div className="flex justify-end mr-4">
+        <Button
+          variant="outline"
+          onClick={() => exportTableToCSV(table, "financial_records.csv")}
+        >
+          Exportar CSV
+        </Button>
+      </div>
 
       {selectedOrder && isOrder(selectedOrder) && (
         <PaymentModal
@@ -275,7 +340,6 @@ const { totalReceber, totalPagar } = React.useMemo(() => {
             onSuccess={fetchAll}
           />
         )}
-
     </>
   )
 }

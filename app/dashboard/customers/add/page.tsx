@@ -88,9 +88,10 @@ export default function CreateClient() {
     });
   };
   const buscarEndereco = async () => {
-    if (!cliente.zip_code || cliente.zip_code.length !== 8) return;
+    const cep = cliente.zip_code.replace(/\D/g, "")
+    if (!cep || cep.length !== 8) return;
     try {
-      const { data } = await axios.get(`https://viacep.com.br/ws/${cliente.zip_code}/json/`);
+      const { data } = await axios.get(`https://viacep.com.br/ws/${cep}/json/`);
       if (data.erro) {
         toast.error("CEP inválido!");
       } else {
@@ -179,6 +180,8 @@ export default function CreateClient() {
       toast.error("Erro ao identificar a empresa do usuário!");
       return;
     }
+    const documentoLimpo = cliente.document.replace(/\D/g, "")
+    const telefoneLimpo = cliente.phone.replace(/\D/g, "")
     // 🔹 Verificar duplicidade correta (ajustado para usar company_id)
     const { data: clienteExistente, error: consultaError } = await supabase
       .from("customers")
@@ -200,8 +203,10 @@ export default function CreateClient() {
     const { error } = await supabase.from("customers").insert([
       {
         ...cliente,
+        document: documentoLimpo,
         price_table_id: selectedCatalog || null,
         company_id: companyId, 
+        phone: telefoneLimpo,
       },
     ]);
   
@@ -290,13 +295,17 @@ export default function CreateClient() {
   );
 }
 function formatarTelefone(valor: string) {
-  const telefone = valor.replace(/^\+?55/, "") // Remove +55 se existir
-                        .replace(/\D/g, "")    // Remove tudo que não é número
-                        .slice(0, 11)          // Limita a 11 dígitos
-  if (telefone.length === 11) {
-    return telefone.replace(/^(\d{2})(\d{5})(\d{4})$/, "($1) $2-$3") // (48) 99999-9999
-  } else if (telefone.length === 10) {
-    return telefone.replace(/^(\d{2})(\d{4})(\d{4})$/, "($1) $2-$3") // (48) 9999-9999
+  const numeros = valor.replace(/\D/g, "").slice(0, 13)
+
+  // Ex: +55 (48) 99999-9999
+  if (numeros.length >= 12) {
+    return numeros.replace(/^(\d{2})(\d{2})(\d{5})(\d{4})$/, "+$1 ($2) $3-$4")
   }
-  return telefone // Se ainda incompleto, apenas retorna os números
+
+  // Se ainda estiver incompleto, formatar parcialmente
+  if (numeros.length >= 11) {
+    return numeros.replace(/^(\d{2})(\d{2})(\d{4,5})(\d{0,4})$/, "+$1 ($2) $3-$4")
+  }
+
+  return "+" + numeros
 }
