@@ -28,6 +28,8 @@ import {
   IconCalendarSmile,
   IconBuildingBank,
   IconBarrel,
+  IconRefresh,
+  IconCirclePlusFilled,
 } from "@tabler/icons-react"
 
 import { NavDocuments } from "@/components/nav-documents"
@@ -46,8 +48,7 @@ import {
 import NavDocumentsSidebar from "./nav-documents-sidebar"
 
 const data = {
-
-  navMain: [
+  navMainTop: [
     {
       title: "Dashboard",
       url: "/dashboard",
@@ -78,10 +79,17 @@ const data = {
       url: "/dashboard/equipments",
       icon: IconBarrel,
     },
+  ],
+  navMainBottom: [
     {
       title: "Vendas",
       url: "/dashboard/orders",
       icon: IconShoppingCart,
+    },
+    {
+      title: "Comodatos",
+      url: "/dashboard/loan",
+      icon: IconRefresh,
     },
     {
       title: "Relatórios",
@@ -89,7 +97,6 @@ const data = {
       icon: IconChartBar,
     },
   ],
-
   navSecondary: [
     {
       title: "Configurações",
@@ -122,10 +129,26 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
-        <NavDocumentsSidebar />
-        <NavSecondary items={data.navSecondary} className="mt-auto" />
-      </SidebarContent>
+  <SidebarMenu className="mt-2 px-2">
+  <SidebarMenuItem className="flex items-center gap-2">
+          <Link className="w-full" href="/dashboard/orders">
+            <SidebarMenuButton
+              tooltip="Quick Action"
+              className="bg-primary -mb-2 text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground min-w-8 duration-200 ease-linear"
+            >
+              <IconCirclePlusFilled />
+              <span>Ação Rápida</span>
+            </SidebarMenuButton>
+            </Link>
+          </SidebarMenuItem>
+  </SidebarMenu>
+  <NavMain items={data.navMainTop} />
+  <div className="my-2 h-px bg-border shrink-0" />
+  <NavMain items={data.navMainBottom} />
+
+  <NavDocumentsSidebar />
+  <NavSecondary items={data.navSecondary} className="mt-auto" />
+</SidebarContent>
       <SidebarFooter>
       <NavUserWrapper />
       </SidebarFooter>

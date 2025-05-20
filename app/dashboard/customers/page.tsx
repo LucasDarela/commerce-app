@@ -276,7 +276,6 @@ export default function ListCustomers() {
                 selectedCliente.number
               ].filter(Boolean).join(", ")}</p>
               {selectedCliente.complement && <p><strong>Complemento:</strong> {selectedCliente.complement}</p>}
-              {selectedCliente.complement && <p><strong>Complemento:</strong> {selectedCliente.complement}</p>}
               <p><strong>Cidade:</strong> {selectedCliente.city}</p>
               <p><strong>Estado:</strong> {selectedCliente.state}</p>
               <p><strong>Email:</strong> {selectedCliente.email || ""}</p>
