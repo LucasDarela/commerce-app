@@ -122,6 +122,9 @@ import { useRouter } from "next/navigation";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { supabase } from "@/lib/supabase"
 import { PaymentModal } from "@/components/payment-modal"
+import { LoanEquipmentModal } from "@/components/equipment-loan/LoanEquipmentModal"
+import { fetchEquipmentsForOrderProducts } from "@/lib/fetch-equipments-for-products"
+import { ReturnEquipmentModal } from "@/components/equipment-loan/ReturnEquipmentModal"
 
 //New Schema
 export const schema = z.object({
@@ -156,6 +159,12 @@ type CustomColumnMeta = {
 type CustomColumnDef<T> = ColumnDef<T, unknown> & {
   meta?: CustomColumnMeta
 }
+
+type Item = {
+  loanId: string;
+  equipmentName: string;
+  quantity: number;
+};
 
 // Create a separate component for the drag handle
 function DragHandle({ id }: { id: string }) {
@@ -267,6 +276,14 @@ export function DataTable({
   const [dateInput, setDateInput] = useState("")
   const { accessToken, loading: loadingIntegration, error: integrationError } = useCompanyIntegration('mercado_pago')
   const router = useRouter();
+  const [isLoanModalOpen, setIsLoanModalOpen] = useState(false)
+  const [initialLoanCustomer, setInitialLoanCustomer] = useState<{ id: string; name: string } | undefined>()
+const [initialLoanItems, setInitialLoanItems] = useState<any[] | undefined>()
+
+const [isReturnModalOpen, setIsReturnModalOpen] = useState(false)
+const [returnModalCustomerId, setReturnModalCustomerId] = useState<string | null>(null)
+const [returnModalItems, setReturnModalItems] = useState<Item[]>([]) 
+
 
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
     if (typeof window !== "undefined") {
@@ -686,6 +703,52 @@ export function DataTable({
     })
   }, [orders])
 
+  async function handleDeliveryStatusUpdate() {
+    if (!selectedCustomer) return
+  
+    let nextStatus: "Coletar" | "Coletado" | null = null
+  
+    if (selectedCustomer.delivery_status === "Entregar") {
+      nextStatus = "Coletar"
+    } else if (selectedCustomer.delivery_status === "Coletar") {
+      nextStatus = "Coletado"
+    }
+  
+    if (nextStatus) {
+      const { error } = await supabase
+        .from("orders")
+        .update({ delivery_status: nextStatus })
+        .eq("id", selectedCustomer.id)
+  
+      if (!error) {
+        // Atualiza o painel lateral
+        setSelectedCustomer({
+          ...selectedCustomer,
+          delivery_status: nextStatus,
+        })
+  
+        // Atualiza a tabela sem recarregar tudo
+        setOrders(prev =>
+          prev.map(order =>
+            order.id === selectedCustomer.id
+              ? { ...order, delivery_status: nextStatus! }
+              : order
+          )
+        )
+  
+        // Atualiza estoque se necessário
+        if (nextStatus === "Coletado") {
+          await updateStockBasedOnOrder(selectedCustomer)
+        }
+  
+        toast.success(`Status atualizado para ${nextStatus}`)
+      } else {
+        toast.error("Erro ao atualizar status.")
+        console.error(error)
+      }
+    }
+  }
+
   return (
     <>
     
@@ -933,50 +996,124 @@ export function DataTable({
         <div><strong>Forma de Pagamento:</strong> {selectedCustomer.payment_method}</div>
         <div><strong>Delivery:</strong> {selectedCustomer.delivery_status}</div>
         <div><strong>Pagamento:</strong> {selectedCustomer.payment_status}</div>
-
-        <Button
+{/* 
+          <Button
             className="mt-6"
-            variant={selectedCustomer?.delivery_status === "Coletado" ? "secondary" : "default"}
-            disabled={selectedCustomer?.delivery_status === "Coletado"}
             onClick={async () => {
-              if (!selectedCustomer) return;
+              if (selectedCustomer?.delivery_status === "Entregar") {
+                // 1. Busca os equipamentos vinculados aos produtos
+                const equipmentItems = await fetchEquipmentsForOrderProducts(selectedCustomer.products)
 
-              let nextStatus: "Coletar" | "Coletado" | null = null;
+                // 2. Busca o cliente pela tabela de customers, com base no nome
+                const { data: matchingCustomer, error: customerError } = await supabase
+                  .from("customers")
+                  .select("id, name")
+                  .eq("name", selectedCustomer.customer)
+                  .maybeSingle()
 
-              if (selectedCustomer.delivery_status === "Entregar") {
-                nextStatus = "Coletar";
-              } else if (selectedCustomer.delivery_status === "Coletar") {
-                nextStatus = "Coletado";
-              }
-
-              if (nextStatus) {
-                const { error } = await supabase
-                  .from("orders")
-                  .update({ delivery_status: nextStatus })
-                  .eq("id", selectedCustomer.id);
-
-                if (!error) {
-                  setSelectedCustomer({
-                    ...selectedCustomer,
-                    delivery_status: nextStatus,
-                  });
-                  // ✅ ADICIONE ESTA VERIFICAÇÃO AQUI:
-                  if (nextStatus === "Coletado") {
-                    await updateStockBasedOnOrder(selectedCustomer);
-                  }
-
-                  toast.success(`Status atualizado para ${nextStatus}`);
-                } else {
-                  toast.error("Erro ao atualizar status.");
-                  console.error(error);
+                if (!matchingCustomer || customerError) {
+                  toast.error("Cliente não encontrado na tabela de clientes.")
+                  return
                 }
+
+                // 3. Seta os dados no modal
+                setInitialLoanCustomer({
+                  id: matchingCustomer.id,
+                  name: matchingCustomer.name
+                })
+
+                setInitialLoanItems(equipmentItems)
+                setIsLoanModalOpen(true)
+              } else {
+                handleDeliveryStatusUpdate()
               }
             }}
           >
             {selectedCustomer?.delivery_status === "Entregar" && "Marcar como Entregue"}
             {selectedCustomer?.delivery_status === "Coletar" && "Marcar como Coletado"}
             {selectedCustomer?.delivery_status === "Coletado" && "Chopp já Coletado ✅"}
-          </Button>
+            {!selectedCustomer?.delivery_status && "Atualizar Status"}
+          </Button> */}
+
+        <Button
+            className={`mt-6 ${
+              selectedCustomer?.delivery_status === "Coletado"
+                ? "bg-muted text-muted-foreground cursor-not-allowed opacity-60"
+                : ""
+            }`}
+          disabled={selectedCustomer?.delivery_status === "Coletado"}
+          onClick={async () => {
+            if (!selectedCustomer) return;
+
+            if (selectedCustomer.delivery_status === "Entregar") {
+              const equipmentItems = await fetchEquipmentsForOrderProducts(selectedCustomer.products)
+
+              const { data: matchingCustomer, error: customerError } = await supabase
+                .from("customers")
+                .select("id, name")
+                .eq("name", selectedCustomer.customer)
+                .maybeSingle()
+
+              if (!matchingCustomer || customerError) {
+                toast.error("Cliente não encontrado na tabela de clientes.")
+                return
+              }
+
+              setInitialLoanCustomer({ id: matchingCustomer.id, name: matchingCustomer.name })
+              setInitialLoanItems(equipmentItems)
+              setIsLoanModalOpen(true)
+            }
+
+            else if (selectedCustomer.delivery_status === "Coletar") {
+              const { data: matchingCustomer, error: customerError } = await supabase
+                .from("customers")
+                .select("id, name")
+                .eq("name", selectedCustomer.customer)
+                .maybeSingle()
+            
+              if (!matchingCustomer || customerError) {
+                toast.error("Cliente não encontrado na tabela de clientes.")
+                return
+              }
+            
+              const { data: loans, error } = await supabase
+                .from("equipment_loans")
+                .select("id, quantity, equipment:equipments(name)")
+                .eq("customer_id", matchingCustomer.id) 
+                .eq("status", "active")
+            
+              if (error || !loans) {
+                toast.error("Erro ao buscar itens para retorno")
+                return
+              }
+            
+              const formatted = loans.map((loan) => ({
+                loanId: loan.id,
+                equipmentName: loan.equipment?.[0]?.name || "Equipamento",
+                quantity: loan.quantity,
+              }))
+            
+              if (formatted.length === 0) {
+                toast.warning("Nenhum item de empréstimo encontrado para retornar.")
+                return
+              }
+            
+              setReturnModalItems(formatted)
+              setReturnModalCustomerId(matchingCustomer.id)
+              setIsReturnModalOpen(true)
+            }
+
+            else {
+              handleDeliveryStatusUpdate()
+            }
+          }}
+        >
+          {selectedCustomer?.delivery_status === "Entregar" && "Marcar como Entregue"}
+          {selectedCustomer?.delivery_status === "Coletar" && "Coletar Itens"}
+          {selectedCustomer?.delivery_status === "Coletado" && "Chopp já Coletado ✅"}
+          {!selectedCustomer?.delivery_status && "Atualizar Status"}
+        </Button>
+
       </div>
     )}
   </SheetContent>
@@ -1073,6 +1210,31 @@ export function DataTable({
     onSuccess={() => {
       refreshOrders()
       setIsPaymentOpen(false)
+    }}
+  />
+)}
+<LoanEquipmentModal
+  open={isLoanModalOpen}
+  onOpenChange={setIsLoanModalOpen}
+  onLoanSaved={() => {
+    setIsLoanModalOpen(false)
+    handleDeliveryStatusUpdate()
+    refreshOrders()
+  }}
+  initialCustomer={initialLoanCustomer}
+  initialItems={initialLoanItems}
+/>
+
+{isReturnModalOpen && returnModalItems.length > 0 && (
+  <ReturnEquipmentModal
+    open={isReturnModalOpen}
+    onOpenChange={setIsReturnModalOpen}
+    customerId={returnModalCustomerId}
+    items={returnModalItems}
+    onReturnSuccess={() => {
+      setIsReturnModalOpen(false)
+      handleDeliveryStatusUpdate()
+      refreshOrders()
     }}
   />
 )}

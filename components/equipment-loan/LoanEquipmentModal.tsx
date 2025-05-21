@@ -16,15 +16,20 @@ import { Select, SelectTrigger, SelectValue, SelectItem, SelectContent } from "@
 
 
 
-export function LoanEquipmentModal({ 
-  open, 
-  onOpenChange, 
-  onLoanSaved 
+
+export function LoanEquipmentModal({
+  open,
+  onOpenChange,
+  onLoanSaved,
+  initialCustomer,
+  initialItems,
 }: {
-   open: boolean; 
-   onOpenChange: (value: boolean) => void 
-   onLoanSaved: () => void
-  }) {
+  open: boolean
+  onOpenChange: (value: boolean) => void
+  onLoanSaved: () => void
+  initialCustomer?: { id: string; name: string }
+  initialItems?: { equipment_id: string; name: string; quantity: number }[]
+}) {
 
   const { companyId } = useAuthenticatedCompany()
   const [equipmentList, setEquipmentList] = useState<any[]>([])
@@ -145,7 +150,19 @@ export function LoanEquipmentModal({
   : []
 
   useEffect(() => {
-    if (!open) {
+    if (open) {
+
+      if (initialCustomer) {
+        setSelectedCustomer(initialCustomer)
+        setSearchCustomer(initialCustomer.name)
+      }
+  
+      if (initialItems) {
+        setLoanItems(initialItems)
+      }
+  
+    } else {
+
       setSelectedCustomer(null)
       setSearchCustomer("")
       setLoanItems([])
@@ -153,7 +170,50 @@ export function LoanEquipmentModal({
       setSearchEquipment("")
       setNoteNumber(Date.now().toString().slice(-6)) 
     }
-  }, [open])
+  }, [open, initialCustomer, initialItems])
+
+  // async function fetchEquipmentsForOrderProducts(productsText: string) {
+  //   const parsed = productsText.split(",").map(entry => {
+  //     const match = entry.trim().match(/^(.+?) \((\d+)x\)$/)
+  //     if (!match) return null
+  //     const [, name, quantity] = match
+  //     return { name: name.trim(), quantity: Number(quantity) }
+  //   }).filter(Boolean)
+  
+  //   const productNames = parsed.map(p => p!.name)
+  
+  //   const { data: productsData, error } = await supabase
+  //     .from("products")
+  //     .select("id, name")
+  //     .in("name", productNames)
+  
+  //   if (error) {
+  //     console.error("Erro ao buscar produtos:", error)
+  //     return []
+  //   }
+  
+  //   const equipments: any[] = []
+  
+  //   for (const parsedProduct of parsed) {
+  //     const product = productsData.find(p => p.name === parsedProduct!.name)
+  //     if (!product) continue
+  
+  //     const { data: linkedEquipments } = await supabase
+  //       .from("product_loans")
+  //       .select("equipment_id, quantity, equipment:equipment_id(name)")
+  //       .eq("product_id", product.id)
+  
+  //     linkedEquipments?.forEach(item => {
+  //       equipments.push({
+  //         equipment_id: item.equipment_id,
+  //         name: item.equipment?.name,
+  //         quantity: item.quantity * parsedProduct!.quantity
+  //       })
+  //     })
+  //   }
+  
+  //   return equipments
+  // }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

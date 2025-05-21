@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -22,6 +22,7 @@ export default function AddProduct() {
   const router = useRouter();
 
   const { companyId, loading } = useAuthenticatedCompany();
+  const [equipments, setEquipments] = useState<{ id: string; name: string }[]>([])
   const [product, setProduct] = useState({
     code: "",
     name: "",
@@ -39,6 +40,24 @@ export default function AddProduct() {
   const [image, setImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    const fetchEquipments = async () => {
+      const { data, error } = await supabase
+        .from("equipments")
+        .select("id, name")
+        .eq("company_id", companyId)
+  
+      if (error) {
+        console.error("Erro ao buscar equipamentos:", error)
+        return
+      }
+  
+      setEquipments(data || [])
+    }
+  
+    if (companyId) fetchEquipments()
+  }, [companyId])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setProduct({ ...product, [e.target.name]: e.target.value });
@@ -88,31 +107,33 @@ export default function AddProduct() {
       toast.error("Fill in all required fields!");
       return;
     }
-
-    setSubmitting(true);
-
+  
+    setSubmitting(true)
+  
     const { data: existingProduct, error: checkError } = await supabase
       .from("products")
       .select("code")
       .eq("code", product.code)
       .eq("company_id", companyId)
-      .maybeSingle();
-
+      .maybeSingle()
+  
     if (checkError && checkError.code !== "PGRST116") {
-      toast.error("Error checking product code!");
-      setSubmitting(false);
-      return;
+      toast.error("Error checking product code!")
+      setSubmitting(false)
+      return
     }
-
+  
     if (existingProduct) {
-      toast.error("Product code already exists!");
-      setSubmitting(false);
-      return;
+      toast.error("Product code already exists!")
+      setSubmitting(false)
+      return
     }
-
-    const imageUrl = await uploadImage();
-
-    const { error } = await supabase.from("products").insert([
+  
+    const imageUrl = await uploadImage()
+  
+    const { data: createdProduct, error: insertError } = await supabase
+    .from("products")
+    .insert([
       {
         ...product,
         standard_price: parseFloat(product.standard_price),
@@ -120,21 +141,36 @@ export default function AddProduct() {
         image_url: imageUrl || null,
         company_id: companyId,
       },
-    ]);
-
-    if (error) {
-      toast.error("Failed to create product!");
-    } else {
-      toast.success("Product successfully added!");
-      router.push("/dashboard/products");
-    }
-
+    ])
+    .select("id")
+    .single();
+  
+  if (insertError || !createdProduct) {
+    toast.error("Failed to create product!");
     setSubmitting(false);
-  };
+    return;
+  }
+  
+  // ✅ Se loan_product_code estiver preenchido, insere na product_loans
+  if (product.loan_product_code) {
+    await supabase.from("product_loans").insert([
+      {
+        product_id: createdProduct.id,
+        equipment_id: product.loan_product_code,
+        company_id: companyId,
+      },
+    ]);
+  }
+  
+    toast.success("Product successfully added!")
+    router.push("/dashboard/products")
+    setSubmitting(false)
+  }
 
   if (loading) {
     return <div className="p-6 text-center text-muted-foreground">Loading company data...</div>;
   }
+
 
   return (
     <div className="max-w-3xl mx-auto p-6 rounded-lg shadow-md">
@@ -197,7 +233,21 @@ export default function AddProduct() {
 
           <Textarea name="aplication" value={product.aplication} onChange={handleChange} placeholder="Aplicação do Produto" />
 
-          <Input type="text" name="loan_product_code" value={product.loan_product_code} onChange={handleChange} placeholder="Produto Vinculado (Opcional)" />
+          <Select
+            value={product.loan_product_code}
+            onValueChange={(value) => handleSelectChange("loan_product_code", value)}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Produto Vinculado (Opcional)" />
+            </SelectTrigger>
+            <SelectContent>
+              {equipments.map((eq) => (
+                <SelectItem key={eq.id} value={eq.id}>
+                  {eq.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
           <Button className="w-full" onClick={handleSubmit} disabled={loading || submitting}>
             {submitting ? "Savando..." : "Salvar Produto"}

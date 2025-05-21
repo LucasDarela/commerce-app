@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { useRouter, useParams } from "next/navigation";
+import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 
 // 🔹 Product Type
 type Product = {
@@ -28,9 +29,16 @@ type Product = {
   image_url?: string;
 };
 
+type Equipment = {
+  id: string;
+  name: string;
+};
+
 export default function EditProduct() {
   const router = useRouter();
+  const { companyId, loading: loadingCompany } = useAuthenticatedCompany();
   const { id } = useParams();
+  const productId = Array.isArray(id) ? id[0] : id;
   const [loading, setLoading] = useState(false);
   const [product, setProduct] = useState<Product>({
     id: 0,
@@ -49,12 +57,13 @@ export default function EditProduct() {
     image_url: "",
   });
 
+  const [equipments, setEquipments] = useState<Equipment[]>([]);
   const [image, setImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchProduct = async () => {
-      const { data, error } = await supabase.from("products").select("*").eq("id", id).single();
+      const { data, error } = await supabase.from("products").select("*").eq("id", productId).single();
       if (error) {
         toast.error("Erro ao carregar produto!");
       } else {
@@ -64,6 +73,14 @@ export default function EditProduct() {
     };
     if (id) fetchProduct();
   }, [id]);
+
+  useEffect(() => {
+    const fetchEquipments = async () => {
+      const { data, error } = await supabase.from("equipments").select("id, name");
+      if (!error && data) setEquipments(data);
+    };
+    fetchEquipments();
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setProduct({ ...product, [e.target.name]: e.target.value });
@@ -88,12 +105,17 @@ export default function EditProduct() {
 
   const handleSubmit = async () => {
     setLoading(true);
+    if (loadingCompany) {
+      toast.warning("Carregando dados da empresa...");
+      setLoading(false);
+      return;
+    }
     if (!product.name || !product.standard_price || !product.material_class) {
       toast.error("Preencha os campos obrigatórios!");
       setLoading(false);
       return;
     }
-
+  
     let imageUrl = product.image_url ?? "";
     if (image) {
       const fileExt = image.name.split(".").pop();
@@ -106,30 +128,75 @@ export default function EditProduct() {
         imageUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/products/${filePath}`;
       }
     }
+  
+    const { error } = await supabase
+      .from("products")
+      .update({
+        code: product.code,
+        name: product.name,
+        manufacturer: product.manufacturer,
+        standard_price: parseFloat(product.standard_price),
+        percentage_taxes: product.percentage_taxes ? parseFloat(product.percentage_taxes) : null,
+        material_class: product.material_class,
+        submaterial_class: product.submaterial_class || null,
+        tax_classification: product.tax_classification || null,
+        material_origin: product.material_origin,
+        aplication: product.aplication || null,
+        loan_product_code: product.loan_product_code || null,
+        image_url: imageUrl,
+      })
+      .eq("id", productId);
 
-    const { error } = await supabase.from("products").update({
-      code: product.code,
-      name: product.name,
-      manufacturer: product.manufacturer,
-      standard_price: parseFloat(product.standard_price),
-      percentage_taxes: product.percentage_taxes ? parseFloat(product.percentage_taxes) : null,
-      material_class: product.material_class,
-      submaterial_class: product.submaterial_class || null,
-      tax_classification: product.tax_classification || null,
-      material_origin: product.material_origin,
-      aplication: product.aplication || null,
-      loan_product_code: product.loan_product_code || null,
-      image_url: imageUrl,
-    }).eq("id", id);
+  
+      if (!companyId || !product.loan_product_code) {
+        console.error("❌ Dados faltando:", { companyId, loan_product_code: product.loan_product_code });
+        toast.error("Erro: empresa ou equipamento não encontrado.");
+        setLoading(false);
+        return;
+      }
+      
+      if (product.loan_product_code) {
+        const { data: existingLoan, error: loanError } = await supabase
+        .from("product_loans")
+        .select("*")
+        .eq("product_id", String(productId))
+        .maybeSingle(); // evita erro 406
+      
+      if (loanError) {
+        console.error("❌ Erro ao buscar product_loans:", loanError.message);
+      }
 
+      
+        if (existingLoan) {
+          await supabase
+            .from("product_loans")
+            .update({ equipment_id: product.loan_product_code })
+            .eq("id", existingLoan.id);
+        } else {
+      
+          await supabase
+          .from("product_loans")
+          .insert([
+            {
+              product_id: String(productId),
+              equipment_id: String(product.loan_product_code),
+              company_id: String(companyId),
+              quantity: 1,
+            },
+          ]);
+        }
+      }
+  
     if (error) {
       toast.error("Erro ao atualizar produto!");
     } else {
       toast.success("Produto atualizado com sucesso!");
       router.push("/dashboard/products");
     }
+  
     setLoading(false);
   };
+
 
   return (
     <div className="max-w-3xl mx-auto p-6 rounded-lg shadow-md">
@@ -153,20 +220,23 @@ export default function EditProduct() {
       <Card>
         <CardContent className="p-6 space-y-4">
           <div className="grid grid-cols-3 gap-4">
-            <Input type="text" name="code" value={product.code} onChange={handleChange} placeholder="Product Code" required />
-            <Input type="text" name="name" value={product.name} onChange={handleChange} placeholder="Product Name" className="col-span-2" required />
+            <Input type="text" name="code" value={product.code ?? ""} onChange={handleChange} placeholder="Product Code" required />
+            <Input type="text" name="name" value={product.name ?? ""} onChange={handleChange} placeholder="Product Name" className="col-span-2" required />
           </div>
 
           <div className="grid grid-cols-3 gap-4">
-            <Input type="text" name="standard_price" value={product.standard_price} onChange={handleChange} placeholder="Standard Price (R$)" required />
-            <Input type="text" name="manufacturer" value={product.manufacturer} onChange={handleChange} placeholder="Manufacturer" />
-            <Input type="text" name="percentage_taxes" value={product.percentage_taxes} onChange={handleChange} placeholder="Taxes (%)" />
+            <Input type="text" name="standard_price" value={product.standard_price ?? ""} onChange={handleChange} placeholder="Standard Price (R$)" required />
+            <Input type="text" name="manufacturer" value={product.manufacturer ?? ""} onChange={handleChange} placeholder="Manufacturer" />
+            <Input type="text" name="percentage_taxes" value={product.percentage_taxes ?? ""} onChange={handleChange} placeholder="Taxes (%)" />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <Select onValueChange={(value) => handleSelectChange("material_class", value)}>
+          <Select
+              value={product.material_class}
+              onValueChange={(value) => handleSelectChange("material_class", value)}
+            >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Material Class" />
+                <SelectValue placeholder="Classe do Material" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="Chopp">Chopp</SelectItem>
@@ -174,12 +244,12 @@ export default function EditProduct() {
                 <SelectItem value="Acessório">Acessório</SelectItem>
               </SelectContent>
             </Select>
-            <Input type="text" name="submaterial_class" value={product.submaterial_class} onChange={handleChange} placeholder="Submaterial Class" />
+            <Input type="text" name="submaterial_class" value={product.submaterial_class ?? ""} onChange={handleChange} placeholder="Submaterial Class" />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <Input type="text" name="tax_classification" value={product.tax_classification} onChange={handleChange} placeholder="Tax Classification" />
-            <Select onValueChange={(value) => handleSelectChange("material_origin", value)}>
+            <Input type="text" name="tax_classification" value={product.tax_classification ?? ""} onChange={handleChange} placeholder="Tax Classification" />
+            <Select value={product.material_origin} onValueChange={(value) => handleSelectChange("material_origin", value)}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Material Origin" />
               </SelectTrigger>
@@ -190,11 +260,23 @@ export default function EditProduct() {
             </Select>
           </div>
 
-          <Textarea name="aplication" value={product.aplication} onChange={handleChange} placeholder="Product Application" />
-          <Input type="text" name="loan_product_code" value={product.loan_product_code ?? ""} onChange={handleChange} placeholder="Loan Product Code" />
+          <Textarea name="aplication" value={product.aplication ?? ""} onChange={handleChange} placeholder="Product Application" />
 
-          <Button onClick={handleSubmit} disabled={loading}>
-            {loading ? "Salvando..." : "Salvar Produto"}
+          <Select value={product.loan_product_code ?? ""} onValueChange={(value) => handleSelectChange("loan_product_code", value)}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Produto Vinculado (Comodato)" />
+            </SelectTrigger>
+            <SelectContent>
+              {equipments.map((eq) => (
+                <SelectItem key={eq.id} value={eq.id}>
+                  {eq.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Button onClick={handleSubmit} disabled={loading || loadingCompany} className="w-full">
+            {loading || loadingCompany ? "Salvando..." : "Salvar Produto"}
           </Button>
         </CardContent>
       </Card>

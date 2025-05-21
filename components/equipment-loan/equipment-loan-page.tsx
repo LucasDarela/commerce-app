@@ -16,6 +16,7 @@ import {
     IconPlus,
   } from "@tabler/icons-react"
 import { LoanEquipmentModal } from "@/components/equipment-loan/LoanEquipmentModal"
+import { ReturnEquipmentModal } from "./ReturnEquipmentModal"
 
 type LoanWithDetails = {
   id: string
@@ -24,7 +25,7 @@ type LoanWithDetails = {
   note_date: string
   customer_id: string
   customer: { name: string }
-  equipment: { name: string }[] 
+  equipment: { name: string }
 }
 
 type GroupedByCustomer = {
@@ -48,7 +49,7 @@ export default function LoanByCustomerPage() {
   const fetchData = async () => {
     const { data, error } = await supabase
       .from("equipment_loans")
-      .select("id, quantity, note_number, customer_id, customer_name, equipment:equipments(name)")
+      .select("id, quantity, note_number, customer_id, customer_name, equipments(name)")
       .neq("status", "returned")
   
     if (!error && data) {
@@ -56,7 +57,7 @@ export default function LoanByCustomerPage() {
       for (const loan of data) {
         const customerId = loan.customer_id
         const customerName = loan.customer_name ?? "Desconhecido"
-        const equipmentName = loan.equipment?.[0]?.name ?? "Equipamento"
+        const equipmentName = loan.equipments?.[0]?.name ?? "Equipamento"
   
         if (!grouped[customerId]) {
           grouped[customerId] = {
@@ -129,7 +130,23 @@ export default function LoanByCustomerPage() {
     </div>
   )}
 
-<Dialog open={openModal} onOpenChange={setOpenModal}>
+{openModal && selectedCustomerId && (
+  <ReturnEquipmentModal
+    open={openModal}
+    onOpenChange={setOpenModal}
+    customerId={selectedCustomerId}
+    items={
+      groupedData.find((g) => g.customerId === selectedCustomerId)?.items ?? []
+    }
+    onReturnSuccess={() => {
+      setOpenModal(false)
+      setSelectedItems([])
+      fetchData()
+    }}
+  />
+)}
+
+{/* <Dialog open={openModal} onOpenChange={setOpenModal}>
   <DialogContent>
     <DialogHeader>
       <DialogTitle>Selecionar Itens para Retorno</DialogTitle>
@@ -181,7 +198,7 @@ export default function LoanByCustomerPage() {
       </Button>
     </DialogFooter>
   </DialogContent>
-</Dialog>
+</Dialog> */}
 
 </div>
 

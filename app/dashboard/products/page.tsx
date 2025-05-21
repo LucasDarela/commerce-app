@@ -28,6 +28,11 @@ import { PriceTableManager } from "@/components/price-table-manager";
 import Link from "next/link";
 import { IconPlus } from "@tabler/icons-react";
 
+type Equipment = {
+  id: string;
+  name: string;
+};
+
 // 🔹 Product Type
 type Product = {
   id: number;
@@ -54,6 +59,7 @@ export default function ListProduct() {
   const [search, setSearch] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [equipments, setEquipments] = useState<Equipment[]>([]);
 
   useEffect(() => {
     if (!companyId || loading) return;
@@ -81,6 +87,25 @@ export default function ListProduct() {
     fetchProducts();
   }, [companyId, loading]);
 
+  useEffect(() => {
+    if (!companyId || loading) return;
+  
+    const fetchEquipments = async () => {
+      const { data, error } = await supabase
+        .from("equipments")
+        .select("id, name")
+        .eq("company_id", companyId);
+  
+      if (error) {
+        toast.error("Erro ao buscar equipamentos");
+      } else {
+        setEquipments(data ?? []);
+      }
+    };
+  
+    fetchEquipments();
+  }, [companyId, loading]);
+
   const filteredProducts = products.filter((product) => {
     const searchTerm = search.toLowerCase().trim();
     return (
@@ -88,6 +113,11 @@ export default function ListProduct() {
       product.code.toLowerCase().includes(searchTerm)
     );
   });
+
+  const equipmentMap = equipments.reduce((map, eq) => {
+    map[eq.id] = eq.name;
+    return map;
+  }, {} as Record<string, string>);
 
   const openModal = (product: Product) => {
     setSelectedProduct(product);
@@ -160,7 +190,7 @@ export default function ListProduct() {
               <TableHead>Categoria</TableHead>
               <TableHead>Preço Compra</TableHead>
               <TableHead>Estoque</TableHead>
-              <TableHead>Comodato</TableHead>
+              <TableHead>Equipamento Vinculado</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -176,7 +206,7 @@ export default function ListProduct() {
                   <TableCell>{product.material_class || "N/A"}</TableCell>
                   <TableCell>{product.standard_price}</TableCell>
                   <TableCell>{product.stock}</TableCell>
-                  <TableCell>{product.loan_product_code || ""}</TableCell>
+                  <TableCell>{equipmentMap[product.loan_product_code ?? ""] ?? ""}</TableCell>
                 </TableRow>
               ))
             ) : (
@@ -217,7 +247,7 @@ export default function ListProduct() {
               <p><strong>Origem:</strong> {selectedProduct.material_origin}</p>
               <p><strong>Aplicação:</strong> {selectedProduct.aplication}</p>
               <p><strong>Estoque:</strong> {selectedProduct.stock}</p>
-              <p><strong>Comodato:</strong> {selectedProduct.loan_product_code}</p>
+              <p><strong>Comodato:</strong> {equipmentMap[selectedProduct.loan_product_code ?? ""] ?? ""}</p>
             </div>
             <DialogFooter className="flex justify-between">
             <Button onClick={handleEdit}>

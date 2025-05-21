@@ -65,11 +65,6 @@ const data = {
       icon: IconUserCog,
     },
     {
-      title: "Financeiro",
-      url: "/dashboard/financial",
-      icon: IconBuildingBank,
-    },
-    {
       title: "Produtos",
       url: "/dashboard/products",
       icon: IconPackage,
@@ -78,6 +73,16 @@ const data = {
       title: "Equipamentos",
       url: "/dashboard/equipments",
       icon: IconBarrel,
+    },
+    {
+      title: "Financeiro",
+      url: "/dashboard/financial",
+      icon: IconBuildingBank,
+    },
+    {
+      title: "Relatórios",
+      url: "/dashboard/analytics",
+      icon: IconChartBar,
     },
   ],
   navMainBottom: [
@@ -90,11 +95,6 @@ const data = {
       title: "Comodatos",
       url: "/dashboard/loan",
       icon: IconRefresh,
-    },
-    {
-      title: "Relatórios",
-      url: "/dashboard/analytics",
-      icon: IconChartBar,
     },
   ],
   navSecondary: [
