@@ -37,6 +37,7 @@ import {
   IconPlus,
   IconTrendingUp,
 } from "@tabler/icons-react"
+import clsx from "clsx"
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -147,6 +148,7 @@ export const schema = z.object({
   order_index: z.number().nullable().optional(),
   issue_date: z.string().optional().nullable(),
   due_date: z.string().optional().nullable(),
+  customer_signature: z.string().nullable().optional(),
 })
 
 type Sale = z.infer<typeof schema>
@@ -336,7 +338,8 @@ const [returnModalItems, setReturnModalItems] = useState<Item[]>([])
         payment_method,
         order_index,
         issue_date,
-        due_date
+        due_date,
+        customer_signature
       `)
       .order("order_index", { ascending: true })
   
@@ -749,6 +752,8 @@ const [returnModalItems, setReturnModalItems] = useState<Item[]>([])
     }
   }
 
+  const isDisabled = !selectedCustomer?.customer_signature || selectedCustomer?.delivery_status === "Coletado"
+
   return (
     <>
     
@@ -996,58 +1001,35 @@ const [returnModalItems, setReturnModalItems] = useState<Item[]>([])
         <div><strong>Forma de Pagamento:</strong> {selectedCustomer.payment_method}</div>
         <div><strong>Delivery:</strong> {selectedCustomer.delivery_status}</div>
         <div><strong>Pagamento:</strong> {selectedCustomer.payment_status}</div>
-{/* 
-          <Button
-            className="mt-6"
-            onClick={async () => {
-              if (selectedCustomer?.delivery_status === "Entregar") {
-                // 1. Busca os equipamentos vinculados aos produtos
-                const equipmentItems = await fetchEquipmentsForOrderProducts(selectedCustomer.products)
-
-                // 2. Busca o cliente pela tabela de customers, com base no nome
-                const { data: matchingCustomer, error: customerError } = await supabase
-                  .from("customers")
-                  .select("id, name")
-                  .eq("name", selectedCustomer.customer)
-                  .maybeSingle()
-
-                if (!matchingCustomer || customerError) {
-                  toast.error("Cliente não encontrado na tabela de clientes.")
-                  return
-                }
-
-                // 3. Seta os dados no modal
-                setInitialLoanCustomer({
-                  id: matchingCustomer.id,
-                  name: matchingCustomer.name
-                })
-
-                setInitialLoanItems(equipmentItems)
-                setIsLoanModalOpen(true)
-              } else {
-                handleDeliveryStatusUpdate()
-              }
-            }}
-          >
-            {selectedCustomer?.delivery_status === "Entregar" && "Marcar como Entregue"}
-            {selectedCustomer?.delivery_status === "Coletar" && "Marcar como Coletado"}
-            {selectedCustomer?.delivery_status === "Coletado" && "Chopp já Coletado ✅"}
-            {!selectedCustomer?.delivery_status && "Atualizar Status"}
-          </Button> */}
 
         <Button
-            className={`mt-6 ${
-              selectedCustomer?.delivery_status === "Coletado"
-                ? "bg-muted text-muted-foreground cursor-not-allowed opacity-60"
-                : ""
-            }`}
-          disabled={selectedCustomer?.delivery_status === "Coletado"}
+          className="mt-6"
+          onClick={() => {
+            if (selectedCustomer?.id) {
+              router.push(`/dashboard/orders/${selectedCustomer.id}/view`);
+            }
+          }}
+        >
+          Ver Espelho
+        </Button>
+
+        <Button
+          className={clsx({
+            "bg-muted text-muted-foreground cursor-not-allowed opacity-60": isDisabled,
+          })}
+          disabled={isDisabled}
           onClick={async () => {
-            if (!selectedCustomer) return;
+            if (!selectedCustomer?.customer_signature) {
+              toast.warning("⚠️ O cliente precisa assinar antes de marcar como entregue."); 
+              return;
+            }
+
+            if (selectedCustomer?.delivery_status === "Coletado") {
+              return;
+            }
 
             if (selectedCustomer.delivery_status === "Entregar") {
               const equipmentItems = await fetchEquipmentsForOrderProducts(selectedCustomer.products)
-
               const { data: matchingCustomer, error: customerError } = await supabase
                 .from("customers")
                 .select("id, name")

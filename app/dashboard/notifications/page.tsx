@@ -1,14 +1,16 @@
 // app/dashboard/notifications/page.tsx
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Bell, Trash2, Check } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { Database } from "@/components/types/supabase"
 
 interface Notification {
-  id: number
+  id: string
   title: string
   description: string
   date: string
@@ -16,37 +18,31 @@ interface Notification {
 }
 
 export default function NotificationsPage() {
-  const [notifications, setNotifications] = useState<Notification[]>([
-    {
-      id: 1,
-      title: "New Sale Registered",
-      description: "A new sale has been recorded for your company.",
-      date: "2025-03-31 10:00 AM",
-      read: false,
-    },
-    {
-      id: 2,
-      title: "Subscription Renewed",
-      description: "Your monthly subscription was successfully renewed.",
-      date: "2025-03-30 2:22 PM",
-      read: true,
-    },
-    {
-      id: 3,
-      title: "New Team Member",
-      description: "A new team member has been added to your account.",
-      date: "2025-03-28 9:45 AM",
-      read: false,
-    },
-  ])
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const supabase = createClientComponentClient<Database>()
 
-  const markAsRead = (id: number) => {
+  useEffect(() => {
+    async function fetchNotifications() {
+      const { data, error } = await supabase
+        .from("notifications")
+        .select("id, title, description, date, read")
+        .order("date", { ascending: false })
+
+      if (!error && data) setNotifications(data as Notification[])
+    }
+
+    fetchNotifications()
+  }, [])
+
+  const markAsRead = async (id: string) => {
+    await supabase.from("notifications").update({ read: true }).eq("id", id)
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, read: true } : n))
     )
   }
 
-  const deleteNotification = (id: number) => {
+  const deleteNotification = async (id: string) => {
+    await supabase.from("notifications").delete().eq("id", id)
     setNotifications((prev) => prev.filter((n) => n.id !== id))
   }
 

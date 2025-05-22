@@ -2,6 +2,8 @@
 
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { useRouter } from "next/navigation";
+import { useUnreadNotifications } from "@/hooks/useUnreadNotifications"
+import { Badge } from "@/components/ui/badge"
 
 import {
   IconCreditCard,
@@ -34,17 +36,21 @@ import {
 
 export function NavUser({
   user,
+  unreadCount,
 }: {
   user: {
     name: string;
     email: string;
     avatar: string;
   };
+  unreadCount?: number;
 }) {
   const { isMobile } = useSidebar();
 
   const supabase = createClientComponentClient();
   const router = useRouter();
+
+  // const unreadCount = useUnreadNotifications()
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -72,6 +78,11 @@ export function NavUser({
                   {user.email}
                 </span>
               </div>
+              {(unreadCount ?? 0) > 0 && (
+                <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
+                  {unreadCount}
+                </div>
+              )}
               <IconDotsVertical className="ml-auto size-4" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
@@ -108,8 +119,15 @@ export function NavUser({
                 Pagamento
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => router.push("/dashboard/notifications")}>
-                <IconNotification className="mr-2 h-4 w-4" />
-                Notificações
+                <div className="relative flex items-center">
+                  <IconNotification className="mr-2 h-4 w-4" />
+                  Notificações
+                  {unreadCount && unreadCount > 0 && (
+                    <span className="ml-2 inline-flex items-center justify-center text-xs font-bold text-white bg-red-500 rounded-full w-5 h-5">
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </span>
+                  )}
+                </div>
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
