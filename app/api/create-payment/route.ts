@@ -68,10 +68,11 @@ export async function POST(req: Request) {
 
     const paymentData = {
       transaction_amount: Number(body.total),
-      payment_method_id: "bolbradesco", // ou outro banco que desejar
+      payment_method_id: "bolbradesco", 
       description: "Pedido no Chopp Hub",
       date_of_expiration: formattedDueDate,
       external_reference: body.order_id,
+      notification_url: "https://seusite.com/api/mp-notify",
       payer: {
         email: body.email,
         first_name,
@@ -111,14 +112,15 @@ export async function POST(req: Request) {
 
     // Atualizar pedido no Supabase
     await supabase
-      .from("orders")
-      .update({
-        boleto_url: data.transaction_details.external_resource_url,
-        boleto_barcode_number: data.transaction_details.barcode.content,
-        boleto_id: data.id,
-        boleto_expiration_date: data.date_of_expiration,
-      })
-      .eq("id", body.order_id)
+    .from("orders")
+    .update({
+      boleto_url: data.transaction_details.external_resource_url,
+      boleto_barcode_number: data.transaction_details.barcode.content,
+      boleto_digitable_line: data.transaction_details.payment_method_reference_id,
+      boleto_id: data.id,
+      boleto_expiration_date: data.date_of_expiration,
+    })
+    .eq("id", body.order_id)
 
 
       return NextResponse.json({ success: true });
