@@ -20,7 +20,13 @@ export default function ViewOrderPage() {
   const handleSaveSignature = async (dataUrl: string) => {
     if (!dataUrl) return;
   
-    // Salvar assinatura no banco (Supabase)
+    // ⚠️ Verifica antes se o estoque já foi atualizado
+    if (order?.stock_updated) {
+      toast.info("✔️ Estoque já foi atualizado para este pedido.");
+      return;
+    }
+  
+    // Atualiza a assinatura no banco
     const { error } = await supabase
       .from("orders")
       .update({ customer_signature: dataUrl })
@@ -34,7 +40,52 @@ export default function ViewOrderPage() {
   
     toast.success("Assinatura salva com sucesso!");
   
-    // Atualiza localmente o estado
+    // Buscar itens da venda
+    const { data: items, error: itemsError } = await supabase
+      .from("order_items")
+      .select("product_id, quantity")
+      .eq("order_id", id);
+  
+    if (itemsError) {
+      console.error("Erro ao buscar itens da venda:", itemsError);
+      toast.error("Erro ao buscar itens para atualizar estoque.");
+      return;
+    }
+  
+    // Atualizar estoque para cada item
+    for (const item of items) {
+      const { data: product, error: productError } = await supabase
+        .from("products")
+        .select("stock")
+        .eq("id", item.product_id)
+        .single();
+  
+      if (productError || product?.stock == null) {
+        console.error("Erro ao buscar produto:", productError);
+        continue;
+      }
+  
+      const novoEstoque = product.stock - item.quantity;
+  
+      const { error: updateError } = await supabase
+        .from("products")
+        .update({ stock: novoEstoque })
+        .eq("id", item.product_id);
+  
+      if (updateError) {
+        console.error("Erro ao atualizar estoque:", updateError);
+      }
+    }
+  
+    toast.success("✔️ Estoque atualizado com sucesso.");
+  
+    // Marca como estoque processado
+    await supabase
+      .from("orders")
+      .update({ stock_updated: true })
+      .eq("id", id);
+  
+    // Atualiza localmente
     setSignatureData(dataUrl);
     setOpenSignature(false);
   }
@@ -123,7 +174,7 @@ export default function ViewOrderPage() {
           </tbody>
         </table>
         <div className="w-full mt-6">
-        <Button onClick={() => setOpenSignature(true)}>
+        <Button className="w-full" onClick={() => setOpenSignature(true)}>
         Assinar
       </Button>
         </div>
@@ -155,7 +206,7 @@ export default function ViewOrderPage() {
               note={order.note_number}
             />} fileName="nota.pdf">
             {({ loading }) => (
-              <Button variant="default">
+              <Button variant="default" className="w-full">
                 {loading ? "Gerando PDF..." : "Download PDF"}
               </Button>
             )}

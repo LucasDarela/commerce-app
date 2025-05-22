@@ -37,6 +37,12 @@ export function GenerateBoletoButton({ orderId, paymentMethod, signatureData }: 
         return;
       }
 
+      if (order.boleto_url) {
+        toast.success("✅ Boleto já gerado.");
+        window.open(order.boleto_url, "_blank");
+        return; 
+      }
+
       const { data: updatedOrder } = await supabase
       .from("orders")
       .select("boleto_url")
