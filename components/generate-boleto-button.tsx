@@ -37,6 +37,17 @@ export function GenerateBoletoButton({ orderId, paymentMethod, signatureData }: 
         return;
       }
 
+      const { data: updatedOrder } = await supabase
+      .from("orders")
+      .select("boleto_url")
+      .eq("id", order.id)
+      .single();
+
+    if (!updatedOrder?.boleto_url) {
+      toast.error("⚠️ Boleto não encontrado no Supabase.");
+      return;
+    }
+
       const cliente = order.customers;
 
       const payload = {
@@ -75,22 +86,12 @@ export function GenerateBoletoButton({ orderId, paymentMethod, signatureData }: 
       }
 
       toast.success("🎉 Boleto gerado com sucesso!");
+      window.open(updatedOrder.boleto_url, "_blank");
 
       const deliveryDate = new Date();
       const vencimento = new Date(deliveryDate.setDate(deliveryDate.getDate() + parseInt(order.days_ticket || "12")));
       const vencimentoStr = vencimento.toLocaleDateString("pt-BR");
   
-
-      // Agora gerar o PDF local usando o signatureData
-      const pdfBlob = await pdf(
-        <BoletoPDF 
-        order={order} 
-        signatureData={signatureData} 
-        vencimentoStr={vencimentoStr} 
-      />
-      ).toBlob();
-
-      saveAs(pdfBlob, `boleto-pedido-${order.note_number}.pdf`);
 
     } catch (error) {
       console.error("❌ Erro inesperado:", error);

@@ -24,8 +24,19 @@ export async function POST(req: Request) {
 
       console.log("🧪 RESULTADO companyUser:", companyUser, companyError)
 
-    if (!companyUser) {
+
+    if (!companyUser || companyError) {
       return NextResponse.json({ error: "Empresa não encontrada" }, { status: 400 })
+    }
+
+    const { data: company, error: companyFetchError } = await supabase
+    .from("companies")
+    .select("name")
+    .eq("id", companyUser.company_id)
+    .single()
+
+    if (!company || companyFetchError) {
+      return NextResponse.json({ error: "Nome da empresa não encontrado" }, { status: 400 })
     }
 
     // Valida campos obrigatórios
@@ -69,10 +80,10 @@ export async function POST(req: Request) {
     const paymentData = {
       transaction_amount: Number(body.total),
       payment_method_id: "bolbradesco", 
-      description: "Pedido no Chopp Hub",
+      description: company.name,
       date_of_expiration: formattedDueDate,
       external_reference: body.order_id,
-      notification_url: "https://seusite.com/api/mp-notify",
+      notification_url: body.notification_url || "https://seusite.com/api/mp-notify",
       payer: {
         email: body.email,
         first_name,
