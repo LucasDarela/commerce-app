@@ -37,7 +37,7 @@ export function GenerateBoletoButton({ orderId, paymentMethod, signatureData }: 
       // ✅ Se já existe, apenas abrir
       if (order.boleto_url) {
         toast.success("✅ Boleto já gerado.");
-        window.open(order.boleto_url, "_blank");
+        window.location.href = order.boleto_url;
         return;
       }
   
