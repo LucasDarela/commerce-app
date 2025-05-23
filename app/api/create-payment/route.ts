@@ -1,12 +1,13 @@
-import { cookies } from "next/headers";
+import { cookies as nextCookies } from "next/headers";
 import { createServerComponentClient } from "@supabase/auth-helpers-nextjs";
 import { NextResponse } from "next/server";
-import { Database } from "@/components/types/supabase"; // Ajuste o caminho se precisar
+import { Database } from "@/components/types/supabase"; 
 
 export async function POST(req: Request) {
   try {
+    const cookieStore = await nextCookies(); 
     const supabase = createServerComponentClient<Database>({
-      cookies: async () => cookies(),
+      cookies: () => cookieStore,
     });
 
     const {
@@ -116,8 +117,21 @@ export async function POST(req: Request) {
     const data = await response.json()
 
     if (!response.ok || !data.transaction_details?.barcode?.content) {
-      console.error("❌ Erro ao gerar boleto:", data)
-      return NextResponse.json({ error: "Erro ao gerar boleto", details: data }, { status: 500 })
+      console.error("❌ Erro ao gerar boleto:", {
+        status: response.status,
+        message: data.message,
+        cause: data.cause,
+        full: data,
+      });
+    
+      return NextResponse.json({
+        error: "Erro ao gerar boleto",
+        details: {
+          status: response.status,
+          message: data.message,
+          cause: data.cause,
+        }
+      }, { status: 500 });
     }
 
     // Atualizar pedido no Supabase
