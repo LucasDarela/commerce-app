@@ -5,7 +5,9 @@ import { Database } from "@/components/types/supabase"; // Ajuste o caminho se p
 
 export async function POST(req: Request) {
   try {
-    const supabase = createServerComponentClient<Database>({ cookies });
+    const supabase = createServerComponentClient<Database>({
+      cookies: async () => cookies(),
+    });
 
     const {
       data: { user },
@@ -21,9 +23,6 @@ export async function POST(req: Request) {
       .select("company_id")
       .eq("user_id", user?.id)
       .single()
-
-      console.log("🧪 RESULTADO companyUser:", companyUser, companyError)
-
 
     if (!companyUser || companyError) {
       return NextResponse.json({ error: "Empresa não encontrada" }, { status: 400 })

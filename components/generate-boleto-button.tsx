@@ -22,40 +22,27 @@ export function GenerateBoletoButton({ orderId, paymentMethod, signatureData }: 
   const handleGenerateBoleto = async () => {
     try {
       setLoading(true);
-
+  
       const { data: order } = await supabase
         .from("orders")
-        .select(`
-          *,
-          customers:customers(*)
-        `)
+        .select(`*, customers:customers(*)`)
         .eq("id", orderId)
         .single();
-
+  
       if (!order || !order.customers) {
         toast.error("⚠️ Dados do cliente não encontrados.");
         return;
       }
-
+  
+      // ✅ Se já existe, apenas abrir
       if (order.boleto_url) {
         toast.success("✅ Boleto já gerado.");
         window.open(order.boleto_url, "_blank");
-        return; 
+        return;
       }
-
-      const { data: updatedOrder } = await supabase
-      .from("orders")
-      .select("boleto_url")
-      .eq("id", order.id)
-      .single();
-
-    if (!updatedOrder?.boleto_url) {
-      toast.error("⚠️ Boleto não encontrado no Supabase.");
-      return;
-    }
-
+  
       const cliente = order.customers;
-
+  
       const payload = {
         nome: cliente.name,
         document: cliente.document,
@@ -70,15 +57,16 @@ export function GenerateBoletoButton({ orderId, paymentMethod, signatureData }: 
         city: cliente.city,
         state: cliente.state,
       };
-
+  
+      // ✅ Agora sim: criar boleto
       const res = await fetch("/api/create-payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-
+  
       const result = await res.json();
-
+  
       if (!res.ok) {
         if (result?.error === "Access Token não configurado") {
           toast.error("⚠️ Integração com Mercado Pago não configurada.");
@@ -90,22 +78,29 @@ export function GenerateBoletoButton({ orderId, paymentMethod, signatureData }: 
         console.error("Erro:", result);
         return;
       }
-
+  
+      // ✅ Buscar boleto atualizado no Supabase
+      const { data: updatedOrder, error: fetchError } = await supabase
+        .from("orders")
+        .select("boleto_url")
+        .eq("id", order.id)
+        .single();
+  
+      if (fetchError || !updatedOrder?.boleto_url) {
+        toast.error("❌ Boleto gerado mas não encontrado no Supabase.");
+        return;
+      }
+  
       toast.success("🎉 Boleto gerado com sucesso!");
       window.open(updatedOrder.boleto_url, "_blank");
-
-      const deliveryDate = new Date();
-      const vencimento = new Date(deliveryDate.setDate(deliveryDate.getDate() + parseInt(order.days_ticket || "12")));
-      const vencimentoStr = vencimento.toLocaleDateString("pt-BR");
   
-
     } catch (error) {
       console.error("❌ Erro inesperado:", error);
       toast.error("❌ Erro inesperado ao gerar boleto.");
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   if (!paymentMethod || paymentMethod.toLowerCase() !== "boleto") {
     return null;
