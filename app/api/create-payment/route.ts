@@ -14,11 +14,9 @@ export async function POST(req: Request) {
       data: { user },
     } = await supabase.auth.getUser();
 
-    console.log("👤 User:", user);
 
     const body = await req.json();
 
-    console.log("🧪 USER LOGADO:", user)
     const { data: companyUser, error: companyError } = await supabase
       .from("company_users")
       .select("company_id")
