@@ -91,15 +91,15 @@ export function SectionCards() {
     <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
       <Card className="@container/card">
         <CardHeader>
-          <CardDescription>Receita Líquida (Mês)</CardDescription>
+          <CardDescription>Receita Líquida</CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
             {formatCurrency(receitaLiquida)}
           </CardTitle>
           <CardAction className="z-20">
-            <Badge variant="outline">
+            {/* <Badge variant="outline">
               <IconTrendingUp className="mr-1" />
               {formatPercent(crescimento)}
-            </Badge>
+            </Badge> */}
           </CardAction>
         </CardHeader>
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
@@ -110,7 +110,7 @@ export function SectionCards() {
       </Card>
       <Card className="@container/card">
         <CardHeader>
-          <CardDescription>A Receber (Mês)</CardDescription>
+          <CardDescription>A Receber</CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
             {formatCurrency(aReceber)}
           </CardTitle>
@@ -123,7 +123,7 @@ export function SectionCards() {
       </Card>
       <Card className="@container/card">
         <CardHeader>
-          <CardDescription>A Pagar (Mês)</CardDescription>
+          <CardDescription>A Pagar</CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
             {formatCurrency(aPagar)}
           </CardTitle>

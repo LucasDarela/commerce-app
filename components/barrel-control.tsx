@@ -1,5 +1,3 @@
-// ✅ Código atualizado conforme seu pedido
-
 "use client";
 
 import { useState, useEffect } from "react";
