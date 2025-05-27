@@ -1,25 +1,43 @@
-import { createServerComponentClient } from "@supabase/auth-helpers-nextjs";
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
-import LandingLayout from "./sections/LandingLayout";
-import { RedirectIfAuthenticated } from "@/hooks/redirect-if-authenticated";
+// import { createServerComponentClient } from "@supabase/auth-helpers-nextjs";
+// import { cookies } from "next/headers";
+// import { redirect } from "next/navigation";
+// import LandingLayout from "./sections/LandingLayout";
+// import { RedirectIfAuthenticated } from "@/hooks/redirect-if-authenticated";
+
+// export default async function LandingPage() {
+//   const supabase = createServerComponentClient({ cookies });
+
+//   try {
+//     const { data: { user } } = await supabase.auth.getUser();
+
+//     if (user) {
+//       return redirect("/dashboard");
+//     }
+//   } catch (error) {
+//     console.log("Erro:", (error as { message?: string })?.message);
+//   }
+
+//   return (
+//   <>
+//   <RedirectIfAuthenticated />
+//   <LandingLayout />
+//   </>);
+// }
+
+// page.tsx
+import { createServerComponentClient } from "@supabase/auth-helpers-nextjs"
+import { cookies } from "next/headers"
+import { redirect } from "next/navigation"
+import LandingLayout from "./sections/LandingLayout"
 
 export default async function LandingPage() {
-  const supabase = createServerComponentClient({ cookies });
+  const supabase = createServerComponentClient({ cookies })
 
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser()
 
-    if (user) {
-      return redirect("/dashboard");
-    }
-  } catch (error) {
-    console.log("Erro:", (error as { message?: string })?.message);
+  if (user) {
+    redirect("/dashboard")
   }
 
-  return (
-  <>
-  <RedirectIfAuthenticated />
-  <LandingLayout />
-  </>);
+  return <LandingLayout />
 }

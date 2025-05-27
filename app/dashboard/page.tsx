@@ -2,9 +2,9 @@ import { createServerComponentClient } from "@supabase/auth-helpers-nextjs";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { ChartAreaInteractive } from "@/components/chart-area-interactive"
-import { SectionCards } from "@/components/section-cards"
 import { Database } from "@/components/types/supabase";
 import { supabaseServer } from "@/lib/supabaseServer";
+import { SectionCards } from "@/components/dashboard/SectionCardsServer"
 
 export default async function DashboardPage() {
   const supabase = supabaseServer();

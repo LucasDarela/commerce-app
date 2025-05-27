@@ -74,12 +74,16 @@ export default function ResetPasswordPage() {
       <h1 className="text-2xl font-bold mb-6">Redefinir Senha</h1>
       <div className="space-y-4">
         <Input
+          id="reset-password"
+          name="reset-password"
           type="password"
           placeholder="Nova senha"
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
         />
         <Input
+          id="reset-confirm-password"
+          name="reset-confirm-password"
           type="password"
           placeholder="Confirmar nova senha"
           value={confirmPassword}

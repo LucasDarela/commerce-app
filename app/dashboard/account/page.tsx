@@ -136,6 +136,7 @@ export default function AccountPage() {
             </Avatar>
           </label>
           <input
+            name="avatar-upload"
             type="file"
             id="avatarUpload"
             accept="image/png, image/jpeg, image/jpg, image/heic, image/webp"
