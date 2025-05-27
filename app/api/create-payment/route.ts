@@ -5,7 +5,7 @@ import { Database } from "@/components/types/supabase";
 
 export async function POST(req: Request) {
   try {
-    const cookieStore = await nextCookies(); 
+    const cookieStore = nextCookies(); 
     const supabase = createServerComponentClient<Database>({
       cookies: () => cookieStore,
     });
@@ -23,7 +23,7 @@ export async function POST(req: Request) {
       .eq("user_id", user?.id)
       .single()
 
-    if (!companyUser || companyError) {
+      if (companyError || !companyUser?.company_id) {
       return NextResponse.json({ error: "Empresa não encontrada" }, { status: 400 })
     }
 
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
     .eq("id", companyUser.company_id)
     .single()
 
-    if (!company || companyFetchError) {
+    if (companyFetchError || !company?.name) {
       return NextResponse.json({ error: "Nome da empresa não encontrado" }, { status: 400 })
     }
 
@@ -53,10 +53,10 @@ export async function POST(req: Request) {
       .from("company_integrations")
       .select("access_token")
       .eq("company_id", companyUser.company_id)
-      .eq("provider", "mercado_pago")
+      .eq("provider", "mercado_pago" as Database["public"]["Tables"]["company_integrations"]["Row"]["provider"])
       .single()
 
-    if (!integration || !integration.access_token) {
+      if (!integration || !integration.access_token) {
       return NextResponse.json({ error: "Access Token não configurado" }, { status: 400 })
     }
 
@@ -137,13 +137,12 @@ export async function POST(req: Request) {
     .from("orders")
     .update({
       boleto_url: data.transaction_details.external_resource_url,
-      boleto_barcode_number: data.transaction_details.barcode.content,
+      boleto_barcode_number: data.transaction_details?.barcode?.content,
       boleto_digitable_line: data.transaction_details.payment_method_reference_id,
       boleto_id: data.id,
       boleto_expiration_date: data.date_of_expiration,
     })
     .eq("id", body.order_id)
-
 
       return NextResponse.json({ success: true });
 

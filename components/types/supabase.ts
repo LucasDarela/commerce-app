@@ -1,6 +1,3 @@
-export type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
-
-
 export interface Database {
   public: {
     Tables: {
@@ -15,12 +12,38 @@ export interface Database {
           boleto_id: string | null;
           boleto_expiration_date: string | null;
           customer_signature: string | null;
-          // outros campos...
         };
         Insert: Partial<Database["public"]["Tables"]["orders"]["Row"]>;
         Update: Partial<Database["public"]["Tables"]["orders"]["Row"]>;
       };
-      // outras tabelas se quiser...
+
+      company_integrations: {
+        Row: {
+          company_id: string;
+          provider: "mercado_pago" | "stripe"; // adicione outros se tiver
+          access_token: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["company_integrations"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["company_integrations"]["Row"]>;
+      };
+
+      company_users: {
+        Row: {
+          user_id: string;
+          company_id: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["company_users"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["company_users"]["Row"]>;
+      };
+
+      companies: {
+        Row: {
+          id: string;
+          name: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["companies"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["companies"]["Row"]>;
+      };
     };
   };
 }
