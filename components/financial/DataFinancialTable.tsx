@@ -253,7 +253,7 @@ const { totalReceber, totalPagar } = useMemo(() => {
         dueDateInput={dueDateInput}
         setDueDateInput={setDueDateInput}
         />
-        <div className="flex justify-end gap-2 px-6 text-sm font-medium text-muted-foreground ">
+        <div className="flex gap-2 px-6 text-sm font-medium text-muted-foreground ">
         <div>
           <span className="">Total a Pagar: </span>
           <span className="text-red-600 font-semibold">R$ {totalPagar.toFixed(2).replace(".", ",")}</span>
