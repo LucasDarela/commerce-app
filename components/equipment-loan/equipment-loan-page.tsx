@@ -17,6 +17,7 @@ import {
   } from "@tabler/icons-react"
 import { LoanEquipmentModal } from "@/components/equipment-loan/LoanEquipmentModal"
 import { ReturnEquipmentModal } from "./ReturnEquipmentModal"
+import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany"
 
 type LoanWithDetails = {
   id: string
@@ -44,20 +45,28 @@ export default function LoanByCustomerPage() {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
   const [selectedItems, setSelectedItems] = useState<string[]>([])
   const [isLoanModalOpen, setIsLoanModalOpen] = useState(false)
-
+  const { companyId } = useAuthenticatedCompany()
 
   const fetchData = async () => {
+    if (!companyId) return
+  
     const { data, error } = await supabase
       .from("equipment_loans")
-      .select("id, quantity, note_number, customer_id, customer_name, equipments(name)")
-      .neq("status", "returned")
+      .select("id, equipment_id, quantity, customer_id, customer_name")
+      .eq("status", "active") // ou .neq("status", "returned")
   
-    if (!error && data) {
+    const { data: equipmentList } = await supabase
+      .from("equipments")
+      .select("id, name")
+      .eq("company_id", companyId)
+  
+    if (!error && data && equipmentList) {
       const grouped: Record<string, GroupedByCustomer> = {}
+  
       for (const loan of data) {
         const customerId = loan.customer_id
         const customerName = loan.customer_name ?? "Desconhecido"
-        const equipmentName = loan.equipments?.[0]?.name ?? "Equipamento"
+        const equipmentName = equipmentList.find(eq => eq.id === loan.equipment_id)?.name || "Equipamento"
   
         if (!grouped[customerId]) {
           grouped[customerId] = {
@@ -70,16 +79,22 @@ export default function LoanByCustomerPage() {
         grouped[customerId].items.push({
           loanId: loan.id,
           equipmentName,
-          quantity: loan.quantity,
+          quantity: Number(loan.quantity) || 1,
         })
       }
   
       setGroupedData(Object.values(grouped))
+    } else {
+      toast.error("Erro ao buscar dados")
+      console.error(error)
     }
   }
+
   useEffect(() => {
-    fetchData()
-  }, [])
+    if (companyId) {
+      fetchData()
+    }
+  }, [companyId])
 
   return (
 <div className="w-full px-6 py-4">
@@ -145,63 +160,7 @@ export default function LoanByCustomerPage() {
     }}
   />
 )}
-
-{/* <Dialog open={openModal} onOpenChange={setOpenModal}>
-  <DialogContent>
-    <DialogHeader>
-      <DialogTitle>Selecionar Itens para Retorno</DialogTitle>
-    </DialogHeader>
-
-    <div className="space-y-2">
-      {groupedData
-        .find((g) => g.customerId === selectedCustomerId)
-        ?.items.map((item) => (
-          <div key={item.loanId} className="flex items-center space-x-2">
-            <Checkbox
-              id={item.loanId}
-              checked={selectedItems.includes(item.loanId)}
-              onCheckedChange={(checked) => {
-                setSelectedItems((prev) =>
-                  checked
-                    ? [...prev, item.loanId]
-                    : prev.filter((id) => id !== item.loanId)
-                )
-              }}
-            />
-            <label htmlFor={item.loanId} className="text-sm">
-              {item.equipmentName} - {item.quantity}
-            </label>
-          </div>
-        ))}
-    </div>
-
-    <DialogFooter>
-      <Button
-        onClick={async () => {
-          if (selectedItems.length === 0) return
-
-          const { error } = await supabase
-            .from("equipment_loans")
-            .update({ status: "returned", return_date: new Date().toISOString().split("T")[0] })
-            .in("id", selectedItems)
-
-          if (!error) {
-            toast.success("Itens retornados com sucesso!")
-            setOpenModal(false)
-            window.location.reload()
-          } else {
-            toast.error("Erro ao retornar itens")
-          }
-        }}
-      >
-        Confirmar Retorno
-      </Button>
-    </DialogFooter>
-  </DialogContent>
-</Dialog> */}
-
 </div>
-
   )
 }
 
