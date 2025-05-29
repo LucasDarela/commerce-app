@@ -16,7 +16,7 @@ export const orderSchema = z.object({
   payment_method: z.enum(["Pix", "Dinheiro", "Boleto", "Cartao"]).default("Pix"),
   payment_status: z.enum(["Pendente", "Pago"]),
   days_ticket: z.union([z.string(), z.number()]).optional(),
-  freight: z.union([z.string(), z.number()]).optional(),
+  freight: z.union([z.string(), z.number(), z.null()]).optional(),
   note_number: z.string().optional(),
   document_type: z.string().optional(),
   total: z.number(),
@@ -69,6 +69,7 @@ export async function fetchOrders(companyId: string): Promise<Order[]> {
   // Se quiser renomear os campos manualmente:
   return result.data.map((order) => ({
     ...order,
+    id: order.id ?? crypto.randomUUID(),
     date: order.appointment_date,
     hour: order.appointment_hour,
     location: order.appointment_local,

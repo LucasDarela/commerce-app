@@ -274,14 +274,7 @@ const { totalReceber, totalPagar } = useMemo(() => {
 
         {monthKeysSorted.map((monthKey) => (
           <TabsContent key={monthKey} value={monthKey}>
-            <MonthlyFinancialTable
-              records={
-                monthKey === selectedMonth
-                  ? currentMonthRows.map((row) => row.original)
-                  : []
-              }
-              columns={columns}
-            />
+            <MonthlyFinancialTable records={groupedByMonth[monthKey]} columns={columns} />
           </TabsContent>
         ))}
       </Tabs>

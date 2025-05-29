@@ -138,7 +138,7 @@ export const schema = z.object({
   customer: z.string(),
   phone: z.string(),
   products: z.string(),
-  freight: z.union([z.string(), z.number()]).optional().nullable(),
+  freight: z.union([z.string(), z.number(), z.null()]).optional(),
   amount: z.number(),
   total: z.number(),
   total_payed: z.number().optional().nullable(),

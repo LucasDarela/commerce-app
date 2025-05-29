@@ -17,7 +17,14 @@ export default function OrdersPage() {
     const getData = async () => {
       setLoading(true)
       const data = await fetchOrders(companyId)
-      setOrders(data)
+      setOrders(
+        data
+          .filter((o): o is Order => !!o.id) 
+          .map((o) => ({
+            ...o,
+            id: o.id!,
+          }))
+      )
       setLoading(false)
     }
 

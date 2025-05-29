@@ -14,9 +14,15 @@ import {
 import { DataTableConfig } from "./DataTableConfig"
 import { CombinedRecord } from "./DataFinancialTable"
 import { TablePagination } from "@/components/ui/pagination"
+import type { Order, FinancialRecord } from "./DataFinancialTable"
 
-interface MonthlyFinancialTableProps {
-  table: ReturnType<typeof useReactTable<CombinedRecord>>
+// interface MonthlyFinancialTableProps {
+//   table: ReturnType<typeof useReactTable<CombinedRecord>>
+// }
+
+type MonthlyFinancialTableProps = {
+  records: (Order | FinancialRecord)[]
+  columns: ColumnDef<CombinedRecord, any>[] 
 }
 
 export function MonthlyFinancialTable({ records, columns }: MonthlyFinancialTableProps) {

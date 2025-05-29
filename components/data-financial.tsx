@@ -118,7 +118,7 @@ export const schema = z.object({
     payment_method: z.enum(["Pix", "Dinheiro", "Boleto", "Cartao"]),
     payment_status: z.enum(["Pendente", "Pago"]),
     days_ticket: z.union([z.string(), z.number()]).optional(),
-    freight: z.union([z.string(), z.number()]).optional(),
+    freight: z.union([z.string(), z.number(), z.null()]).optional(),
     note_number: z.string().optional(),
     document_type: z.string().optional(),
     total: z.number(),

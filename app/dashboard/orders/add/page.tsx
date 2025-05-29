@@ -17,10 +17,12 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import { getReservedStock } from "@/lib/stock/getReservedStock"
-
+import { z } from "zod"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { orderSchema, Order } from "@/lib/fetchOrders" 
+import { orderSchema, Order as OrderType } from "@/lib/fetchOrders"
+
+type OrderFormData = z.infer<typeof orderSchema> & { id?: string }
 
 interface Customer {
   id: string;
