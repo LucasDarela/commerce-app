@@ -170,7 +170,7 @@ export default function DataFinancialTable() {
     return Object.keys(groupedByMonth).sort((a, b) => {
       const [aMonth, aYear] = a.split("/").map(Number)
       const [bMonth, bYear] = b.split("/").map(Number)
-      return new Date(aYear, aMonth - 1).getTime() - new Date(bYear, bMonth - 1).getTime()
+      return new Date(bYear, bMonth - 1).getTime() - new Date(aYear, aMonth - 1).getTime()
     })
   }, [groupedByMonth])
   
@@ -265,14 +265,14 @@ const { totalReceber, totalPagar } = useMemo(() => {
       </div>
       <Tabs value={selectedMonth} onValueChange={setSelectedMonth} className="overflow-hidden rounded-lg mx-6">
         <TabsList className="mb-4">
-          {Object.keys(groupedByMonth).map((monthKey) => (
+        {monthKeysSorted.map((monthKey) => (
             <TabsTrigger key={monthKey} value={monthKey}>
               {monthKey}
             </TabsTrigger>
           ))}
         </TabsList>
 
-        {Object.entries(groupedByMonth).map(([monthKey, records]) => (
+        {monthKeysSorted.map((monthKey) => (
           <TabsContent key={monthKey} value={monthKey}>
             <MonthlyFinancialTable
               records={
