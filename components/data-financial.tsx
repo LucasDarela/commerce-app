@@ -102,6 +102,7 @@ import { supabase } from "@/lib/supabase"
 import { PaymentModal } from "@/components/payment-modal"
 import { YourFinancialRecords } from "@/components/your-financial-modal"
 import { ActionsCell } from "@/components/actions-cell"
+import { mapToFinancial } from "@/utils/mapPaymentMethod"
 
 //New Schema
 export const schema = z.object({
@@ -137,7 +138,7 @@ const financialSchema = z.object({
     category: z.string(),
     amount: z.preprocess((val) => Number(val), z.number()),
     status: z.enum(["Paid", "Unpaid"]),
-    payment_method: z.enum(["Pix", "Cash", "Card", "Ticket"]),
+    payment_method: z.enum(["Pix", "Dinheiro", "Boleto", "Cartao"]),
     invoice_number: z.string().optional(),
     type: z.enum(["input", "output"]),
     notes: z.string().optional(),
@@ -158,22 +159,22 @@ type CustomColumnDef<T> = ColumnDef<T, unknown> & {
   meta?: CustomColumnMeta
 }
 
-function mapToFinancialPaymentMethod(
-  method: "Pix" | "Dinheiro" | "Boleto" | "Cartao"
-): "Pix" | "Cash" | "Card" | "Ticket" {
-  switch (method) {
-    case "Dinheiro":
-      return "Cash"
-    case "Cartao":
-      return "Card"
-    case "Boleto":
-      return "Ticket"
-    default:
-      return method
-  }
-}
+// function mapToFinancialPaymentMethod(
+//   method: string) {
+//   switch (method) {
+//     case "Cash":
+//       return "Dinheiro"
+//     case "Card":
+//       return "Cartao"
+//     case "Ticket":
+//       return "Boleto"
+//     default:
+//       return method
+//   }
+// }
 
 // Create a separate component for the drag handle
+
 function DragHandle({ id }: { id: string }) {
   const { attributes, listeners } = useSortable({ id })
 
@@ -393,7 +394,7 @@ export default function DataFinancialTable() {
       due_date: o.due_date || null,
       amount: o.total,
       status: o.payment_status === "Pago" ? "Paid" : "Unpaid" as "Paid",
-      payment_method: mapToFinancialPaymentMethod(o.payment_method),
+      payment_method: mapToFinancial(o.payment_method),
       supplier_id: "", 
       supplier: o.customer || "Cliente",
       company_id: "", 
@@ -541,9 +542,9 @@ const link = `https://wa.me/55${phoneClean}?text=${encodedMessage}`
         const method = row.original.payment_method
         const methodMap: Record<string, string> = {
           Pix: "Pix",
-          Cash: "Dinheiro",
-          Ticket: "Boleto",
-          Card: "Cartão"
+          Dinheiro: "Dinheiro",
+          Boleto: "Boleto",
+          Cartao: "Cartão"
         }
       
         return methodMap[method] || method

@@ -10,7 +10,7 @@ export type FinancialRecord = {
     category: string
     amount: number
     status: "Paid" | "Unpaid"
-    payment_method: "Pix" | "Cash" | "Card" | "Ticket"
+    payment_method: "Pix" | "Dinheiro" | "Cartao" | "Boleto"
     invoice_number?: string
     type: "input" | "output"
     notes?: string

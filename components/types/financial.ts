@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { financialSchema } from "@/components/financial/schema"
+import { financialSchema, paymentMethodEnum } from "@/components/financial/schema"
 
 export type FinancialRecord = z.infer<typeof financialSchema> & {
   source: "order" | "financial"
@@ -7,3 +7,5 @@ export type FinancialRecord = z.infer<typeof financialSchema> & {
   customer?: string
   total_payed?: number
 }
+
+export type PaymentMethodFinancial = z.infer<typeof paymentMethodEnum>

@@ -21,18 +21,16 @@ export function isFinancial(record: any): record is FinancialRecord {
 /**
  * Converte o nome do método de pagamento do pedido para o formato do financeiro.
  */
-export function mapToFinancialPaymentMethod(
-  method: "Pix" | "Dinheiro" | "Boleto" | "Cartao"
-): "Pix" | "Cash" | "Ticket" | "Card" {
+export function mapToFinancialPaymentMethod(method: string) {
   switch (method) {
-    case "Dinheiro":
-      return "Cash"
-    case "Cartao":
-      return "Card"
-    case "Boleto":
-      return "Ticket"
+    case "Cash":
+      return "Dinheiro"
+    case "Card":
+      return "Cartao"
+    case "Ticket":
+      return "Boleto"
     default:
-      return method
+      return method 
   }
 }
 

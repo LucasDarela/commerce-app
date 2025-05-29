@@ -1,5 +1,7 @@
 import { z } from "zod"
 
+export const paymentMethodEnum = z.enum(["Dinheiro", "Cartao", "Boleto", "Pix"])
+
 export const orderSchema = z.object({
   id: z.string(),
   appointment_date: z.string(),
@@ -10,7 +12,7 @@ export const orderSchema = z.object({
   amount: z.number(),
   products: z.string(),
   delivery_status: z.enum(["Entregar", "Coletar", "Coletado"]),
-  payment_method: z.enum(["Pix", "Dinheiro", "Boleto", "Cartao"]),
+  payment_method: paymentMethodEnum,
   payment_status: z.enum(["Pendente", "Pago"]),
   days_ticket: z.union([z.string(), z.number()]).optional(),
   freight: z.union([z.string(), z.number()]).optional(),
@@ -23,6 +25,7 @@ export const orderSchema = z.object({
   source: z.literal("order"),
 })
 
+
 export const financialSchema = z.object({
   id: z.string(),
   supplier_id: z.string().uuid().optional().nullable(),
@@ -34,7 +37,7 @@ export const financialSchema = z.object({
   category: z.string(),
   amount: z.preprocess((val) => Number(val), z.number()),
   status: z.enum(["Paid", "Unpaid"]),
-  payment_method: z.enum(["Pix", "Cash", "Card", "Ticket"]),
+  payment_method: paymentMethodEnum,
   invoice_number: z.string().optional(),
   type: z.enum(["input", "output"]),
   notes: z.string().optional(),

@@ -14,14 +14,6 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
 
-// ✅ Tipagem da venda
-interface Financial {
-  id: string;
-  total: number;
-  payment_status: "Pendente" | "Pago";
-  payment_method: "Pix" | "Dinheiro" | "Boleto" | "Cartao";
-  total_payed?: number;
-}
 
 interface PaymentModalProps {
     open: boolean;
@@ -34,7 +26,7 @@ interface FinancialRecord {
     id: string;
     amount: number;
     status: "Unpaid" | "Paid";
-    payment_method: "Pix" | "Cash" | "Card" | "Ticket";
+    payment_method: "Pix" | "Cartao" | "Dinheiro" | "Boleto";
   }
 
 export function YourFinancialRecords({ open, onClose, financial, onSuccess }: PaymentModalProps) {
@@ -42,18 +34,9 @@ export function YourFinancialRecords({ open, onClose, financial, onSuccess }: Pa
     const [paymentMethod, setPaymentMethod] = useState<"Pix" | "Dinheiro" | "Boleto" | "Cartao" | "">("")
     const [loading, setLoading] = useState(false)
     
-    const mapPaymentMethod = (value: "Pix" | "Cash" | "Card" | "Ticket"): "Pix" | "Dinheiro" | "Boleto" | "Cartao" => {
-      switch (value) {
-        case "Cash":
-          return "Dinheiro";
-        case "Card":
-          return "Cartao";
-        case "Ticket":
-          return "Boleto";
-        default:
-          return value;
-      }
-    };
+    const mapPaymentMethod = (
+      value: "Pix" | "Dinheiro" | "Boleto" | "Cartao"
+    ): "Pix" | "Dinheiro" | "Boleto" | "Cartao" => value
 
     useEffect(() => {
       if (financial?.payment_method) {
