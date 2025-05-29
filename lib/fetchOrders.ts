@@ -2,8 +2,10 @@ import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { z } from "zod"
 
 export const orderSchema = z.object({
-  id: z.string(),
-  appointment_date: z.string(),      
+  id: z.string().optional(),
+  appointment_date: z
+  .string({ required_error: "A data do agendamento é obrigatória" })
+  .min(1, "A data do agendamento é obrigatória"),
   appointment_hour: z.string(),
   appointment_local: z.string(),
   customer: z.string(),
@@ -72,7 +74,4 @@ export async function fetchOrders(companyId: string): Promise<Order[]> {
     location: order.appointment_local,
   }))
 
-  
-
-  return result.data ?? [];
 }

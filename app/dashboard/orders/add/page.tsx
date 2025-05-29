@@ -18,6 +18,10 @@ import "react-datepicker/dist/react-datepicker.css";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import { getReservedStock } from "@/lib/stock/getReservedStock"
 
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { orderSchema, Order } from "@/lib/fetchOrders" 
+
 interface Customer {
   id: string;
   name: string;
@@ -228,6 +232,11 @@ const dueDate = format(
       isSubmittingRef.current = false;
       return;
     }
+    if (!appointment.date) {
+      toast.error("Informe uma data de agendamento.");
+      isSubmittingRef.current = false;
+      return;
+    }
   
     setLoading(true);
   
@@ -336,6 +345,15 @@ const dueDate = format(
     
       fetchReservedStock()
     }, [selectedProduct, quantity])
+
+    const {
+      register,
+      watch,
+      setValue,
+      formState: { errors },
+    } = useForm<OrderFormData>({
+      resolver: zodResolver(orderSchema),
+    })
 
   return (
     <div className="w-full max-w-4xl mx-auto p-6 rounded-lg shadow-md">
@@ -612,6 +630,9 @@ const dueDate = format(
                     className="hidden"
                     inline
                   />
+                    {errors.appointment_date && (
+                    <p className="text-red-500 text-sm">{errors.appointment_date.message}</p>
+                  )}
                 </PopoverContent>
               </Popover>
 
