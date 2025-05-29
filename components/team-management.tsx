@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,7 @@ type TeamMember = {
 
 export default function TeamManagementPage() {
   const { user, companyId } = useAuthenticatedCompany();
+  const router = useRouter()
   const [companyName, setCompanyName] = useState("");
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [isAdding, setIsAdding] = useState(false);
@@ -250,7 +252,7 @@ export default function TeamManagementPage() {
                     <Button
                       size="sm"
                       variant="secondary"
-                      onClick={() => handleResetPassword(member.email)}
+                      onClick={() => router.push("/dashboard/update-password")}
                     >
                       Update Password
                     </Button>

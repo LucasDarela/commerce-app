@@ -56,9 +56,20 @@ export default function ListSuppliers() {
             const raw = search.trim();
             const cleaned = raw.replace(/\D/g, "");
           
-            query = query.or(
-              `name.ilike.%${raw.toUpperCase()}%,document.ilike.%${cleaned}%,phone.ilike.%${cleaned}%`
-            );
+            const filters = [];
+          
+            if (raw) {
+              filters.push(`name.ilike.%${raw}%`);
+            }
+          
+            if (cleaned) {
+              filters.push(`document.ilike.%${cleaned}%`);
+              filters.push(`phone.ilike.%${cleaned}%`);
+            }
+          
+            if (filters.length > 0) {
+              query = query.or(filters.join(","));
+            }
           }
   
         const { data, error } = await query;

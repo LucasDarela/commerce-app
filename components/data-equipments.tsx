@@ -287,14 +287,14 @@ export function DataEquipments({
             onClick={() => {
                 setSelectedEquipment(row.original)
                 setSheetOpen(true)
-            }}>
+            }}> 
             Ver
-            </DropdownMenuItem>
-            <Link href={`/dashboard/equipments/${row.original.id}/edit`} passHref legacyBehavior>
-                <DropdownMenuItem asChild>
+            </DropdownMenuItem >
+            <DropdownMenuItem asChild>
+            <Link href={`/dashboard/equipments/${row.original.id}/edit`}>
                   <span>Editar</span>
-                </DropdownMenuItem>
               </Link>
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 variant="destructive"
@@ -560,6 +560,10 @@ export function DataEquipments({
                         {selectedEquipment.created_at
                             ? format(parseISO(selectedEquipment.created_at), "dd/MM/yyyy")
                             : "—"}
+                        </div>
+                        <div>
+                        <strong>Descrição</strong>{" "}
+                        {selectedEquipment.description}
                         </div>
                     </div>
                     )}

@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { useState } from "react";
 import { toast } from "sonner";
+import { PasswordInput } from "../ui/password-input";
 
 
 const formSchema = z.object ({
@@ -125,9 +126,7 @@ export function LoginAccountForm() {
                                 <FormItem>
                                     <FormLabel>Password</FormLabel>
                                     <FormControl>
-                                        <Input type="password"
-                                        placeholder="Password" 
-                                        {...field} />
+                                    <PasswordInput placeholder="Password" {...field} />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>

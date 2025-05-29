@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
+import { useRouter, useParams } from "next/navigation"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -12,9 +12,11 @@ import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany"
 
-export default function AddEquipmentPage() {
+export default function EditEquipmentPage() {
   const { companyId } = useAuthenticatedCompany()
   const router = useRouter()
+  const params = useParams()
+  const equipmentId = params.id as string
 
   const [form, setForm] = useState({
     name: "",
@@ -26,50 +28,63 @@ export default function AddEquipmentPage() {
     description: "",
   })
 
+  useEffect(() => {
+    const fetchEquipment = async () => {
+      if (!equipmentId) return
+      const { data, error } = await supabase
+        .from("equipments")
+        .select("*")
+        .eq("id", equipmentId)
+        .single()
+
+      if (error || !data) {
+        toast.error("Erro ao carregar equipamento.")
+        return
+      }
+
+      setForm({
+        name: data.name || "",
+        code: data.code || "",
+        value: data.value?.toString() || "",
+        stock: data.stock?.toString() || "",
+        type: data.type || "",
+        is_available: data.is_available ?? true,
+        description: data.description || "",
+      })
+    }
+
+    fetchEquipment()
+  }, [equipmentId])
+
   const handleChange = (field: string, value: any) => {
     setForm((prev) => ({ ...prev, [field]: value }))
   }
 
   const handleSubmit = async () => {
-    if (!companyId) return toast.error("Empresa não identificada.");
-  
+    if (!companyId) return toast.error("Empresa não identificada.")
+
     if (!form.name || !form.code || !form.type) {
-      return toast.error("Preencha os campos obrigatórios.");
+      return toast.error("Preencha os campos obrigatórios.")
     }
-  
-    // 🔎 Verifica se já existe um equipamento com o mesmo código para a empresa
-    const { data: existing, error: fetchError } = await supabase
-      .from("equipments")
-      .select("id")
-      .eq("code", form.code)
-      .eq("company_id", companyId)
-      .maybeSingle();
-  
-    if (fetchError) {
-      console.error("Erro ao verificar duplicação:", fetchError);
-      return toast.error("Erro ao verificar código existente.");
-    }
-  
-    if (existing) {
-      return toast.error("Já existe um equipamento com esse código.");
-    }
-  
-    // ✅ Se não existir, insere
-    const { error } = await supabase.from("equipments").insert({
+
+    const { error } = await supabase
+    .from("equipments")
+    .update({
       ...form,
       value: Number(form.value),
       stock: Number(form.stock),
       company_id: companyId,
-    });
-  
+    })
+    .eq("id", equipmentId)
+
     if (error) {
-      toast.error("Erro ao salvar equipamento.");
-      console.error(error);
+      toast.error("Erro ao atualizar equipamento.")
+      console.error(error)
     } else {
-      toast.success("Equipamento cadastrado com sucesso!");
-      router.push("/dashboard/equipments");
+      toast.success("Equipamento atualizado com sucesso!")
+      router.push("/dashboard/equipments")
     }
-  };
+  }
 
   return (
     <div className="max-w-2xl mx-auto py-6 space-y-6">
