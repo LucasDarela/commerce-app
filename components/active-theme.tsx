@@ -33,23 +33,35 @@ export function ActiveThemeProvider({
   children: ReactNode;
   initialTheme?: string;
 }) {
-  const [activeTheme, setActiveTheme] = useState<string>(
-    () => initialTheme || DEFAULT_THEME
-  );
 
-  useEffect(() => {
-    setThemeCookie(activeTheme);
+  const [activeTheme, setActiveTheme] = useState<string | null>(null)
 
-    Array.from(document.body.classList)
-      .filter((className) => className.startsWith("theme-"))
-      .forEach((className) => {
-        document.body.classList.remove(className);
-      });
-    document.body.classList.add(`theme-${activeTheme}`);
-    if (activeTheme.endsWith("-scaled")) {
-      document.body.classList.add("theme-scaled");
-    }
-  }, [activeTheme]);
+useEffect(() => {
+  const savedTheme = document.cookie
+    .split("; ")
+    .find((row) => row.startsWith(`${COOKIE_NAME}=`))
+    ?.split("=")[1]
+
+  setActiveTheme(savedTheme || DEFAULT_THEME)
+}, [])
+
+useEffect(() => {
+  if (!activeTheme) return
+
+  setThemeCookie(activeTheme)
+
+  // Remove temas antigos
+  Array.from(document.body.classList)
+    .filter((className) => className.startsWith("theme-"))
+    .forEach((className) => {
+      document.body.classList.remove(className)
+    })
+
+  document.body.classList.add(`theme-${activeTheme}`)
+  if (activeTheme.endsWith("-scaled")) {
+    document.body.classList.add("theme-scaled")
+  }
+}, [activeTheme])
 
   return (
     <ThemeContext.Provider value={{ activeTheme, setActiveTheme }}>

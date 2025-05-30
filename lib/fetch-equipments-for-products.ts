@@ -9,7 +9,7 @@ type EquipmentItem = {
 type LinkedEquipment = {
   equipment_id: string
   quantity: number
-  equipment: { name: string }[] | null
+  equipment: { name: string } | null
 }
 
 export async function fetchEquipmentsForOrderProducts(productsText: string): Promise<EquipmentItem[]> {
@@ -58,7 +58,7 @@ if (linkError) {
 linkedEquipments.forEach((item) => {
   equipments.push({
     equipment_id: item.equipment_id,
-    name: item.equipment?.[0]?.name || "Equipamento",
+    name: item.equipment?.name || "Equipamento",
     quantity: item.quantity * parsedProduct.quantity,
   })
 })

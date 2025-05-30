@@ -87,7 +87,7 @@ export default function LandingLayout(){
 
   {/* Dropdown do Mobile Menu */}
   {menuOpen && (
-    <ul className="bg-muted shadow-md absolute top-full left-0 w-full flex flex-col items-center p-4 space-y-4 z-40">
+    <ul className="bg-muted shadow-md fixed top-16 left-0 w-full flex flex-col items-center p-4 space-y-4 z-[9999]">
       <li><Link href="#features" onClick={toggleMenu}>Funcionalidades</Link></li>
       <li><Link href="#pricing" onClick={toggleMenu}>Preços</Link></li>
       <li><Link href="#testimonials" onClick={toggleMenu}>Clientes</Link></li>
