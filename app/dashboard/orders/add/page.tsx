@@ -21,6 +21,7 @@ import { z } from "zod"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { orderSchema, Order as OrderType } from "@/lib/fetchOrders"
+import { generateNextNoteNumber } from "@/lib/generate-next-note-number";
 
 type OrderFormData = z.infer<typeof orderSchema> & { id?: string }
 
@@ -79,6 +80,7 @@ export default function AddOrder() {
   const [freight, setFreight] = useState<number>(0);
   const [items, setItems] = useState<any[]>([]);
   const [catalogPrices, setCatalogPrices] = useState<Record<string, number>>({})
+  const [noteNumber, setNoteNumber] = useState<string>("")
   const [reservedStock, setReservedStock] = useState<number>(0)
   const [appointment, setAppointment] = useState({
     date: undefined as Date | undefined,
@@ -87,6 +89,7 @@ export default function AddOrder() {
   });
   const [order, setOrder] = useState<Order>({
     issue_date: new Date().toISOString().split("T")[0],
+    document_type: "internal",
   });
 
   const [first_name, ...rest] = selectedCustomer?.name?.split(" ") || ["Cliente"];
@@ -122,6 +125,17 @@ const dueDate = format(
       fetchProducts();
     }
   }, [companyId]);
+
+  useEffect(() => {
+    if (!companyId || order?.document_type !== "internal" || order.note_number) return;
+  
+    const prepareNote = async () => {
+      const next = await generateNextNoteNumber(companyId);
+      setOrder((prev) => ({ ...prev, note_number: next }));
+    };
+  
+    prepareNote();
+  }, [companyId, order?.document_type]);
 
   const filteredCustomers = searchCustomer.trim()
     ? customers.filter((customer) =>
@@ -366,25 +380,37 @@ const dueDate = format(
       <CardContent className="space-y-4">
         <h2 className="text-xl font-bold mb-4">Informações do Documento</h2>
         <div className="flex flex-cols w-full h-auto gap-4">
-          <Select
-            onValueChange={(value) => {
-              const generatedNoteNumber = generateNoteNumber(value);
-              setOrder((prev) => ({ ...prev, document_type: value, note_number: generatedNoteNumber }));
-            }}
-          >
-            <SelectTrigger className="border rounded-md shadow-sm w-full">
-              <SelectValue placeholder="Tipo de Documento" />
-            </SelectTrigger>
-            <SelectContent className="shadow-md rounded-md">
-              <SelectItem value="internal">Interno</SelectItem>
-              <SelectItem value="invoice">Fiscal</SelectItem>
-            </SelectContent>
-          </Select>
+        <Select
+          value={order.document_type}
+          onValueChange={async (value) => {
+            let generatedNoteNumber = order.note_number
+
+            if (value === "internal" && companyId) {
+              generatedNoteNumber = await generateNextNoteNumber(companyId)
+            }
+
+            setOrder((prev) => ({
+              ...prev,
+              document_type: value,
+              note_number: generatedNoteNumber,
+            }))
+          }}
+        >
+          <SelectTrigger className="border rounded-md shadow-sm w-full">
+            <SelectValue placeholder="Tipo de Documento" />
+          </SelectTrigger>
+          <SelectContent className="shadow-md rounded-md">
+            <SelectItem value="internal">Interno</SelectItem>
+            <SelectItem value="invoice">Fiscal</SelectItem>
+          </SelectContent>
+        </Select>
           <Input
             type="text"
-            placeholder="Numero do Documento"
+            placeholder="Número da Nota"
             value={order?.note_number || ""}
-            onChange={(e) => setOrder((prev) => ({ ...prev, note_number: e.target.value }))}
+            onChange={(e) =>
+              setOrder((prev) => ({ ...prev, note_number: e.target.value }))
+            }
           />
           <Input
             id="issue_date"

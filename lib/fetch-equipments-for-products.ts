@@ -48,7 +48,17 @@ const { data: linkedEquipmentsRaw, error: linkError } = await supabase
   .select("equipment_id, quantity, equipment:equipment_id(name)")
   .eq("product_id", product.id)
 
-const linkedEquipments = linkedEquipmentsRaw as LinkedEquipment[]
+  const linkedEquipments = (linkedEquipmentsRaw || []).map((item) => {
+    const equipment = Array.isArray(item.equipment)
+      ? item.equipment[0] || null // corrige se vier como array inesperado
+      : item.equipment
+  
+    return {
+      equipment_id: item.equipment_id,
+      quantity: item.quantity,
+      equipment: equipment,
+    } satisfies LinkedEquipment
+  })
 
 if (linkError) {
   console.error("Erro ao buscar equipamentos vinculados:", linkError)

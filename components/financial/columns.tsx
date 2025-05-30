@@ -37,24 +37,6 @@ export function financialColumns({
       enableHiding: false,
     },
     {
-      id: "issue_date",
-      header: "Emissão",
-      meta: { className: "truncate" },
-      accessorFn: (row) => row.issue_date,
-      filterFn: (row, columnId, filterValue) => {
-        const value = row.getValue(columnId)
-        if (typeof value !== "string") return false
-        const formatted = format(parseISO(value), "yyyy-MM-dd")
-        return formatted === filterValue
-      },
-      cell: ({ row }) => {
-        const rawDate = row.original.issue_date
-        if (!rawDate) return "—"
-        const [year, month, day] = rawDate.split("-")
-        return `${day}/${month}/${year}`
-      },
-    },
-    {
       id: "due_date",
       header: "Vencimento",
       meta: { className: "truncate" },
@@ -67,6 +49,24 @@ export function financialColumns({
       },
       cell: ({ row }) => {
         const rawDate = row.original.due_date
+        if (!rawDate) return "—"
+        const [year, month, day] = rawDate.split("-")
+        return `${day}/${month}/${year}`
+      },
+    },
+    {
+      id: "issue_date",
+      header: "Emissão",
+      meta: { className: "truncate" },
+      accessorFn: (row) => row.issue_date,
+      filterFn: (row, columnId, filterValue) => {
+        const value = row.getValue(columnId)
+        if (typeof value !== "string") return false
+        const formatted = format(parseISO(value), "yyyy-MM-dd")
+        return formatted === filterValue
+      },
+      cell: ({ row }) => {
+        const rawDate = row.original.issue_date
         if (!rawDate) return "—"
         const [year, month, day] = rawDate.split("-")
         return `${day}/${month}/${year}`

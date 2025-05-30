@@ -63,8 +63,10 @@ useEffect(() => {
   }
 }, [activeTheme])
 
+const theme = activeTheme ?? DEFAULT_THEME;
+
   return (
-    <ThemeContext.Provider value={{ activeTheme, setActiveTheme }}>
+    <ThemeContext.Provider value={{ activeTheme: theme, setActiveTheme }}>
       {children}
     </ThemeContext.Provider>
   );
