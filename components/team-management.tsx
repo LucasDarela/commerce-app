@@ -48,10 +48,8 @@ export default function TeamManagementPage() {
   
     const { data, error } = await supabase
       .from("company_users")
-      .select("role, user_id, profiles(id, email)")
+      .select("user_id, role, profiles(id, email)")
       .eq("company_id", companyId);
-
-      console.log("🔍 company_users data:", data);
   
     if (error) {
       console.error("Erro ao buscar equipe:", error.message);
@@ -61,7 +59,7 @@ export default function TeamManagementPage() {
     const members: TeamMember[] = (data || [])
       .filter((item: any) => item.profiles)
       .map((item: any) => ({
-        id: item.user_id, // ← Importante para saber quem é o user
+        id: item.user_id,
         email: item.profiles.email,
         role: item.role,
         isBlocked: false,
@@ -100,59 +98,52 @@ export default function TeamManagementPage() {
       password: newMember.password,
     });
   
-    if (error) return toast.error("Erro ao criar usuário.");
+    if (error) {
+      setIsAdding(false);
+      return toast.error("Erro ao criar usuário.");
+    }
   
     const newUserId = data.user?.id;
-    if (!newUserId) return toast.error("Usuário não foi criado corretamente.");
+    if (!newUserId) {
+      setIsAdding(false);
+      return toast.error("Usuário não foi criado corretamente.");
+    }
   
-    // ✅ Aguarda até que o profile seja criado
+    // 1️⃣ Insere no company_users imediatamente — isso ativa a trigger
+    const { error: insertError } = await supabase.from("company_users").insert({
+      user_id: newUserId,
+      company_id: companyId,
+      role: newMember.role,
+    });
+  
+    if (insertError) {
+      setIsAdding(false);
+      return toast.error("Erro ao vincular o usuário à empresa.");
+    }
+  
+    // 2️⃣ Aguarda o profile ser criado e atualizado pela trigger
     let profileReady = false;
     let attempts = 0;
     while (!profileReady && attempts < 10) {
       const { data: profile } = await supabase
         .from("profiles")
-        .select("id")
+        .select("company_id")
         .eq("id", newUserId)
         .maybeSingle();
   
-      if (profile) {
+      if (profile?.company_id) {
         profileReady = true;
       } else {
-        await new Promise((res) => setTimeout(res, 500)); // espera 500ms
+        await new Promise((res) => setTimeout(res, 500));
         attempts++;
       }
     }
-      // 3. 🔁 INSERE no company_users (espelhando)
-  await supabase.from("company_users").upsert({
-    user_id: newUserId,
-    company_id: companyId,
-    role: newMember.role,
-  });
-
-  // 4. 🔁 Atualiza manualmente o company_id no profile
-  await supabase
-    .from("profiles")
-    .update({ company_id: companyId })
-    .eq("id", newUserId);
   
-    // ✅ Insere em company_users (a trigger atualizará o profile)
-    const { error: insertError } = await supabase
-      .from("company_users")
-      .insert({
-        user_id: newUserId,
-        company_id: companyId,
-        role: newMember.role,
-      });
-  
-    if (insertError) {
-      return toast.error("Erro ao vincular o usuário à empresa.");
-    }
-  
-    // Atualiza a UI e reseta o form
+    // ✅ Finaliza
     try {
-      toast.success("Team member added.");
+      toast.success("Membro adicionado com sucesso.");
       setNewMember({ email: "", password: "", role: "normal" });
-      await fetchTeam(); // carrega a nova lista com os dados atualizados
+      await fetchTeam();
     } finally {
       setIsAdding(false);
     }
