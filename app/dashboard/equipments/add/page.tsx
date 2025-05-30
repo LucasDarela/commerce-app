@@ -72,7 +72,7 @@ export default function AddEquipmentPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto py-6 space-y-6">
+    <div className="max-w-2xl mx-auto py-6 space-y-6 overflow-x-hidden">
       <h2 className="text-xl font-bold">Cadastrar Equipamento</h2>
 
       <div className="space-y-2">
@@ -122,8 +122,14 @@ export default function AddEquipmentPage() {
         </div>
       </div>
 
-      <div className="space-y-2">
-        <Textarea value={form.description} onChange={(e) => handleChange("description", e.target.value)} placeholder="Descrição" />
+      <div className="space-y-2 w-full max-w-full overflow-hidden">
+      <Textarea
+  className="w-full resize-y break-words"
+  rows={4}
+  value={form.description}
+  onChange={(e) => handleChange("description", e.target.value)}
+  placeholder="Descrição"
+/>
       </div>
 
       <Button onClick={handleSubmit} className="w-full mt-4">Salvar Equipamento</Button>

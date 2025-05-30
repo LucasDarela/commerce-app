@@ -132,7 +132,6 @@ export const equipmentSchema = z.object({
     }
   }
 
-
 // Create a separate component for the drag handle
 function DragHandle({ id }: { id: string }) {
   const { attributes, listeners } = useSortable({ id })
@@ -197,6 +196,7 @@ export function DataEquipments({
   const [equipments, setEquipments] = useState<Equipment[]>([])
   const [loading, setLoading] = useState(true)
   const [isSavingEquipment, setIsSavingEquipment] = useState(false)
+  const [search, setSearch] = useState("");
 
   const handleDeleteEquipment = async (equipmentId: string) => {
     if (!confirm("Tem certeza que deseja excluir este equipamento?")) return;
@@ -332,8 +332,18 @@ export function DataEquipments({
     [data]
   )
 
+  const filteredEquipments = React.useMemo(() => {
+    if (!search) return equipments
+    const lowerSearch = search.toLowerCase()
+  
+    return equipments.filter((equipment) =>
+      equipment.name?.toLowerCase().includes(lowerSearch) ||
+      equipment.code?.toLowerCase().includes(lowerSearch)
+    )
+  }, [search, equipments])
+
   const table = useReactTable<Equipment>({
-    data: equipments,
+    data: filteredEquipments,
     columns,
     state: {
       sorting,
@@ -393,6 +403,7 @@ export function DataEquipments({
     <>
     {isSavingEquipment && (
       <div className="fixed top-2 left-1/2 z-50 -translate-x-1/2 rounded-full bg-white p-2 shadow-lg border border-muted">
+
         <svg
           className="animate-spin h-4 w-4 text-primary"
           xmlns="http://www.w3.org/2000/svg"
@@ -415,56 +426,71 @@ export function DataEquipments({
         </svg>
       </div>
     )}
+      <div className="px-8">
+          <h2 className="text-xl font-bold">Equipamentos</h2>
+      </div>
+
     <Tabs
       defaultValue="outline"
       className="w-full flex-col justify-start gap-6"
     >
       {/* Selector  */}
-      <div className="flex items-center justify-end gap-2 px-4 lg:px-6">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                <IconLayoutColumns />
-                <span className="hidden lg:inline">Customize Columns</span>
-                <span className="lg:hidden">Columns</span>
-                <IconChevronDown />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              {table
-                .getAllColumns()
-                .filter(
-                  (column) =>
-                    typeof column.accessorFn !== "undefined" &&
-                    column.getCanHide()
-                )
-                .map((column) => {
-                  return (
-                    <DropdownMenuCheckboxItem
-                      key={column.id}
-                      className="capitalize"
-                      checked={column.getIsVisible()}
-                      onCheckedChange={(value) =>
-                        column.toggleVisibility(!!value)
-                      }
-                    >
-                      {column.id}
-                    </DropdownMenuCheckboxItem>
-                  )
-                })}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Link href="/dashboard/equipments/add">
-            <Button
-              variant="default"
-              size="sm"
-              className="min-w-[100px] w-full bg-primary text-primary-foreground hover:bg-primary/90"
-            >
-              <IconPlus className="mr-1" />
-              <span className="hidden sm:inline">Equipamento</span>
-            </Button>
-          </Link>
+      <div className="flex items-center justify-between gap-2 px-4 lg:px-6">
+      {/* Input que cresce */}
+      <div className="flex-grow">
+        <Input
+          type="text"
+          placeholder="Buscar por nome ou código"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full"
+        />
       </div>
+
+  {/* Botões fixos */}
+  <div className="flex items-center gap-2">
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm">
+          <IconLayoutColumns />
+          <span className="hidden lg:inline">Customize Columns</span>
+          <span className="lg:hidden">Columns</span>
+          <IconChevronDown />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        {table
+          .getAllColumns()
+          .filter(
+            (column) =>
+              typeof column.accessorFn !== "undefined" &&
+              column.getCanHide()
+          )
+          .map((column) => (
+            <DropdownMenuCheckboxItem
+              key={column.id}
+              className="capitalize"
+              checked={column.getIsVisible()}
+              onCheckedChange={(value) => column.toggleVisibility(!!value)}
+            >
+              {column.id}
+            </DropdownMenuCheckboxItem>
+          ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+
+    <Link href="/dashboard/equipments/add">
+      <Button
+        variant="default"
+        size="sm"
+        className="min-w-[100px] bg-primary text-primary-foreground hover:bg-primary/90"
+      >
+        <IconPlus className="mr-1" />
+        <span className="hidden sm:inline">Equipamento</span>
+      </Button>
+    </Link>
+  </div>
+</div>
       {/* Delivery Tabs  */}
       <TabsContent
         value="outline"

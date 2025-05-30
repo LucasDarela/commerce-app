@@ -781,6 +781,9 @@ const [returnModalItems, setReturnModalItems] = useState<Item[]>([])
         </svg>
       </div>
     )}
+          <div className="px-8">
+          <h2 className="text-xl font-bold">Vendas</h2>
+      </div>
 <div className="grid gap-2 px-4 lg:px-6 py-2 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 items-center">
   {/* Filtro por data */}
   <Input
