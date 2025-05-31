@@ -23,6 +23,7 @@ import {
   TableCell,
 } from "@/components/ui/table"
 import { toast } from "sonner";
+import { PasswordInput } from "./ui/password-input";
 
 type TeamMember = {
   id: string;
@@ -85,65 +86,57 @@ export default function TeamManagementPage() {
     fetchTeam();
   }, [user?.id, companyId]);
 
-
   const handleAddMember = async () => {
     if (!newMember.email || !newMember.password) {
-      return toast.error("Please fill in email and password.");
+      return toast.error("Preencha o e-mail e a senha.");
     }
   
     setIsAdding(true);
   
-    const { data, error } = await supabase.auth.signUp({
-      email: newMember.email,
-      password: newMember.password,
-    });
-  
-    if (error) {
-      setIsAdding(false);
-      return toast.error("Erro ao criar usuário.");
-    }
-  
-    const newUserId = data.user?.id;
-    if (!newUserId) {
-      setIsAdding(false);
-      return toast.error("Usuário não foi criado corretamente.");
-    }
-  
-    // 1️⃣ Insere no company_users imediatamente — isso ativa a trigger
-    const { error: insertError } = await supabase.from("company_users").insert({
-      user_id: newUserId,
-      company_id: companyId,
-      role: newMember.role,
-    });
-  
-    if (insertError) {
-      setIsAdding(false);
-      return toast.error("Erro ao vincular o usuário à empresa.");
-    }
-  
-    // 2️⃣ Aguarda o profile ser criado e atualizado pela trigger
-    let profileReady = false;
-    let attempts = 0;
-    while (!profileReady && attempts < 10) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("company_id")
-        .eq("id", newUserId)
-        .maybeSingle();
-  
-      if (profile?.company_id) {
-        profileReady = true;
-      } else {
-        await new Promise((res) => setTimeout(res, 500));
-        attempts++;
-      }
-    }
-  
-    // ✅ Finaliza
     try {
-      toast.success("Membro adicionado com sucesso.");
-      setNewMember({ email: "", password: "", role: "normal" });
+      // 1️⃣ Verifica se o e-mail já está em uso
+      const { data: emailExistsRaw, error: emailCheckError } = await supabase
+        .rpc("check_user_exists", { email_input: newMember.email });
+  
+      if (emailCheckError) {
+        throw new Error("Erro ao verificar e-mail.");
+      }
+  
+      if (emailExistsRaw) {
+        toast.error("Este e-mail já está em uso.");
+        return;
+      }
+  
+      // 2️⃣ Chama a rota backend para criar usuário
+      const res = await fetch("/api/users/add-member", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: newMember.email,
+          password: newMember.password,
+          company_id: companyId,
+        }),
+      });
+  
+      let data;
+      try {
+        data = await res.json();
+      } catch (jsonErr) {
+        console.error("Erro ao fazer parse do JSON:", jsonErr);
+        throw new Error("Erro interno ao processar resposta.");
+      }
+  
+      if (!res.ok) {
+        console.error("❌ Backend:", data);
+        throw new Error(data.error || "Erro ao adicionar membro.");
+      }
+  
+      // ✅ Sucesso
+      toast.success("Membro adicionado com sucesso!");
       await fetchTeam();
+      setNewMember({ email: "", password: "", role: "normal" });
+    } catch (err: any) {
+      toast.error(err.message || "Erro inesperado.");
     } finally {
       setIsAdding(false);
     }
@@ -163,7 +156,7 @@ export default function TeamManagementPage() {
 
   const handleRemoveUser = async (id: string) => {
     setTeamMembers((prev) => prev.filter((member) => member.id !== id));
-    toast("User removed");
+    toast("Usuário Removido");
   };
 
   return (
@@ -178,10 +171,9 @@ export default function TeamManagementPage() {
               setNewMember({ ...newMember, email: e.target.value })
             }
           />
-          <Input
-            type="password"
+          <PasswordInput
             placeholder="Password"
-            value={newMember.password ?? ""}
+            value={newMember.password}
             onChange={(e) =>
               setNewMember({ ...newMember, password: e.target.value })
             }
