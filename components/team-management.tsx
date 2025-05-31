@@ -47,24 +47,40 @@ export default function TeamManagementPage() {
   const fetchTeam = async () => {
     if (!companyId) return;
   
-    const { data, error } = await supabase
+    // 1️⃣ Buscar todos os usuários da empresa
+    const { data: usersData, error: usersError } = await supabase
       .from("company_users")
-      .select("user_id, role, profiles(id, email)")
+      .select("user_id, role")
       .eq("company_id", companyId);
   
-    if (error) {
-      console.error("Erro ao buscar equipe:", error.message);
+    if (usersError) {
+      console.error("Erro ao buscar company_users:", usersError.message);
       return;
     }
   
-    const members: TeamMember[] = (data || [])
-      .filter((item: any) => item.profiles)
-      .map((item: any) => ({
-        id: item.user_id,
-        email: item.profiles.email,
-        role: item.role,
+    const userIds = usersData.map((user) => user.user_id);
+  
+    // 2️⃣ Buscar os perfis correspondentes
+    const { data: profilesData, error: profilesError } = await supabase
+      .from("profiles")
+      .select("id, email")
+      .in("id", userIds);
+  
+    if (profilesError) {
+      console.error("Erro ao buscar profiles:", profilesError.message);
+      return;
+    }
+  
+    // 3️⃣ Unir os dados manualmente
+    const members: TeamMember[] = usersData.map((user) => {
+      const profile = profilesData.find((p) => p.id === user.user_id);
+      return {
+        id: user.user_id,
+        email: profile?.email || "Desconhecido",
+        role: user.role,
         isBlocked: false,
-      }));
+      };
+    });
   
     setTeamMembers(members);
   };

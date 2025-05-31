@@ -17,8 +17,9 @@ export async function middleware(req: NextRequest) {
 
   const userId = user.id;
 
-  // ⚠️ Só executa essa parte para rotas sensíveis (ex: API ou painel de admin)
-  const isRestrictedAdminRoute = req.nextUrl.pathname.startsWith("/dashboard/team") || req.nextUrl.pathname.startsWith("/api/users/add-member");
+  const isRestrictedAdminRoute =
+    req.nextUrl.pathname.startsWith("/dashboard/team") ||
+    req.nextUrl.pathname.startsWith("/api/users/add-member");
 
   if (isRestrictedAdminRoute) {
     const { data: companyUser, error } = await supabase
@@ -28,7 +29,7 @@ export async function middleware(req: NextRequest) {
       .maybeSingle();
 
     if (error || !companyUser || companyUser.role !== "admin") {
-      return NextResponse.redirect(new URL("/unauthorized", req.url)); // 🔒 Página de acesso negado
+      return NextResponse.redirect(new URL("/unauthorized", req.url));
     }
   }
 
@@ -38,6 +39,6 @@ export async function middleware(req: NextRequest) {
 export const config = {
   matcher: [
     "/dashboard/:path*",
-    "/api/users/add-member", // 🔒 protege endpoint API
+    "/api/users/add-member",
   ],
 };
