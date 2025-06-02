@@ -18,17 +18,14 @@ import type { FinancialRecord } from "@/components/financial/DataFinancialTable"
 
 type Props<T> = {
   table: Table<T>
-  data: T[]
-  columns: CustomColumnDef<T>[]
+  rows?: Row<T>[] 
+  data?: T[] 
+  columns?: CustomColumnDef<T>[]
 }
 
-export function DataTableConfig<T extends { id: string }>({ data, columns, table: ReactTable, }: Props<T>) {
-  const table = useReactTable({
-    data,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-  })
-
+export function DataTableConfig<T extends { id: string }>({ table, rows }: Props<T>) {
+  const visibleRows = rows ?? table.getRowModel().rows
+  
   return (
     <div className="overflow-hidden rounded-lg border">
       <UITable className="w-full uppercase">
@@ -48,15 +45,15 @@ export function DataTableConfig<T extends { id: string }>({ data, columns, table
           ))}
         </TableHeader>
         <TableBody>
-        {table.getRowModel().rows.map((row) => (
-        <TableRow key={row.id}>
-          {row.getVisibleCells().map((cell) => (
-            <TableCell className="h-13" key={cell.id}>
-              {flexRender(cell.column.columnDef.cell, cell.getContext())}
-            </TableCell>
+          {visibleRows.map((row) => (
+            <TableRow key={row.id}>
+              {row.getVisibleCells().map((cell) => (
+                <TableCell className="h-13" key={cell.id}>
+                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                </TableCell>
+              ))}
+            </TableRow>
           ))}
-        </TableRow>
-      ))}
         </TableBody>
       </UITable>
     </div>

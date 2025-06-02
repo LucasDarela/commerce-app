@@ -41,7 +41,7 @@ export async function POST(req: Request) {
     const rawNewPayed = oldPayed + total_payed;
     const cappedPayed = Math.min(rawNewPayed, Number(safeOrder.total));
     
-    const newStatus = cappedPayed >= Number(safeOrder.total) ? "Pago" : "Pendente";
+    const newStatus = cappedPayed >= Number(safeOrder.total) ? "Paid" : "Unpaid";
 
     const { error: updateError } = await supabase
       .from("orders")

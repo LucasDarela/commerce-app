@@ -126,6 +126,7 @@ import { PaymentModal } from "@/components/payment-modal"
 import { LoanEquipmentModal } from "@/components/equipment-loan/LoanEquipmentModal"
 import { fetchEquipmentsForOrderProducts } from "@/lib/fetch-equipments-for-products"
 import { ReturnEquipmentModal } from "@/components/equipment-loan/ReturnEquipmentModal"
+import { getTranslatedStatus } from "@/utils/getTranslatedStatus"
 
 //New Schema
 export const schema = z.object({
@@ -143,7 +144,7 @@ export const schema = z.object({
   total: z.number(),
   total_payed: z.number().optional().nullable(),
   delivery_status: z.enum(["Entregar", "Coletar", "Coletado"]),
-  payment_status: z.enum(["Pendente", "Pago"]),
+  payment_status: z.enum(["Unpaid", "Paid"]),
   payment_method: z.enum(["Pix", "Dinheiro", "Boleto", "Cartao"]),
   order_index: z.number().nullable().optional(),
   issue_date: z.string().optional().nullable(),
@@ -285,6 +286,11 @@ const [initialLoanItems, setInitialLoanItems] = useState<any[] | undefined>()
 const [isReturnModalOpen, setIsReturnModalOpen] = useState(false)
 const [returnModalCustomerId, setReturnModalCustomerId] = useState<string | null>(null)
 const [returnModalItems, setReturnModalItems] = useState<Item[]>([]) 
+
+const [selectedMonth, setSelectedMonth] = useState(() => {
+  const today = new Date()
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`
+})
 
 
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
@@ -549,7 +555,11 @@ const [returnModalItems, setReturnModalItems] = useState<Item[]>([])
       header: "Pagamento",
       size: 90,
       meta: { className: "w-[90px] uppercase" },
-      cell: ({ row }) => row.original.payment_status,
+      filterFn: "equals",
+      cell: ({ row }) => {
+        const payment_status = row.original.payment_status
+        return getTranslatedStatus({ source: "order", payment_status })
+      },
     },
     {
       accessorKey: "remaining",
@@ -646,7 +656,12 @@ const [returnModalItems, setReturnModalItems] = useState<Item[]>([])
   )
 
   const table = useReactTable<Order>({
-    data: orders,
+    data: React.useMemo(() => {
+      return orders.filter((order) => {
+        if (!order.appointment_date) return false
+        return order.appointment_date.startsWith(selectedMonth)
+      })
+    }, [orders, selectedMonth]),
     columns,
     state: {
       sorting,
@@ -752,6 +767,17 @@ const [returnModalItems, setReturnModalItems] = useState<Item[]>([])
     }
   }
 
+  const monthsAvailable = React.useMemo(() => {
+    const unique = new Set<string>()
+    for (const order of orders) {
+      if (order.appointment_date) {
+        const [year, month] = order.appointment_date.split("-")
+        unique.add(`${year}-${month}`)
+      }
+    }
+    return Array.from(unique).sort().reverse() 
+  }, [orders])
+
   const isDisabled = !selectedCustomer?.customer_signature || selectedCustomer?.delivery_status === "Coletado"
 
   return (
@@ -853,8 +879,8 @@ const [returnModalItems, setReturnModalItems] = useState<Item[]>([])
     </SelectTrigger>
     <SelectContent>
       <SelectItem value="all">Todos</SelectItem>
-      <SelectItem value="Pendente">Pendente</SelectItem>
-      <SelectItem value="Pago">Pago</SelectItem>
+      <SelectItem value="Unpaid">Pendente</SelectItem>
+      <SelectItem value="Paid">Pago</SelectItem>
     </SelectContent>
   </Select>
 
@@ -898,14 +924,18 @@ const [returnModalItems, setReturnModalItems] = useState<Item[]>([])
 </div>
 
 
-    <Tabs
-      defaultValue="outline"
-      className="w-full flex-col justify-start gap-6"
-    >
-      <TabsContent
-        value="outline"
-        className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6"
-      >
+<Tabs value={selectedMonth} onValueChange={setSelectedMonth} className="overflow-hidden rounded-lg ">
+<TabsList className="mb-4 mx-6">
+  {monthsAvailable.map((month) => {
+    const [year, monthNum] = month.split("-")
+    return (
+      <TabsTrigger key={month} value={month} className="capitalize">
+        {`${parseInt(monthNum, 10)}/${year}`}
+      </TabsTrigger>
+    )
+  })}
+</TabsList>
+  <TabsContent value={selectedMonth} className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6">
         <div className="overflow-hidden rounded-lg border">
           <DndContext
             collisionDetection={closestCenter}
@@ -1003,7 +1033,10 @@ const [returnModalItems, setReturnModalItems] = useState<Item[]>([])
         <div><strong>Total:</strong> {selectedCustomer.total}</div>
         <div><strong>Forma de Pagamento:</strong> {selectedCustomer.payment_method}</div>
         <div><strong>Delivery:</strong> {selectedCustomer.delivery_status}</div>
-        <div><strong>Pagamento:</strong> {selectedCustomer.payment_status}</div>
+        <div>
+          <strong>Pagamento:</strong>{" "}
+          {selectedCustomer ? getTranslatedStatus({ source: "order", payment_status: selectedCustomer.payment_status }) : "—"}
+        </div>
 
         <Button
           className="mt-6"

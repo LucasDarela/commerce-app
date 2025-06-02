@@ -16,30 +16,39 @@ import { CombinedRecord } from "./DataFinancialTable"
 import { TablePagination } from "@/components/ui/pagination"
 import type { Order, FinancialRecord } from "./DataFinancialTable"
 
-// interface MonthlyFinancialTableProps {
-//   table: ReturnType<typeof useReactTable<CombinedRecord>>
-// }
 
 type MonthlyFinancialTableProps = {
-  records: (Order | FinancialRecord)[]
-  columns: ColumnDef<CombinedRecord, any>[] 
+  table: ReturnType<typeof useReactTable<CombinedRecord>>
+  monthKey: string
 }
 
-export function MonthlyFinancialTable({ records, columns }: MonthlyFinancialTableProps) {
 
-  const [pagination, setPagination] = React.useState({
-    pageIndex: 0,
-    pageSize: 10,
-  })
+export function MonthlyFinancialTable({ table, monthKey }: MonthlyFinancialTableProps) {
+  const baseRows = table.getFilteredRowModel().rows
 
+  const filteredRows = React.useMemo(() => {
+    return baseRows.filter((row) => {
+      const dueDate = row.original.due_date
+      if (!dueDate) return false
+      const [year, month] = dueDate.split("-")
+      return `${month}/${year}` === monthKey
+    })
+  }, [baseRows, monthKey])
 
-  const table = useReactTable<CombinedRecord>({
-    data: records,
+  const data = React.useMemo(() => filteredRows.map((r) => r.original), [filteredRows])
+  const columns = React.useMemo(() => table.getAllColumns().map((col) => col.columnDef), [table])
+
+  const state = table.getState()
+
+  const tableForMonth = useReactTable({
+    data,
     columns,
     state: {
-      pagination,
+      sorting: state.sorting,
+      columnVisibility: state.columnVisibility,
+      columnFilters: state.columnFilters,
+      rowSelection: state.rowSelection,
     },
-    onPaginationChange: setPagination,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
@@ -48,12 +57,8 @@ export function MonthlyFinancialTable({ records, columns }: MonthlyFinancialTabl
 
   return (
     <>
-      <DataTableConfig
-        table={table}
-        data={table.getRowModel().rows.map(row => row.original)}
-        columns={columns}
-      />
-      <TablePagination table={table} />
+      <DataTableConfig table={tableForMonth} />
+      <TablePagination table={tableForMonth} />
     </>
   )
 }

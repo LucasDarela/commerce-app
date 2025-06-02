@@ -20,7 +20,7 @@ import { toast } from "sonner"
 interface Order {
   id: string;
   total: number;
-  payment_status: "Pendente" | "Pago";
+  payment_status: "Unpaid" | "Paid";
   payment_method: "Pix" | "Dinheiro" | "Boleto" | "Cartao";
   total_payed?: number;
 }

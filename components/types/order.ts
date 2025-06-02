@@ -8,7 +8,7 @@ export type Order = {
   products: string
   amount: number
   delivery_status: "Entregar" | "Coletar" | "Coletado"
-  payment_status: "Pendente" | "Pago"
+  payment_status: "Unpaid" | "Paid"
   payment_method: "Pix" | "Dinheiro" | "Boleto" | "Cartao"
   days_ticket?: string | number
   freight?: string | number | null

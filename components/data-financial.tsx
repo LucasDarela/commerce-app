@@ -116,7 +116,7 @@ export const schema = z.object({
     products: z.string(),
     delivery_status: z.enum(["Entregar", "Coletar", "Coletado"]), 
     payment_method: z.enum(["Pix", "Dinheiro", "Boleto", "Cartao"]),
-    payment_status: z.enum(["Pendente", "Pago"]),
+    payment_status: z.enum(["Unpaid", "Paid"]),
     days_ticket: z.union([z.string(), z.number()]).optional(),
     freight: z.union([z.string(), z.number(), z.null()]).optional(),
     note_number: z.string().optional(),
@@ -393,7 +393,7 @@ export default function DataFinancialTable() {
       issue_date: o.issue_date || "", 
       due_date: o.due_date || null,
       amount: o.total,
-      status: o.payment_status === "Pago" ? "Paid" : "Unpaid" as "Paid",
+      status: o.payment_status === "Paid" ? "Paid" : "Unpaid",
       payment_method: mapToFinancial(o.payment_method),
       supplier_id: "", 
       supplier: o.customer || "Cliente",
@@ -461,7 +461,7 @@ export default function DataFinancialTable() {
       if (isFinancial(row)) return suppliers.find(s => s.id === row.supplier_id)?.name || row.supplier
       return "—"
     },
-    filterFn: "includesString", // <- ESSENCIAL para funcionar com filtro
+    filterFn: "includesString", 
     meta: { className: "w-[250px] truncate uppercase" },
     cell: ({ row }) => {
       const record = row.original
@@ -556,12 +556,15 @@ const link = `https://wa.me/55${phoneClean}?text=${encodedMessage}`
       meta: { className: "uppercase truncate" },
       cell: ({ row }) => {
         const data = row.original as Order | FinancialRecord
-        if (isFinancial(data)) {
-          return data.status === "Paid" ? "Pago" : "Pendente"
-        } else if (isOrder(data)) {
-          return data.payment_status
-        }
-        return "—"
+    
+        const status =
+          isFinancial(data) ? data.status : isOrder(data) ? data.payment_status : undefined
+    
+        return status === "Paid"
+          ? "Pago"
+          : status === "Unpaid"
+          ? "Pendente"
+          : "—"
       },
     },
     {
@@ -594,7 +597,7 @@ const link = `https://wa.me/55${phoneClean}?text=${encodedMessage}`
       size: 50,
       meta: { className: "w-[50px]" },
       cell: ({ row }) => {
-        // return <ActionsCell row={row} onDelete={deleteOrderById} />
+       
       },
     },
   ]
@@ -862,8 +865,8 @@ const link = `https://wa.me/55${phoneClean}?text=${encodedMessage}`
     </SelectTrigger>
     <SelectContent>
       <SelectItem value="all">Todos</SelectItem>
-      <SelectItem value="Pendente">Pendente</SelectItem>
-      <SelectItem value="Pago">Pago</SelectItem>
+      <SelectItem value="Unpaid">Pendente</SelectItem>
+      <SelectItem value="Paid">Pago</SelectItem>
     </SelectContent>
   </Select>
 </div>
@@ -929,91 +932,6 @@ const link = `https://wa.me/55${phoneClean}?text=${encodedMessage}`
                 )}
               </TableBody>
             </Table>
-            <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-            <SheetContent side="right">
-              <SheetHeader>
-                <SheetTitle>Detalhes do Pedido</SheetTitle>
-                <SheetDescription>
-                  Detalhes sobre: <strong>{selectedCustomer?.customer}</strong><br/>
-                  Nota: <strong>{selectedCustomer?.note_number}</strong><br/>
-                  Tipo: <strong>{selectedCustomer?.document_type}</strong><br/>
-                </SheetDescription>
-              </SheetHeader>
-
-    {selectedCustomer && (
-      <div className="mt-4 ml-4 flex flex-col gap-2 text-sm">
-        <div>
-          <strong>Data:</strong>{" "}
-          {selectedCustomer?.appointment_date
-            ? format(parseISO(selectedCustomer.appointment_date), "dd/MM/yyyy")
-            : "—"}
-        </div>
-        <div><strong>Hora:</strong> {selectedCustomer.appointment_hour}</div>
-        <div><strong>Nome:</strong> {selectedCustomer.customer}</div>
-          {selectedCustomer?.phone && (
-              <div>
-                <strong>Telefone:</strong>{" "}
-                <a
-                  href={`https://wa.me/55${selectedCustomer.phone.replace(/\D/g, "")}?text=${encodeURIComponent("Olá, tudo bem? Sua entrega de chopp está a caminho.")}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary hover:underline"
-                >
-                  {selectedCustomer.phone}
-                </a>
-              </div>
-            )}
-        <div><strong>Produtos:</strong><br/> {selectedCustomer.products}</div>
-        <div><strong>Quantidade:</strong> {selectedCustomer.amount}</div>
-        <div><strong>Localização:</strong> {selectedCustomer.appointment_local}</div>
-        <div><strong>Frete:</strong> {selectedCustomer.freight}</div>
-        <div><strong>Total:</strong> {selectedCustomer.total}</div>
-        <div><strong>Forma de Pagamento:</strong> {selectedCustomer.payment_method}</div>
-        <div><strong>Delivery:</strong> {selectedCustomer.delivery_status}</div>
-        <div><strong>Pagamento:</strong> {selectedCustomer.payment_status}</div>
-
-        <Button
-            className="mt-6"
-            variant={selectedCustomer?.delivery_status === "Coletado" ? "secondary" : "default"}
-            disabled={selectedCustomer?.delivery_status === "Coletado"}
-            onClick={async () => {
-              if (!selectedCustomer) return;
-
-              let nextStatus: "Coletar" | "Coletado" | null = null;
-
-              if (selectedCustomer.delivery_status === "Entregar") {
-                nextStatus = "Coletar";
-              } else if (selectedCustomer.delivery_status === "Coletar") {
-                nextStatus = "Coletado";
-              }
-
-              if (nextStatus) {
-                const { error } = await supabase
-                  .from("orders")
-                  .update({ delivery_status: nextStatus })
-                  .eq("id", selectedCustomer.id);
-
-                if (!error) {
-                  setSelectedCustomer({
-                    ...selectedCustomer,
-                    delivery_status: nextStatus,
-                  });
-                  toast.success(`Status atualizado para ${nextStatus}`);
-                } else {
-                  toast.error("Erro ao atualizar status.");
-                  console.error(error);
-                }
-              }
-            }}
-          >
-            {selectedCustomer?.delivery_status === "Entregar" && "Marcar como Entregue"}
-            {selectedCustomer?.delivery_status === "Coletar" && "Marcar como Coletado"}
-            {selectedCustomer?.delivery_status === "Coletado" && "Chopp já Coletado ✅"}
-          </Button>
-      </div>
-    )}
-  </SheetContent>
-</Sheet>
           </DndContext>
         </div>
         <div className="flex items-center justify-between px-4">

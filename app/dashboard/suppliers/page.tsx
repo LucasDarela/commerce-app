@@ -125,7 +125,7 @@ export default function ListSuppliers() {
   return (
     <div className="p-8">
       <h2 className="text-xl font-bold mb-4">Fornecedores</h2>
-      <div className="mb-6 flex flex-col-2 gap-6">
+      <div className="mb-6 flex flex-col sm:flex-row gap-4 items-stretch">
         <Input
           type="text"
           placeholder="Search by name, document or phone..."

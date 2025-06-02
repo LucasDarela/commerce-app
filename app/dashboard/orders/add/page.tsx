@@ -272,8 +272,11 @@ const dueDate = format(
       note_number: order.note_number,
       document_type: order!.document_type,
       payment_method: capitalize(order?.payment_method || ""),
-      payment_status: "Pendente",
-      days_ticket: ["Pix", "Dinheiro"].includes(capitalize(order?.payment_method || "")) ? "1" : order?.days_ticket || "1",
+      payment_status: "Unpaid",
+      days_ticket:
+        capitalize(order?.payment_method || "") === "Boleto"
+          ? order?.days_ticket || "12"
+          : "1",
       total,
       freight,
       delivery_status: "Entregar",
@@ -283,7 +286,18 @@ const dueDate = format(
       company_id: companyId,
       created_at: new Date().toISOString(),
       issue_date: new Date().toISOString().split("T")[0],
-      due_date: new Date(Date.now() + Number(order?.days_ticket || 1) * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+      due_date:
+        ["Pix", "Dinheiro", "Cartao"].includes(capitalize(order?.payment_method || "")) && appointment.date
+          ? format(appointment.date, "yyyy-MM-dd")
+          : appointment.date
+            ? format(
+                new Date(
+                  appointment.date.getTime() +
+                    Number(order?.days_ticket || 12) * 24 * 60 * 60 * 1000
+                ),
+                "yyyy-MM-dd"
+              )
+            : null,
     };
   
     const { data: insertedOrder, error } = await supabase

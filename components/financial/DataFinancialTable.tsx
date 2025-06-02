@@ -144,7 +144,7 @@ export default function DataFinancialTable() {
         ...o,
         source: "order" as const,
         amount: o.total,
-        status: o.payment_status === "Pago" ? "Paid" : "Unpaid",
+        status: o.payment_status === "Paid" ? "Paid" : "Unpaid",
         payment_method: o.payment_method as "Pix" | "Dinheiro" | "Boleto" | "Cartao",
         supplier_id: "",
         supplier: o.customer,
@@ -273,7 +273,7 @@ const { totalReceber, totalPagar } = useMemo(() => {
 
         {monthKeysSorted.map((monthKey) => (
           <TabsContent key={monthKey} value={monthKey}>
-            <MonthlyFinancialTable records={groupedByMonth[monthKey]} columns={columns} />
+            <MonthlyFinancialTable table={table} monthKey={monthKey} />
           </TabsContent>
         ))}
       </Tabs>

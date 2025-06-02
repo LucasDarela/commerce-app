@@ -159,8 +159,8 @@ export function FinancialFilters<T>({
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">Todos</SelectItem>
-          <SelectItem value="Pendente">Pendente</SelectItem>
-          <SelectItem value="Pago">Pago</SelectItem>
+          <SelectItem value="Unpaid">Pendente</SelectItem>
+          <SelectItem value="Paid">Pago</SelectItem>
         </SelectContent>
       </Select>
     </div>
