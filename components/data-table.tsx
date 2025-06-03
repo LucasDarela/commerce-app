@@ -36,6 +36,7 @@ import {
   IconLoader,
   IconPlus,
   IconTrendingUp,
+  IconTrash,
 } from "@tabler/icons-react"
 import clsx from "clsx"
 import {
@@ -127,6 +128,11 @@ import { LoanEquipmentModal } from "@/components/equipment-loan/LoanEquipmentMod
 import { fetchEquipmentsForOrderProducts } from "@/lib/fetch-equipments-for-products"
 import { ReturnEquipmentModal } from "@/components/equipment-loan/ReturnEquipmentModal"
 import { getTranslatedStatus } from "@/utils/getTranslatedStatus"
+
+import DatePicker from "react-datepicker"
+import "react-datepicker/dist/react-datepicker.css"
+import CustomDateInput from "@/components/ui/CustomDateInput"
+
 
 //New Schema
 export const schema = z.object({
@@ -276,16 +282,18 @@ export function DataTable({
   const [isSavingOrder, setIsSavingOrder] = useState(false)
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [dateInput, setDateInput] = useState("")
+  // const [dateInput, setDateInput] = useState("")
   const { accessToken, loading: loadingIntegration, error: integrationError } = useCompanyIntegration('mercado_pago')
   const router = useRouter();
   const [isLoanModalOpen, setIsLoanModalOpen] = useState(false)
   const [initialLoanCustomer, setInitialLoanCustomer] = useState<{ id: string; name: string } | undefined>()
 const [initialLoanItems, setInitialLoanItems] = useState<any[] | undefined>()
-
+const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
 const [isReturnModalOpen, setIsReturnModalOpen] = useState(false)
 const [returnModalCustomerId, setReturnModalCustomerId] = useState<string | null>(null)
 const [returnModalItems, setReturnModalItems] = useState<Item[]>([]) 
+const [dateFilter, setDateFilter] = useState<Date | null>(null)
+const [issueDateFilter, setissueDateFilter] = useState<Date | null>(null)
 
 const [selectedMonth, setSelectedMonth] = useState(() => {
   const today = new Date()
@@ -302,7 +310,7 @@ const [selectedMonth, setSelectedMonth] = useState(() => {
   })
 
   function handleDateInput(e: React.ChangeEvent<HTMLInputElement>) {
-    let value = e.target.value.replace(/\D/g, "") // remove tudo que não é número
+    let value = e.target.value.replace(/\D/g, "") 
     if (value.length > 8) value = value.slice(0, 8)
   
     const parts = []
@@ -410,6 +418,7 @@ const [selectedMonth, setSelectedMonth] = useState(() => {
 
     fetchOrders()
   }, [])
+
 
   //const columns
   const columns: CustomColumnDef<Order>[] = [
@@ -778,6 +787,15 @@ const [selectedMonth, setSelectedMonth] = useState(() => {
     return Array.from(unique).sort().reverse() 
   }, [orders])
 
+  useEffect(() => {
+    if (selectedDate) {
+      const formatted = selectedDate.toISOString().split("T")[0] // yyyy-mm-dd
+      table.getColumn("appointment_date")?.setFilterValue(formatted)
+    } else {
+      table.getColumn("appointment_date")?.setFilterValue(undefined)
+    }
+  }, [selectedDate, table])
+
   const isDisabled = !selectedCustomer?.customer_signature || selectedCustomer?.delivery_status === "Coletado"
 
   return (
@@ -807,20 +825,107 @@ const [selectedMonth, setSelectedMonth] = useState(() => {
         </svg>
       </div>
     )}
-          <div className="px-8">
+          <div className="w-full flex justify-between items-center px-4 lg:px-6 my-2">
           <h2 className="text-xl font-bold">Vendas</h2>
+            {/* Botão Adicionar */}
+            <div className="flex gap-2">
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="min-w-[100px]">
+                    <IconLayoutColumns />
+                    <span className="hidden sm:inline">Colunas</span>
+                    <IconChevronDown />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  {table
+                    .getAllColumns()
+                    .filter((col) => typeof col.accessorFn !== "undefined" && col.getCanHide())
+                    .map((column) => (
+                      <DropdownMenuCheckboxItem
+                        key={column.id}
+                        className="capitalize"
+                        checked={column.getIsVisible()}
+                        onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                      >
+                        {column.id}
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+          <Link href="/dashboard/orders/add">
+            <Button
+              variant="default"
+              size="sm"
+              className="min-w-[100px] bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              <IconPlus className="mr-1" />
+              <span className="hidden sm:inline">Venda</span>
+            </Button>
+          </Link>
+          </div>
       </div>
-<div className="grid gap-2 px-4 lg:px-6 py-2 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 items-center">
+<div className="grid gap-2 px-4 lg:px-6 py-2 grid-cols-2 md:grid-cols-3 lg:grid-cols-6 items-center">
   {/* Filtro por data */}
-  <Input
-    type="text"
-    inputMode="numeric"
-    placeholder="Data"
-    value={dateInput}
-    onChange={handleDateInput}
-    maxLength={10}
-    className="min-w-[70px] w-full"
-  />
+<div className="relative w-full sm:w-full md:max-w-[250px] z-50">
+<DatePicker
+  selected={dateFilter}
+  onChange={(date: Date | null) => {
+    setDateFilter(date)
+    const isoDate = date?.toISOString().split("T")[0]
+    table.getColumn("appointment_date")?.setFilterValue(isoDate ?? undefined)
+  }}
+  placeholderText="Filtrar por Entrega"
+  dateFormat="dd/MM/yyyy"
+  customInput={<CustomDateInput />}
+  popperPlacement="bottom-start"
+  popperClassName="z-[9999]"
+/>
+
+{dateFilter && (
+  <button
+    type="button"
+    onClick={() => {
+      setDateFilter(null)
+      table.getColumn("appointment_date")?.setFilterValue(undefined)
+    }}
+    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-red-600"
+  >
+    <IconTrash className="w-4 h-4" />
+  </button>
+)}
+</div>
+
+<div className="relative w-full sm:w-full md:max-w-[250px] z-50">
+<DatePicker
+  selected={issueDateFilter}
+  onChange={(date: Date | null) => {
+    setissueDateFilter(date)
+    const isoDate = date?.toISOString().split("T")[0]
+    table.getColumn("issue_date")?.setFilterValue(isoDate ?? undefined)
+  }}
+  placeholderText="Filtrar por Emissão"
+  dateFormat="dd/MM/yyyy"
+  customInput={<CustomDateInput />}
+  popperPlacement="bottom-start"
+  popperClassName="z-[9999]"
+/>
+
+{issueDateFilter && (
+  <button
+    type="button"
+    onClick={() => {
+      setissueDateFilter(null)
+      table.getColumn("issue_date")?.setFilterValue(undefined)
+    }}
+    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-red-600"
+  >
+    <IconTrash className="w-4 h-4" />
+  </button>
+)}
+</div>
+
 
   {/* Nome do cliente */}
   <Input
@@ -856,7 +961,7 @@ const [selectedMonth, setSelectedMonth] = useState(() => {
     }
   >
     <SelectTrigger className="min-w-[90px] w-full">
-      <SelectValue placeholder="Pagamento" />
+      <SelectValue placeholder="Tipo" />
     </SelectTrigger>
     <SelectContent>
       <SelectItem value="all">Todos</SelectItem>
@@ -875,7 +980,7 @@ const [selectedMonth, setSelectedMonth] = useState(() => {
     }
   >
     <SelectTrigger className="min-w-[90px] w-full">
-      <SelectValue placeholder="Status" />
+      <SelectValue placeholder="Pagamento" />
     </SelectTrigger>
     <SelectContent>
       <SelectItem value="all">Todos</SelectItem>
@@ -883,49 +988,11 @@ const [selectedMonth, setSelectedMonth] = useState(() => {
       <SelectItem value="Paid">Pago</SelectItem>
     </SelectContent>
   </Select>
-
-  {/* Colunas */}
-  <DropdownMenu>
-    <DropdownMenuTrigger asChild>
-      <Button variant="outline" size="sm" className="min-w-[100px] w-full">
-        <IconLayoutColumns />
-        <span className="hidden sm:inline">Colunas</span>
-        <IconChevronDown />
-      </Button>
-    </DropdownMenuTrigger>
-    <DropdownMenuContent align="end" className="w-56">
-      {table
-        .getAllColumns()
-        .filter((col) => typeof col.accessorFn !== "undefined" && col.getCanHide())
-        .map((column) => (
-          <DropdownMenuCheckboxItem
-            key={column.id}
-            className="capitalize"
-            checked={column.getIsVisible()}
-            onCheckedChange={(value) => column.toggleVisibility(!!value)}
-          >
-            {column.id}
-          </DropdownMenuCheckboxItem>
-        ))}
-    </DropdownMenuContent>
-  </DropdownMenu>
-
-  {/* Botão Adicionar */}
-  <Link href="/dashboard/orders/add">
-    <Button
-      variant="default"
-      size="sm"
-      className="min-w-[100px] w-full bg-primary text-primary-foreground hover:bg-primary/90"
-    >
-      <IconPlus className="mr-1" />
-      <span className="hidden sm:inline">Venda</span>
-    </Button>
-  </Link>
 </div>
 
 
 <Tabs value={selectedMonth} onValueChange={setSelectedMonth} className="overflow-hidden rounded-lg ">
-<TabsList className="mb-4 mx-6">
+<TabsList className="mb-4 mx-4 lg:mx-6">
   {monthsAvailable.map((month) => {
     const [year, monthNum] = month.split("-")
     return (

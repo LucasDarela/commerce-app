@@ -11,6 +11,11 @@ import {
 } from "@/components/ui/select"
 import { Table } from "@tanstack/react-table"
 
+import DatePicker from "react-datepicker"
+import "react-datepicker/dist/react-datepicker.css"
+import CustomDateInput from "@/components/ui/CustomDateInput"
+import { IconTrash } from "@tabler/icons-react"
+
 type Props<T> = {
   table: Table<T>
   issueDateInput: string
@@ -52,26 +57,87 @@ export function FinancialFilters<T>({
   }
 
   return (
-    <div className="grid gap-2 px-4 lg:px-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-8 items-center">
-      <Input
-        type="text"
-        inputMode="numeric"
-        placeholder="Emissão"
-        value={issueDateInput}
-        onChange={(e) => formatDateInput(e, setIssueDateInput, "issue_date")}
-        maxLength={10}
-        className="min-w-[70px] w-full"
-      />
+    <div className="grid gap-2 px-4 lg:px-6 grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-8 items-center">
+     
+     <div className="relative w-full min-w-[70px]">
+        <DatePicker
+          selected={dueDateInput ? new Date(`${dueDateInput.split("/").reverse().join("-")}T00:00:00`) : null}
+          onChange={(date) => {
+            if (!date) {
+              setDueDateInput("")
+              table.getColumn("due_date")?.setFilterValue(undefined)
+              return
+            }
+            const day = date.getDate().toString().padStart(2, "0")
+            const month = (date.getMonth() + 1).toString().padStart(2, "0")
+            const year = date.getFullYear().toString()
+            const formatted = `${day}/${month}/${year}`
+            setDueDateInput(formatted)
+            table
+            .getColumn("due_date")
+            ?.setFilterValue(
+              new Date(+year, +month - 1, +day).toISOString().split("T")[0]
+            )
+          }}
+          placeholderText="Vencimento"
+          dateFormat="dd/MM/yyyy"
+          customInput={<CustomDateInput />}
+          popperPlacement="bottom-start"
+          popperClassName="z-[9999]"
+        />
+        {dueDateInput && (
+          <button
+            type="button"
+            onClick={() => {
+              setDueDateInput("")
+              table.getColumn("due_date")?.setFilterValue(undefined)
+            }}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-red-600"
+          >
+            <IconTrash className="w-4 h-4" />
+          </button>
+        )}
+      </div>
 
-      <Input
-        type="text"
-        inputMode="numeric"
-        placeholder="Vencimento"
-        value={dueDateInput}
-        onChange={(e) => formatDateInput(e, setDueDateInput, "due_date")}
-        maxLength={10}
-        className="min-w-[70px] w-full"
-      />
+      <div className="relative w-full min-w-[70px]">
+        <DatePicker
+          selected={issueDateInput ? new Date(`${issueDateInput.split("/").reverse().join("-")}T00:00:00`) : null}
+          onChange={(date) => {
+            if (!date) {
+              setIssueDateInput("")
+              table.getColumn("issue_date")?.setFilterValue(undefined)
+              return
+            }
+            const day = date.getDate().toString().padStart(2, "0")
+            const month = (date.getMonth() + 1).toString().padStart(2, "0")
+            const year = date.getFullYear().toString()
+            const formatted = `${day}/${month}/${year}`
+            setIssueDateInput(formatted)
+            table
+            .getColumn("issue_date")
+            ?.setFilterValue(
+              new Date(+year, +month - 1, +day).toISOString().split("T")[0]
+            )
+          }}
+          placeholderText="Emissão"
+          dateFormat="dd/MM/yyyy"
+          customInput={<CustomDateInput />}
+          popperPlacement="bottom-start"
+          popperClassName="z-[9999]"
+        />
+        {issueDateInput && (
+          <button
+            type="button"
+            onClick={() => {
+              setIssueDateInput("")
+              table.getColumn("issue_date")?.setFilterValue(undefined)
+            }}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-red-600"
+          >
+            <IconTrash className="w-4 h-4" />
+          </button>
+        )}
+      </div>
 
       <Input
         placeholder="Buscar por Nome"
