@@ -282,7 +282,7 @@ export function DataTable({
   const [isSavingOrder, setIsSavingOrder] = useState(false)
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  // const [dateInput, setDateInput] = useState("")
+  const [dateInput, setDateInput] = useState("")
   const { accessToken, loading: loadingIntegration, error: integrationError } = useCompanyIntegration('mercado_pago')
   const router = useRouter();
   const [isLoanModalOpen, setIsLoanModalOpen] = useState(false)
