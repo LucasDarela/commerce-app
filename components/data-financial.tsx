@@ -357,7 +357,6 @@ export default function DataFinancialTable() {
       supabase.from("financial_records").select("*").order("issue_date", { ascending: false }),
       supabase.from("suppliers").select("id, name"),
     ]);
-    console.log("📦 Fornecedores:", suppliersRes.data)
 
     // Parse dos pedidos
     const parsedOrders = schema.array().safeParse(ordersRes.data);
@@ -485,7 +484,6 @@ const rawPhone = isOrder(row.original) ? row.original.phone : ""
 const phoneClean = typeof rawPhone === "string" ? rawPhone.replace(/\D/g, "") : ""
         const message = "Olá, tudo bem?"
         const encodedMessage = encodeURIComponent(message)
-        console.log(phoneClean)
 const link = `https://wa.me/55${phoneClean}?text=${encodedMessage}`
       
         return (

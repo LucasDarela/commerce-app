@@ -196,7 +196,7 @@ export default function LandingLayout(){
 
         <div className="flex flex-col items-center gap-6 mt-6">
           <p className="mt-6">
-            © 2025 Neotech X. Todos os direitos reservados.
+            © 2025 Chopp Hub. Todos os direitos reservados.
           </p>
         </div>
       </div>

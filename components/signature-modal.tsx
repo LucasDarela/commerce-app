@@ -46,6 +46,18 @@ export function SignatureModal({ open, onSave, onClose }: SignatureModalProps) {
     onClose();
     toast.success("🖊️ Assinatura salva com sucesso!")
   }
+  useEffect(() => {
+    const isMobileDevice = window.innerWidth <= 768
+    setIsMobile(isMobileDevice)
+  
+    if (isMobileDevice) {
+      setCanvasWidth(window.innerWidth - 40)
+      setCanvasHeight(200)
+    } else {
+      setCanvasWidth(500)
+      setCanvasHeight(200)
+    }
+  }, [])
 
   return (
     <Dialog open={open} onOpenChange={onClose}>

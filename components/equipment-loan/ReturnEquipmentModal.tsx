@@ -31,7 +31,6 @@ export function ReturnEquipmentModal({
   onReturnSuccess,
 }: Props) {
   const [selectedItems, setSelectedItems] = useState<string[]>([])
-  console.log("🔁 IDs para retorno:", selectedItems)
   const handleConfirmReturn = async () => {
     if (selectedItems.length === 0) return
     const { error } = await supabase
@@ -53,7 +52,6 @@ export function ReturnEquipmentModal({
   }
 
   return (
-    console.log("🔍 Itens recebidos no modal:", items),
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
@@ -87,8 +85,6 @@ export function ReturnEquipmentModal({
                 toast.warning("Selecione pelo menos um item para retornar.")
                 return
                 }
-
-                console.log("🔁 IDs para retorno:", selectedItems)
 
                 const { error } = await supabase
                 .from("equipment_loans")

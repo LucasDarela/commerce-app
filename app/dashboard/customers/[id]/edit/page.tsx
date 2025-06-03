@@ -181,7 +181,6 @@ export default function EditClient() {
 
     if (error) {
       toast.error("Erro ao atualizar cliente: " + error.message);
-      console.log("Enviando dados:", cliente)
     } else {
       toast.success("Cliente atualizado com sucesso!");
       router.push("/dashboard/customers");

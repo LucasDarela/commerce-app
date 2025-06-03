@@ -24,7 +24,6 @@ export function ResetOrUpdatePasswordForm() {
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (event === "PASSWORD_RECOVERY" && session) {
-          console.log("Sessão restaurada via link de recuperação.")
           setSessionRestored(true)
         }
       }

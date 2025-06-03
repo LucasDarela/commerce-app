@@ -10,7 +10,6 @@ const payment = new Payment(client);
 export async function createPayment(payload: any) {
   try {
     const response = await payment.create({ body: payload });
-    console.log("💳 Pagamento criado com sucesso:", response);
     return response;
   } catch (error) {
     console.error("❌ Erro ao criar pagamento:", error);

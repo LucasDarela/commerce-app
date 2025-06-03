@@ -77,12 +77,6 @@ export function PaymentModal({ open, onClose, order, onSuccess }: PaymentModalPr
   async function handlePartialPayment() {
     const parsedValue = parseFloat(partialValue.replace(",", "."))
   
-    console.log("Enviando:", {
-      order_id: order.id,
-      payment_method: paymentMethod,
-      total_payed: parsedValue,
-    })
-  
     if (!partialValue || isNaN(parsedValue)) {
       toast.error("Informe um valor válido.")
       return

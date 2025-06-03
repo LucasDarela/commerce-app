@@ -133,7 +133,6 @@ export default function OrderBoletoPage() {
     const dataUrl = trimmed?.toDataURL("image/png");
 
     if (dataUrl) {
-      console.log("🖊️ Assinatura gerada (base64):", dataUrl.slice(0, 100));
       setSignatureData(dataUrl);
     } else {
       console.error("⚠️ Erro: dataUrl indefinido ao salvar assinatura.");
@@ -151,8 +150,6 @@ export default function OrderBoletoPage() {
       toast.error("Erro ao salvar assinatura no banco.");
       console.error("❌ Supabase error:", error);
     } else {
-      console.log("✅ Assinatura salva com sucesso no Supabase.");
-      toast.success("Assinatura salva com sucesso!");
       await fetchOrder();
     }
   };

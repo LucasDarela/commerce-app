@@ -38,8 +38,6 @@ export default function ViewOrderPage() {
       return;
     }
   
-    toast.success("Assinatura salva com sucesso!");
-  
     // Buscar itens da venda
     const { data: items, error: itemsError } = await supabase
       .from("order_items")

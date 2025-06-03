@@ -390,7 +390,6 @@ export function DataEquipments({
       )
     )
       .then(() => {
-        console.log("Ordem salva com sucesso no Supabase")
         setIsSavingEquipment(false)
       })
       .catch((err) => {

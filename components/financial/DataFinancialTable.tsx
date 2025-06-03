@@ -34,9 +34,7 @@ export type FinancialRecord = z.infer<typeof financialSchema>
 export type CombinedRecord = (Order & { source: "order" }) | (FinancialRecord & { source: "financial" })
 
 export default function DataFinancialTable() {
-  console.log("🔁 Renderizou DataFinancialTable")
   useEffect(() => {
-    console.log("🔄 DataFinancialTable re-rendered")
   })
   const [orders, setOrders] = useState<Order[]>([])
   const [financialRecords, setFinancialRecords] = useState<FinancialRecord[]>([])

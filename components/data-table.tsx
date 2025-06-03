@@ -650,7 +650,7 @@ const [selectedMonth, setSelectedMonth] = useState(() => {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [pagination, setPagination] = React.useState({
     pageIndex: 0,
-    pageSize: 10,
+    pageSize: 20,
   })
   const sortableId = React.useId()
   const sensors = useSensors(
@@ -1163,7 +1163,7 @@ const [selectedMonth, setSelectedMonth] = useState(() => {
             
               const { data: loans, error } = await supabase
                 .from("equipment_loans")
-                .select("id, quantity, equipment:equipments(name)")
+                .select("id, quantity, equipment:equipment_id(name)")
                 .eq("customer_id", matchingCustomer.id) 
                 .eq("status", "active")
             
@@ -1174,7 +1174,7 @@ const [selectedMonth, setSelectedMonth] = useState(() => {
             
               const formatted = loans.map((loan) => ({
                 loanId: loan.id,
-                equipmentName: loan.equipment?.[0]?.name || "Equipamento",
+                equipmentName: (loan as any).equipment.name || "Equipamento",
                 quantity: loan.quantity,
               }))
             
