@@ -34,8 +34,9 @@ export function LoanEquipmentModal({
   const [searchEquipment, setSearchEquipment] = useState("")
   const [showEquipments, setShowEquipments] = useState(false)
   const [noteDate, setNoteDate] = useState(() => new Date().toISOString().split("T")[0])
-  const [noteNumber, setNoteNumber] = useState(() => Date.now().toString().slice(-6))
+  const [noteNumber, setNoteNumber] = useState("") 
   const [selectedCustomer, setSelectedCustomer] = useState<{ id: string; name: string } | null>(null)
+
 
   const fetchEquipments = async () => {
     if (!companyId) return
@@ -51,7 +52,17 @@ export function LoanEquipmentModal({
     if (!selectedEquipmentId) return
     const equipment = equipmentList.find(e => e.id === selectedEquipmentId)
     if (equipment) {
-      setLoanItems([...loanItems, { equipment_id: equipment.id, name: equipment.name, quantity: 1 }])
+      setLoanItems((prev) => {
+        const existingIndex = prev.findIndex((item) => item.equipment_id === equipment.id)
+      
+        if (existingIndex !== -1) {
+          const updated = [...prev]
+          updated[existingIndex].quantity += 1
+          return updated
+        }
+      
+        return [...prev, { equipment_id: equipment.id, name: equipment.name, quantity: 1 }]
+      })
       setSelectedEquipmentId("")
       setSearchEquipment("")
     }
@@ -66,13 +77,57 @@ export function LoanEquipmentModal({
       toast.error("Preencha todos os campos")
       return
     }
-    const inserts = loanItems.map((item) => ({
+
+    // 1. Buscar o maior número de nota já existente
+    const { data: existingNotes, error: fetchError } = await supabase
+    .from("equipment_loans")
+    .select("note_number")
+    .order("note_number", { ascending: false })
+    .limit(1)
+
+    if (fetchError) {
+    toast.error("Erro ao consultar notas anteriores.")
+    return
+    }
+
+
+    const lastNumber = parseInt(existingNotes?.[0]?.note_number || "0", 10)
+    const nextNoteNumber = (lastNumber + 1).toString().padStart(4, "0")
+    setNoteNumber(nextNoteNumber)
+    // 2. Verificar se o note_number já existe (proteção contra duplicidade)
+    const { data: checkDuplicate, error: checkError } = await supabase
+    .from("equipment_loans")
+    .select("id")
+    .eq("note_number", nextNoteNumber)
+    .maybeSingle()
+
+    if (checkError) {
+    toast.error("Erro ao validar duplicidade de nota.")
+    return
+    }
+
+    if (checkDuplicate) {
+    toast.error("Erro: número de nota já existe. Tente novamente.")
+    return
+    }
+
+    const grouped = new Map<string, { equipment_id: string; name: string; quantity: number }>()
+
+    for (const item of loanItems) {
+      const key = item.equipment_id
+      if (grouped.has(key)) {
+        grouped.get(key)!.quantity += item.quantity
+      } else {
+        grouped.set(key, { equipment_id: item.equipment_id, name: item.name, quantity: item.quantity })
+      }
+    }
+    const inserts = Array.from(grouped.values()).map((item) => ({
       company_id: companyId,
       customer_id: selectedCustomer.id,
       customer_name: selectedCustomer.name,
       equipment_id: item.equipment_id,
       loan_date: noteDate,
-      note_number: noteNumber,
+      note_number: nextNoteNumber,
       note_date: noteDate,
       quantity: item.quantity,
       status: "active",
@@ -90,7 +145,6 @@ export function LoanEquipmentModal({
       setSelectedCustomer(null)
       setSelectedEquipmentId("")
       setSearchEquipment("")
-      setNoteNumber(Date.now().toString().slice(-6))
       onLoanSaved?.()
       onOpenChange(false)
     }
@@ -120,29 +174,31 @@ export function LoanEquipmentModal({
     ? equipmentList.filter((eq) => eq.name.toLowerCase().includes(searchEquipment.toLowerCase()))
     : []
 
-  // useEffect(() => {
-  //   if (open) {
-  //     if (initialCustomer) {
-  //       setSelectedCustomer(initialCustomer)
-  //       setSearchCustomer(initialCustomer.name)
-  //     }
-  //     if (initialItems) {
-  //       setLoanItems(initialItems)
-  //     }
-  //   } else {
-  //     setSelectedCustomer(null)
-  //     setSearchCustomer("")
-  //     setLoanItems([])
-  //     setSelectedEquipmentId("")
-  //     setSearchEquipment("")
-  //     setNoteNumber(Date.now().toString().slice(-6))
-  //   }
-  // }, [open, initialCustomer, initialItems])
 
   useEffect(() => {
     if (!open) return
+
+    const prepareNoteNumber = async () => {
+      const { data, error } = await supabase
+        .from("equipment_loans")
+        .select("note_number")
+        .eq("company_id", companyId)
+        .order("note_number", { ascending: false })
+        .limit(1)
   
-    setLoanItems([]) // Reset antes de aplicar novos
+      if (error) {
+        console.error("Erro ao buscar último número de nota", error)
+        return
+      }
+  
+      const last = parseInt(data?.[0]?.note_number || "0", 10)
+      const next = (last + 1).toString().padStart(4, "0")
+      setNoteNumber(next)
+    }
+  
+    prepareNoteNumber()
+  
+    setLoanItems([]) 
     if (initialCustomer) {
       setSelectedCustomer(initialCustomer)
       setSearchCustomer(initialCustomer.name)
@@ -155,7 +211,7 @@ export function LoanEquipmentModal({
     }, 100)
   
     return () => clearTimeout(timeout)
-  }, [open, initialCustomer, initialItems])
+  }, [open, initialCustomer, initialItems, companyId])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

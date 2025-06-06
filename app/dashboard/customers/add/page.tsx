@@ -132,7 +132,7 @@ export default function CreateClient() {
           complement: data.complemento || "",
           phone: formatarTelefone(data.telefone || ""),
           email: data.email || "",
-          state_registration: "", // se vier de outra API, preenche aqui
+          state_registration: "",
         }));
       } else {
         toast.error("Dados não encontrados para esse CNPJ.");

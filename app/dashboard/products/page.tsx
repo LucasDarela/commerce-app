@@ -249,13 +249,19 @@ export default function ListProduct() {
               <p><strong>Estoque:</strong> {selectedProduct.stock}</p>
               <p><strong>Comodato:</strong> {equipmentMap[selectedProduct.loan_product_code ?? ""] ?? ""}</p>
             </div>
-            <DialogFooter className="flex justify-between">
-            <Button onClick={handleEdit}>
-                <Pencil className="h-4 w-4" /> Editar
-              </Button>
-              <Button variant="destructive" onClick={() => handleDelete(selectedProduct.id)}>
-                <Trash className="h-4 w-4" />
-              </Button>
+            <DialogFooter className="w-full">
+              <div className="grid grid-cols-5 gap-4 w-full">
+                <Button onClick={handleEdit} className="col-span-4">
+                  <Pencil className="h-4 w-4 mr-2" /> Editar
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => handleDelete(selectedProduct.id)}
+                  className="col-span-1"
+                >
+                  <Trash className="h-4 w-4" />
+                </Button>
+              </div>
             </DialogFooter>
           </DialogContent>
         </Dialog>

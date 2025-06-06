@@ -35,9 +35,17 @@ export function MonthlyFinancialTable({ table, monthKey }: MonthlyFinancialTable
     })
   }, [baseRows, monthKey])
 
-  const data = React.useMemo(() => filteredRows.map((r) => r.original), [filteredRows])
-  const columns = React.useMemo(() => table.getAllColumns().map((col) => col.columnDef), [table])
+  const data = React.useMemo(() => {
+    return filteredRows
+      .map((r) => r.original)
+      .sort((a, b) => {
+        const dateA = new Date(a.due_date || "").getTime()
+        const dateB = new Date(b.due_date || "").getTime()
+        return dateA - dateB 
+      })
+  }, [filteredRows])
 
+  const columns = React.useMemo(() => table.getAllColumns().map((col) => col.columnDef), [table])
   const state = table.getState()
 
   const tableForMonth = useReactTable({

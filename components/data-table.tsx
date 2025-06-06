@@ -156,6 +156,7 @@ export const schema = z.object({
   issue_date: z.string().optional().nullable(),
   due_date: z.string().optional().nullable(),
   customer_signature: z.string().nullable().optional(),
+  text_note: z.string().optional().nullable(),
 })
 
 type Sale = z.infer<typeof schema>
@@ -353,7 +354,8 @@ const [selectedMonth, setSelectedMonth] = useState(() => {
         order_index,
         issue_date,
         due_date,
-        customer_signature
+        customer_signature,
+        text_note
       `)
       .order("order_index", { ascending: true })
   
@@ -456,8 +458,8 @@ const [selectedMonth, setSelectedMonth] = useState(() => {
     {
       accessorKey: "customer",
       header: "Cliente",
-      size: 180,
-      meta: { className: "w-[180px] truncate uppercase" },
+      size: 200,
+      meta: { className: "w-[200px] truncate uppercase" },
       cell: ({ row }) => {
         const sale = row.original
         return (
@@ -484,13 +486,26 @@ const [selectedMonth, setSelectedMonth] = useState(() => {
         const cleaned = raw.replace(/\D/g, "")
         const message = "Olá, tudo bem? Sua entrega de chopp está a caminho."
         const encodedMessage = encodeURIComponent(message)
+        
+        const handleClick = (e: React.MouseEvent) => {
+          if (!cleaned) {
+            e.preventDefault()
+            toast.warning("⚠️ Cliente sem número de telefone cadastrado.")
+          }
+        }
+        
         const link = `https://wa.me/${cleaned}?text=${encodedMessage}`
     
         return (
           <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-          <a href={link} target="_blank" rel="noopener noreferrer">
+          <a 
+          href={link} 
+          target="_blank" 
+          rel="noopener noreferrer"
+          onClick={handleClick}
+          >
             <svg 
             width="28"
             height="28"
@@ -506,7 +521,7 @@ const [selectedMonth, setSelectedMonth] = useState(() => {
           </a>
           </TooltipTrigger>
             <TooltipContent>
-              Send message via WhatsApp
+            {cleaned ? "Enviar mensagem via WhatsApp" : "Sem telefone"}
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -517,28 +532,47 @@ const [selectedMonth, setSelectedMonth] = useState(() => {
       accessorKey: "products",
       header: "Produtos",
       size: 200,
-      meta: { className: "w-[200px] truncate uppercase" },
-      cell: ({ row }) => row.original.products,
+      meta: { className: "w-[300px]" },
+      cell: ({ row }) => (
+        <div className="leading-tight whitespace-pre-line break-words uppercase">
+          {row.original.products}
+        </div>
+      ),
     },
     {
       accessorKey: "appointment_local",
       header: "Localização",
-      size: 150,
-      meta: { className: "w-[150px] truncate uppercase" },
-      cell: ({ row }) => row.original.appointment_local,
+      size: 250,
+      meta: { className: "w-[250px]" },
+      cell: ({ row }) => (
+        <div className="whitespace-pre-wrap lowercase text-muted-foreground">
+        {row.original.appointment_local || ""}
+        </div>
+        ),
+    },
+    {
+      accessorKey: "text_note",
+      header: "Observação",
+      size: 250,
+      meta: { className: "w-[250px] truncate" },
+      cell: ({ row }) => (
+        <div className="whitespace-pre-wrap lowercase text-muted-foreground">
+          {row.original.text_note || ""}
+        </div>
+      ),
     },
     {
       accessorKey: "delivery_status",
       header: "Delivery",
-      size: 90,
-      meta: { className: "w-[90px] uppercase" },
+      size: 100,
+      meta: { className: "w-[100px] uppercase" },
       cell: ({ row }) => row.original.delivery_status,
     },
     {
       accessorKey: "issue_date",
       header: "Emissão",
-      size: 100,
-      meta: { className: "w-[100px]" },
+      size: 110,
+      meta: { className: "w-[110px]" },
       cell: ({ row }) => row.original.issue_date
         ? format(parseISO(row.original.issue_date), "dd/MM/yyyy")
         : "—",
@@ -546,8 +580,8 @@ const [selectedMonth, setSelectedMonth] = useState(() => {
     {
       accessorKey: "due_date",
       header: "Vencimento",
-      size: 100,
-      meta: { className: "w-[100px]" },
+      size: 110,
+      meta: { className: "w-[110px]" },
       cell: ({ row }) => row.original.due_date
         ? format(parseISO(row.original.due_date), "dd/MM/yyyy")
         : "—",
@@ -555,15 +589,15 @@ const [selectedMonth, setSelectedMonth] = useState(() => {
     {
       accessorKey: "payment_method",
       header: "Tipo",
-      size: 60,
-      meta: { className: "w-[60px] uppercase" },
+      size: 80,
+      meta: { className: "w-[80px] uppercase" },
       cell: ({ row }) => row.original.payment_method,
     },
     {
       accessorKey: "payment_status",
       header: "Pagamento",
-      size: 90,
-      meta: { className: "w-[90px] uppercase" },
+      size: 100,
+      meta: { className: "w-[100px] uppercase" },
       filterFn: "equals",
       cell: ({ row }) => {
         const payment_status = row.original.payment_status
@@ -1069,140 +1103,145 @@ const [selectedMonth, setSelectedMonth] = useState(() => {
                   Vencimento: <strong>{selectedCustomer?.due_date}</strong><br/>
                 </SheetDescription>
               </SheetHeader>
+              <div className="max-h-[80vh] overflow-y-auto pr-4">
+              {selectedCustomer && (
+                <div className="ml-4 flex flex-col gap-2 text-sm">
+                  <div>
+                    <strong>Data de Agendamento:</strong>{" "}
+                    {selectedCustomer?.appointment_date
+                      ? format(parseISO(selectedCustomer.appointment_date), "dd/MM/yyyy")
+                      : "—"}
+                  </div>
+                  <div><strong>Hora:</strong> {selectedCustomer.appointment_hour}</div>
+                  <div><strong>Nome:</strong> {selectedCustomer.customer}</div>
+                    {selectedCustomer?.phone && (
+                        <div>
+                          <strong>Telefone:</strong>{" "}
+                          <a
+                            href={`https://wa.me/55${selectedCustomer.phone.replace(/\D/g, "")}?text=${encodeURIComponent("Olá, tudo bem? Sua entrega de chopp está a caminho.")}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:underline"
+                          >
+                            {selectedCustomer.phone}
+                          </a>
+                        </div>
+                      )}
+                  <div><strong>Produtos:</strong><br/> {selectedCustomer.products}</div>
+                  <div><strong>Quantidade:</strong> {selectedCustomer.amount}</div>
+                  <div><strong>Localização:</strong> {selectedCustomer.appointment_local}</div>
+                  <div>
+                    <strong>Observação:</strong><br />
+                    <span className="whitespace-pre-wrap">{selectedCustomer.text_note}</span>
+                  </div>
+                  <div><strong>Frete:</strong> {selectedCustomer.freight}</div>
+                  <div><strong>Total:</strong> {selectedCustomer.total}</div>
+                  <div><strong>Forma de Pagamento:</strong> {selectedCustomer.payment_method}</div>
+                  <div><strong>Delivery:</strong> {selectedCustomer.delivery_status}</div>
+                  <div>
+                    <strong>Pagamento:</strong>{" "}
+                    {selectedCustomer ? getTranslatedStatus({ source: "order", payment_status: selectedCustomer.payment_status }) : "—"}
+                  </div>
 
-    {selectedCustomer && (
-      <div className="ml-4 flex flex-col gap-2 text-sm">
-        <div>
-          <strong>Data de Agendamento:</strong>{" "}
-          {selectedCustomer?.appointment_date
-            ? format(parseISO(selectedCustomer.appointment_date), "dd/MM/yyyy")
-            : "—"}
-        </div>
-        <div><strong>Hora:</strong> {selectedCustomer.appointment_hour}</div>
-        <div><strong>Nome:</strong> {selectedCustomer.customer}</div>
-          {selectedCustomer?.phone && (
-              <div>
-                <strong>Telefone:</strong>{" "}
-                <a
-                  href={`https://wa.me/55${selectedCustomer.phone.replace(/\D/g, "")}?text=${encodeURIComponent("Olá, tudo bem? Sua entrega de chopp está a caminho.")}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary hover:underline"
-                >
-                  {selectedCustomer.phone}
-                </a>
+                  <Button
+                    className="mt-6"
+                    onClick={() => {
+                      if (selectedCustomer?.id) {
+                        router.push(`/dashboard/orders/${selectedCustomer.id}/view`);
+                      }
+                    }}
+                  >
+                    Ver Espelho
+                  </Button>
+
+                  <Button
+                    className={clsx({
+                      "bg-muted text-muted-foreground cursor-not-allowed opacity-60": isDisabled,
+                    })}
+                    disabled={isDisabled}
+                    onClick={async () => {
+                      if (!selectedCustomer?.customer_signature) {
+                        toast.warning("⚠️ O cliente precisa assinar antes de marcar como entregue."); 
+                        return;
+                      }
+
+                      if (selectedCustomer?.delivery_status === "Coletado") {
+                        return;
+                      }
+
+                      if (selectedCustomer.delivery_status === "Entregar") {
+                        const equipmentItems = await fetchEquipmentsForOrderProducts(selectedCustomer.products)
+                        const { data: matchingCustomer, error: customerError } = await supabase
+                          .from("customers")
+                          .select("id, name")
+                          .eq("name", selectedCustomer.customer)
+                          .maybeSingle()
+
+                        if (!matchingCustomer || customerError) {
+                          toast.error("Cliente não encontrado na tabela de clientes.")
+                          return
+                        }
+
+                        setInitialLoanCustomer({ id: matchingCustomer.id, name: matchingCustomer.name })
+                        setInitialLoanItems(equipmentItems)
+                        setIsLoanModalOpen(true)
+                      }
+
+                      else if (selectedCustomer.delivery_status === "Coletar") {
+                        const { data: matchingCustomer, error: customerError } = await supabase
+                          .from("customers")
+                          .select("id, name")
+                          .eq("name", selectedCustomer.customer)
+                          .maybeSingle()
+                      
+                        if (!matchingCustomer || customerError) {
+                          toast.error("Cliente não encontrado na tabela de clientes.")
+                          return
+                        }
+                      
+                        const { data: loans, error } = await supabase
+                          .from("equipment_loans")
+                          .select("id, quantity, equipment:equipment_id(name)")
+                          .eq("customer_id", matchingCustomer.id) 
+                          .eq("status", "active")
+                      
+                        if (error || !loans) {
+                          toast.error("Erro ao buscar itens para retorno")
+                          return
+                        }
+                      
+                        const formatted = loans.map((loan) => ({
+                          loanId: loan.id,
+                          equipmentName: (loan as any).equipment.name || "Equipamento",
+                          quantity: loan.quantity,
+                        }))
+                      
+                        if (formatted.length === 0) {
+                          toast.warning("Nenhum item de empréstimo encontrado para retornar.")
+                          return
+                        }
+                      
+                        setReturnModalItems(formatted)
+                        setReturnModalCustomerId(matchingCustomer.id)
+                        setIsReturnModalOpen(true)
+                      }
+
+                      else {
+                        handleDeliveryStatusUpdate()
+                      }
+                    }}
+                  >
+                    {selectedCustomer?.delivery_status === "Entregar" && "Marcar como Entregue"}
+                    {selectedCustomer?.delivery_status === "Coletar" && "Coletar Itens"}
+                    {selectedCustomer?.delivery_status === "Coletado" && "Chopp já Coletado ✅"}
+                    {!selectedCustomer?.delivery_status && "Atualizar Status"}
+                  </Button>
+
+                </div>
+              )}
               </div>
-            )}
-        <div><strong>Produtos:</strong><br/> {selectedCustomer.products}</div>
-        <div><strong>Quantidade:</strong> {selectedCustomer.amount}</div>
-        <div><strong>Localização:</strong> {selectedCustomer.appointment_local}</div>
-        <div><strong>Frete:</strong> {selectedCustomer.freight}</div>
-        <div><strong>Total:</strong> {selectedCustomer.total}</div>
-        <div><strong>Forma de Pagamento:</strong> {selectedCustomer.payment_method}</div>
-        <div><strong>Delivery:</strong> {selectedCustomer.delivery_status}</div>
-        <div>
-          <strong>Pagamento:</strong>{" "}
-          {selectedCustomer ? getTranslatedStatus({ source: "order", payment_status: selectedCustomer.payment_status }) : "—"}
-        </div>
-
-        <Button
-          className="mt-6"
-          onClick={() => {
-            if (selectedCustomer?.id) {
-              router.push(`/dashboard/orders/${selectedCustomer.id}/view`);
-            }
-          }}
-        >
-          Ver Espelho
-        </Button>
-
-        <Button
-          className={clsx({
-            "bg-muted text-muted-foreground cursor-not-allowed opacity-60": isDisabled,
-          })}
-          disabled={isDisabled}
-          onClick={async () => {
-            if (!selectedCustomer?.customer_signature) {
-              toast.warning("⚠️ O cliente precisa assinar antes de marcar como entregue."); 
-              return;
-            }
-
-            if (selectedCustomer?.delivery_status === "Coletado") {
-              return;
-            }
-
-            if (selectedCustomer.delivery_status === "Entregar") {
-              const equipmentItems = await fetchEquipmentsForOrderProducts(selectedCustomer.products)
-              const { data: matchingCustomer, error: customerError } = await supabase
-                .from("customers")
-                .select("id, name")
-                .eq("name", selectedCustomer.customer)
-                .maybeSingle()
-
-              if (!matchingCustomer || customerError) {
-                toast.error("Cliente não encontrado na tabela de clientes.")
-                return
-              }
-
-              setInitialLoanCustomer({ id: matchingCustomer.id, name: matchingCustomer.name })
-              setInitialLoanItems(equipmentItems)
-              setIsLoanModalOpen(true)
-            }
-
-            else if (selectedCustomer.delivery_status === "Coletar") {
-              const { data: matchingCustomer, error: customerError } = await supabase
-                .from("customers")
-                .select("id, name")
-                .eq("name", selectedCustomer.customer)
-                .maybeSingle()
-            
-              if (!matchingCustomer || customerError) {
-                toast.error("Cliente não encontrado na tabela de clientes.")
-                return
-              }
-            
-              const { data: loans, error } = await supabase
-                .from("equipment_loans")
-                .select("id, quantity, equipment:equipment_id(name)")
-                .eq("customer_id", matchingCustomer.id) 
-                .eq("status", "active")
-            
-              if (error || !loans) {
-                toast.error("Erro ao buscar itens para retorno")
-                return
-              }
-            
-              const formatted = loans.map((loan) => ({
-                loanId: loan.id,
-                equipmentName: (loan as any).equipment.name || "Equipamento",
-                quantity: loan.quantity,
-              }))
-            
-              if (formatted.length === 0) {
-                toast.warning("Nenhum item de empréstimo encontrado para retornar.")
-                return
-              }
-            
-              setReturnModalItems(formatted)
-              setReturnModalCustomerId(matchingCustomer.id)
-              setIsReturnModalOpen(true)
-            }
-
-            else {
-              handleDeliveryStatusUpdate()
-            }
-          }}
-        >
-          {selectedCustomer?.delivery_status === "Entregar" && "Marcar como Entregue"}
-          {selectedCustomer?.delivery_status === "Coletar" && "Coletar Itens"}
-          {selectedCustomer?.delivery_status === "Coletado" && "Chopp já Coletado ✅"}
-          {!selectedCustomer?.delivery_status && "Atualizar Status"}
-        </Button>
-
-      </div>
-    )}
-  </SheetContent>
-</Sheet>
+            </SheetContent>
+            </Sheet>
           </DndContext>
         </div>
         <div className="flex items-center justify-between px-4">

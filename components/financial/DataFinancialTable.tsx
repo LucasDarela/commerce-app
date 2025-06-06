@@ -204,7 +204,8 @@ const table = useReactTable<CombinedRecord>({
 })
 
 const currentMonthRows = useMemo(() => {
-  return table.getFilteredRowModel().rows.filter((row) => {
+  return table.getFilteredRowModel().rows
+  .filter((row) => {
     const record = row.original
     const dueDate = isOrder(record) ? record.due_date : record.due_date
     if (!dueDate) return false
@@ -216,28 +217,54 @@ const currentMonthRows = useMemo(() => {
   })
 }, [selectedMonth, table.getFilteredRowModel().rows])
 
-const { totalReceber, totalPagar } = useMemo(() => {
-  let totalReceber = 0
-  let totalPagar = 0
+const {
+  totalNotasEntrada,
+  totalEntradaPagas,
+  totalEntradaVencidas,
+  totalNotasSaida,
+  totalSaidaRecebidas,
+  totalSaidaVencidas,
+} = useMemo(() => {
+  let totalNotasEntrada = 0
+  let totalEntradaPagas = 0
+  let totalEntradaVencidas = 0
+
+  let totalNotasSaida = 0
+  let totalSaidaRecebidas = 0
+  let totalSaidaVencidas = 0
+
+  const today = new Date()
 
   for (const item of currentMonthRows) {
     const record = item.original
-    const value = isOrder(record)
-      ? Number(record.total ?? 0)
-      : Number(record.amount ?? 0)
+    const isFinancial = !isOrder(record)
+    const value = isOrder(record) ? Number(record.total ?? 0) : Number(record.amount ?? 0)
+    const status = isOrder(record) ? record.payment_status : record.status
+    const type = isOrder(record) ? "output" : record.type
+    const dueDateStr = record.due_date
+    const dueDate = dueDateStr ? new Date(dueDateStr) : null
 
-    if (!isOrder(record)) {
-      if (record.type === "input") {
-        totalPagar += value
-      } else if (record.type === "output") {
-        totalReceber += value
-      }
-    } else {
-      totalReceber += value
+    if (type === "input") {
+      totalNotasEntrada += value
+      if (status === "Paid") totalEntradaPagas += value
+      if (status === "Unpaid" && dueDate && dueDate < today) totalEntradaVencidas += value
+    }
+
+    if (type === "output") {
+      totalNotasSaida += value
+      if (status === "Paid") totalSaidaRecebidas += value
+      if (status === "Unpaid" && dueDate && dueDate < today) totalSaidaVencidas += value
     }
   }
 
-  return { totalReceber, totalPagar }
+  return {
+    totalNotasEntrada,
+    totalEntradaPagas,
+    totalEntradaVencidas,
+    totalNotasSaida,
+    totalSaidaRecebidas,
+    totalSaidaVencidas,
+  }
 }, [currentMonthRows])
 
   return (
@@ -250,14 +277,31 @@ const { totalReceber, totalPagar } = useMemo(() => {
         dueDateInput={dueDateInput}
         setDueDateInput={setDueDateInput}
         />
-        <div className="flex gap-2 px-6 text-sm font-medium text-muted-foreground ">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 px-6 text-sm font-medium text-muted-foreground">
         <div>
-          <span className="">Total a Pagar: </span>
-          <span className="text-red-600 font-semibold">R$ {totalPagar.toFixed(2).replace(".", ",")}</span>
+          <span>Total Notas de Entrada: </span>
+          <span className="text-red-600 font-semibold">R$ {totalNotasEntrada.toFixed(2).replace(".", ",")}</span>
         </div>
         <div>
-          <span className="">Total a Receber: </span>
-          <span className="text-green-600 font-semibold">R$ {totalReceber.toFixed(2).replace(".", ",")}</span>
+          <span>Total Entrada Pagas: </span>
+          <span className="text-blue-600 font-semibold">R$ {totalEntradaPagas.toFixed(2).replace(".", ",")}</span>
+        </div>
+        <div>
+          <span>Total Entrada Vencidas: </span>
+          <span className="text-orange-600 font-semibold">R$ {totalEntradaVencidas.toFixed(2).replace(".", ",")}</span>
+        </div>
+
+        <div>
+          <span>Total Notas de Saída: </span>
+          <span className="text-green-600 font-semibold">R$ {totalNotasSaida.toFixed(2).replace(".", ",")}</span>
+        </div>
+        <div>
+          <span>Total Saída Recebidas: </span>
+          <span className="text-blue-600 font-semibold">R$ {totalSaidaRecebidas.toFixed(2).replace(".", ",")}</span>
+        </div>
+        <div>
+          <span>Total Saída Vencidas: </span>
+          <span className="text-orange-600 font-semibold">R$ {totalSaidaVencidas.toFixed(2).replace(".", ",")}</span>
         </div>
       </div>
       <Tabs value={selectedMonth} onValueChange={setSelectedMonth} className="overflow-hidden rounded-lg mx-6">

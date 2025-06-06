@@ -284,13 +284,17 @@ export default function ListCustomers() {
                 <p><strong>Catálogo de Preço:</strong> {catalogName}</p>
               )}
             </div>
-            <DialogFooter className="flex justify-between">
-              <Button onClick={handleEdit}>
+            <DialogFooter className="w-full">
+              <div className="grid grid-cols-4 gap-4 w-full">
+              <Button onClick={handleEdit} className="col-span-3">
                 <Pencil className="h-4 w-4" /> Editar
               </Button>
-              <Button variant="destructive" onClick={() => handleDelete(selectedCliente.id)}>
+              <Button variant="destructive" 
+              onClick={() => handleDelete(selectedCliente.id)}
+              className="col-span-1">
                 <Trash className="h-4 w-4" />
               </Button>
+              </div>
             </DialogFooter>
           </DialogContent>
         </Dialog>

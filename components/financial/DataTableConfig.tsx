@@ -29,7 +29,7 @@ export function DataTableConfig<T extends { id: string }>({ table, rows }: Props
   return (
     <div className="overflow-hidden rounded-lg border">
       <UITable className="w-full uppercase">
-        <TableHeader className="bg-muted sticky top-0 z-10">
+        <TableHeader className="bg-muted sticky top-0">
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow className="h-10" key={headerGroup.id}>
               {headerGroup.headers

@@ -172,7 +172,9 @@ export default function EditClient() {
   const handleUpdate = async () => {
     const clienteToUpdate = { ...cliente }
     delete clienteToUpdate.id
-    delete clienteToUpdate.created_at // também pode dar conflito
+    delete clienteToUpdate.created_at
+
+    clienteToUpdate.phone = cliente.phone.replace(/\D/g, "")
 
     const { error } = await supabase
       .from("customers")
@@ -188,16 +190,18 @@ export default function EditClient() {
   };
 
   const formatarTelefone = (valor: string) => {
-    let telefone = valor.replace(/\D/g, "").slice(0, 11);
-    if (telefone.length >= 3) {
-      telefone = `(${telefone.slice(0, 2)}) ${telefone.slice(2)}`;
+    const numeros = valor.replace(/\D/g, "").slice(0, 13);
+  
+    if (numeros.length >= 12) {
+      return numeros.replace(/^(\d{2})(\d{2})(\d{5})(\d{4})$/, "+$1 ($2) $3-$4");
     }
-    return telefone;
+  
+    if (numeros.length >= 11) {
+      return numeros.replace(/^(\d{2})(\d{2})(\d{4,5})(\d{0,4})$/, "+$1 ($2) $3-$4");
+    }
+  
+    return "+" + numeros;
   };
-
-  if (loading) {
-    return <p className="text-center text-gray-500">Carregando cliente...</p>;
-  }
 
   return (
     <div className="max-w-3xl mx-auto w-full px-4 py-6 rounded-lg shadow-md">
