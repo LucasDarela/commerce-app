@@ -49,7 +49,7 @@ export default function CreateClient() {
     number: "Número",
     complement: "Complemento",
     phone: "Telefone",
-    email: "Email (Opcional)",
+    email: "Email (Obrigatório caso gere boleto.)",
     state_registration: "Inscrição Estadual",
   };
   const formatarMaiusculo = (valor: string, campo: string) => {

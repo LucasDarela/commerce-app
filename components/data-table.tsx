@@ -1026,6 +1026,7 @@ const [selectedMonth, setSelectedMonth] = useState(() => {
 
 
 <Tabs value={selectedMonth} onValueChange={setSelectedMonth} className="overflow-hidden rounded-lg ">
+<div className="overflow-x-auto scrollbar-hide">
 <TabsList className="mb-4 mx-4 lg:mx-6">
   {monthsAvailable.map((month) => {
     const [year, monthNum] = month.split("-")
@@ -1036,6 +1037,7 @@ const [selectedMonth, setSelectedMonth] = useState(() => {
     )
   })}
 </TabsList>
+</div>
   <TabsContent value={selectedMonth} className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6">
         <div className="overflow-hidden rounded-lg border">
           <DndContext

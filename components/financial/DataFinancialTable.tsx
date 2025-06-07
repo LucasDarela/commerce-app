@@ -305,6 +305,7 @@ const {
         </div>
       </div>
       <Tabs value={selectedMonth} onValueChange={setSelectedMonth} className="overflow-hidden rounded-lg mx-6">
+      <div className="overflow-x-auto scrollbar-hide">
         <TabsList className="mb-4">
         {monthKeysSorted.map((monthKey) => (
             <TabsTrigger key={monthKey} value={monthKey}>
@@ -312,7 +313,7 @@ const {
             </TabsTrigger>
           ))}
         </TabsList>
-
+      </div>
         {monthKeysSorted.map((monthKey) => (
           <TabsContent key={monthKey} value={monthKey}>
             <MonthlyFinancialTable table={table} monthKey={monthKey} />
