@@ -270,10 +270,17 @@ async function parseProductsWithIds(products: string): Promise<{ id: number, qua
   }).filter(p => p.id !== 0)
 }
 
+interface DataTableProps {
+  data: Order[]
+  companyId: string
+}
+
 export function DataTable({
   data: initialData,
+  companyId,
 }: {
   data: z.infer<typeof schema>[]
+  companyId: string
 }) {
   const [selectedCustomer, setSelectedCustomer] = React.useState<Sale | null>(null)
   const [sheetOpen, setSheetOpen] = React.useState(false)
@@ -656,9 +663,9 @@ const [selectedMonth, setSelectedMonth] = useState(() => {
     >
       Pagar
     </DropdownMenuItem>
-    <DropdownMenuItem>
-      Emitir NF-e
-    </DropdownMenuItem>
+    <DropdownMenuItem onClick={() => emitirNota(row.original)}>
+  Emitir NF-e
+</DropdownMenuItem>
 
     <DropdownMenuSeparator />
     
@@ -834,6 +841,31 @@ const [selectedMonth, setSelectedMonth] = useState(() => {
   }, [selectedDate, table])
 
   const isDisabled = !selectedCustomer?.customer_signature || selectedCustomer?.delivery_status === "Coletado"
+
+  const emitirNota = async (nota: Order) => {
+    try {
+      const response = await fetch("/api/nfe/create", {
+        method: "POST",
+        body: JSON.stringify({
+          companyId,
+          invoiceData: nota,
+        }),
+      });
+  
+      const data = await response.json();
+  
+      if (!response.ok) {
+        console.error("Erro da API:", data);
+        toast.error(`Erro ao emitir NF: ${data.error || "Erro desconhecido"}`);
+      } else {
+        console.log("Resposta da Focus:", data); // 👈 aqui você vê o payload
+        toast.success("NF-e emitida com sucesso!");
+      }
+    } catch (err) {
+      console.error("Erro inesperado:", err);
+      toast.error("Erro inesperado ao emitir NF.");
+    }
+  };
 
   return (
     <>

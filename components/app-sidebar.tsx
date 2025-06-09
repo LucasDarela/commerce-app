@@ -30,6 +30,7 @@ import {
   IconBarrel,
   IconRefresh,
   IconCirclePlusFilled,
+  IconFileDots,
 } from "@tabler/icons-react"
 
 import { NavDocuments } from "@/components/nav-documents"
@@ -78,6 +79,11 @@ const data = {
       title: "Financeiro",
       url: "/dashboard/financial",
       icon: IconBuildingBank,
+    },
+    {
+      title: "Nfe",
+      url: "/dashboard/nfe",
+      icon: IconFileDots,
     },
     {
       title: "Relatórios",

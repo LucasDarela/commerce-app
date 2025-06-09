@@ -13,7 +13,6 @@ export default function SettingsPage() {
             <h2 className="text-2xl font-bold">Configurações</h2>
             <CompanySettingsForm />
             <IntegrationsPage />
-            
     </div>
   );
 }

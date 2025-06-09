@@ -15,6 +15,22 @@ interface Supplier {
   name: string;
 }
 
+interface BarrelRecord {
+  supplier_id: string;
+  suppliers?: { name: string } | null;
+  id: string;
+  date: string;
+  note?: string;
+  had_30?: number;
+  had_50?: number;
+  arrived_30?: number;
+  arrived_50?: number;
+  returned_30?: number;
+  returned_50?: number;
+  total_30?: number;
+  total_50?: number;
+}
+
 export default function BarrelControl() {
   const { companyId } = useAuthenticatedCompany();
   const [tabs, setTabs] = useState<{ supplier: Supplier; rows: BarrelEntry[] }[]>([]);
@@ -31,7 +47,21 @@ export default function BarrelControl() {
     const fetchInitialData = async () => {
       const { data, error } = await supabase
         .from("barrel_controls")
-        .select("supplier_id, suppliers(name), id, date, note, had_30, had_50, arrived_30, arrived_50, returned_30, returned_50, total_30, total_50")
+        .select(`
+          supplier_id,
+          suppliers: suppliers!inner(name),
+          id,
+          date,
+          note,
+          had_30,
+          had_50,
+          arrived_30,
+          arrived_50,
+          returned_30,
+          returned_50,
+          total_30,
+          total_50
+        `)
         .order("date", { ascending: true });
 
       if (error) {
@@ -44,13 +74,13 @@ export default function BarrelControl() {
 
       const suppliersMap: Record<string, { supplier: Supplier; rows: BarrelEntry[] }> = {};
 
-      data.forEach((record) => {
+      (data as unknown as BarrelRecord[]).forEach((record) => {
         const supplierId = record.supplier_id;
         if (!suppliersMap[supplierId]) {
           suppliersMap[supplierId] = {
             supplier: {
               id: supplierId,
-              name: record.suppliers?.[0]?.name || "Fornecedor desconhecido",
+              name: record.suppliers?.name || "Fornecedor desconhecido",
             },
             rows: [],
           };
