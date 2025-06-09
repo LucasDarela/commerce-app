@@ -36,6 +36,7 @@ type Cliente = {
   state_registration?: string;
   fantasy_name?: string;
   price_table_id?: string;
+  emit_nf?: boolean;
 };
 
 export default function ListCustomers() {
@@ -283,6 +284,7 @@ export default function ListCustomers() {
               {catalogName && (
                 <p><strong>Catálogo de Preço:</strong> {catalogName}</p>
               )}
+              <p><strong>Emite NFe:</strong> {selectedCliente.emit_nf === true ? "Sim": "Não"}</p>
             </div>
             <DialogFooter className="w-full">
               <div className="grid grid-cols-4 gap-4 w-full">

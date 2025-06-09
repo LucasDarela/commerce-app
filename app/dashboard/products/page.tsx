@@ -14,7 +14,7 @@ import {
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
-import { Pencil, Trash } from "lucide-react";
+import { Pencil, Trash, ChevronDown, ChevronUp } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -22,6 +22,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
 import { Card } from "@/components/ui/card";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import { PriceTableManager } from "@/components/price-table-manager";
@@ -40,16 +45,20 @@ type Product = {
   name: string;
   manufacturer: string;
   standard_price: string;
-  percentage_taxes: string;
   material_class: string;
   submaterial_class: string;
-  tax_classification: string;
   material_origin: string;
   aplication: string;
   loan_product_code?: string;
   stock: number;
-  image_url?: string;
-  company_id: string;
+
+  ncm: string;
+  cfop: string;
+  csosn: string;
+  unit: string;
+  icms_rate: string;
+  pis_rate: string;
+  cofins_rate: string;
 };
 
 export default function ListProduct() {
@@ -60,6 +69,7 @@ export default function ListProduct() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [equipments, setEquipments] = useState<Equipment[]>([]);
+  const [isOpen, setIsOpen] = useState(false)
 
   useEffect(() => {
     if (!companyId || loading) return;
@@ -227,28 +237,38 @@ export default function ListProduct() {
               <DialogTitle>Detalhes do Produto</DialogTitle>
             </DialogHeader>
             <div className="space-y-2">
-              {selectedProduct.image_url && (
-                <Card className="p-4 flex justify-center">
-                  <img
-                    src={selectedProduct.image_url}
-                    alt={selectedProduct.name}
-                    className="h-40 object-cover rounded-lg shadow-md"
-                  />
-                </Card>
-              )}
-              <p><strong>Codigo:</strong> {selectedProduct.code}</p>
-              <p><strong>Nome:</strong> {selectedProduct.name}</p>
-              <p><strong>Fabricante:</strong> {selectedProduct.manufacturer}</p>
-              <p><strong>Preço Compra:</strong> {selectedProduct.standard_price}</p>
-              <p><strong>Taxas:</strong> {selectedProduct.percentage_taxes}</p>
-              <p><strong>Classe:</strong> {selectedProduct.material_class}</p>
-              <p><strong>Subclasse:</strong> {selectedProduct.submaterial_class}</p>
-              <p><strong>Classificação Tributária:</strong> {selectedProduct.tax_classification}</p>
-              <p><strong>Origem:</strong> {selectedProduct.material_origin}</p>
-              <p><strong>Aplicação:</strong> {selectedProduct.aplication}</p>
-              <p><strong>Estoque:</strong> {selectedProduct.stock}</p>
-              <p><strong>Comodato:</strong> {equipmentMap[selectedProduct.loan_product_code ?? ""] ?? ""}</p>
-            </div>
+                <p><strong>Código:</strong> {selectedProduct.code}</p>
+                <p><strong>Nome:</strong> {selectedProduct.name}</p>
+                <p><strong>Fabricante:</strong> {selectedProduct.manufacturer}</p>
+                <p><strong>Preço Compra:</strong> {selectedProduct.standard_price}</p>
+                <p><strong>Estoque:</strong> {selectedProduct.stock}</p>
+                <p><strong>Comodato:</strong> {equipmentMap[selectedProduct.loan_product_code ?? ""] ?? ""}</p>
+                <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+                  <CollapsibleTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      className="flex items-center gap-2 text-sm"
+                    >
+                      {isOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                      Informações Fiscais
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="space-y-2 mt-2">
+                    <p><strong>Origem:</strong> {selectedProduct.material_origin}</p>
+                    <p><strong>Classe:</strong> {selectedProduct.material_class}</p>
+                    <p><strong>Subclasse:</strong> {selectedProduct.submaterial_class}</p>
+                    <p><strong>Aplicação:</strong> {selectedProduct.aplication}</p>
+                    <p><strong>NCM:</strong> {selectedProduct.ncm}</p>
+                    <p><strong>CFOP:</strong> {selectedProduct.cfop}</p>
+                    <p><strong>CSOSN:</strong> {selectedProduct.csosn}</p>
+                    <p><strong>UNIT:</strong> {selectedProduct.unit}</p>
+                    <p><strong>ICMS:</strong> {selectedProduct.icms_rate}</p>
+                    <p><strong>PIS:</strong> {selectedProduct.pis_rate}</p>
+                    <p><strong>COFINS:</strong> {selectedProduct.cofins_rate}</p>
+                  </CollapsibleContent>
+                </Collapsible>
+              </div>
+
             <DialogFooter className="w-full">
               <div className="grid grid-cols-5 gap-4 w-full">
                 <Button onClick={handleEdit} className="col-span-4">

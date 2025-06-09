@@ -656,14 +656,17 @@ const [selectedMonth, setSelectedMonth] = useState(() => {
     >
       Pagar
     </DropdownMenuItem>
+    <DropdownMenuItem>
+      Emitir NF-e
+    </DropdownMenuItem>
+
+    <DropdownMenuSeparator />
+    
     <DropdownMenuItem asChild>
       <Link href={`/dashboard/orders/${row.original.id}/edit`}>
         Editar
       </Link>
     </DropdownMenuItem>
-
-    <DropdownMenuSeparator />
-
     <DropdownMenuItem
       variant="destructive"
       onClick={() => deleteOrderById(row.original.id)}

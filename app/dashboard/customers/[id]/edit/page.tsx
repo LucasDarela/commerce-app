@@ -14,6 +14,7 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox";
 
 type Cliente = {
   id?: string
@@ -33,6 +34,7 @@ type Cliente = {
   phone: string
   email: string
   state_registration?: string
+  emit_nf?: boolean 
 }
 
 export default function EditClient() {
@@ -56,13 +58,14 @@ export default function EditClient() {
     phone: "",
     email: "",
     state_registration: "",
+    emit_nf: false,
   });
 
   const placeholdersMap: Record<string, string> = {
     document: "CPF/CNPJ",
     name: "Nome Completo / Razão Social",
     fantasy_name: "Nome Fantasia",
-    zip_code: "CEP",
+    zip_code: "CEP (Obrigatório caso gere NFe)",
     address: "Endereço",
     neighborhood: "Bairro",
     city: "Cidade",
@@ -70,7 +73,7 @@ export default function EditClient() {
     number: "Número",
     complement: "Complemento",
     phone: "Telefone",
-    email: "Email (Opcional)",
+    email: "Email (Obrigatório caso gere boleto)",
     state_registration: "Inscrição Estadual",
   };
 
@@ -98,6 +101,7 @@ export default function EditClient() {
           state: formatarMaiusculo(data.state || "", "state"),
           state_registration: formatarMaiusculo(data.state_registration || "", "state_registration"),
           price_table_id: data.price_table_id || "",
+          emit_nf: data.emit_nf ?? false
         });
       }
       setLoading(false);
@@ -222,7 +226,13 @@ export default function EditClient() {
             type={campo === "email" ? "email" : "text"}
             name={campo}
             placeholder={placeholdersMap[campo]}
-            value={cliente[campo as keyof typeof cliente] || ""}
+            value={
+              typeof cliente[campo as keyof typeof cliente] === "boolean"
+                ? cliente[campo as keyof typeof cliente]
+                  ? "Sim"
+                  : "Não"
+                : (cliente[campo as keyof typeof cliente] as string | number | undefined) ?? ""
+            }
             onChange={handleChange}
             onBlur={campo === "zip_code" ? buscarEndereco : undefined}
             onKeyDown={(e) => handleKeyDown(e, index)}
@@ -249,6 +259,18 @@ export default function EditClient() {
           ))}
         </SelectContent>
       </Select>
+      </div>
+      <div className="flex items-center space-x-2 mt-4">
+      <Checkbox
+          id="emit_nf"
+          checked={cliente.emit_nf ?? false}
+          onCheckedChange={(checked) =>
+            setCliente((prev) => ({ ...prev, emit_nf: checked === true }))
+          }
+        />
+        <label htmlFor="emit_nf" className="text-sm font-medium leading-none">
+          Emitir Nota Fiscal
+        </label>
       </div>
 
       <Button className="mt-4 w-full" onClick={handleUpdate}>Atualizar</Button>

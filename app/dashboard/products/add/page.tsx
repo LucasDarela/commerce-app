@@ -20,8 +20,7 @@ import { useRouter } from "next/navigation";
 export default function AddProduct() {
   const supabase = createClientComponentClient();
   const router = useRouter();
-
-  const { companyId, loading } = useAuthenticatedCompany();
+  const { companyId, loading: loadingCompany } = useAuthenticatedCompany()
   const [equipments, setEquipments] = useState<{ id: string; name: string }[]>([])
   const [product, setProduct] = useState({
     code: "",
@@ -31,14 +30,18 @@ export default function AddProduct() {
     percentage_taxes: "",
     material_class: "",
     submaterial_class: "",
-    tax_classification: "",
     material_origin: "National",
     aplication: "",
     loan_product_code: "",
+    ncm: "",
+    cfop: "",
+    csosn: "",
+    unit: "",
+    icms_rate: "",
+    pis_rate: "",
+    cofins_rate: "",
   });
 
-  const [image, setImage] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -67,46 +70,16 @@ export default function AddProduct() {
     setProduct({ ...product, [name]: value });
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-
-    if (file) {
-      const allowedTypes = ["image/png", "image/jpeg"];
-      if (!allowedTypes.includes(file.type)) {
-        toast.error("Invalid format! Only PNG and JPG are allowed.");
-        return;
-      }
-
-      setImage(file);
-
-      const reader = new FileReader();
-      reader.onload = () => setImagePreview(reader.result as string);
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const uploadImage = async () => {
-    if (!image) return null;
-
-    const fileExt = image.name.split(".").pop();
-    const fileName = `${Date.now()}.${fileExt}`;
-    const filePath = `products/${fileName}`;
-
-    const { error } = await supabase.storage.from("products").upload(filePath, image);
-
-    if (error) {
-      toast.error("Failed to upload image!");
-      return null;
-    }
-
-    return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/products/${filePath}`;
-  };
-
   const handleSubmit = async () => {
-    if (!product.name || !product.standard_price || !product.material_class || !product.code || !companyId) {
-      toast.error("Fill in all required fields!");
+    if (!product.name || !product.standard_price || !product.material_class) {
+      toast.error("Preencha os campos obrigatórios!");
       return;
     }
+
+    if (!product.ncm || !product.cfop || !product.csosn || !product.unit) {
+      toast.error("Preencha os dados fiscais obrigatórios (NCM, CFOP, CSOSN, Unidade).");
+      return;
+    }  
   
     setSubmitting(true)
   
@@ -124,12 +97,10 @@ export default function AddProduct() {
     }
   
     if (existingProduct) {
-      toast.error("Product code already exists!")
+      toast.error("Código do produto já existe!")
       setSubmitting(false)
       return
     }
-  
-    const imageUrl = await uploadImage()
   
     const { data: createdProduct, error: insertError } = await supabase
     .from("products")
@@ -137,21 +108,21 @@ export default function AddProduct() {
       {
         ...product,
         standard_price: parseFloat(product.standard_price),
-        percentage_taxes: product.percentage_taxes ? parseFloat(product.percentage_taxes) : null,
-        image_url: imageUrl || null,
         company_id: companyId,
+        icms_rate: product.icms_rate ? parseFloat(product.icms_rate) : undefined,
+        pis_rate: product.pis_rate ? parseFloat(product.pis_rate) : undefined,
+        cofins_rate: product.cofins_rate ? parseFloat(product.cofins_rate) : undefined,  
       },
     ])
     .select("id")
     .single();
   
   if (insertError || !createdProduct) {
-    toast.error("Failed to create product!");
+    toast.error("Erro ao criar produto!");
     setSubmitting(false);
     return;
   }
   
-  // ✅ Se loan_product_code estiver preenchido, insere na product_loans
   if (product.loan_product_code) {
     await supabase.from("product_loans").insert([
       {
@@ -167,29 +138,13 @@ export default function AddProduct() {
     setSubmitting(false)
   }
 
-  if (loading) {
+  if (loadingCompany) {
     return <div className="p-6 text-center text-muted-foreground">Loading company data...</div>;
   }
-
 
   return (
     <div className="max-w-3xl mx-auto p-6 rounded-lg shadow-md">
       <h1 className="text-2xl font-bold mb-4">Adicionar Produto</h1>
-
-      <Card className="mb-6">
-        <CardContent className="p-4 flex flex-col items-center">
-          <label htmlFor="imageUpload" className="cursor-pointer">
-            {imagePreview ? (
-              <img src={imagePreview} alt="Preview" className="h-40 object-cover rounded-lg shadow-md" />
-            ) : (
-              <div className="h-40 w-full flex items-center justify-center border-2 border-dashed border-gray-300 rounded-lg">
-                <span className="text-gray-500">Clique para adicionar imagem</span>
-              </div>
-            )}
-          </label>
-          <input type="file" id="imageUpload" accept="image/png, image/jpeg" className="hidden" onChange={handleImageChange} />
-        </CardContent>
-      </Card>
 
       <Card>
         <CardContent className="p-6 space-y-4">
@@ -201,10 +156,6 @@ export default function AddProduct() {
           <div className="grid grid-cols-3 gap-4">
             <Input type="text" name="standard_price" value={product.standard_price} onChange={handleChange} placeholder="Preço (R$)" required />
             <Input type="text" name="manufacturer" value={product.manufacturer} onChange={handleChange} placeholder="Fabricante" />
-            <Input type="text" name="percentage_taxes" value={product.percentage_taxes} onChange={handleChange} placeholder="Taxas (%)" />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
             <Select value={product.material_class} onValueChange={(value) => handleSelectChange("material_class", value)}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Classe do Material" />
@@ -214,12 +165,11 @@ export default function AddProduct() {
                 <SelectItem value="EQUIPAMENTO">EQUIPAMENTO</SelectItem>
                 <SelectItem value="ACESSORIO">ACESSORIO</SelectItem>
               </SelectContent>
-            </Select>
-            <Input type="text" name="submaterial_class" value={product.submaterial_class} onChange={handleChange} placeholder="Sub Classe" />
-          </div>
+            </Select></div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <Input type="text" name="tax_classification" value={product.tax_classification} onChange={handleChange} placeholder="Classificação Tributária" />
+          <div className="grid grid-cols-3 gap-4">
+
+            <Input type="text" name="submaterial_class" value={product.submaterial_class} onChange={handleChange} placeholder="Sub Classe" />
             <Select value={product.material_origin} onValueChange={(value) => handleSelectChange("material_origin", value)}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Origem do Produto" />
@@ -229,6 +179,21 @@ export default function AddProduct() {
                 <SelectItem value="Imported">Importado</SelectItem>
               </SelectContent>
             </Select>
+            <Input name="ncm" value={product.ncm || ""} onChange={handleChange} placeholder="NCM" />
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+
+            <Input name="cfop" value={product.cfop || ""} onChange={handleChange} placeholder="CFOP" />
+            <Input name="csosn" value={product.csosn || ""} onChange={handleChange} placeholder="CSOSN" />
+            <Input name="unit" value={product.unit || ""} onChange={handleChange} placeholder="Unidade (ex: L, CX, UN)" />
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+
+            <Input name="icms_rate" value={product.icms_rate || ""} onChange={handleChange} placeholder="ICMS (%)" />
+            <Input name="pis_rate" value={product.pis_rate || ""} onChange={handleChange} placeholder="PIS (%)" />
+            <Input name="cofins_rate" value={product.cofins_rate || ""} onChange={handleChange} placeholder="COFINS (%)" />
           </div>
 
           <Textarea name="aplication" value={product.aplication} onChange={handleChange} placeholder="Aplicação do Produto" />
@@ -249,8 +214,8 @@ export default function AddProduct() {
             </SelectContent>
           </Select>
 
-          <Button className="w-full" onClick={handleSubmit} disabled={loading || submitting}>
-            {submitting ? "Savando..." : "Salvar Produto"}
+          <Button className="w-full" onClick={handleSubmit} disabled={submitting}>
+            {submitting ? "Salvando..." : "Salvar Produto"}
           </Button>
         </CardContent>
       </Card>

@@ -11,22 +11,25 @@ import { toast } from "sonner";
 import { useRouter, useParams } from "next/navigation";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 
-// 🔹 Product Type
 type Product = {
   id: number;
   code: string;
   name: string;
   manufacturer: string;
   standard_price: string;
-  percentage_taxes: string;
   material_class: string;
   submaterial_class: string;
-  tax_classification: string;
   material_origin: string;
   aplication: string;
   loan_product_code?: string;
   stock: number;
-  image_url?: string;
+  ncm: string;
+  cfop: string;
+  csosn: string;
+  unit: string;
+  icms_rate: string;
+  pis_rate: string;
+  cofins_rate: string;
 };
 
 type Equipment = {
@@ -46,20 +49,22 @@ export default function EditProduct() {
     name: "",
     manufacturer: "",
     standard_price: "0",
-    percentage_taxes: "",
     material_class: "Chopp",
     submaterial_class: "",
-    tax_classification: "",
     material_origin: "Nacional",
     aplication: "",
     loan_product_code: "",
     stock: 0,
-    image_url: "",
+    ncm: "",
+    cfop: "",
+    csosn: "",
+    unit: "",
+    icms_rate: "",
+    pis_rate: "",
+    cofins_rate: "",
   });
 
   const [equipments, setEquipments] = useState<Equipment[]>([]);
-  const [image, setImage] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -68,7 +73,6 @@ export default function EditProduct() {
         toast.error("Erro ao carregar produto!");
       } else {
         setProduct(data);
-        if (data.image_url) setImagePreview(data.image_url);
       }
     };
     if (id) fetchProduct();
@@ -93,16 +97,6 @@ export default function EditProduct() {
     }));
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setImage(file);
-      const reader = new FileReader();
-      reader.onload = () => setImagePreview(reader.result as string);
-      reader.readAsDataURL(file);
-    }
-  };
-
   const handleSubmit = async () => {
     setLoading(true);
     if (loadingCompany) {
@@ -115,19 +109,13 @@ export default function EditProduct() {
       setLoading(false);
       return;
     }
-  
-    let imageUrl = product.image_url ?? "";
-    if (image) {
-      const fileExt = image.name.split(".").pop();
-      const fileName = `${Date.now()}.${fileExt}`;
-      const filePath = `products/${fileName}`;
-      const { data, error } = await supabase.storage.from("products").upload(filePath, image);
-      if (error) {
-        toast.error("Erro ao fazer upload da imagem!");
-      } else {
-        imageUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/products/${filePath}`;
-      }
-    }
+
+
+    if (!product.ncm || !product.cfop || !product.csosn || !product.unit) {
+      toast.error("Preencha os dados fiscais obrigatórios (NCM, CFOP, CSOSN, Unidade).");
+      setLoading(false);
+      return;
+    }  
   
     const { error } = await supabase
       .from("products")
@@ -136,14 +124,17 @@ export default function EditProduct() {
         name: product.name,
         manufacturer: product.manufacturer,
         standard_price: parseFloat(product.standard_price),
-        percentage_taxes: product.percentage_taxes ? parseFloat(product.percentage_taxes) : null,
         material_class: product.material_class,
         submaterial_class: product.submaterial_class || null,
-        tax_classification: product.tax_classification || null,
         material_origin: product.material_origin,
         aplication: product.aplication || null,
         loan_product_code: product.loan_product_code || null,
-        image_url: imageUrl,
+        cfop: product.cfop,
+        csosn: product.csosn,
+        unit: product.unit,
+        icms_rate: product.icms_rate ? parseFloat(product.icms_rate) : null,
+        pis_rate: product.pis_rate ? parseFloat(product.pis_rate) : null,
+        cofins_rate: product.cofins_rate ? parseFloat(product.cofins_rate) : null,
       })
       .eq("id", productId);
 
@@ -174,7 +165,7 @@ export default function EditProduct() {
             .eq("id", existingLoan.id);
         } else {
       
-          await supabase
+         const { error: insertLoanError } = await supabase
           .from("product_loans")
           .insert([
             {
@@ -184,38 +175,23 @@ export default function EditProduct() {
               quantity: 1,
             },
           ]);
+          if (insertLoanError) {
+            toast.error("Erro ao vincular equipamento")
+            console.error(insertLoanError);
+            setLoading(false);
+            return;
+          }
         }
       }
   
-    if (error) {
-      toast.error("Erro ao atualizar produto!");
-    } else {
       toast.success("Produto atualizado com sucesso!");
       router.push("/dashboard/products");
-    }
-  
-    setLoading(false);
+      setLoading(false);
   };
-
 
   return (
     <div className="max-w-3xl mx-auto p-6 rounded-lg shadow-md">
       <h1 className="text-2xl font-bold mb-4">Editar Produto</h1>
-
-      <Card className="mb-6">
-        <CardContent className="p-4 flex flex-col items-center">
-          <label htmlFor="imageUpload" className="cursor-pointer">
-            {imagePreview ? (
-              <img src={imagePreview} alt="Preview" className="h-40 object-cover rounded-lg shadow-md" />
-            ) : (
-              <div className="h-40 w-full flex items-center justify-center border-2 border-dashed border-gray-300 rounded-lg">
-                <span className="text-gray-500">Clique para adicionar uma imagem</span>
-              </div>
-            )}
-          </label>
-          <input type="file" id="imageUpload" accept="image/png, image/jpeg" className="hidden" onChange={handleImageChange} />
-        </CardContent>
-      </Card>
 
       <Card>
         <CardContent className="p-6 space-y-4">
@@ -227,11 +203,8 @@ export default function EditProduct() {
           <div className="grid grid-cols-3 gap-4">
             <Input type="text" name="standard_price" value={product.standard_price ?? ""} onChange={handleChange} placeholder="Standard Price (R$)" required />
             <Input type="text" name="manufacturer" value={product.manufacturer ?? ""} onChange={handleChange} placeholder="Manufacturer" />
-            <Input type="text" name="percentage_taxes" value={product.percentage_taxes ?? ""} onChange={handleChange} placeholder="Taxes (%)" />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-          <Select
+            {/* <Input type="text" name="percentage_taxes" value={product.percentage_taxes ?? ""} onChange={handleChange} placeholder="Taxes (%)" /> */}
+            <Select
               value={product.material_class}
               onValueChange={(value) => handleSelectChange("material_class", value)}
             >
@@ -244,11 +217,11 @@ export default function EditProduct() {
                 <SelectItem value="Acessório">Acessório</SelectItem>
               </SelectContent>
             </Select>
-            <Input type="text" name="submaterial_class" value={product.submaterial_class ?? ""} onChange={handleChange} placeholder="Submaterial Class" />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <Input type="text" name="tax_classification" value={product.tax_classification ?? ""} onChange={handleChange} placeholder="Tax Classification" />
+          <div className="grid grid-cols-3 gap-4">
+
+            <Input type="text" name="submaterial_class" value={product.submaterial_class ?? ""} onChange={handleChange} placeholder="Submaterial Class" />
             <Select value={product.material_origin} onValueChange={(value) => handleSelectChange("material_origin", value)}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Material Origin" />
@@ -258,7 +231,21 @@ export default function EditProduct() {
                 <SelectItem value="Importado">Importado</SelectItem>
               </SelectContent>
             </Select>
+            <Input name="ncm" value={product.ncm} onChange={handleChange} placeholder="NCM" />
           </div>
+
+          <div className="grid grid-cols-3 gap-4">
+  <Input name="cfop" value={product.cfop} onChange={handleChange} placeholder="CFOP" />
+  <Input name="csosn" value={product.csosn} onChange={handleChange} placeholder="CSOSN" />
+  <Input name="unit" value={product.unit} onChange={handleChange} placeholder="Unidade (ex: UN, CX, L)" />
+</div>
+
+<div className="grid grid-cols-3 gap-4">
+
+  <Input name="icms_rate" value={product.icms_rate} onChange={handleChange} placeholder="ICMS (%)" />
+  <Input name="pis_rate" value={product.pis_rate} onChange={handleChange} placeholder="PIS (%)" />
+  <Input name="cofins_rate" value={product.cofins_rate} onChange={handleChange} placeholder="COFINS (%)" />
+</div>
 
           <Textarea name="aplication" value={product.aplication ?? ""} onChange={handleChange} placeholder="Product Application" />
 

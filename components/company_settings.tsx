@@ -7,10 +7,15 @@ import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 import { supabase } from "@/lib/supabase"
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany"
+import { PasswordInput } from "./ui/password-input"
 
 export default function CompanySettingsForm() {
   const { companyId } = useAuthenticatedCompany()
   const [loading, setLoading] = useState(false)
+
+  const [focusToken, setFocusToken] = useState("")
+  const [certificateFile, setCertificateFile] = useState<File | null>(null)
+  const [certificatePassword, setCertificatePassword] = useState("")
 
   const [formData, setFormData] = useState({
     document: "",
@@ -93,14 +98,48 @@ export default function CompanySettingsForm() {
       .update(formData)
       .eq("id", companyId)
 
-    setLoading(false)
-
     if (error) {
       toast.error("Erro ao atualizar dados da empresa")
       return
     }
 
     toast.success("Dados da empresa atualizados com sucesso")
+
+    // Upload e insert no final do handleSubmit
+    if (focusToken && certificateFile) {
+      const filePath = `certificates/${formData.document}.pfx`
+
+      const { error: uploadError } = await supabase.storage
+        .from("certificates")
+        .upload(filePath, certificateFile, { upsert: true })
+
+      if (uploadError) {
+        toast.error("Erro ao enviar o certificado A1")
+        return
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from("certificates")
+        .getPublicUrl(filePath)
+
+      const { error: insertError } = await supabase
+        .from("nfe_credentials")
+        .upsert({
+          company_id: companyId,
+          cnpj: formData.document,
+          focus_token: focusToken,
+          certificate_password: certificatePassword,
+          certificate_file_url: publicUrlData.publicUrl,
+        })
+
+      if (insertError) {
+        toast.error("Erro ao salvar dados de NF-e")
+        return
+      }
+
+      toast.success("Dados de NF-e salvos com sucesso!")
+    }
+    setLoading(false)
   }
 
   return (
@@ -175,6 +214,52 @@ export default function CompanySettingsForm() {
           />
         </div>
       </div>
+
+      <div className="col-span-2 mt-6">
+  <h3 className="text-lg font-semibold mb-2">NF-e (Focus NFe)</h3>
+  <p className="text-sm text-muted-foreground">Solicite via suporte os dados para emitir NF-e</p>
+</div>
+
+<div>
+  <Label className="mb-2">Token da Focus NFe</Label>
+  <Input
+    value={focusToken}
+    onChange={(e) => setFocusToken(e.target.value)}
+    placeholder="Ex: a7ff01da-xxxx-xxxx-xxxx-44c75d490245"
+  />
+</div>
+
+<div>
+  <Label className="mb-2 block">Upload do Certificado A1 (.pfx)</Label>
+  <Button
+    type="button"
+    onClick={() => document.getElementById("certFile")?.click()}
+  >
+    Selecionar Arquivo
+  </Button>
+  <input
+    id="certFile"
+    type="file"
+    accept=".pfx"
+    className="hidden"
+    onChange={(e) => setCertificateFile(e.target.files?.[0] || null)}
+  />
+  {certificateFile && (
+    <p className="text-sm text-muted-foreground mt-2">
+      Arquivo selecionado: {certificateFile.name}
+    </p>
+  )}
+</div>
+
+<div>
+  <Label className="mb-2">Senha do Certificado</Label>
+  <PasswordInput placeholder="Digite sua Senha"
+    value={certificatePassword}
+    onChange={(e) => setCertificatePassword(e.target.value)} />
+</div>
+
+
+
       <Button onClick={handleSubmit} disabled={loading}>
         {loading ? "Salvando..." : "Salvar Empresa"}
       </Button>

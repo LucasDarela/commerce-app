@@ -31,17 +31,19 @@ const initialCliente = {
   phone: "",
   email: "",
   state_registration: "",
+  emit_nf: "",
 };
 export default function CreateClient() {
   const router = useRouter();
   const inputRefs = useRef<HTMLInputElement[]>([]);
   const { user, companyId, loading } = useAuthenticatedCompany();
   const [cliente, setCliente] = useState(initialCliente);
+  const [emitNf, setEmitNf] = useState(false)
   const placeholdersMap: Record<string, string> = {
     document: "CPF/CNPJ",
     name: "Nome Completo / Razão Social",
     fantasy_name: "Nome Fantasia",
-    zip_code: "CEP",
+    zip_code: "CEP (Obrigatório caso gere NFe)",
     address: "Endereço",
     neighborhood: "Bairro",
     city: "Cidade",
@@ -49,7 +51,7 @@ export default function CreateClient() {
     number: "Número",
     complement: "Complemento",
     phone: "Telefone",
-    email: "Email (Obrigatório caso gere boleto.)",
+    email: "Email (Obrigatório caso gere boleto)",
     state_registration: "Inscrição Estadual",
   };
   const formatarMaiusculo = (valor: string, campo: string) => {
@@ -85,6 +87,7 @@ export default function CreateClient() {
       phone: "",
       email: "",
       state_registration: "",
+      emit_nf: "",
     });
   };
   const buscarEndereco = async () => {
@@ -207,6 +210,7 @@ export default function CreateClient() {
         price_table_id: selectedCatalog || null,
         company_id: companyId, 
         phone: telefoneLimpo,
+        emit_nf: emitNf,
       },
     ]);
   
@@ -275,7 +279,7 @@ export default function CreateClient() {
           />
         );
       })}
-            {/* check box  */}
+            {/* price catalog  */}
             <div className="mt-4">
               <Select value={selectedCatalog} onValueChange={setSelectedCatalog}>
                 <SelectTrigger className="w-full">
@@ -290,6 +294,13 @@ export default function CreateClient() {
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="flex items-center space-x-2 mt-4">
+            <Checkbox id="emit_nf" checked={emitNf} onCheckedChange={(checked) => setEmitNf(!!checked)} />
+            <label htmlFor="emit_nf" className="text-sm font-medium leading-none">
+              Emitir Nota Fiscal
+            </label>
+          </div>
       <Button className="mt-4 w-full" onClick={handleSubmit}>Cadastrar</Button>
     </div>
   );

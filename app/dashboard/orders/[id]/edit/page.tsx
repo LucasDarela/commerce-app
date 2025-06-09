@@ -15,18 +15,30 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { toast } from "sonner";
 import Link from "next/link";
+import { getReservedStock } from "@/lib/stock/getReservedStock"
+import { z } from "zod"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { orderSchema, Order as OrderType } from "@/lib/fetchOrders"
+import { generateNextNoteNumber } from "@/lib/generate-next-note-number";
+import { Textarea } from "@/components/ui/textarea";
+import { parseISO } from "date-fns"
 
 interface Customer {
   id: string;
   name: string;
+  type: string;
   document: string;
   phone: string;
   address: string;
-  zip_code: string;
-  neighborhood: string;
+  zip_code: string;     
+  neighborhood: string;   
   city: string;
   state: string;
-  number: string;
+  number: string;         
+  complement?: string;
+  email?: string;
+  price_table_id?: string;
 }
 
 interface Product {
@@ -50,7 +62,11 @@ interface Order {
   appointment_hour?: string;
   appointment_local?: string;
   customer_id?: string;
+  issue_date?: string;
+  text_note?: string;
+  due_date?: string;
 }
+type OrderFormData = z.infer<typeof orderSchema>
 
 export default function EditOrderPage() {
   const router = useRouter();
@@ -70,6 +86,10 @@ export default function EditOrderPage() {
   const [appointment, setAppointment] = useState({ date: undefined as Date | undefined, hour: "", location: "" });
   const [loading, setLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [text_note, setTextNote] = useState<string>("");
+  const [reservedStock, setReservedStock] = useState<number>(0)
+  const [originalDueDate, setOriginalDueDate] = useState<Date | null>(null);
+  const [calculatedDueDate, setCalculatedDueDate] = useState<Date | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -101,9 +121,13 @@ export default function EditOrderPage() {
       setProducts(productsData || []);
       setCustomers(customersData || []);
       setOrder(orderData);
+      setOriginalDueDate(orderData.due_date ? parseISO(orderData.due_date) : null);
+      setCalculatedDueDate(orderData.due_date ? parseISO(orderData.due_date) : null);
       setFreight(Number(orderData.freight || 0));
       setAppointment({
-        date: orderData.appointment_date ? new Date(orderData.appointment_date) : undefined,
+        date: orderData.appointment_date 
+        ? parseISO(orderData.appointment_date)
+        : undefined,
         hour: orderData.appointment_hour || "",
         location: orderData.appointment_local || "",
       });
@@ -130,6 +154,43 @@ export default function EditOrderPage() {
   
     fetchData();
   }, [id]);
+
+  useEffect(() => {
+    const fetchReservedStock = async () => {
+      if (!selectedProduct) return
+  
+      const reserved = await getReservedStock(Number(selectedProduct.id))
+      const available = selectedProduct.stock - reserved
+  
+      setReservedStock(reserved)
+  
+      if (quantity > available) {
+        toast.warning("Atenção: quantidade maior que o estoque disponível para a data.")
+      }
+    }
+  
+    fetchReservedStock()
+  }, [selectedProduct, quantity])
+
+  useEffect(() => {
+    if (!appointment.date || !order?.days_ticket) return;
+  
+    const dias = Number(order.days_ticket);
+    if (isNaN(dias)) return;
+  
+    const novaData = new Date(appointment.date);
+    novaData.setDate(novaData.getDate() + dias);
+    setCalculatedDueDate(novaData);
+  }, [appointment.date, order?.days_ticket]);
+
+  const {
+    register,
+    watch,
+    setValue,
+    formState: { errors },
+  } = useForm<OrderFormData>({
+    resolver: zodResolver(orderSchema),
+  })
 
   const handleSelectCustomer = (customer: Customer) => {
     setSelectedCustomer(customer);
@@ -174,21 +235,30 @@ export default function EditOrderPage() {
   
       // 🔥 NOVO: monta o total de itens vendidos
       const amount = items.reduce((acc, item) => acc + item.quantity, 0);
+
+      const capitalize = (text: string) =>
+        text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
   
       // 🔥 MONTA CORRETAMENTE O OBJETO A ENVIAR PARA O SUPABASE
       const updatedOrder = {
         document_type: order.document_type,
         note_number: order.note_number,
         payment_method: order.payment_method,
-        days_ticket: order.days_ticket,
-        freight,
+        days_ticket:
+        capitalize(order?.payment_method || "") === "Boleto"
+          ? order?.days_ticket || "12"
+          : "1",
         total,
-        amount, // <- Novo
-        products: productsDescription, // <- Novo
+        amount, 
+        products: productsDescription, 
         appointment_date: appointment.date ? format(appointment.date, "yyyy-MM-dd") : null,
         appointment_hour: appointment.hour,
         appointment_local: appointment.location,
         customer_id: selectedCustomer ? selectedCustomer.id : order.customer_id, 
+        due_date: calculatedDueDate
+        ? format(calculatedDueDate, "yyyy-MM-dd")
+        : null,
+      text_note,
       };
   
       const { error: orderError } = await supabase
@@ -294,10 +364,16 @@ export default function EditOrderPage() {
     return <div className="p-6 text-center">Carregando venda...</div>;
   }
 
+  const issueDate = order?.issue_date ?? new Date().toISOString().split("T")[0]
+  const daysTicket = Number(order?.days_ticket ?? 0)
+  // Converter issueDate para Date
+  const dueDate = order?.due_date
+  ? format(parseISO(order.due_date), "dd/MM/yyyy")
+  : "";
+
   return (
     <div className="w-full max-w-4xl mx-auto p-6 rounded-lg shadow-md">
       <h1 className="text-2xl font-bold mb-4">Editar Venda</h1>
-  
       {/* Informações do Documento */}
       <Card className="mb-6">
         <CardContent className="space-y-4">
@@ -312,8 +388,72 @@ export default function EditOrderPage() {
                 <SelectItem value="invoice">Fiscal</SelectItem>
               </SelectContent>
             </Select>
-            <Input placeholder="Numero do Documento" value={order?.note_number || ""} onChange={(e) => setOrder({ ...order, note_number: e.target.value })} />
+            <Input placeholder="Numero da Nota" value={order?.note_number || ""} onChange={(e) => setOrder({ ...order, note_number: e.target.value })} />
+            <div className="flex items-center gap-2 w-full">
+            <span className="text-sm text-muted-foreground font-medium hidden sm:inline">
+              Emissão:
+            </span>
+            <Input
+              id="issue_date"
+              value={order?.issue_date ? format(new Date(order.issue_date), "dd/MM/yyyy") : ""}
+              readOnly
+              className="cursor-not-allowed bg-muted w-full"
+            />
           </div>
+          </div>
+              {/* Seção Forma de Pagamento */}
+    <div className="flex gap-4 items-center w-full mt-6">
+    <Select
+                value={order?.payment_method || ""}
+                onValueChange={(value) => {
+                  let days = "0"
+                  if (value.toLowerCase() === "boleto") days = "12"
+
+                  setOrder((prev) => ({
+                    ...prev,
+                    payment_method: value,
+                    days_ticket: days,
+                  }))
+                }}
+              >
+        <SelectTrigger className="w-full border rounded-md shadow-sm">
+          <SelectValue placeholder="Forma de Pagamento" />
+        </SelectTrigger>
+        <SelectContent className="w-full shadow-md rounded-md">
+          <SelectItem value="Pix">Pix</SelectItem>
+          <SelectItem value="Dinheiro">Dinheiro</SelectItem>
+          <SelectItem value="Cartao">Cartão</SelectItem>
+          <SelectItem value="Boleto">Boleto</SelectItem>
+        </SelectContent>
+      </Select>
+
+      <Input
+                type="number"
+                placeholder="Prazo"
+                value={order?.days_ticket || ""}
+                onChange={(e) =>
+                  setOrder((prev) => ({ ...prev, days_ticket: e.target.value }))
+                }
+                disabled={["pix", "dinheiro"].includes(order?.payment_method?.toLowerCase() || "")}
+                className={`w-full border rounded-md shadow-sm ${
+                  ["pix", "dinheiro"].includes(order?.payment_method?.toLowerCase() || "")
+                    ? "cursor-not-allowed bg-gray-100 text-gray-500"
+                    : ""
+                }`}
+              />
+                    <div className="flex items-center gap-2 w-full">
+                <span className="text-sm text-muted-foreground font-medium hidden sm:inline">
+                  Vencimento:
+                </span>
+                <Input
+                  id="due_date"
+                  value={calculatedDueDate ? format(calculatedDueDate, "dd/MM/yyyy") : ""}
+                  readOnly
+                  className="cursor-not-allowed bg-muted w-full"
+                />
+              </div>
+    </div>
+          
         </CardContent>
       </Card>
   
@@ -322,7 +462,7 @@ export default function EditOrderPage() {
         <CardContent>
           <h2 className="text-xl font-bold mb-4">Informações do Cliente</h2>
           <div className="grid grid-cols-5 gap-4 mb-4">
-            <div className="col-span-4 relative">
+            <div className="col-span-3 relative">
               <Input
                 type="text"
                 placeholder="Procurar Cliente..."
@@ -346,9 +486,11 @@ export default function EditOrderPage() {
                 </div>
               )}
             </div>
+            <div className="col-span-2">
             <Link href="/dashboard/customers/add">
               <Button variant="default" className="w-full">Adicionar</Button>
             </Link>
+            </div>
           </div>
   
           <div className="grid grid-cols-2 gap-4">
@@ -367,12 +509,12 @@ export default function EditOrderPage() {
       {/* Products */}
       <Card className="mb-6">
   <CardContent className="space-y-4">
-    <h2 className="text-xl font-bold mb-4">Produtos</h2>
+    <h2 className="text-xl font-bold mb-4">Selecione os Produtos</h2>
 
     {/* Área de Adicionar Novo Produto */}
-    <div className="grid grid-cols-4 gap-4 items-center">
+    <div className="grid grid-cols-5 gap-4 items-center">
       <Select onValueChange={(value) => handleSelectNewProduct(value)}>
-      <SelectTrigger className="border rounded-md shadow-sm w-full col-span-2 truncate ">
+      <SelectTrigger className="border rounded-md shadow-sm w-full col-span-3 truncate ">
           <SelectValue placeholder="Selecionar Produto" />
         </SelectTrigger>
         <SelectContent className="shadow-md rounded-md z-50">
@@ -384,57 +526,7 @@ export default function EditOrderPage() {
         </SelectContent>
       </Select>
 
-
-      {/* <Input
-        className="col-span-1"
-        type="number"
-        placeholder="Quantidade"
-        value={quantity === 0 ? "" : quantity}
-        onChange={(e) => setQuantity(Number(e.target.value))}
-      />
-      <Input
-        placeholder="Preço"
-        value={standardPrice || ""}
-        onChange={(e) => setStandardPrice(Number(e.target.value) || 0)}
-      /> */}
       <Button className="col-span-2 w-full cursor-pointer" onClick={addItem}>Adicionar Produto</Button>
-    </div>
-
-    {/* Seção Forma de Pagamento */}
-    <div className="grid grid-cols-2 gap-4 items-center">
-    <Select
-        value={order.payment_method}
-        onValueChange={(value) =>
-          setOrder((prev) => ({
-            ...prev,
-            payment_method: value,
-            days_ticket: value.toLowerCase() === "boleto" ? "12" : value.toLowerCase() === "cartao" ? "1" : prev?.days_ticket || "",
-          }))
-        }
-      >
-        <SelectTrigger className="w-full border rounded-md shadow-sm">
-          <SelectValue placeholder="Forma de Pagamento" />
-        </SelectTrigger>
-        <SelectContent className="w-full shadow-md rounded-md">
-          <SelectItem value="Pix">Pix</SelectItem>
-          <SelectItem value="Dinheiro">Dinheiro</SelectItem>
-          <SelectItem value="Cartao">Cartão</SelectItem>
-          <SelectItem value="Boleto">Boleto</SelectItem>
-        </SelectContent>
-      </Select>
-
-      <Input
-        type="number"
-        placeholder="Dias"
-        value={order.days_ticket}
-        onChange={(e) => setOrder((prev) => ({ ...prev, days_ticket: e.target.value }))}
-        disabled={["pix", "dinheiro"].includes(order.payment_method?.toLowerCase() || "")}
-        className={`w-full border rounded-md shadow-sm ${
-          ["Pix", "Dinheiro"].includes(order.payment_method?.toLowerCase() || "")}
-            ? "cursor-not-allowed bg-gray-100 text-gray-500"
-            : ""
-        }`}
-      />
     </div>
 
     {/* Área da Tabela de Produtos */}
@@ -496,44 +588,70 @@ export default function EditOrderPage() {
           <CardContent>
           <div>
             <h2 className="text-xl font-bold mb-4">Agendamento de Entrega</h2>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
             <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="w-full flex justify-between cursor-pointer hover:bg-gray-100">
-                  {appointment.date ? format(appointment.date, "dd/MM/yyyy") : "Escolher Data"}
-                  <CalendarIcon className="h-5 w-5" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[260px]">
-                <DatePicker
-                  selected={appointment.date}
-                  onChange={(date: Date | null) => setAppointment((prev) => ({ ...prev, date: date || undefined }))
-                }
-                  dateFormat="dd/MM/yyyy"
-                  className="hidden"
-                  inline
-                />
-              </PopoverContent>
-            </Popover>
-            <Input placeholder="Horário" type="time" value={appointment.hour} onChange={(e) => setAppointment({ ...appointment, hour: e.target.value })} />
-            <Input placeholder="Local de Entrega" value={appointment.location} onChange={(e) => setAppointment({ ...appointment, location: e.target.value })} />
-          </div>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full flex justify-between cursor-pointer hover:bg-gray-100">
+                    {appointment.date ? format(appointment.date, "dd/MM/yyyy") : "Data da Entrega"}
+                    <CalendarIcon className="h-5 w-5" />
+                  </Button>
+                </PopoverTrigger>
+
+                <PopoverContent className="w-[260px] shadow-lg rounded-md p-2 z-50 border" align="center" side="bottom">
+                  <DatePicker
+                    selected={appointment.date}
+                    onChange={(date: Date | null) =>
+                      setAppointment((prev) => ({ ...prev, date: date || undefined }))
+                    }
+                    dateFormat="dd/MM/yyyy"
+                    className="hidden"
+                    inline
+                  />
+                    {errors.appointment_date && (
+                    <p className="text-red-500 text-sm">{errors.appointment_date.message}</p>
+                  )}
+                </PopoverContent>
+              </Popover>
+
+              <Input
+                type="time"
+                placeholder="Horário"
+                value={appointment.hour}
+                onChange={(e) => setAppointment({ ...appointment, hour: e.target.value })}
+              />
+            </div>
           </div>
   
-          <div className="grid grid-cols-3 gap-4 items-center mt-6">
+          <div className="grid grid-cols-2 gap-4 items-center mt-4">
+          <Input
+                type="text"
+                placeholder="Local da Entrega"
+                value={appointment.location}
+                onChange={(e) => setAppointment({ ...appointment, location: e.target.value })}
+              />
             <Input
               type="number"
               placeholder="Frete"
-              value={freight || ""}
-              onChange={(e) => setFreight(Number(e.target.value) || 0)}
+              value={freight === 0 ? "" : freight}
+              onChange={(e) => {
+                const value = e.target.value;
+                setFreight(value === "" ? 0 : Number(value));
+              }}
             />
-            <div className="font-bold">Total: R$ {getTotal().toFixed(2)}</div>
+          </div>
+
+          <div className="flex mt-4">
+          <Textarea value={text_note} onChange={(e) => setTextNote (e.target.value)} placeholder="Observação"/>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 items-center mt-4">
+          <div className="text-center font-bold">Total: R$ {getTotal().toFixed(2)}</div>
             <Button variant="default" onClick={handleUpdate} disabled={loading}>
-              {loading ? "Salvando..." : "Atualizar Venda"}
+              {loading ? "Salvando..." : "Salvar"}
             </Button>
           </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+          </Card>
     </div>
   );
 };

@@ -318,7 +318,7 @@ const dueDate = format(
       .single();
   
     if (error) {
-      toast.error("Failed to create order.");
+      toast.error("❌ Falha ao criar ordem.");
       console.error("❌ Error inserting order:", error);
       setLoading(false);
       return;
@@ -334,10 +334,10 @@ const dueDate = format(
     const { error: itemError } = await supabase.from("order_items").insert(orderItems);
   
     if (itemError) {
-      toast.error("Order created but failed to insert items.");
+      toast.error("❌ Ordem criada mas ERRO ao inserir itens.");
       console.error("❌ Error inserting order items:", itemError);
     } else {
-      toast.success("Order created successfully!");
+      toast.success("🍻 Venda criada com sucesso!");
       router.push("/dashboard/orders");
     }
   }catch(err){
@@ -412,11 +412,9 @@ const dueDate = format(
             value={order.document_type}
             onValueChange={async (value) => {
               let generatedNoteNumber = order.note_number
-
               if (value === "internal" && companyId) {
                 generatedNoteNumber = await generateNextNoteNumber(companyId)
               }
-
               setOrder((prev) => ({
                 ...prev,
                 document_type: value,
@@ -432,7 +430,6 @@ const dueDate = format(
               <SelectItem value="invoice">Fiscal</SelectItem>
             </SelectContent>
           </Select>
-
           <Input
             type="text"
             placeholder="Número da Nota"
@@ -510,10 +507,10 @@ const dueDate = format(
             </div>
         </CardContent>
         </Card>
-
+        
+          {/* Customer Info */}
         <Card className="mb-6">
         <CardContent>
-          {/* Customer Info */}
           <h2 className="text-xl font-bold mb-4">Informações do Cliente</h2>
           <div className="grid grid-cols-5 gap-4 mb-4">
           <div className="col-span-3 relative">
