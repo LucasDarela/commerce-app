@@ -33,13 +33,8 @@ export default function AddProduct() {
     material_origin: "National",
     aplication: "",
     loan_product_code: "",
-    ncm: "",
-    cfop: "",
-    csosn: "",
     unit: "",
-    icms_rate: "",
-    pis_rate: "",
-    cofins_rate: "",
+    description: "",
   });
 
   const [submitting, setSubmitting] = useState(false);
@@ -75,11 +70,6 @@ export default function AddProduct() {
       toast.error("Preencha os campos obrigatórios!");
       return;
     }
-
-    if (!product.ncm || !product.cfop || !product.csosn || !product.unit) {
-      toast.error("Preencha os dados fiscais obrigatórios (NCM, CFOP, CSOSN, Unidade).");
-      return;
-    }  
   
     setSubmitting(true)
   
@@ -107,11 +97,8 @@ export default function AddProduct() {
     .insert([
       {
         ...product,
-        standard_price: parseFloat(product.standard_price),
-        company_id: companyId,
-        icms_rate: product.icms_rate ? parseFloat(product.icms_rate) : undefined,
-        pis_rate: product.pis_rate ? parseFloat(product.pis_rate) : undefined,
-        cofins_rate: product.cofins_rate ? parseFloat(product.cofins_rate) : undefined,  
+        standard_price: parseFloat(product.standard_price.replace(',', '.')),
+        company_id: companyId, 
       },
     ])
     .select("id")
@@ -154,9 +141,29 @@ export default function AddProduct() {
           </div>
 
           <div className="grid grid-cols-3 gap-4">
-            <Input type="text" name="standard_price" value={product.standard_price} onChange={handleChange} placeholder="Preço (R$)" required />
+            <Input type="text" name="standard_price" value={product.standard_price} onChange={handleChange} placeholder="Custo (R$)" required />
             <Input type="text" name="manufacturer" value={product.manufacturer} onChange={handleChange} placeholder="Fabricante" />
-            <Select value={product.material_class} onValueChange={(value) => handleSelectChange("material_class", value)}>
+            
+            <Select value={product.unit} onValueChange={(value) => handleSelectChange("unit", value)}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Unidade" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="un">Un - Unidade</SelectItem>
+                <SelectItem value="kg">Kg - kilograma</SelectItem>
+                <SelectItem value="m">M - Metro</SelectItem>
+                <SelectItem value="l">L - Litro</SelectItem>
+                <SelectItem value="m2">M2 - Metro quadrado</SelectItem>
+                <SelectItem value="m3">M3 - Metro cubico</SelectItem>
+                <SelectItem value="kw">Kw - Kilowatt</SelectItem>
+                <SelectItem value="h">H - Hora</SelectItem>
+                <SelectItem value="par">P - Par</SelectItem>
+              </SelectContent>
+            </Select>
+            </div>
+
+          <div className="grid grid-cols-3 gap-4">
+          <Select value={product.material_class} onValueChange={(value) => handleSelectChange("material_class", value)}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Classe do Material" />
               </SelectTrigger>
@@ -165,38 +172,41 @@ export default function AddProduct() {
                 <SelectItem value="EQUIPAMENTO">EQUIPAMENTO</SelectItem>
                 <SelectItem value="ACESSORIO">ACESSORIO</SelectItem>
               </SelectContent>
-            </Select></div>
-
-          <div className="grid grid-cols-3 gap-4">
-
+            </Select>
             <Input type="text" name="submaterial_class" value={product.submaterial_class} onChange={handleChange} placeholder="Sub Classe" />
             <Select value={product.material_origin} onValueChange={(value) => handleSelectChange("material_origin", value)}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Origem do Produto" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="National">National</SelectItem>
-                <SelectItem value="Imported">Importado</SelectItem>
+                <SelectItem value="National">Nacional</SelectItem>
+                <SelectItem value="Foreign">Estrangeira</SelectItem>
               </SelectContent>
             </Select>
-            <Input name="ncm" value={product.ncm || ""} onChange={handleChange} placeholder="NCM" />
           </div>
 
           <div className="grid grid-cols-3 gap-4">
 
-            <Input name="cfop" value={product.cfop || ""} onChange={handleChange} placeholder="CFOP" />
-            <Input name="csosn" value={product.csosn || ""} onChange={handleChange} placeholder="CSOSN" />
-            <Input name="unit" value={product.unit || ""} onChange={handleChange} placeholder="Unidade (ex: L, CX, UN)" />
+            <Input name="percentage_taxes" value={product.percentage_taxes || ""} onChange={handleChange} placeholder="Tributos %" />
+            <Select value={product.aplication} onValueChange={(value) => handleSelectChange("aplication", value)}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Aplicação do Material" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="sale-product">Mercadoria para Revenda</SelectItem>
+                <SelectItem value="materail-use-consumption">Material de Uso e Consumo</SelectItem>
+                <SelectItem value="service">Serviço</SelectItem>
+                <SelectItem value="fixed-asset">Ativo Imobilizado</SelectItem>
+                <SelectItem value="raw-material">Matéria prima</SelectItem>
+                <SelectItem value="sub-product">Subproduto</SelectItem>
+                <SelectItem value="packaging">Embalagem</SelectItem>
+                <SelectItem value="others">Outros</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
 
-            <Input name="icms_rate" value={product.icms_rate || ""} onChange={handleChange} placeholder="ICMS (%)" />
-            <Input name="pis_rate" value={product.pis_rate || ""} onChange={handleChange} placeholder="PIS (%)" />
-            <Input name="cofins_rate" value={product.cofins_rate || ""} onChange={handleChange} placeholder="COFINS (%)" />
-          </div>
-
-          <Textarea name="aplication" value={product.aplication} onChange={handleChange} placeholder="Aplicação do Produto" />
+          <Textarea name="description" value={product.description} onChange={handleChange} placeholder="Descrição do Produto" />
 
           <Select
             value={product.loan_product_code}

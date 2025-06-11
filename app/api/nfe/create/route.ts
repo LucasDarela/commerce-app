@@ -16,12 +16,27 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Parâmetros inválidos" }, { status: 400 })
     }
 
+    console.log("🧾 Dados recebidos para emissão de NF-e:", JSON.stringify(invoiceData, null, 2))
+
     const parseResult = invoiceSchema.safeParse(invoiceData)
+
     if (!parseResult.success) {
-      return NextResponse.json({ error: "Dados da nota inválidos", details: parseResult.error.format() }, { status: 422 })
+      console.error("❌ Erro de validação da NF-e:", parseResult.error.flatten())
+      return NextResponse.json(
+        {
+          error: "Dados da nota inválidos",
+          details: parseResult.error.format(),
+        },
+        { status: 422 }
+      )
     }
 
-    const result = await emitInvoice({ companyId, invoiceData, supabaseClient: supabase })
+    const result = await emitInvoice({
+      companyId,
+      invoiceData: parseResult.data, // melhor usar os dados validados
+      supabaseClient: supabase,
+    })
+
     return NextResponse.json(result)
   } catch (err: any) {
     console.error("Erro na emissão da nota:", err)

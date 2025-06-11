@@ -15,7 +15,8 @@ export async function emitInvoice({ companyId, invoiceData, supabaseClient }: Em
     .single()
 
   if (error || !cred) throw new Error("Token da Focus NFe não encontrado")
-
+  console.log("🔧 Token da empresa:", cred?.focus_token)
+  console.log("📤 Enviando para Focus:", invoiceData)
   try {
     const response = await axios.post(
       "https://homologacao.focusnfe.com.br/v2/nfe",
@@ -30,13 +31,14 @@ export async function emitInvoice({ companyId, invoiceData, supabaseClient }: Em
 
     return response.data
   } catch (err: any) {
+    console.error("❌ Erro na resposta da Focus:", err.response?.data || err.message)
+  
     if (err.response?.data?.erros) {
       throw new Error(
-        err.response.data.erros
-          .map((e: any) => e.mensagem)
-          .join(" | ")
+        err.response.data.erros.map((e: any) => e.mensagem).join(" | ")
       )
     }
+  
     throw new Error("Erro na API da Focus NFe")
   }
 }

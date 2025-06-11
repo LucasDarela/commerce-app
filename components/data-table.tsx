@@ -663,9 +663,12 @@ const [selectedMonth, setSelectedMonth] = useState(() => {
     >
       Pagar
     </DropdownMenuItem>
-    <DropdownMenuItem onClick={() => emitirNota(row.original)}>
-  Emitir NF-e
-</DropdownMenuItem>
+
+    <DropdownMenuItem asChild>
+      <Link href={`/dashboard/orders/${row.original.id}/nfe`}>
+      Emitir NF-e
+      </Link>
+    </DropdownMenuItem>
 
     <DropdownMenuSeparator />
     

@@ -42,7 +42,7 @@ interface Customer {
 }
 
 interface Product {
-  id: string;
+  id: number;
   code: string;
   name: string;
   standard_price: number;
@@ -90,6 +90,10 @@ export default function EditOrderPage() {
   const [reservedStock, setReservedStock] = useState<number>(0)
   const [originalDueDate, setOriginalDueDate] = useState<Date | null>(null);
   const [calculatedDueDate, setCalculatedDueDate] = useState<Date | null>(null);
+
+  const [priceTableItems, setPriceTableItems] = useState<
+  { product_id: string; price: number }[]
+>([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -159,7 +163,7 @@ export default function EditOrderPage() {
     const fetchReservedStock = async () => {
       if (!selectedProduct) return
   
-      const reserved = await getReservedStock(Number(selectedProduct.id))
+      const reserved = await getReservedStock(selectedProduct.id)
       const available = selectedProduct.stock - reserved
   
       setReservedStock(reserved)
@@ -182,6 +186,26 @@ export default function EditOrderPage() {
     novaData.setDate(novaData.getDate() + dias);
     setCalculatedDueDate(novaData);
   }, [appointment.date, order?.days_ticket]);
+
+  useEffect(() => {
+    const fetchPriceTableItems = async () => {
+      if (!selectedCustomer?.price_table_id) return;
+  
+      const { data, error } = await supabase
+        .from("price_table_products")
+        .select("product_id, price")
+        .eq("price_table_id", selectedCustomer.price_table_id);
+  
+      if (error) {
+        toast.error("Erro ao buscar preços personalizados.");
+        return;
+      }
+  
+      setPriceTableItems(data || []);
+    };
+  
+    fetchPriceTableItems();
+  }, [selectedCustomer?.price_table_id]);
 
   const {
     register,
@@ -311,8 +335,12 @@ export default function EditOrderPage() {
   const handleSelectNewProduct = (productId: string) => {
     const product = products.find((p) => p.id.toString() === productId);
     if (!product) return;
+
+    const priceItem = priceTableItems.find((item) => item.product_id === product.id.toString());
+    const price = priceItem?.price ?? product.standard_price;
+
     setSelectedProduct(product);
-    setStandardPrice(product.standard_price);
+    setStandardPrice(price);
   };
   
   const handleChangeProduct = (index: number, productId: string) => {
@@ -552,7 +580,7 @@ export default function EditOrderPage() {
                 </SelectTrigger>
                 <SelectContent>
                   {products.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
+                    <SelectItem key={p.id} value={p.id.toString()}>
                       {p.code} - {p.name}
                     </SelectItem>
                   ))}

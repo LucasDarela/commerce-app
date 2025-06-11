@@ -112,27 +112,17 @@ export default function ViewOrderPage() {
   const customer = order.customer
   const items = order.items || []
 
+  const freight = Number(order.freight || 0);
+  const totalItems = items.reduce(
+    (sum: number, item: any) => sum + item.quantity * item.unit_price,
+    0
+  );
+  const totalFinal = totalItems + freight;
+
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-6">
     <div className="flex items-start justify-between">
       <h1 className="text-2xl font-bold">Espelho da Venda</h1>
-      <div className="flex flex-col gap-2">
-
-        {/* <PDFDownloadLink
-          document={<ItemRelationPDF company={company} customer={customer} items={items} />}
-          fileName={`espelho-pedido-${order.note_number}.pdf`}
-        >
-          {({ loading }) => (
-            <Button >
-              {loading ? "Gerando PDF..." : "Exportar PDF"}
-            </Button>
-          )}
-        </PDFDownloadLink>
-        <GenerateBoletoButton
-          orderId={order.id}
-          paymentMethod={order.payment_method}
-        /> */}
-      </div>
     </div>
       {/* Cliente */}
       <section>
@@ -171,13 +161,17 @@ export default function ViewOrderPage() {
             ))}
           </tbody>
         </table>
+        <div className="mt-6 border-t pt-4 text-sm text-right space-y-1">
+        <p><strong>Frete:</strong> R$ {freight.toFixed(2)}</p>
+        <p className="text-lg font-bold"><strong>Total:</strong> R$ {totalFinal.toFixed(2)}</p>
+      </div>
         <div className="w-full mt-6">
         <Button className="w-full" onClick={() => setOpenSignature(true)}>
         Assinar
       </Button>
         </div>
         {signatureData && (
-            <div className="flex flex-col items-center mt-4">
+            <div className="flex flex-col items-center mt-4 bg-white">
               <p className="text-sm text-gray-600 mb-2">Assinatura capturada:</p>
               <img
                 src={signatureData}
@@ -202,6 +196,7 @@ export default function ViewOrderPage() {
               customer={customer}
               items={items}
               note={order.note_number}
+              freight={order.freight}
             />} fileName="nota.pdf">
             {({ loading }) => (
               <Button variant="default" className="w-full">

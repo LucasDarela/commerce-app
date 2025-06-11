@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
+import { Label } from "@radix-ui/react-label";
 
 interface BankAccount {
   id: string;
@@ -73,6 +74,9 @@ export default function AddFinancialRecord() {
   const [entities, setEntities] = useState<{ id: string; name: string }[]>([]);
   const [showEntityDropdown, setShowEntityDropdown] = useState(false);
   const router = useRouter();
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurrenceType, setRecurrenceType] = useState<"daily" | "weekly" | "monthly">("monthly");
+  const [recurrenceCount, setRecurrenceCount] = useState<number>(1);
 
   const handleAddProduct = () => {
     setProductEntries([...productEntries, { productId: "", quantity: 1, unitPrice: 0 }]);
@@ -167,12 +171,37 @@ export default function AddFinancialRecord() {
         .insert([record])
         .select()
         .maybeSingle();
-    
-      if (error || !inserted) {
-        toast.error("Erro ao salvar: " + error?.message || "Erro desconhecido");
-        setLoading(false);
-        return;
-      }
+
+        if (isRecurring && recurrenceCount > 1) {
+          const intervalMap = {
+            daily: 1,
+            weekly: 7,
+            monthly: 30,
+          };
+        
+          const baseDate = new Date(toISODate(dueDate));
+          const entriesToInsert = [];
+        
+          for (let i = 1; i < recurrenceCount; i++) {
+            const newDate = new Date(baseDate);
+            newDate.setDate(newDate.getDate() + i * intervalMap[recurrenceType]);
+        
+            entriesToInsert.push({
+              ...record,
+              due_date: newDate.toISOString().split("T")[0],
+              created_at: new Date().toISOString(),
+              invoice_number: invoiceNumber ? `${invoiceNumber}-${i + 1}` : null,
+            });
+          }
+        
+          const { error: recurrenceError } = await supabase
+            .from("financial_records")
+            .insert(entriesToInsert);
+        
+          if (recurrenceError) {
+            console.error("Erro ao salvar notas recorrentes:", recurrenceError);
+          }
+        }
     
       if (selectedCategory === "compra_produto") {
         for (const entry of productEntries) {
@@ -570,6 +599,51 @@ export default function AddFinancialRecord() {
     }}
     disabled={selectedCategory === "compra_produto" || selectedCategory === "compra_equipamento"}
   />
+</div>
+
+{/* recorrencia */}
+<div className="mt-4">
+  <label className="flex items-center gap-2">
+    <input
+      type="checkbox"
+      checked={isRecurring}
+      onChange={(e) => setIsRecurring(e.target.checked)}
+      disabled={
+        selectedCategory === "compra_produto" ||
+        selectedCategory === "compra_equipamento"
+      }
+    />
+    Adicionar recorrência
+  </label>
+  {(selectedCategory === "compra_produto" || selectedCategory === "compra_equipamento") && (
+  <p className="text-sm text-muted-foreground italic ml-1">
+    Recorrência não disponível para compras de produto ou equipamento.
+  </p>
+)}
+  {isRecurring && (
+    <div className="flex gap-4 mt-2">
+      <Select value={recurrenceType} onValueChange={(val) => setRecurrenceType(val as any)}>
+        <SelectTrigger className="w-[200px]">
+          <SelectValue placeholder="Frequência" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="daily">Diária</SelectItem>
+          <SelectItem value="weekly">Semanal</SelectItem>
+          <SelectItem value="monthly">Mensal</SelectItem>
+        </SelectContent>
+      </Select>
+
+      <Label className="flex items-center">Repetir:</Label>
+      <Input
+        type="number"
+        min={1}
+        placeholder="Quantas vezes?"
+        value={recurrenceCount}
+        onChange={(e) => setRecurrenceCount(Number(e.target.value))}
+        className="w-[100px]"
+      />
+    </div>
+  )}
 </div>
 
   {/* Notas */}

@@ -97,13 +97,16 @@ interface ItemRelationPDFProps {
   customer: any;
   items: any[];
   signature?: string | null;
+  freight?: number;
 }
 
-const RelationSection = ({ company, customer, items, note, signature }: any) => {
-  const total = items.reduce(
+const RelationSection = ({ company, customer, items, note, freight = 0, signature }: any) => {
+  const totalItems = items.reduce(
     (sum: number, item: any) => sum + item.unit_price * item.quantity,
     0
   )
+
+  const totalFinal = totalItems + Number(freight);
 
   return (
     <View>
@@ -162,7 +165,10 @@ const RelationSection = ({ company, customer, items, note, signature }: any) => 
 
       {/* Total */}
       <View style={styles.totalRow}>
-        <Text style={styles.bold}>Total: R$ {total.toFixed(2)}</Text>
+    <Text>Frete: R$ {Number(freight).toFixed(2)}</Text>
+      </View>
+      <View style={styles.totalRow}>
+        <Text style={styles.bold}>Total: R$ {totalFinal.toFixed(2)}</Text>
       </View>
 
       {signature && (
@@ -175,12 +181,12 @@ const RelationSection = ({ company, customer, items, note, signature }: any) => 
   )
 }
 
-export function ItemRelationPDF({ company, customer, items, note, signature }: ItemRelationPDFProps) {
+export function ItemRelationPDF({ company, customer, items, note, signature, freight }: ItemRelationPDFProps) {
   return (
     <Document>
       <Page size="A4" style={styles.page}>
         {/* Parte de cima */}
-        <RelationSection company={company} customer={customer} items={items} note={note} signature={signature} />
+        <RelationSection company={company} customer={customer} items={items} note={note} signature={signature} freight={freight}/>
       </Page>
     </Document>
   )

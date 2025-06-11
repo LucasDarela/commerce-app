@@ -57,7 +57,7 @@ export function FinancialFilters<T>({
   }
 
   return (
-    <div className="grid gap-2 px-4 lg:px-6 grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-8 items-center">
+    <div className="grid gap-2 px-4 lg:px-6 grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 items-center">
      
      <div className="relative w-full min-w-[70px]">
         <DatePicker
@@ -91,46 +91,6 @@ export function FinancialFilters<T>({
             onClick={() => {
               setDueDateInput("")
               table.getColumn("due_date")?.setFilterValue(undefined)
-            }}
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-red-600"
-          >
-            <IconTrash className="w-4 h-4" />
-          </button>
-        )}
-      </div>
-
-      <div className="relative w-full min-w-[70px]">
-        <DatePicker
-          selected={issueDateInput ? new Date(`${issueDateInput.split("/").reverse().join("-")}T00:00:00`) : null}
-          onChange={(date) => {
-            if (!date) {
-              setIssueDateInput("")
-              table.getColumn("issue_date")?.setFilterValue(undefined)
-              return
-            }
-            const day = date.getDate().toString().padStart(2, "0")
-            const month = (date.getMonth() + 1).toString().padStart(2, "0")
-            const year = date.getFullYear().toString()
-            const formatted = `${day}/${month}/${year}`
-            setIssueDateInput(formatted)
-            table
-            .getColumn("issue_date")
-            ?.setFilterValue(
-              new Date(+year, +month - 1, +day).toISOString().split("T")[0]
-            )
-          }}
-          placeholderText="Emissão"
-          dateFormat="dd/MM/yyyy"
-          customInput={<CustomDateInput />}
-          popperPlacement="bottom-start"
-          popperClassName="z-[9999]"
-        />
-        {issueDateInput && (
-          <button
-            type="button"
-            onClick={() => {
-              setIssueDateInput("")
-              table.getColumn("issue_date")?.setFilterValue(undefined)
             }}
             className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-red-600"
           >

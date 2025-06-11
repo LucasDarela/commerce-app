@@ -379,10 +379,8 @@ const dueDate = format(
         const reserved = await getReservedStock(selectedProduct.id)
         const available = selectedProduct.stock - reserved
     
-        // Você pode guardar isso num state ou mostrar direto
         setReservedStock(reserved)
     
-        // Se quiser, pode emitir alerta
         if (quantity > available) {
           toast.warning("Atenção: quantidade maior que o estoque disponível para a data.")
         }
