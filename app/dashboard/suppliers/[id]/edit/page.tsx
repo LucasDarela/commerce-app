@@ -53,7 +53,11 @@ export default function EditSupplier() {
     const fetchSupplier = async () => {
       if (!id) return;
 
-      const { data, error } = await supabase.from("suppliers").select("*").eq("id", id).single();
+      const { data, error } = await supabase
+        .from("suppliers")
+        .select("*")
+        .eq("id", id)
+        .single();
 
       if (error || !data) {
         toast.error("Error loading supplier");
@@ -62,12 +66,21 @@ export default function EditSupplier() {
         setSupplier({
           ...data,
           name: formatUppercase(data.name || "", "name"),
-          fantasy_name: formatUppercase(data.fantasy_name || "", "fantasy_name"),
+          fantasy_name: formatUppercase(
+            data.fantasy_name || "",
+            "fantasy_name",
+          ),
           address: formatUppercase(data.address || "", "address"),
-          neighborhood: formatUppercase(data.neighborhood || "", "neighborhood"),
+          neighborhood: formatUppercase(
+            data.neighborhood || "",
+            "neighborhood",
+          ),
           city: formatUppercase(data.city || "", "city"),
           state: formatUppercase(data.state || "", "state"),
-          state_registration: formatUppercase(data.state_registration || "", "state_registration"),
+          state_registration: formatUppercase(
+            data.state_registration || "",
+            "state_registration",
+          ),
         });
       }
       setLoading(false);
@@ -82,8 +95,8 @@ export default function EditSupplier() {
       name === "phone"
         ? formatPhone(rawValue)
         : name === "email"
-        ? rawValue.trim()
-        : formatUppercase(rawValue, name);
+          ? rawValue.trim()
+          : formatUppercase(rawValue, name);
 
     setSupplier((prevSupplier) => ({
       ...prevSupplier,
@@ -91,7 +104,10 @@ export default function EditSupplier() {
     }));
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
+  const handleKeyDown = (
+    e: React.KeyboardEvent<HTMLInputElement>,
+    index: number,
+  ) => {
     if (e.key === "Enter") {
       e.preventDefault();
       const nextInput = inputRefs.current[index + 1];
@@ -103,10 +119,18 @@ export default function EditSupplier() {
     if (!supplier.zip_code || supplier.zip_code.length !== 8) return;
 
     try {
-      const { data } = await axios.get(`https://viacep.com.br/ws/${supplier.zip_code}/json/`);
+      const { data } = await axios.get(
+        `https://viacep.com.br/ws/${supplier.zip_code}/json/`,
+      );
       if (data.erro) {
         toast.error("Invalid ZIP Code!");
-        setSupplier((prev) => ({ ...prev, address: "", neighborhood: "", city: "", state: "" }));
+        setSupplier((prev) => ({
+          ...prev,
+          address: "",
+          neighborhood: "",
+          city: "",
+          state: "",
+        }));
       } else {
         setSupplier((prev) => ({
           ...prev,
@@ -122,7 +146,10 @@ export default function EditSupplier() {
   };
 
   const handleUpdate = async () => {
-    const { error } = await supabase.from("suppliers").update(supplier).eq("id", id);
+    const { error } = await supabase
+      .from("suppliers")
+      .update(supplier)
+      .eq("id", id);
 
     if (error) {
       toast.error("Error updating supplier: " + error.message);
@@ -145,8 +172,8 @@ export default function EditSupplier() {
 
   return (
     <div className="max-w-3xl mx-auto w-full px-4 py-6 rounded-lg shadow-md">
-      <div  className="flex gap-2 items-center justify-center">
-          <h1 className="text-2xl font-bold mb-4">Edit Supplier</h1>
+      <div className="flex gap-2 items-center justify-center">
+        <h1 className="text-2xl font-bold mb-4">Edit Supplier</h1>
       </div>
 
       {Object.keys(placeholdersMap).map((field, index) => (
@@ -167,7 +194,9 @@ export default function EditSupplier() {
         />
       ))}
 
-      <Button className="mt-4 w-full" onClick={handleUpdate}>Update</Button>
+      <Button className="mt-4 w-full" onClick={handleUpdate}>
+        Update
+      </Button>
     </div>
   );
 }

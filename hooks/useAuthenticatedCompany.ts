@@ -17,7 +17,10 @@ export function useAuthenticatedCompany() {
       const { data, error: userError } = await supabase.auth.getUser();
 
       if (userError || !data?.user) {
-        console.warn("❌ Sessão ausente ou erro ao buscar usuário:", userError?.message);
+        console.warn(
+          "❌ Sessão ausente ou erro ao buscar usuário:",
+          userError?.message,
+        );
         setLoading(false);
         return;
       }
@@ -26,26 +29,26 @@ export function useAuthenticatedCompany() {
       setUser(currentUser);
 
       const { data: companyUser, error: companyError } = await supabase
-      .from("company_users")
-      .select("company_id")
-      .eq("user_id", currentUser.id)
-      .maybeSingle(); 
-    
-    if (companyError) {
-      console.error("❌ Erro ao buscar empresa:", companyError.message);
-      toast.error("Erro ao carregar empresa do usuário.");
-      setLoading(false);
-      return;
-    }
-    
-    if (!companyUser) {
-      console.warn("⚠️ Nenhuma empresa vinculada a esse usuário.");
-      toast.error("Usuário sem empresa vinculada.");
-      setLoading(false);
-      return;
-    }
-    
-    setCompanyId(companyUser.company_id);
+        .from("company_users")
+        .select("company_id")
+        .eq("user_id", currentUser.id)
+        .maybeSingle();
+
+      if (companyError) {
+        console.error("❌ Erro ao buscar empresa:", companyError.message);
+        toast.error("Erro ao carregar empresa do usuário.");
+        setLoading(false);
+        return;
+      }
+
+      if (!companyUser) {
+        console.warn("⚠️ Nenhuma empresa vinculada a esse usuário.");
+        toast.error("Usuário sem empresa vinculada.");
+        setLoading(false);
+        return;
+      }
+
+      setCompanyId(companyUser.company_id);
     } catch (err) {
       console.error("❌ Erro inesperado no hook useAuthenticatedCompany:", err);
       toast.error("Erro inesperado ao buscar empresa.");

@@ -1,20 +1,22 @@
-import { TableRow, TableCell } from "@/components/ui/table"
-import { Row } from "@tanstack/react-table"
-import { useSortable } from "@dnd-kit/sortable"
-import { CSS } from "@dnd-kit/utilities"
-import { DragHandle } from "./DragHandle"
-import { CustomColumnDef } from "./columns"
-import { FinancialRecord } from "@/components/types/financial"
-import { flexRender } from "@tanstack/react-table"
+import { TableRow, TableCell } from "@/components/ui/table";
+import { Row } from "@tanstack/react-table";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { DragHandle } from "./DragHandle";
+import { CustomColumnDef } from "./columns";
+import { FinancialRecord } from "@/components/types/financial";
+import { flexRender } from "@tanstack/react-table";
 
 type DraggableRowProps<T extends { id: string }> = {
-  row: Row<T>
-}
+  row: Row<T>;
+};
 
-export function DraggableRow<T extends { id: string }>({ row }: DraggableRowProps<T>) {
+export function DraggableRow<T extends { id: string }>({
+  row,
+}: DraggableRowProps<T>) {
   const { transform, transition, setNodeRef, isDragging } = useSortable({
     id: row.original.id,
-  })
+  });
 
   return (
     <TableRow
@@ -28,17 +30,23 @@ export function DraggableRow<T extends { id: string }>({ row }: DraggableRowProp
       }}
     >
       {row.getVisibleCells().map((cell) => {
-        const isDragCell = cell.column.id === "drag"
+        const isDragCell = cell.column.id === "drag";
 
         return (
           <TableCell
             key={cell.id}
-            className={(cell.column.columnDef as CustomColumnDef<T>)?.meta?.className}
+            className={
+              (cell.column.columnDef as CustomColumnDef<T>)?.meta?.className
+            }
           >
-            {isDragCell ? <DragHandle id={row.original.id} /> : flexRender(cell.column.columnDef.cell, cell.getContext())}
+            {isDragCell ? (
+              <DragHandle id={row.original.id} />
+            ) : (
+              flexRender(cell.column.columnDef.cell, cell.getContext())
+            )}
           </TableCell>
-        )
+        );
       })}
     </TableRow>
-  )
+  );
 }

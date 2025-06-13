@@ -1,9 +1,9 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import NavUserWrapper from "@/components/nav-user-wrapper"
-import Link from "next/link"
-import { CompanyBrand } from "@/components/company-brand"
+import * as React from "react";
+import NavUserWrapper from "@/components/nav-user-wrapper";
+import Link from "next/link";
+import { CompanyBrand } from "@/components/company-brand";
 import {
   IconCamera,
   IconChartBar,
@@ -31,12 +31,12 @@ import {
   IconRefresh,
   IconCirclePlusFilled,
   IconFileDots,
-} from "@tabler/icons-react"
+} from "@tabler/icons-react";
 
-import { NavDocuments } from "@/components/nav-documents"
-import { NavMain } from "@/components/nav-main"
-import { NavSecondary } from "@/components/nav-secondary"
-import { NavUser } from "@/components/nav-user"
+import { NavDocuments } from "@/components/nav-documents";
+import { NavMain } from "@/components/nav-main";
+import { NavSecondary } from "@/components/nav-secondary";
+import { NavUser } from "@/components/nav-user";
 import {
   Sidebar,
   SidebarContent,
@@ -45,8 +45,8 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar"
-import NavDocumentsSidebar from "./nav-documents-sidebar"
+} from "@/components/ui/sidebar";
+import NavDocumentsSidebar from "./nav-documents-sidebar";
 
 const data = {
   navMainTop: [
@@ -115,7 +115,7 @@ const data = {
       icon: IconHelp,
     },
   ],
-}
+};
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
@@ -127,37 +127,37 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               asChild
               className="data-[slot=sidebar-menu-button]:!p-1.5"
             >
-            <a href="#">
-              <CompanyBrand />
-            </a>
+              <a href="#">
+                <CompanyBrand />
+              </a>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-  <SidebarMenu className="mt-2 px-2">
-  <SidebarMenuItem className="flex items-center gap-2">
-          <Link className="w-full" href="/dashboard/orders">
-            <SidebarMenuButton
-              tooltip="Quick Action"
-              className="bg-primary -mb-2 text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground min-w-8 duration-200 ease-linear"
-            >
-              <IconCirclePlusFilled />
-              <span>Ação Rápida</span>
-            </SidebarMenuButton>
+        <SidebarMenu className="mt-2 px-2">
+          <SidebarMenuItem className="flex items-center gap-2">
+            <Link className="w-full" href="/dashboard/orders">
+              <SidebarMenuButton
+                tooltip="Quick Action"
+                className="bg-primary -mb-2 text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground min-w-8 duration-200 ease-linear"
+              >
+                <IconCirclePlusFilled />
+                <span>Ação Rápida</span>
+              </SidebarMenuButton>
             </Link>
           </SidebarMenuItem>
-  </SidebarMenu>
-  <NavMain items={data.navMainTop} />
-  <div className="my-2 h-px bg-border shrink-0" />
-  <NavMain items={data.navMainBottom} />
+        </SidebarMenu>
+        <NavMain items={data.navMainTop} />
+        <div className="my-2 h-px bg-border shrink-0" />
+        <NavMain items={data.navMainBottom} />
 
-  <NavDocumentsSidebar />
-  <NavSecondary items={data.navSecondary} className="mt-auto" />
-</SidebarContent>
+        <NavDocumentsSidebar />
+        <NavSecondary items={data.navSecondary} className="mt-auto" />
+      </SidebarContent>
       <SidebarFooter>
-      <NavUserWrapper />
+        <NavUserWrapper />
       </SidebarFooter>
     </Sidebar>
-  )
+  );
 }

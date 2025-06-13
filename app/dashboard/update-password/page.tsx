@@ -89,8 +89,6 @@ import { ResetOrUpdatePasswordForm } from "@/components/auth/ResetOrUpdatePasswo
 //   )
 // }
 
-export default function UpdatePasswordDashboard () {
-  return (
-    <ResetOrUpdatePasswordForm />
-  )
+export default function UpdatePasswordDashboard() {
+  return <ResetOrUpdatePasswordForm />;
 }

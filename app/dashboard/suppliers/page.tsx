@@ -3,12 +3,25 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { Pencil, Trash } from "lucide-react";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import Link from "next/link";
 import { IconPlus } from "@tabler/icons-react";
@@ -38,42 +51,44 @@ export default function ListSuppliers() {
   const { user, companyId, loading } = useAuthenticatedCompany();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [search, setSearch] = useState<string>("");
-  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
+  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(
+    null,
+  );
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchSuppliers = async () => {
       try {
         if (!companyId) return;
-  
+
         let query = supabase
           .from("suppliers")
           .select("*")
           .eq("company_id", companyId)
           .order("name", { ascending: true });
-  
-          if (search.trim()) {
-            const raw = search.trim();
-            const cleaned = raw.replace(/\D/g, "");
-          
-            const filters = [];
-          
-            if (raw) {
-              filters.push(`name.ilike.%${raw}%`);
-            }
-          
-            if (cleaned) {
-              filters.push(`document.ilike.%${cleaned}%`);
-              filters.push(`phone.ilike.%${cleaned}%`);
-            }
-          
-            if (filters.length > 0) {
-              query = query.or(filters.join(","));
-            }
+
+        if (search.trim()) {
+          const raw = search.trim();
+          const cleaned = raw.replace(/\D/g, "");
+
+          const filters = [];
+
+          if (raw) {
+            filters.push(`name.ilike.%${raw}%`);
           }
-  
+
+          if (cleaned) {
+            filters.push(`document.ilike.%${cleaned}%`);
+            filters.push(`phone.ilike.%${cleaned}%`);
+          }
+
+          if (filters.length > 0) {
+            query = query.or(filters.join(","));
+          }
+        }
+
         const { data, error } = await query;
-  
+
         if (error) {
           console.error("❌ Erro ao buscar fornecedores:", error.message);
           toast.error("Erro ao carregar fornecedores.");
@@ -85,13 +100,14 @@ export default function ListSuppliers() {
         toast.error("Erro inesperado ao carregar fornecedores.");
       }
     };
-  
+
     if (!loading && companyId) {
       fetchSuppliers();
     }
   }, [companyId, loading, search]);
 
-  const normalizeText = (text: string) => text.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+  const normalizeText = (text: string) =>
+    text.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
 
   const openModal = (supplier: Supplier) => {
     setSelectedSupplier(supplier);
@@ -159,12 +175,24 @@ export default function ListSuppliers() {
           <TableBody>
             {suppliers.length > 0 ? (
               suppliers.map((supplier) => (
-                <TableRow key={supplier.id} onClick={() => openModal(supplier)} className="cursor-pointer h-[50px]">
+                <TableRow
+                  key={supplier.id}
+                  onClick={() => openModal(supplier)}
+                  className="cursor-pointer h-[50px]"
+                >
                   <TableCell>{supplier.name}</TableCell>
-                  <TableCell className="hidden md:table-cell">{supplier.type}</TableCell>
-                  <TableCell className="hidden md:table-cell">{supplier.document}</TableCell>
-                  <TableCell className="hidden md:table-cell">{supplier.phone}</TableCell>
-                  <TableCell className="hidden md:table-cell">{supplier.city}</TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    {supplier.type}
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    {supplier.document}
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    {supplier.phone}
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    {supplier.city}
+                  </TableCell>
                 </TableRow>
               ))
             ) : (
@@ -185,34 +213,70 @@ export default function ListSuppliers() {
               <DialogTitle>Detalhes do Fornecedor</DialogTitle>
             </DialogHeader>
             <div className="space-y-2">
-              <p><strong>Nome:</strong> {selectedSupplier.name}</p>
-              {selectedSupplier.fantasy_name && <p><strong>Nome Fantasia:</strong> {selectedSupplier.fantasy_name}</p>}
-              <p><strong>Tipo:</strong> {selectedSupplier.type}</p>
-              <p><strong>Documento:</strong> {selectedSupplier.document}</p>
-              <p><strong>Telefone:</strong> {selectedSupplier.phone}</p>
-              <p><strong>CEP:</strong> {selectedSupplier.zip_code}</p>
-              <p><strong>Endereço:</strong> {[
-                selectedSupplier.address,
-                selectedSupplier.neighborhood,
-                selectedSupplier.number
-              ].filter(Boolean).join(", ")}</p>
-              {selectedSupplier.complement && <p><strong>Complemento:</strong> {selectedSupplier.complement}</p>}
-              <p><strong>Cidade:</strong> {selectedSupplier.city}</p>
-              <p><strong>Estado:</strong> {selectedSupplier.state}</p>
-              <p><strong>Email:</strong> {selectedSupplier.email || ""}</p>
-              {selectedSupplier.state_registration && <p><strong>Inscrição Estadual:</strong> {selectedSupplier.state_registration}</p>}
+              <p>
+                <strong>Nome:</strong> {selectedSupplier.name}
+              </p>
+              {selectedSupplier.fantasy_name && (
+                <p>
+                  <strong>Nome Fantasia:</strong>{" "}
+                  {selectedSupplier.fantasy_name}
+                </p>
+              )}
+              <p>
+                <strong>Tipo:</strong> {selectedSupplier.type}
+              </p>
+              <p>
+                <strong>Documento:</strong> {selectedSupplier.document}
+              </p>
+              <p>
+                <strong>Telefone:</strong> {selectedSupplier.phone}
+              </p>
+              <p>
+                <strong>CEP:</strong> {selectedSupplier.zip_code}
+              </p>
+              <p>
+                <strong>Endereço:</strong>{" "}
+                {[
+                  selectedSupplier.address,
+                  selectedSupplier.neighborhood,
+                  selectedSupplier.number,
+                ]
+                  .filter(Boolean)
+                  .join(", ")}
+              </p>
+              {selectedSupplier.complement && (
+                <p>
+                  <strong>Complemento:</strong> {selectedSupplier.complement}
+                </p>
+              )}
+              <p>
+                <strong>Cidade:</strong> {selectedSupplier.city}
+              </p>
+              <p>
+                <strong>Estado:</strong> {selectedSupplier.state}
+              </p>
+              <p>
+                <strong>Email:</strong> {selectedSupplier.email || ""}
+              </p>
+              {selectedSupplier.state_registration && (
+                <p>
+                  <strong>Inscrição Estadual:</strong>{" "}
+                  {selectedSupplier.state_registration}
+                </p>
+              )}
             </div>
             <DialogFooter className="w-full">
               <div className="grid grid-cols-4 gap-4 w-full">
-            <Button onClick={handleEdit} className="col-span-3">
-                <Pencil className="h-4 w-4" /> Editar
-              </Button>
-              <Button variant="destructive" 
-              onClick={() => handleDelete(selectedSupplier.id)}
-              className="col-span-1"
-              >
-                <Trash className="h-4 w-4" />
-              </Button>
+                <Button onClick={handleEdit} className="col-span-3">
+                  <Pencil className="h-4 w-4" /> Editar
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => handleDelete(selectedSupplier.id)}
+                  className="col-span-1"
+                >
+                  <Trash className="h-4 w-4" />
+                </Button>
               </div>
             </DialogFooter>
           </DialogContent>

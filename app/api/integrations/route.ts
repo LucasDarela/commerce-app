@@ -6,7 +6,10 @@ import { Database } from "@/components/types/supabase";
 export async function POST(req: NextRequest) {
   const supabase = createRouteHandlerClient<Database>({ cookies });
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
 
   if (authError || !user) {
     return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
@@ -16,7 +19,10 @@ export async function POST(req: NextRequest) {
   const { provider, access_token } = body;
 
   if (!provider || !access_token) {
-    return NextResponse.json({ error: "Campos obrigatórios ausentes" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Campos obrigatórios ausentes" },
+      { status: 400 },
+    );
   }
 
   const { data: companyUser } = await supabase
@@ -26,7 +32,10 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
 
   if (!companyUser || "code" in companyUser) {
-    return NextResponse.json({ error: "Empresa não encontrada" }, { status: 404 });
+    return NextResponse.json(
+      { error: "Empresa não encontrada" },
+      { status: 404 },
+    );
   }
 
   await supabase
@@ -42,7 +51,7 @@ export async function POST(req: NextRequest) {
         company_id: companyUser.company_id,
         provider,
         access_token,
-      }
+      },
     ]);
 
   if (insertError) {
@@ -56,7 +65,10 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const supabase = createRouteHandlerClient<Database>({ cookies });
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
 
   if (authError || !user) {
     return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
@@ -65,7 +77,10 @@ export async function DELETE(req: NextRequest) {
   const provider = req.nextUrl.searchParams.get("provider");
 
   if (!provider) {
-    return NextResponse.json({ error: "Provider não informado" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Provider não informado" },
+      { status: 400 },
+    );
   }
 
   const { data: companyUser } = await supabase
@@ -75,7 +90,10 @@ export async function DELETE(req: NextRequest) {
     .maybeSingle();
 
   if (!companyUser || "code" in companyUser) {
-    return NextResponse.json({ error: "Empresa não encontrada" }, { status: 404 });
+    return NextResponse.json(
+      { error: "Empresa não encontrada" },
+      { status: 404 },
+    );
   }
 
   const { error: deleteError } = await supabase

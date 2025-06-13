@@ -23,8 +23,12 @@ export interface Database {
           provider: "mercado_pago" | "stripe"; // adicione outros se tiver
           access_token: string;
         };
-        Insert: Partial<Database["public"]["Tables"]["company_integrations"]["Row"]>;
-        Update: Partial<Database["public"]["Tables"]["company_integrations"]["Row"]>;
+        Insert: Partial<
+          Database["public"]["Tables"]["company_integrations"]["Row"]
+        >;
+        Update: Partial<
+          Database["public"]["Tables"]["company_integrations"]["Row"]
+        >;
       };
 
       company_users: {

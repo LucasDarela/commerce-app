@@ -1,22 +1,29 @@
 // components/data-financial-table-content.tsx
-"use client"
+"use client";
 
-import React from "react"
-import { TableRow, TableCell } from "@/components/ui/table"
-import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip"
-import { Button } from "@/components/ui/button"
-import { IconGripVertical } from "@tabler/icons-react"
-import { useSortable } from "@dnd-kit/sortable"
-import { CSS } from "@dnd-kit/utilities"
-import { flexRender, Row } from "@tanstack/react-table"
-import type { FinancialRecord } from "@/components/types/financial"
-import type { Order } from "@/components/types/order"
+import React from "react";
+import { TableRow, TableCell } from "@/components/ui/table";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+} from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
+import { IconGripVertical } from "@tabler/icons-react";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { flexRender, Row } from "@tanstack/react-table";
+import type { FinancialRecord } from "@/components/types/financial";
+import type { Order } from "@/components/types/order";
 
-export const isOrder = (record: any): record is Order => record?.source === "order"
-export const isFinancial = (record: any): record is FinancialRecord => record?.source === "financial"
+export const isOrder = (record: any): record is Order =>
+  record?.source === "order";
+export const isFinancial = (record: any): record is FinancialRecord =>
+  record?.source === "financial";
 
 const DragHandle = ({ id }: { id: string }) => {
-  const { attributes, listeners } = useSortable({ id })
+  const { attributes, listeners } = useSortable({ id });
   return (
     <Button
       {...attributes}
@@ -28,13 +35,13 @@ const DragHandle = ({ id }: { id: string }) => {
       <IconGripVertical className="text-muted-foreground size-3" />
       <span className="sr-only">Reordenar</span>
     </Button>
-  )
-}
+  );
+};
 
 export const DraggableRow = ({ row }: { row: Row<FinancialRecord> }) => {
   const { transform, transition, setNodeRef, isDragging } = useSortable({
     id: row.original.id,
-  })
+  });
 
   return (
     <TableRow
@@ -48,7 +55,7 @@ export const DraggableRow = ({ row }: { row: Row<FinancialRecord> }) => {
       }}
     >
       {row.getVisibleCells().map((cell) => {
-        const isDragCell = cell.column.id === "drag"
+        const isDragCell = cell.column.id === "drag";
         return (
           <TableCell
             key={cell.id}
@@ -60,8 +67,8 @@ export const DraggableRow = ({ row }: { row: Row<FinancialRecord> }) => {
               flexRender(cell.column.columnDef.cell, cell.getContext())
             )}
           </TableCell>
-        )
+        );
       })}
     </TableRow>
-  )
-}
+  );
+};

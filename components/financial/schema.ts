@@ -1,6 +1,11 @@
-import { z } from "zod"
+import { z } from "zod";
 
-export const paymentMethodEnum = z.enum(["Dinheiro", "Cartao", "Boleto", "Pix"])
+export const paymentMethodEnum = z.enum([
+  "Dinheiro",
+  "Cartao",
+  "Boleto",
+  "Pix",
+]);
 
 export const orderSchema = z.object({
   id: z.string(),
@@ -23,8 +28,7 @@ export const orderSchema = z.object({
   issue_date: z.string().nullable().optional(),
   due_date: z.string().nullable().optional(),
   source: z.literal("order"),
-})
-
+});
 
 export const financialSchema = z.object({
   id: z.string(),
@@ -44,4 +48,4 @@ export const financialSchema = z.object({
   source: z.literal("financial"),
   phone: z.string().optional(),
   total_payed: z.preprocess((val) => Number(val ?? 0), z.number().optional()),
-})
+});

@@ -1,4 +1,4 @@
-import { VisibilityState } from "@tanstack/react-table"
+import { VisibilityState } from "@tanstack/react-table";
 
 export const defaultColumnVisibility: VisibilityState = {
   issue_date: true,
@@ -12,17 +12,17 @@ export const defaultColumnVisibility: VisibilityState = {
   payment_status: true,
   remaining: true,
   total: true,
-}
+};
 
 export function getInitialColumnVisibility(): VisibilityState {
-  if (typeof window === "undefined") return defaultColumnVisibility
+  if (typeof window === "undefined") return defaultColumnVisibility;
 
-  const stored = localStorage.getItem("orders_column_visibility")
-  return stored ? JSON.parse(stored) : defaultColumnVisibility
+  const stored = localStorage.getItem("orders_column_visibility");
+  return stored ? JSON.parse(stored) : defaultColumnVisibility;
 }
 
 export function persistColumnVisibility(state: VisibilityState) {
   if (typeof window !== "undefined") {
-    localStorage.setItem("orders_column_visibility", JSON.stringify(state))
+    localStorage.setItem("orders_column_visibility", JSON.stringify(state));
   }
 }

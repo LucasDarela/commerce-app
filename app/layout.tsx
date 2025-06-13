@@ -25,7 +25,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Chopp Hub - Desenvolvido para sua distribuidora",
-  description: "Gerencia sua distribuidora de Chopp com muito mais segurança e agilidade.",
+  description:
+    "Gerencia sua distribuidora de Chopp com muito mais segurança e agilidade.",
 };
 
 export const dynamic = "force-dynamic";
@@ -37,7 +38,7 @@ export default async function RootLayout({
 }>) {
   const cookieStore = await cookies();
 
-  const activeThemeCookie = await cookieStore.get("active_theme"); 
+  const activeThemeCookie = await cookieStore.get("active_theme");
   const activeThemeValue = activeThemeCookie?.value;
   const isScaled = activeThemeValue?.endsWith("-scaled");
 
@@ -47,7 +48,7 @@ export default async function RootLayout({
         className={cn(
           "bg-background overscroll-none font-sans antialiased",
           activeThemeValue ? `theme-${activeThemeValue}` : "",
-          isScaled ? "theme-scaled" : ""
+          isScaled ? "theme-scaled" : "",
         )}
       >
         <ThemeProvider
@@ -58,10 +59,8 @@ export default async function RootLayout({
           enableColorScheme
         >
           <ActiveThemeProvider initialTheme={activeThemeValue}>
-          <React.StrictMode>
-            {children}
-          </React.StrictMode>
-            <Toaster richColors /> 
+            <React.StrictMode>{children}</React.StrictMode>
+            <Toaster richColors />
           </ActiveThemeProvider>
         </ThemeProvider>
       </body>

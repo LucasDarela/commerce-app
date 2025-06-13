@@ -1,51 +1,52 @@
-import { supabase } from "@/lib/supabase"
-import { Order } from "@/components/types/order"
-import { Database } from "@/components/types/supabase"
+import { supabase } from "@/lib/supabase";
+import { Order } from "@/components/types/order";
+import { Database } from "@/components/types/supabase";
 
 export async function buildInvoiceData(order: Order, companyId: string) {
-  const client = supabase as unknown as import("@supabase/supabase-js").SupabaseClient<Database>
+  const client =
+    supabase as unknown as import("@supabase/supabase-js").SupabaseClient<Database>;
 
   // 1. Buscar dados da empresa
   const { data: company, error: companyError } = await client
     .from("companies")
     .select("*")
     .eq("id", companyId)
-    .single()
+    .single();
 
-  if (!company || companyError) throw new Error("Empresa não encontrada")
+  if (!company || companyError) throw new Error("Empresa não encontrada");
 
   // 2. Buscar cliente
   const { data: customer, error: customerError } = await client
     .from("customers")
     .select("*")
     .eq("name", order.customer)
-    .single()
+    .single();
 
-  if (!customer || customerError) throw new Error("Cliente não encontrado")
+  if (!customer || customerError) throw new Error("Cliente não encontrado");
 
   // 3. Converter produtos para array estruturado
   const parsed = order.products
     ?.split(",")
     .map((entry) => {
-      const match = entry.trim().match(/^(.+?) \((\d+)x\)$/)
-      if (!match) return null
-      const [, name, qty] = match
-      return { name: name.trim(), quantity: parseInt(qty) }
+      const match = entry.trim().match(/^(.+?) \((\d+)x\)$/);
+      if (!match) return null;
+      const [, name, qty] = match;
+      return { name: name.trim(), quantity: parseInt(qty) };
     })
-    .filter((p): p is { name: string; quantity: number } => p !== null)
+    .filter((p): p is { name: string; quantity: number } => p !== null);
 
-  if (!parsed || parsed.length === 0) throw new Error("Produtos inválidos")
+  if (!parsed || parsed.length === 0) throw new Error("Produtos inválidos");
 
-  const productNames = parsed.map((p) => p.name)
+  const productNames = parsed.map((p) => p.name);
   const { data: productsDb } = await client
     .from("products")
     .select("name, code, ncm, unit, standard_price")
-    .in("name", productNames)
+    .in("name", productNames);
 
   const products = parsed.map((p) => {
-    const db = productsDb?.find((prod) => prod.name === p.name)
+    const db = productsDb?.find((prod) => prod.name === p.name);
     if (!db || !db.ncm || !db.unit) {
-      throw new Error(`Produto '${p.name}' está sem NCM ou unidade definida.`)
+      throw new Error(`Produto '${p.name}' está sem NCM ou unidade definida.`);
     }
     return {
       numero_item: 1, // pode ser incrementado se necessário
@@ -64,8 +65,8 @@ export async function buildInvoiceData(order: Order, companyId: string) {
       icms_cst: "102",
       pis_cst: "07",
       cofins_cst: "07",
-    }
-  })
+    };
+  });
 
   const invoiceData = {
     natureza_operacao: "Venda de mercadoria",
@@ -96,7 +97,7 @@ export async function buildInvoiceData(order: Order, companyId: string) {
       cnpj: company.document,
       nome_razao_social: company.corporate_name,
     },
-  }
+  };
 
-  return invoiceData
+  return invoiceData;
 }

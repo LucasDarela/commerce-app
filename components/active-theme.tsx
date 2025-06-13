@@ -33,37 +33,36 @@ export function ActiveThemeProvider({
   children: ReactNode;
   initialTheme?: string;
 }) {
+  const [activeTheme, setActiveTheme] = useState<string | null>(null);
 
-  const [activeTheme, setActiveTheme] = useState<string | null>(null)
+  useEffect(() => {
+    const savedTheme = document.cookie
+      .split("; ")
+      .find((row) => row.startsWith(`${COOKIE_NAME}=`))
+      ?.split("=")[1];
 
-useEffect(() => {
-  const savedTheme = document.cookie
-    .split("; ")
-    .find((row) => row.startsWith(`${COOKIE_NAME}=`))
-    ?.split("=")[1]
+    setActiveTheme(savedTheme || DEFAULT_THEME);
+  }, []);
 
-  setActiveTheme(savedTheme || DEFAULT_THEME)
-}, [])
+  useEffect(() => {
+    if (!activeTheme) return;
 
-useEffect(() => {
-  if (!activeTheme) return
+    setThemeCookie(activeTheme);
 
-  setThemeCookie(activeTheme)
+    // Remove temas antigos
+    Array.from(document.body.classList)
+      .filter((className) => className.startsWith("theme-"))
+      .forEach((className) => {
+        document.body.classList.remove(className);
+      });
 
-  // Remove temas antigos
-  Array.from(document.body.classList)
-    .filter((className) => className.startsWith("theme-"))
-    .forEach((className) => {
-      document.body.classList.remove(className)
-    })
+    document.body.classList.add(`theme-${activeTheme}`);
+    if (activeTheme.endsWith("-scaled")) {
+      document.body.classList.add("theme-scaled");
+    }
+  }, [activeTheme]);
 
-  document.body.classList.add(`theme-${activeTheme}`)
-  if (activeTheme.endsWith("-scaled")) {
-    document.body.classList.add("theme-scaled")
-  }
-}, [activeTheme])
-
-const theme = activeTheme ?? DEFAULT_THEME;
+  const theme = activeTheme ?? DEFAULT_THEME;
 
   return (
     <ThemeContext.Provider value={{ activeTheme: theme, setActiveTheme }}>
@@ -76,7 +75,7 @@ export function useThemeConfig() {
   const context = useContext(ThemeContext);
   if (context === undefined) {
     throw new Error(
-      "useThemeConfig must be used within an ActiveThemeProvider"
+      "useThemeConfig must be used within an ActiveThemeProvider",
     );
   }
   return context;

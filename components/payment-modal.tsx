@@ -1,20 +1,26 @@
 // ✅ Modal de Pagamento (com melhorias e integração completa)
 
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { toast } from "sonner"
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { toast } from "sonner";
 
 // ✅ Tipagem da venda
 interface Order {
@@ -32,24 +38,31 @@ interface PaymentModalProps {
   onSuccess: () => void;
 }
 
-export function PaymentModal({ open, onClose, order, onSuccess }: PaymentModalProps) {
-    const [partialValue, setPartialValue] = useState("")
-    const [paymentMethod, setPaymentMethod] = useState<"Pix" | "Dinheiro" | "Boleto" | "Cartao" | "">("")
-    const [loading, setLoading] = useState(false)
-  
-    // ✅ Atualiza o método de pagamento quando a venda é carregada
-    useEffect(() => {
-      if (order?.payment_method) {
-        setPaymentMethod(order.payment_method)
-      }
-    }, [order])
-  
-    // ✅ Garante que só renderiza se o pedido estiver disponível
-    if (!order) return null
+export function PaymentModal({
+  open,
+  onClose,
+  order,
+  onSuccess,
+}: PaymentModalProps) {
+  const [partialValue, setPartialValue] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<
+    "Pix" | "Dinheiro" | "Boleto" | "Cartao" | ""
+  >("");
+  const [loading, setLoading] = useState(false);
+
+  // ✅ Atualiza o método de pagamento quando a venda é carregada
+  useEffect(() => {
+    if (order?.payment_method) {
+      setPaymentMethod(order.payment_method);
+    }
+  }, [order]);
+
+  // ✅ Garante que só renderiza se o pedido estiver disponível
+  if (!order) return null;
 
   // ✅ Função para pagamento integral
   async function handleFullPayment() {
-    setLoading(true)
+    setLoading(true);
     try {
       const res = await fetch("/api/update-payment/", {
         method: "POST",
@@ -59,30 +72,30 @@ export function PaymentModal({ open, onClose, order, onSuccess }: PaymentModalPr
           payment_method: paymentMethod,
           total_payed: order.total,
         }),
-      })
+      });
 
-      if (!res.ok) throw new Error("Erro ao pagar nota.")
-      toast.success("Pagamento integral registrado.")
-      onSuccess()
-      onClose()
+      if (!res.ok) throw new Error("Erro ao pagar nota.");
+      toast.success("Pagamento integral registrado.");
+      onSuccess();
+      onClose();
     } catch (err) {
-      toast.error("Erro ao pagar nota")
-      console.error(err)
+      toast.error("Erro ao pagar nota");
+      console.error(err);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
   // ✅ Função para pagamento parcial
   async function handlePartialPayment() {
-    const parsedValue = parseFloat(partialValue.replace(",", "."))
-  
+    const parsedValue = parseFloat(partialValue.replace(",", "."));
+
     if (!partialValue || isNaN(parsedValue)) {
-      toast.error("Informe um valor válido.")
-      return
+      toast.error("Informe um valor válido.");
+      return;
     }
-  
-    setLoading(true)
+
+    setLoading(true);
     try {
       const res = await fetch("/api/update-payment/", {
         method: "POST",
@@ -92,17 +105,17 @@ export function PaymentModal({ open, onClose, order, onSuccess }: PaymentModalPr
           payment_method: paymentMethod,
           total_payed: parsedValue,
         }),
-      })
-  
-      if (!res.ok) throw new Error("Erro ao registrar pagamento parcial.")
-      toast.success("Pagamento parcial registrado.")
-      onSuccess()
-      onClose()
+      });
+
+      if (!res.ok) throw new Error("Erro ao registrar pagamento parcial.");
+      toast.success("Pagamento parcial registrado.");
+      onSuccess();
+      onClose();
     } catch (err) {
-      toast.error("Erro ao pagar nota")
-      console.error(err)
+      toast.error("Erro ao pagar nota");
+      console.error(err);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
@@ -112,14 +125,22 @@ export function PaymentModal({ open, onClose, order, onSuccess }: PaymentModalPr
         <DialogHeader>
           <DialogTitle>Pagamento da Nota</DialogTitle>
           <DialogDescription>
-  Total da nota: <strong>R$ {order.total?.toFixed(2) ?? "0,00"}</strong>
-</DialogDescription>
+            Total da nota:{" "}
+            <strong>R$ {order.total?.toFixed(2) ?? "0,00"}</strong>
+          </DialogDescription>
         </DialogHeader>
 
         {/* ✅ Seletor de método de pagamento */}
         <div className="space-y-2">
-          <Label  className="mb-2">Método de Pagamento</Label>
-          <Select value={paymentMethod} onValueChange={(val) => setPaymentMethod(val as "Pix" | "Dinheiro" | "Boleto" | "Cartao" | "")}>
+          <Label className="mb-2">Método de Pagamento</Label>
+          <Select
+            value={paymentMethod}
+            onValueChange={(val) =>
+              setPaymentMethod(
+                val as "Pix" | "Dinheiro" | "Boleto" | "Cartao" | "",
+              )
+            }
+          >
             <SelectTrigger>
               <SelectValue placeholder="Selecionar método" />
             </SelectTrigger>
@@ -133,23 +154,26 @@ export function PaymentModal({ open, onClose, order, onSuccess }: PaymentModalPr
         </div>
 
         <div className="flex flex-col gap-4">
-          <Button disabled={loading} onClick={handleFullPayment} className="w-full">
+          <Button
+            disabled={loading}
+            onClick={handleFullPayment}
+            className="w-full"
+          >
             Receber Pagamento Integral
           </Button>
 
-            <Input
-              type="number"
-              placeholder="Valor parcial"
-              value={partialValue}
-              onChange={(e) => setPartialValue(e.target.value)}
-            />
+          <Input
+            type="number"
+            placeholder="Valor parcial"
+            value={partialValue}
+            onChange={(e) => setPartialValue(e.target.value)}
+          />
 
-            <Button disabled={loading} onClick={handlePartialPayment}>
-              Receber Parcial
-            </Button>
-
+          <Button disabled={loading} onClick={handlePartialPayment}>
+            Receber Parcial
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

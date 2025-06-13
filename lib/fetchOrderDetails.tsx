@@ -1,32 +1,34 @@
-import { supabase } from "@/lib/supabase"
+import { supabase } from "@/lib/supabase";
 
 type OrderItemWithProduct = {
-  id: string
-  product_id: string
-  quantity: number
-  note_number: string
-  price: number
+  id: string;
+  product_id: string;
+  quantity: number;
+  note_number: string;
+  price: number;
   products?: {
-    name: string
-    note_number?: string
-  }
-}
+    name: string;
+    note_number?: string;
+  };
+};
 
 export async function fetchOrderDetails(orderId: string) {
-const { data, error } = await supabase
-  .from("orders")
-  .select(`
+  const { data, error } = await supabase
+    .from("orders")
+    .select(
+      `
     *,
     note_number,
     customers:customers(*),
     companies:companies!fk_company_id(*),
     order_items:order_items(id, quantity, price, product_id, products(name, code))
-  `)
-  .eq("id", orderId)
-  .single()
+  `,
+    )
+    .eq("id", orderId)
+    .single();
 
   if (error) {
-    throw error
+    throw error;
   }
 
   return {
@@ -39,6 +41,6 @@ const { data, error } = await supabase
       name: item.products?.name ?? "Produto não encontrado",
       quantity: item.quantity,
       unit_price: item.price,
-    }))
-  }
+    })),
+  };
 }

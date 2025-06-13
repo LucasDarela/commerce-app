@@ -1,8 +1,8 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { supabase } from "@/lib/supabase"
-import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany"
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 
 import {
   IconBeerFilled,
@@ -10,7 +10,7 @@ import {
   IconPackage,
   IconBuildingStore,
   IconStarFilled,
-} from "@tabler/icons-react"
+} from "@tabler/icons-react";
 
 const iconMap: Record<string, React.ElementType> = {
   IconBeerFilled,
@@ -18,12 +18,12 @@ const iconMap: Record<string, React.ElementType> = {
   IconPackage,
   IconBuildingStore,
   IconStarFilled,
-}
+};
 
 export function CompanyBrand() {
   const { companyId, loading } = useAuthenticatedCompany();
-  const [companyName, setCompanyName] = useState("My Company")
-  const [iconKey, setIconKey] = useState("IconBeerFilled")
+  const [companyName, setCompanyName] = useState("My Company");
+  const [iconKey, setIconKey] = useState("IconBeerFilled");
 
   useEffect(() => {
     const fetchCompany = async () => {
@@ -32,23 +32,23 @@ export function CompanyBrand() {
         .from("companies")
         .select("name, icon")
         .eq("id", companyId)
-        .single()
+        .single();
 
       if (!error && data) {
-        setCompanyName(data.name)
-        setIconKey(data.icon || "IconBeerFilled")
+        setCompanyName(data.name);
+        setIconKey(data.icon || "IconBeerFilled");
       }
-    }
+    };
 
-    fetchCompany()
-  }, [companyId])
+    fetchCompany();
+  }, [companyId]);
 
-  const IconComponent = iconMap[iconKey] || IconBeerFilled
+  const IconComponent = iconMap[iconKey] || IconBeerFilled;
 
   return (
     <div className="flex items-center gap-2">
       <IconComponent className="!size-5" />
       <span className="text-base font-semibold">{companyName}</span>
     </div>
-  )
+  );
 }

@@ -1,6 +1,6 @@
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { EquipmentLoan } from "@/components/types/equipments";
-import { z } from "zod"
+import { z } from "zod";
 
 export const equipmentLoanSchema = z.object({
   id: z.string(),
@@ -12,9 +12,11 @@ export const equipmentLoanSchema = z.object({
   end_date: z.string().nullable(),
   status: z.enum(["Deposito", "Cliente"]),
   created_at: z.string(),
-})
+});
 
-export async function fetchEquipmentLoans(companyId: string): Promise<EquipmentLoan[]> {
+export async function fetchEquipmentLoans(
+  companyId: string,
+): Promise<EquipmentLoan[]> {
   const supabase = createClientComponentClient();
 
   const { data, error } = await supabase

@@ -1,13 +1,17 @@
-import { format } from "date-fns"
-import { Calendar } from "@/components/ui/calendar"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Button } from "@/components/ui/button"
-import { CalendarIcon } from "@radix-ui/react-icons"
+import { format } from "date-fns";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
+import { CalendarIcon } from "@radix-ui/react-icons";
 
 type DatePickerProps = {
-  date: Date | undefined
-  setDate: (date: Date | undefined) => void
-}
+  date: Date | undefined;
+  setDate: (date: Date | undefined) => void;
+};
 
 export function DatePicker({ date, setDate }: DatePickerProps) {
   return (
@@ -34,5 +38,5 @@ export function DatePicker({ date, setDate }: DatePickerProps) {
         />
       </PopoverContent>
     </Popover>
-  )
+  );
 }

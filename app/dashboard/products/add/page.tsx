@@ -20,8 +20,10 @@ import { useRouter } from "next/navigation";
 export default function AddProduct() {
   const supabase = createClientComponentClient();
   const router = useRouter();
-  const { companyId, loading: loadingCompany } = useAuthenticatedCompany()
-  const [equipments, setEquipments] = useState<{ id: string; name: string }[]>([])
+  const { companyId, loading: loadingCompany } = useAuthenticatedCompany();
+  const [equipments, setEquipments] = useState<{ id: string; name: string }[]>(
+    [],
+  );
   const [product, setProduct] = useState({
     code: "",
     name: "",
@@ -44,20 +46,22 @@ export default function AddProduct() {
       const { data, error } = await supabase
         .from("equipments")
         .select("id, name")
-        .eq("company_id", companyId)
-  
-      if (error) {
-        console.error("Erro ao buscar equipamentos:", error)
-        return
-      }
-  
-      setEquipments(data || [])
-    }
-  
-    if (companyId) fetchEquipments()
-  }, [companyId])
+        .eq("company_id", companyId);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      if (error) {
+        console.error("Erro ao buscar equipamentos:", error);
+        return;
+      }
+
+      setEquipments(data || []);
+    };
+
+    if (companyId) fetchEquipments();
+  }, [companyId]);
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => {
     setProduct({ ...product, [e.target.name]: e.target.value });
   };
 
@@ -70,63 +74,67 @@ export default function AddProduct() {
       toast.error("Preencha os campos obrigatórios!");
       return;
     }
-  
-    setSubmitting(true)
-  
+
+    setSubmitting(true);
+
     const { data: existingProduct, error: checkError } = await supabase
       .from("products")
       .select("code")
       .eq("code", product.code)
       .eq("company_id", companyId)
-      .maybeSingle()
-  
+      .maybeSingle();
+
     if (checkError && checkError.code !== "PGRST116") {
-      toast.error("Error checking product code!")
-      setSubmitting(false)
-      return
+      toast.error("Error checking product code!");
+      setSubmitting(false);
+      return;
     }
-  
+
     if (existingProduct) {
-      toast.error("Código do produto já existe!")
-      setSubmitting(false)
-      return
+      toast.error("Código do produto já existe!");
+      setSubmitting(false);
+      return;
     }
-  
+
     const { data: createdProduct, error: insertError } = await supabase
-    .from("products")
-    .insert([
-      {
-        ...product,
-        standard_price: parseFloat(product.standard_price.replace(',', '.')),
-        company_id: companyId, 
-      },
-    ])
-    .select("id")
-    .single();
-  
-  if (insertError || !createdProduct) {
-    toast.error("Erro ao criar produto!");
+      .from("products")
+      .insert([
+        {
+          ...product,
+          standard_price: parseFloat(product.standard_price.replace(",", ".")),
+          company_id: companyId,
+        },
+      ])
+      .select("id")
+      .single();
+
+    if (insertError || !createdProduct) {
+      toast.error("Erro ao criar produto!");
+      setSubmitting(false);
+      return;
+    }
+
+    if (product.loan_product_code) {
+      await supabase.from("product_loans").insert([
+        {
+          product_id: createdProduct.id,
+          equipment_id: product.loan_product_code,
+          company_id: companyId,
+        },
+      ]);
+    }
+
+    toast.success("Product successfully added!");
+    router.push("/dashboard/products");
     setSubmitting(false);
-    return;
-  }
-  
-  if (product.loan_product_code) {
-    await supabase.from("product_loans").insert([
-      {
-        product_id: createdProduct.id,
-        equipment_id: product.loan_product_code,
-        company_id: companyId,
-      },
-    ]);
-  }
-  
-    toast.success("Product successfully added!")
-    router.push("/dashboard/products")
-    setSubmitting(false)
-  }
+  };
 
   if (loadingCompany) {
-    return <div className="p-6 text-center text-muted-foreground">Loading company data...</div>;
+    return (
+      <div className="p-6 text-center text-muted-foreground">
+        Loading company data...
+      </div>
+    );
   }
 
   return (
@@ -136,15 +144,46 @@ export default function AddProduct() {
       <Card>
         <CardContent className="p-6 space-y-4">
           <div className="grid grid-cols-3 gap-4">
-            <Input type="text" name="code" value={product.code} onChange={handleChange} placeholder="Código do Produto" required />
-            <Input type="text" name="name" value={product.name} onChange={handleChange} placeholder="Nome do Produto" className="col-span-2" required />
+            <Input
+              type="text"
+              name="code"
+              value={product.code}
+              onChange={handleChange}
+              placeholder="Código do Produto"
+              required
+            />
+            <Input
+              type="text"
+              name="name"
+              value={product.name}
+              onChange={handleChange}
+              placeholder="Nome do Produto"
+              className="col-span-2"
+              required
+            />
           </div>
 
           <div className="grid grid-cols-3 gap-4">
-            <Input type="text" name="standard_price" value={product.standard_price} onChange={handleChange} placeholder="Custo (R$)" required />
-            <Input type="text" name="manufacturer" value={product.manufacturer} onChange={handleChange} placeholder="Fabricante" />
-            
-            <Select value={product.unit} onValueChange={(value) => handleSelectChange("unit", value)}>
+            <Input
+              type="text"
+              name="standard_price"
+              value={product.standard_price}
+              onChange={handleChange}
+              placeholder="Custo (R$)"
+              required
+            />
+            <Input
+              type="text"
+              name="manufacturer"
+              value={product.manufacturer}
+              onChange={handleChange}
+              placeholder="Fabricante"
+            />
+
+            <Select
+              value={product.unit}
+              onValueChange={(value) => handleSelectChange("unit", value)}
+            >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Unidade" />
               </SelectTrigger>
@@ -160,10 +199,15 @@ export default function AddProduct() {
                 <SelectItem value="par">P - Par</SelectItem>
               </SelectContent>
             </Select>
-            </div>
+          </div>
 
           <div className="grid grid-cols-3 gap-4">
-          <Select value={product.material_class} onValueChange={(value) => handleSelectChange("material_class", value)}>
+            <Select
+              value={product.material_class}
+              onValueChange={(value) =>
+                handleSelectChange("material_class", value)
+              }
+            >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Classe do Material" />
               </SelectTrigger>
@@ -173,8 +217,19 @@ export default function AddProduct() {
                 <SelectItem value="ACESSORIO">ACESSORIO</SelectItem>
               </SelectContent>
             </Select>
-            <Input type="text" name="submaterial_class" value={product.submaterial_class} onChange={handleChange} placeholder="Sub Classe" />
-            <Select value={product.material_origin} onValueChange={(value) => handleSelectChange("material_origin", value)}>
+            <Input
+              type="text"
+              name="submaterial_class"
+              value={product.submaterial_class}
+              onChange={handleChange}
+              placeholder="Sub Classe"
+            />
+            <Select
+              value={product.material_origin}
+              onValueChange={(value) =>
+                handleSelectChange("material_origin", value)
+              }
+            >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Origem do Produto" />
               </SelectTrigger>
@@ -186,15 +241,26 @@ export default function AddProduct() {
           </div>
 
           <div className="grid grid-cols-3 gap-4">
-
-            <Input name="percentage_taxes" value={product.percentage_taxes || ""} onChange={handleChange} placeholder="Tributos %" />
-            <Select value={product.aplication} onValueChange={(value) => handleSelectChange("aplication", value)}>
+            <Input
+              name="percentage_taxes"
+              value={product.percentage_taxes || ""}
+              onChange={handleChange}
+              placeholder="Tributos %"
+            />
+            <Select
+              value={product.aplication}
+              onValueChange={(value) => handleSelectChange("aplication", value)}
+            >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Aplicação do Material" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="sale-product">Mercadoria para Revenda</SelectItem>
-                <SelectItem value="materail-use-consumption">Material de Uso e Consumo</SelectItem>
+                <SelectItem value="sale-product">
+                  Mercadoria para Revenda
+                </SelectItem>
+                <SelectItem value="materail-use-consumption">
+                  Material de Uso e Consumo
+                </SelectItem>
                 <SelectItem value="service">Serviço</SelectItem>
                 <SelectItem value="fixed-asset">Ativo Imobilizado</SelectItem>
                 <SelectItem value="raw-material">Matéria prima</SelectItem>
@@ -205,12 +271,18 @@ export default function AddProduct() {
             </Select>
           </div>
 
-
-          <Textarea name="description" value={product.description} onChange={handleChange} placeholder="Descrição do Produto" />
+          <Textarea
+            name="description"
+            value={product.description}
+            onChange={handleChange}
+            placeholder="Descrição do Produto"
+          />
 
           <Select
             value={product.loan_product_code}
-            onValueChange={(value) => handleSelectChange("loan_product_code", value)}
+            onValueChange={(value) =>
+              handleSelectChange("loan_product_code", value)
+            }
           >
             <SelectTrigger className="w-full">
               <SelectValue placeholder="Produto Vinculado (Opcional)" />
@@ -224,7 +296,11 @@ export default function AddProduct() {
             </SelectContent>
           </Select>
 
-          <Button className="w-full" onClick={handleSubmit} disabled={submitting}>
+          <Button
+            className="w-full"
+            onClick={handleSubmit}
+            disabled={submitting}
+          >
             {submitting ? "Salvando..." : "Salvar Produto"}
           </Button>
         </CardContent>

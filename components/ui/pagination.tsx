@@ -1,18 +1,26 @@
-"use client"
+"use client";
 
-import * as React from "react"
+import * as React from "react";
+import { Table as ReactTable, flexRender } from "@tanstack/react-table";
+import { Button } from "@/components/ui/button";
 import {
-  Table as ReactTable,
-  flexRender,
-} from "@tanstack/react-table"
-import { Button } from "@/components/ui/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Label } from "@/components/ui/label"
-import { IconChevronLeft, IconChevronRight, IconChevronsLeft, IconChevronsRight } from "@tabler/icons-react"
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import {
+  IconChevronLeft,
+  IconChevronRight,
+  IconChevronsLeft,
+  IconChevronsRight,
+} from "@tabler/icons-react";
 
 type Props<T> = {
-  table: ReactTable<T>
-}
+  table: ReactTable<T>;
+};
 
 export function TablePagination<T>({ table }: Props<T>) {
   return (
@@ -87,5 +95,5 @@ export function TablePagination<T>({ table }: Props<T>) {
         </div>
       </div>
     </div>
-  )
+  );
 }

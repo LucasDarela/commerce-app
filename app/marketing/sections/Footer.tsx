@@ -1,14 +1,14 @@
 "use client";
 
 import React from "react";
-import logoWh from '@/app/assets/logo-wh.webp';
+import logoWh from "@/app/assets/logo-wh.webp";
 import Image from "next/image";
 
 export default function Footer() {
   // Função para fazer a rolagem suave até a seção correspondente
   const handleScroll = (
     event: React.MouseEvent<HTMLAnchorElement>,
-    targetId: string
+    targetId: string,
   ) => {
     event.preventDefault();
     const targetElement = document.querySelector(targetId);
@@ -72,4 +72,4 @@ export default function Footer() {
       </div>
     </footer>
   );
-};
+}

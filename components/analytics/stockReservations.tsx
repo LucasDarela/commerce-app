@@ -10,7 +10,7 @@ interface StockReservationReportProps {
   companyId: string;
   startDate: string;
   endDate?: string;
-  supplierFilter?: string
+  supplierFilter?: string;
 }
 
 interface ReservationItem {
@@ -19,7 +19,11 @@ interface ReservationItem {
   quantity: number;
 }
 
-export function StockReservationReport({ companyId, startDate, endDate }: StockReservationReportProps) {
+export function StockReservationReport({
+  companyId,
+  startDate,
+  endDate,
+}: StockReservationReportProps) {
   const [reservations, setReservations] = useState<ReservationItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -47,7 +51,7 @@ export function StockReservationReport({ companyId, startDate, endDate }: StockR
             appointment_date: order.appointment_date,
             product_name: item.products?.name || "Produto desconhecido",
             quantity: item.quantity,
-          }))
+          })),
         );
 
         // Agrupar por data e produto
@@ -56,7 +60,8 @@ export function StockReservationReport({ companyId, startDate, endDate }: StockR
         flattened.forEach((item) => {
           const date = format(new Date(item.appointment_date), "dd/MM/yyyy");
           if (!grouped[date]) grouped[date] = {};
-          if (!grouped[date][item.product_name]) grouped[date][item.product_name] = 0;
+          if (!grouped[date][item.product_name])
+            grouped[date][item.product_name] = 0;
           grouped[date][item.product_name] += item.quantity;
         });
 
@@ -89,11 +94,14 @@ export function StockReservationReport({ companyId, startDate, endDate }: StockR
     );
   }
 
-  const groupedByDate = reservations.reduce<Record<string, ReservationItem[]>>((acc, item) => {
-    if (!acc[item.appointment_date]) acc[item.appointment_date] = [];
-    acc[item.appointment_date].push(item);
-    return acc;
-  }, {});
+  const groupedByDate = reservations.reduce<Record<string, ReservationItem[]>>(
+    (acc, item) => {
+      if (!acc[item.appointment_date]) acc[item.appointment_date] = [];
+      acc[item.appointment_date].push(item);
+      return acc;
+    },
+    {},
+  );
 
   return (
     <div className="space-y-4">

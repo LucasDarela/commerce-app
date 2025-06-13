@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
 );
 
 export async function POST(req: Request) {
@@ -12,11 +12,12 @@ export async function POST(req: Request) {
   const { email, password, company_id } = body;
 
   // 1️⃣ Cria o usuário no Auth
-  const { data: signUpData, error: signUpError } = await supabase.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: false,
-  });
+  const { data: signUpData, error: signUpError } =
+    await supabase.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: false,
+    });
 
   if (signUpError || !signUpData.user) {
     console.error("Erro ao criar usuário:", signUpError?.message);
@@ -45,7 +46,10 @@ export async function POST(req: Request) {
   }
 
   if (!profileCreated) {
-    return NextResponse.json({ error: "Perfil não foi criado automaticamente." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Perfil não foi criado automaticamente." },
+      { status: 400 },
+    );
   }
 
   // 3️⃣ Atualiza o profile com company_id
@@ -56,16 +60,17 @@ export async function POST(req: Request) {
 
   if (updateProfileError) {
     console.error("Erro ao atualizar profile:", updateProfileError.message);
-    return NextResponse.json({ error: updateProfileError.message }, { status: 400 });
+    return NextResponse.json(
+      { error: updateProfileError.message },
+      { status: 400 },
+    );
   }
 
   // 4️⃣ Insere na company_users
-  const { error: insertError } = await supabase
-    .from("company_users")
-    .insert({
-      user_id,
-      company_id,
-    });
+  const { error: insertError } = await supabase.from("company_users").insert({
+    user_id,
+    company_id,
+  });
 
   if (insertError) {
     console.error("Erro ao vincular company_users:", insertError.message);

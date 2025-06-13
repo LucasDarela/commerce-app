@@ -7,7 +7,8 @@ const planos = [
   {
     nome: "Basic",
     preco: "R$100/mês",
-    descricao: "Sistema financeiro básico com 1 usuário e funcionalidades limitadas.",
+    descricao:
+      "Sistema financeiro básico com 1 usuário e funcionalidades limitadas.",
     periodoTeste: "Todas as funções por 3 dias grátis",
     funcionalidades: [
       "Dashboard básico",
@@ -23,7 +24,8 @@ const planos = [
   {
     nome: "Starter",
     preco: "R$500/mês",
-    descricao: "Todas as funcionalidades habilitadas com limite de 2 usuários simultâneos.",
+    descricao:
+      "Todas as funcionalidades habilitadas com limite de 2 usuários simultâneos.",
     periodoTeste: "3 dias grátis",
     funcionalidades: [
       "Todas as funções habilitadas",
@@ -41,7 +43,7 @@ const planos = [
       "Agendamentos e controle de delivery",
       "Até 5 usuários logados simultaneamente",
     ],
-    suporte: "Usuários adicionais mediante contato com suporte."
+    suporte: "Usuários adicionais mediante contato com suporte.",
   },
 ];
 
@@ -55,9 +57,13 @@ export default function Planos() {
         {planos.map((plano, index) => (
           <Card key={index} className="p-6 shadow-md rounded-lg">
             <CardContent>
-              <h2 className="text-2xl font-semibold text-center">{plano.nome}</h2>
+              <h2 className="text-2xl font-semibold text-center">
+                {plano.nome}
+              </h2>
               <p className="text-center text-gray-500 mt-2">{plano.preco}</p>
-              <p className="text-center text-sm text-gray-400 mb-4">{plano.periodoTeste}</p>
+              <p className="text-center text-sm text-gray-400 mb-4">
+                {plano.periodoTeste}
+              </p>
               <ul className="text-sm space-y-2 mb-4">
                 {plano.funcionalidades.map((func, i) => (
                   <li key={i} className="flex items-center">
@@ -82,7 +88,9 @@ export default function Planos() {
               )}
               <Button
                 className="w-full mt-6"
-                onClick={() => router.push(`/cadastro?plano=${plano.nome.toLowerCase()}`)}
+                onClick={() =>
+                  router.push(`/cadastro?plano=${plano.nome.toLowerCase()}`)
+                }
               >
                 Escolher Plano
               </Button>

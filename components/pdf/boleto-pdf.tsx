@@ -1,13 +1,34 @@
 "use client";
 
-import { Document, Page, Text, View, Image, StyleSheet } from "@react-pdf/renderer"
+import {
+  Document,
+  Page,
+  Text,
+  View,
+  Image,
+  StyleSheet,
+} from "@react-pdf/renderer";
 
 const styles = StyleSheet.create({
   page: { padding: 32, fontSize: 11, fontFamily: "Helvetica" },
-  header: { flexDirection: "row", justifyContent: "space-between", marginBottom: 16 },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
   logo: { width: 100, height: 40 },
-  title: { fontSize: 14, textAlign: "center", marginBottom: 12, fontWeight: "bold" },
-  box: { border: "1pt solid #000", padding: 10, borderRadius: 4, marginBottom: 10 },
+  title: {
+    fontSize: 14,
+    textAlign: "center",
+    marginBottom: 12,
+    fontWeight: "bold",
+  },
+  box: {
+    border: "1pt solid #000",
+    padding: 10,
+    borderRadius: 4,
+    marginBottom: 10,
+  },
   label: { fontWeight: "bold", fontSize: 10, marginBottom: 2 },
   value: { fontSize: 10, marginBottom: 6 },
   barcodeBox: {
@@ -16,7 +37,7 @@ const styles = StyleSheet.create({
     border: "1pt solid #000",
     borderRadius: 6,
     textAlign: "center",
-    alignItems: "center"
+    alignItems: "center",
   },
   barcodeImage: {
     width: 260,
@@ -38,7 +59,7 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 10,
   },
-})
+});
 
 interface BoletoPDFProps {
   order: any;
@@ -46,8 +67,12 @@ interface BoletoPDFProps {
   vencimentoStr: string;
 }
 
-export function BoletoPDF({ order, signatureData, vencimentoStr }: BoletoPDFProps) {
-  const companyName = order.company?.name || "Nome da Empresa"
+export function BoletoPDF({
+  order,
+  signatureData,
+  vencimentoStr,
+}: BoletoPDFProps) {
+  const companyName = order.company?.name || "Nome da Empresa";
 
   return (
     <Document>
@@ -67,7 +92,9 @@ export function BoletoPDF({ order, signatureData, vencimentoStr }: BoletoPDFProp
           </View>
         </View>
 
-        <Text style={styles.title}>Boleto Bancário - Pedido Nº {order.note_number}</Text>
+        <Text style={styles.title}>
+          Boleto Bancário - Pedido Nº {order.note_number}
+        </Text>
 
         {/* Dados do cliente e pagamento */}
         <View style={styles.section}>
@@ -97,18 +124,23 @@ export function BoletoPDF({ order, signatureData, vencimentoStr }: BoletoPDFProp
           </View>
         )}
 
-                {/* Código de barras (imagem) */}
-                {order.boleto_barcode_image && (
+        {/* Código de barras (imagem) */}
+        {order.boleto_barcode_image && (
           <View style={styles.barcodeBox}>
             <Text style={styles.label}>Código de Barras:</Text>
-            <Image src={order.boleto_barcode_image} style={styles.barcodeImage} />
+            <Image
+              src={order.boleto_barcode_image}
+              style={styles.barcodeImage}
+            />
           </View>
         )}
 
         {/* Assinatura */}
         <View style={styles.signatureBox}>
           <Text style={styles.label}>Assinatura do Cliente</Text>
-          {signatureData && <Image src={signatureData} style={styles.signature} />}
+          {signatureData && (
+            <Image src={signatureData} style={styles.signature} />
+          )}
         </View>
       </Page>
     </Document>

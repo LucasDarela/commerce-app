@@ -2,8 +2,8 @@
 
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { useRouter } from "next/navigation";
-import { useUnreadNotifications } from "@/hooks/useUnreadNotifications"
-import { Badge } from "@/components/ui/badge"
+import { useUnreadNotifications } from "@/hooks/useUnreadNotifications";
+import { Badge } from "@/components/ui/badge";
 
 import {
   IconCreditCard,
@@ -13,11 +13,7 @@ import {
   IconUserCircle,
 } from "@tabler/icons-react";
 
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -110,15 +106,21 @@ export function NavUser({
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem onClick={() => router.push("/dashboard/account")}>
+              <DropdownMenuItem
+                onClick={() => router.push("/dashboard/account")}
+              >
                 <IconUserCircle className="mr-2 h-4 w-4" />
                 Conta
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => router.push("/dashboard/billing")}>
+              <DropdownMenuItem
+                onClick={() => router.push("/dashboard/billing")}
+              >
                 <IconCreditCard className="mr-2 h-4 w-4" />
                 Pagamento
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => router.push("/dashboard/notifications")}>
+              <DropdownMenuItem
+                onClick={() => router.push("/dashboard/notifications")}
+              >
                 <div className="relative flex items-center">
                   <IconNotification className="mr-2 h-4 w-4" />
                   Notificações

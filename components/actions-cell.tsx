@@ -1,27 +1,29 @@
-import React from "react"
-import { Row } from "@tanstack/react-table"
-import Link from "next/link"
-import { Button } from "./ui/button"
+import React from "react";
+import { Row } from "@tanstack/react-table";
+import Link from "next/link";
+import { Button } from "./ui/button";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu"
-import { IconDotsVertical } from "@tabler/icons-react"
-import type { FinancialRecord } from "@/components/types/financial"
-import type { Order } from "@/components/types/orders"
+} from "@/components/ui/dropdown-menu";
+import { IconDotsVertical } from "@tabler/icons-react";
+import type { FinancialRecord } from "@/components/types/financial";
+import type { Order } from "@/components/types/orders";
 
 type Props = {
-  row: Row<Order | FinancialRecord>
-  setSelectedOrder: React.Dispatch<React.SetStateAction<Order | FinancialRecord | null>>
-  setIsPaymentOpen: (open: boolean) => void
-  onDelete: (id: string) => void
-}
+  row: Row<Order | FinancialRecord>;
+  setSelectedOrder: React.Dispatch<
+    React.SetStateAction<Order | FinancialRecord | null>
+  >;
+  setIsPaymentOpen: (open: boolean) => void;
+  onDelete: (id: string) => void;
+};
 
 function isOrder(record: any): record is Order {
-  return record && record.source === "order"
+  return record && record.source === "order";
 }
 
 export function ActionsCell({
@@ -30,15 +32,15 @@ export function ActionsCell({
   setIsPaymentOpen,
   onDelete,
 }: Props) {
-  const isFinancial = row.original.source === "financial"
+  const isFinancial = row.original.source === "financial";
 
-  const id = row.original.id
+  const id = row.original.id;
   const viewHref = isFinancial
     ? `/dashboard/financial/${id}/view`
-    : `/dashboard/orders/${id}/view`
+    : `/dashboard/orders/${id}/view`;
   const editHref = isFinancial
     ? `/dashboard/financial/${id}/edit`
-    : `/dashboard/orders/${id}/edit`
+    : `/dashboard/orders/${id}/edit`;
 
   return (
     <DropdownMenu>
@@ -50,15 +52,19 @@ export function ActionsCell({
 
       <DropdownMenuContent align="end">
         <DropdownMenuItem asChild>
-          <a href={viewHref} rel="noopener noreferrer" className="w-full text-left">
+          <a
+            href={viewHref}
+            rel="noopener noreferrer"
+            className="w-full text-left"
+          >
             Ver Espelho
           </a>
         </DropdownMenuItem>
 
         <DropdownMenuItem
           onClick={() => {
-            setSelectedOrder(row.original)
-            setIsPaymentOpen(true)
+            setSelectedOrder(row.original);
+            setIsPaymentOpen(true);
           }}
         >
           Pagar
@@ -78,9 +84,7 @@ export function ActionsCell({
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
-    
-    
-  )
+  );
 }
 
-ActionsCell.displayName = "ActionsCell"
+ActionsCell.displayName = "ActionsCell";

@@ -1,148 +1,153 @@
-"use client"
+"use client";
 
 import * as z from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form"
-import { Loader2 } from "lucide-react"
+import { useForm } from "react-hook-form";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { useRouter } from "next/navigation";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { useState } from "react";
 import { toast } from "sonner";
 import { PasswordInput } from "../ui/password-input";
 
-
-const formSchema = z.object ({
-    email: z.string({
-        required_error: "Email is required."
-    }).email({
-        message: "Must be a valid email."
+const formSchema = z.object({
+  email: z
+    .string({
+      required_error: "Email is required.",
+    })
+    .email({
+      message: "Must be a valid email.",
     }),
 
-    password: z.string({
-        required_error: "Password is required."
-    }).min(7, { 
-                message: "Password must have at least 7 characters."
-    }).max(12, {
-        message: "Exceded limit of 12 characters."
+  password: z
+    .string({
+      required_error: "Password is required.",
+    })
+    .min(7, {
+      message: "Password must have at least 7 characters.",
+    })
+    .max(12, {
+      message: "Exceded limit of 12 characters.",
     }),
 });
 
 export function LoginAccountForm() {
+  const [isLoading, setIsLoading] = useState(false);
 
-    const [isLoading, setIsLoading] = useState(false)
+  const router = useRouter();
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  });
 
-    const router = useRouter();
-    const form = useForm<z.infer<typeof formSchema>>({
-        resolver: zodResolver(formSchema),
-        defaultValues: {
-            email: "",
-            password: "",
-        },
-    });
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    setIsLoading(true);
 
-    const onSubmit = async (values: z.infer<typeof formSchema>) => {
-        setIsLoading(true);
-      
-        try {
-          const supabase = createClientComponentClient();
-          const { email, password } = values;
-      
-          const {
-            error,
-            data: { session },
-          } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-          });
-      
-          if (error?.status === 429) {
-            toast.error("Too many tries. Try again in a few minutes.");
-          } else if (error) {
-            toast.error("Login error: " + error.message);
-          } else if (session) {
-            toast.success("Login successfully!");
-            form.reset();
-            router.refresh();
-            router.push("/dashboard");
-          }
-        } catch (error) {
-          console.error("LoginAccountForm:onSubmit", error);
-          toast.error("Unexpected error while trying to log in.");
-        } finally {
-          setIsLoading(false);
-        }
-      };
+    try {
+      const supabase = createClientComponentClient();
+      const { email, password } = values;
 
-    const [showReset, setShowReset] = useState(false);
-    const [resetEmail, setResetEmail] = useState("");
+      const {
+        error,
+        data: { session },
+      } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    const handleResetPassword = async () => {
+      if (error?.status === 429) {
+        toast.error("Too many tries. Try again in a few minutes.");
+      } else if (error) {
+        toast.error("Login error: " + error.message);
+      } else if (session) {
+        toast.success("Login successfully!");
+        form.reset();
+        router.refresh();
+        router.push("/dashboard");
+      }
+    } catch (error) {
+      console.error("LoginAccountForm:onSubmit", error);
+      toast.error("Unexpected error while trying to log in.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const [showReset, setShowReset] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+
+  const handleResetPassword = async () => {
     const supabase = createClientComponentClient();
 
     const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-        redirectTo: `${location.origin}/auth/reset-password`, // página que o usuário será redirecionado
+      redirectTo: `${location.origin}/auth/reset-password`, // página que o usuário será redirecionado
     });
 
     if (error) {
-        toast.error("Error sending recovery email.");
+      toast.error("Error sending recovery email.");
     } else {
-        toast.success("Check your email to reset your password.");
-        setShowReset(false);
-        setResetEmail("");
+      toast.success("Check your email to reset your password.");
+      setShowReset(false);
+      setResetEmail("");
     }
-    };
+  };
 
-    return (
+  return (
     <div className="flex flex-col justify-center items-center space-y-2">
-            <span className="text-lg p-4">It's good to see you again.</span>
-            <Form {...form}>
-                <form 
-                    onSubmit={form.handleSubmit(onSubmit)}
-                    className="flex flex-col space-y-2"
-                    >
-                        <FormField
-                            control={form.control}
-                            name="email"
-                            render={({field}) => (
-                                <FormItem>
-                                    <FormLabel>E-mail</FormLabel>
-                                    <FormControl>
-                                        <Input 
-                                        placeholder="E-mail" 
-                                        {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-
-                        />
-                        <FormField
-                            control={form.control}
-                            name="password"
-                            render={({field}) => (
-                                <FormItem>
-                                    <FormLabel>Password</FormLabel>
-                                    <FormControl>
-                                    <PasswordInput placeholder="Password" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                            <Button className="my-4" type="submit" disabled={isLoading}>
-                            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            {isLoading ? "Login in..." : "Login"}
-                            </Button>
-
-                        
-
-                </form>
-            </Form>
-    {/* Forgot Password Block (fora do form) */}
-    <div className="text-sm text-center w-full">
+      <span className="text-lg p-4">It's good to see you again.</span>
+      <Form {...form}>
+        <form
+          onSubmit={form.handleSubmit(onSubmit)}
+          className="flex flex-col space-y-2"
+        >
+          <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>E-mail</FormLabel>
+                <FormControl>
+                  <Input placeholder="E-mail" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="password"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Password</FormLabel>
+                <FormControl>
+                  <PasswordInput placeholder="Password" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <Button className="my-4" type="submit" disabled={isLoading}>
+            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isLoading ? "Login in..." : "Login"}
+          </Button>
+        </form>
+      </Form>
+      {/* Forgot Password Block (fora do form) */}
+      <div className="text-sm text-center w-full">
         <button
           type="button"
           onClick={() => setShowReset(!showReset)}
@@ -160,7 +165,11 @@ export function LoginAccountForm() {
             value={resetEmail}
             onChange={(e) => setResetEmail(e.target.value)}
           />
-          <Button type="button" onClick={handleResetPassword} className="w-full">
+          <Button
+            type="button"
+            onClick={handleResetPassword}
+            className="w-full"
+          >
             Reset Password
           </Button>
         </div>
@@ -168,4 +177,3 @@ export function LoginAccountForm() {
     </div>
   );
 }
-

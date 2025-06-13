@@ -10,9 +10,9 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6 p-8">
-            <h2 className="text-2xl font-bold">Configurações</h2>
-            <CompanySettingsForm />
-            <IntegrationsPage />
+      <h2 className="text-2xl font-bold">Configurações</h2>
+      <CompanySettingsForm />
+      <IntegrationsPage />
     </div>
   );
 }

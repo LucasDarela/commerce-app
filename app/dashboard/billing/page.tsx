@@ -1,25 +1,32 @@
-"use client"
+"use client";
 
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Separator } from "@/components/ui/separator"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { useState } from "react"
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { useState } from "react";
 
 export default function BillingPage() {
   const [card, setCard] = useState({
     name: "Lucas Andrade",
     number: "4242 4242 4242 4242",
     expiry: "12/26",
-    cvc: "123"
-  })
+    cvc: "123",
+  });
 
   const handleCardChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
-    setCard({ ...card, [name]: value })
-  }
+    const { name, value } = e.target;
+    setCard({ ...card, [name]: value });
+  };
 
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-8">
@@ -34,19 +41,43 @@ export default function BillingPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="name">Nome do Cartão</Label>
-            <Input id="name" name="name" value={card.name} onChange={handleCardChange} placeholder="Nome como está no cartão" />
+              <Input
+                id="name"
+                name="name"
+                value={card.name}
+                onChange={handleCardChange}
+                placeholder="Nome como está no cartão"
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="number">Número do Cartão</Label>
-              <Input id="number" name="number" value={card.number} onChange={handleCardChange} placeholder="XXXX XXXX XXXX XXXX" />
+              <Input
+                id="number"
+                name="number"
+                value={card.number}
+                onChange={handleCardChange}
+                placeholder="XXXX XXXX XXXX XXXX"
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="expiry">Expiry Date</Label>
-              <Input id="expiry" name="expiry" value={card.expiry} onChange={handleCardChange} placeholder="MM/AA" />
+              <Input
+                id="expiry"
+                name="expiry"
+                value={card.expiry}
+                onChange={handleCardChange}
+                placeholder="MM/AA"
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="cvc">CVC</Label>
-              <Input id="cvc" name="cvc" value={card.cvc} onChange={handleCardChange} placeholder="CVC" />
+              <Input
+                id="cvc"
+                name="cvc"
+                value={card.cvc}
+                onChange={handleCardChange}
+                placeholder="CVC"
+              />
             </div>
           </div>
           <Button className="mt-4">Salvar Cartão</Button>
@@ -92,10 +123,13 @@ export default function BillingPage() {
           <CardTitle>Cancelar Inscrição</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground mb-4">You can cancel your subscription at any time. Your access will remain until the end of the current billing period.</p>
+          <p className="text-muted-foreground mb-4">
+            You can cancel your subscription at any time. Your access will
+            remain until the end of the current billing period.
+          </p>
           <Button variant="destructive">Cancelar Inscrição</Button>
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

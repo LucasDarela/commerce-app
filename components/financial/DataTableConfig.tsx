@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import * as React from "react"
+import * as React from "react";
 import {
   flexRender,
   Row,
@@ -8,24 +8,37 @@ import {
   useReactTable,
   type ColumnDef,
   type Table,
-} from "@tanstack/react-table"
-import { Table as UITable, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { DraggableRow } from "./DraggableRow"
-import { verticalListSortingStrategy, SortableContext } from "@dnd-kit/sortable"
-import type { CustomColumnDef } from "./columns"
-import type { Order } from "@/components/financial/DataFinancialTable"
-import type { FinancialRecord } from "@/components/financial/DataFinancialTable"
+} from "@tanstack/react-table";
+import {
+  Table as UITable,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { DraggableRow } from "./DraggableRow";
+import {
+  verticalListSortingStrategy,
+  SortableContext,
+} from "@dnd-kit/sortable";
+import type { CustomColumnDef } from "./columns";
+import type { Order } from "@/components/financial/DataFinancialTable";
+import type { FinancialRecord } from "@/components/financial/DataFinancialTable";
 
 type Props<T> = {
-  table: Table<T>
-  rows?: Row<T>[] 
-  data?: T[] 
-  columns?: CustomColumnDef<T>[]
-}
+  table: Table<T>;
+  rows?: Row<T>[];
+  data?: T[];
+  columns?: CustomColumnDef<T>[];
+};
 
-export function DataTableConfig<T extends { id: string }>({ table, rows }: Props<T>) {
-  const visibleRows = rows ?? table.getRowModel().rows
-  
+export function DataTableConfig<T extends { id: string }>({
+  table,
+  rows,
+}: Props<T>) {
+  const visibleRows = rows ?? table.getRowModel().rows;
+
   return (
     <div className="overflow-hidden rounded-lg border">
       <UITable className="w-full uppercase">
@@ -33,14 +46,17 @@ export function DataTableConfig<T extends { id: string }>({ table, rows }: Props
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow className="h-10" key={headerGroup.id}>
               {headerGroup.headers
-              .filter((header) => header.column.getIsVisible())
-              .map((header) => (
-                <TableHead key={header.id}>
-                  {header.isPlaceholder
-                    ? null
-                    : flexRender(header.column.columnDef.header, header.getContext())}
-                </TableHead>
-              ))}
+                .filter((header) => header.column.getIsVisible())
+                .map((header) => (
+                  <TableHead key={header.id}>
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(
+                          header.column.columnDef.header,
+                          header.getContext(),
+                        )}
+                  </TableHead>
+                ))}
             </TableRow>
           ))}
         </TableHeader>
@@ -57,5 +73,5 @@ export function DataTableConfig<T extends { id: string }>({ table, rows }: Props
         </TableBody>
       </UITable>
     </div>
-  )
+  );
 }

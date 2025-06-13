@@ -5,9 +5,9 @@ import {
   View,
   StyleSheet,
   Image,
-} from "@react-pdf/renderer"
-import dayjs from "dayjs"
-import logo from "@/app/assets/logo-bk.png"
+} from "@react-pdf/renderer";
+import dayjs from "dayjs";
+import logo from "@/app/assets/logo-bk.png";
 
 const styles = StyleSheet.create({
   page: {
@@ -74,9 +74,9 @@ const styles = StyleSheet.create({
     marginVertical: 20,
     borderTop: "1pt dashed #999",
   },
-  signature: { 
-    width: 200, 
-    height: 100 
+  signature: {
+    width: 200,
+    height: 100,
   },
   signatureBox: {
     marginTop: 20,
@@ -89,7 +89,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     marginBottom: 2,
   },
-})
+});
 
 interface ItemRelationPDFProps {
   company: any;
@@ -100,11 +100,18 @@ interface ItemRelationPDFProps {
   freight?: number;
 }
 
-const RelationSection = ({ company, customer, items, note, freight = 0, signature }: any) => {
+const RelationSection = ({
+  company,
+  customer,
+  items,
+  note,
+  freight = 0,
+  signature,
+}: any) => {
   const totalItems = items.reduce(
     (sum: number, item: any) => sum + item.unit_price * item.quantity,
-    0
-  )
+    0,
+  );
 
   const totalFinal = totalItems + Number(freight);
 
@@ -114,7 +121,9 @@ const RelationSection = ({ company, customer, items, note, freight = 0, signatur
       <View style={styles.header}>
         <Image src={logo.src} style={styles.logo} />
         <View>
-          <Text>Nota: <Text style={styles.bold}>{note ?? "000000"}</Text></Text>
+          <Text>
+            Nota: <Text style={styles.bold}>{note ?? "000000"}</Text>
+          </Text>
           <Text>Data: {dayjs().format("DD/MM/YYYY HH:mm")}</Text>
         </View>
       </View>
@@ -126,15 +135,23 @@ const RelationSection = ({ company, customer, items, note, freight = 0, signatur
         <View style={[styles.section, { flex: 1, marginRight: 4 }]}>
           <Text style={styles.bold}>{company.name}</Text>
           <Text>{company.document}</Text>
-          <Text>{company.address}, {company.number}</Text>
-          <Text>{company.city} - {company.state}, {company.zip_code}</Text>
+          <Text>
+            {company.address}, {company.number}
+          </Text>
+          <Text>
+            {company.city} - {company.state}, {company.zip_code}
+          </Text>
           <Text>{company.phone}</Text>
         </View>
         <View style={[styles.section, { flex: 1, marginLeft: 4 }]}>
           <Text style={styles.bold}>{customer.name}</Text>
           <Text>{customer.document}</Text>
-          <Text>{customer.address}, {customer.number}</Text>
-          <Text>{customer.city} - {customer.state}, {customer.zip_code}</Text>
+          <Text>
+            {customer.address}, {customer.number}
+          </Text>
+          <Text>
+            {customer.city} - {customer.state}, {customer.zip_code}
+          </Text>
           <Text>{customer.phone}</Text>
         </View>
       </View>
@@ -150,7 +167,9 @@ const RelationSection = ({ company, customer, items, note, freight = 0, signatur
         </View>
         {items.map((item: any, index: number) => (
           <View key={index} style={styles.tableRow}>
-            <Text style={[styles.cell, { flex: 0.5 }]}>{item.code ?? "000"}</Text>
+            <Text style={[styles.cell, { flex: 0.5 }]}>
+              {item.code ?? "000"}
+            </Text>
             <Text style={[styles.cell, { flex: 2 }]}>{item.name}</Text>
             <Text style={[styles.cell, styles.cellRight]}>{item.quantity}</Text>
             <Text style={[styles.cell, styles.cellRight]}>
@@ -165,29 +184,43 @@ const RelationSection = ({ company, customer, items, note, freight = 0, signatur
 
       {/* Total */}
       <View style={styles.totalRow}>
-    <Text>Frete: R$ {Number(freight).toFixed(2)}</Text>
+        <Text>Frete: R$ {Number(freight).toFixed(2)}</Text>
       </View>
       <View style={styles.totalRow}>
         <Text style={styles.bold}>Total: R$ {totalFinal.toFixed(2)}</Text>
       </View>
 
       {signature && (
-          <View style={styles.signatureBox}>
-            <Text style={styles.label}>Assinatura do Cliente:</Text>
-            <Image src={signature} style={styles.signature} />
-          </View>
-        )}
+        <View style={styles.signatureBox}>
+          <Text style={styles.label}>Assinatura do Cliente:</Text>
+          <Image src={signature} style={styles.signature} />
+        </View>
+      )}
     </View>
-  )
-}
+  );
+};
 
-export function ItemRelationPDF({ company, customer, items, note, signature, freight }: ItemRelationPDFProps) {
+export function ItemRelationPDF({
+  company,
+  customer,
+  items,
+  note,
+  signature,
+  freight,
+}: ItemRelationPDFProps) {
   return (
     <Document>
       <Page size="A4" style={styles.page}>
         {/* Parte de cima */}
-        <RelationSection company={company} customer={customer} items={items} note={note} signature={signature} freight={freight}/>
+        <RelationSection
+          company={company}
+          customer={customer}
+          items={items}
+          note={note}
+          signature={signature}
+          freight={freight}
+        />
       </Page>
     </Document>
-  )
+  );
 }

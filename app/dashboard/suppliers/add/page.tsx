@@ -61,13 +61,16 @@ export default function AddSupplier() {
       name === "phone"
         ? formatPhone(rawValue)
         : name === "email"
-        ? rawValue.trim()
-        : formatUpper(rawValue, name);
+          ? rawValue.trim()
+          : formatUpper(rawValue, name);
 
     setSupplier((prev) => ({ ...prev, [name]: formatted }));
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
+  const handleKeyDown = (
+    e: React.KeyboardEvent<HTMLInputElement>,
+    index: number,
+  ) => {
     if (e.key === "Enter") {
       e.preventDefault();
       inputRefs.current[index + 1]?.focus();
@@ -77,7 +80,9 @@ export default function AddSupplier() {
   const fetchAddress = async () => {
     if (!supplier.zip_code || supplier.zip_code.length !== 8) return;
     try {
-      const { data } = await axios.get(`https://viacep.com.br/ws/${supplier.zip_code}/json/`);
+      const { data } = await axios.get(
+        `https://viacep.com.br/ws/${supplier.zip_code}/json/`,
+      );
       if (data.erro) {
         toast.error("Invalid ZIP Code!");
       } else {
@@ -98,7 +103,9 @@ export default function AddSupplier() {
     const cleanDoc = supplier.document.replace(/\D/g, "");
     if (cleanDoc.length !== 14) return;
     try {
-      const { data } = await axios.get(`https://brasilapi.com.br/api/cnpj/v1/${cleanDoc}`);
+      const { data } = await axios.get(
+        `https://brasilapi.com.br/api/cnpj/v1/${cleanDoc}`,
+      );
       setSupplier((prev) => ({
         ...prev,
         name: formatUpper(data.razao_social || "", "name"),
@@ -112,7 +119,10 @@ export default function AddSupplier() {
         complement: data.complemento || "",
         phone: data.telefone || "",
         email: data.email || "",
-        state_registration: formatUpper(data.inscricao_estadual || "", "state_registration"),
+        state_registration: formatUpper(
+          data.inscricao_estadual || "",
+          "state_registration",
+        ),
       }));
     } catch {
       toast.error("Failed to fetch CNPJ info");
@@ -171,7 +181,11 @@ export default function AddSupplier() {
 
       {/* 🔹 Campos do formulário */}
       {Object.keys(placeholders).map((field, index) => {
-        if (supplier.type === "CPF" && ["fantasy_name", "state_registration"].includes(field)) return null;
+        if (
+          supplier.type === "CPF" &&
+          ["fantasy_name", "state_registration"].includes(field)
+        )
+          return null;
         return (
           <Input
             key={field}
@@ -180,7 +194,13 @@ export default function AddSupplier() {
             type={field === "email" ? "email" : "text"}
             value={supplier[field as keyof typeof supplier]}
             onChange={handleChange}
-            onBlur={field === "zip_code" ? fetchAddress : field === "document" && supplier.type === "CNPJ" ? fetchCNPJ : undefined}
+            onBlur={
+              field === "zip_code"
+                ? fetchAddress
+                : field === "document" && supplier.type === "CNPJ"
+                  ? fetchCNPJ
+                  : undefined
+            }
             onKeyDown={(e) => handleKeyDown(e, index)}
             ref={(el) => {
               if (el) inputRefs.current[index] = el;

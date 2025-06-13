@@ -26,7 +26,7 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@/components/ui/collapsible"
+} from "@/components/ui/collapsible";
 import { Card } from "@/components/ui/card";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import { PriceTableManager } from "@/components/price-table-manager";
@@ -69,7 +69,7 @@ export default function ListProduct() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [equipments, setEquipments] = useState<Equipment[]>([]);
-  const [isOpen, setIsOpen] = useState(false)
+  const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
     if (!companyId || loading) return;
@@ -99,20 +99,20 @@ export default function ListProduct() {
 
   useEffect(() => {
     if (!companyId || loading) return;
-  
+
     const fetchEquipments = async () => {
       const { data, error } = await supabase
         .from("equipments")
         .select("id, name")
         .eq("company_id", companyId);
-  
+
       if (error) {
         toast.error("Erro ao buscar equipamentos");
       } else {
         setEquipments(data ?? []);
       }
     };
-  
+
     fetchEquipments();
   }, [companyId, loading]);
 
@@ -124,10 +124,13 @@ export default function ListProduct() {
     );
   });
 
-  const equipmentMap = equipments.reduce((map, eq) => {
-    map[eq.id] = eq.name;
-    return map;
-  }, {} as Record<string, string>);
+  const equipmentMap = equipments.reduce(
+    (map, eq) => {
+      map[eq.id] = eq.name;
+      return map;
+    },
+    {} as Record<string, string>,
+  );
 
   const openModal = (product: Product) => {
     setSelectedProduct(product);
@@ -216,7 +219,9 @@ export default function ListProduct() {
                   <TableCell>{product.material_class || "N/A"}</TableCell>
                   <TableCell>{product.standard_price}</TableCell>
                   <TableCell>{product.stock}</TableCell>
-                  <TableCell>{equipmentMap[product.loan_product_code ?? ""] ?? ""}</TableCell>
+                  <TableCell>
+                    {equipmentMap[product.loan_product_code ?? ""] ?? ""}
+                  </TableCell>
                 </TableRow>
               ))
             ) : (
@@ -237,37 +242,77 @@ export default function ListProduct() {
               <DialogTitle>Detalhes do Produto</DialogTitle>
             </DialogHeader>
             <div className="space-y-2">
-                <p><strong>Código:</strong> {selectedProduct.code}</p>
-                <p><strong>Nome:</strong> {selectedProduct.name}</p>
-                <p><strong>Fabricante:</strong> {selectedProduct.manufacturer}</p>
-                <p><strong>Preço Compra:</strong> {selectedProduct.standard_price}</p>
-                <p><strong>Estoque:</strong> {selectedProduct.stock}</p>
-                <p><strong>Comodato:</strong> {equipmentMap[selectedProduct.loan_product_code ?? ""] ?? ""}</p>
-                <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-                  <CollapsibleTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      className="flex items-center gap-2 text-sm"
-                    >
-                      {isOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                      Informações Fiscais
-                    </Button>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="space-y-2 mt-2">
-                    <p><strong>Origem:</strong> {selectedProduct.material_origin}</p>
-                    <p><strong>Classe:</strong> {selectedProduct.material_class}</p>
-                    <p><strong>Subclasse:</strong> {selectedProduct.submaterial_class}</p>
-                    <p><strong>Aplicação:</strong> {selectedProduct.aplication}</p>
-                    <p><strong>NCM:</strong> {selectedProduct.ncm}</p>
-                    <p><strong>CFOP:</strong> {selectedProduct.cfop}</p>
-                    <p><strong>CSOSN:</strong> {selectedProduct.csosn}</p>
-                    <p><strong>UNIT:</strong> {selectedProduct.unit}</p>
-                    <p><strong>ICMS:</strong> {selectedProduct.icms_rate}</p>
-                    <p><strong>PIS:</strong> {selectedProduct.pis_rate}</p>
-                    <p><strong>COFINS:</strong> {selectedProduct.cofins_rate}</p>
-                  </CollapsibleContent>
-                </Collapsible>
-              </div>
+              <p>
+                <strong>Código:</strong> {selectedProduct.code}
+              </p>
+              <p>
+                <strong>Nome:</strong> {selectedProduct.name}
+              </p>
+              <p>
+                <strong>Fabricante:</strong> {selectedProduct.manufacturer}
+              </p>
+              <p>
+                <strong>Preço Compra:</strong> {selectedProduct.standard_price}
+              </p>
+              <p>
+                <strong>Estoque:</strong> {selectedProduct.stock}
+              </p>
+              <p>
+                <strong>Comodato:</strong>{" "}
+                {equipmentMap[selectedProduct.loan_product_code ?? ""] ?? ""}
+              </p>
+              <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+                <CollapsibleTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="flex items-center gap-2 text-sm"
+                  >
+                    {isOpen ? (
+                      <ChevronUp size={16} />
+                    ) : (
+                      <ChevronDown size={16} />
+                    )}
+                    Informações Fiscais
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-2 mt-2">
+                  <p>
+                    <strong>Origem:</strong> {selectedProduct.material_origin}
+                  </p>
+                  <p>
+                    <strong>Classe:</strong> {selectedProduct.material_class}
+                  </p>
+                  <p>
+                    <strong>Subclasse:</strong>{" "}
+                    {selectedProduct.submaterial_class}
+                  </p>
+                  <p>
+                    <strong>Aplicação:</strong> {selectedProduct.aplication}
+                  </p>
+                  <p>
+                    <strong>NCM:</strong> {selectedProduct.ncm}
+                  </p>
+                  <p>
+                    <strong>CFOP:</strong> {selectedProduct.cfop}
+                  </p>
+                  <p>
+                    <strong>CSOSN:</strong> {selectedProduct.csosn}
+                  </p>
+                  <p>
+                    <strong>UNIT:</strong> {selectedProduct.unit}
+                  </p>
+                  <p>
+                    <strong>ICMS:</strong> {selectedProduct.icms_rate}
+                  </p>
+                  <p>
+                    <strong>PIS:</strong> {selectedProduct.pis_rate}
+                  </p>
+                  <p>
+                    <strong>COFINS:</strong> {selectedProduct.cofins_rate}
+                  </p>
+                </CollapsibleContent>
+              </Collapsible>
+            </div>
 
             <DialogFooter className="w-full">
               <div className="grid grid-cols-5 gap-4 w-full">

@@ -1,50 +1,50 @@
 // app/dashboard/notifications/page.tsx
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { Bell, Trash2, Check } from "lucide-react"
-import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Separator } from "@/components/ui/separator"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
-import { Database } from "@/components/types/supabase"
+import { useEffect, useState } from "react";
+import { Bell, Trash2, Check } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { Database } from "@/components/types/supabase";
 
 interface Notification {
-  id: string
-  title: string
-  description: string
-  date: string
-  read: boolean
+  id: string;
+  title: string;
+  description: string;
+  date: string;
+  read: boolean;
 }
 
 export default function NotificationsPage() {
-  const [notifications, setNotifications] = useState<Notification[]>([])
-  const supabase = createClientComponentClient<Database>()
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const supabase = createClientComponentClient<Database>();
 
   useEffect(() => {
     async function fetchNotifications() {
       const { data, error } = await supabase
         .from("notifications")
         .select("id, title, description, date, read")
-        .order("date", { ascending: false })
+        .order("date", { ascending: false });
 
-      if (!error && data) setNotifications(data as Notification[])
+      if (!error && data) setNotifications(data as Notification[]);
     }
 
-    fetchNotifications()
-  }, [])
+    fetchNotifications();
+  }, []);
 
   const markAsRead = async (id: string) => {
-    await supabase.from("notifications").update({ read: true }).eq("id", id)
+    await supabase.from("notifications").update({ read: true }).eq("id", id);
     setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
-    )
-  }
+      prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
+    );
+  };
 
   const deleteNotification = async (id: string) => {
-    await supabase.from("notifications").delete().eq("id", id)
-    setNotifications((prev) => prev.filter((n) => n.id !== id))
-  }
+    await supabase.from("notifications").delete().eq("id", id);
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  };
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
@@ -69,11 +69,15 @@ export default function NotificationsPage() {
             >
               <CardContent className="py-4 flex justify-between items-center">
                 <div>
-                  <h3 className="font-semibold text-lg">{notification.title}</h3>
+                  <h3 className="font-semibold text-lg">
+                    {notification.title}
+                  </h3>
                   <p className="text-sm text-muted-foreground">
                     {notification.description}
                   </p>
-                  <span className="text-xs text-gray-500">{notification.date}</span>
+                  <span className="text-xs text-gray-500">
+                    {notification.date}
+                  </span>
                 </div>
                 <div className="flex gap-2">
                   {!notification.read && (
@@ -101,5 +105,5 @@ export default function NotificationsPage() {
         </div>
       )}
     </div>
-  )
+  );
 }

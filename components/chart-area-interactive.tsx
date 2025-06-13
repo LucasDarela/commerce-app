@@ -1,8 +1,8 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { Area, AreaChart, CartesianGrid, XAxis } from "recharts"
-import { useIsMobile } from "@/hooks/use-mobile"
+import * as React from "react";
+import { Area, AreaChart, CartesianGrid, XAxis } from "recharts";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   Card,
   CardAction,
@@ -10,26 +10,23 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
+} from "@/components/ui/card";
 import {
   ChartConfig,
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
-} from "@/components/ui/chart"
+} from "@/components/ui/chart";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from "@/components/ui/toggle-group"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
-import { Database } from "@/components/types/supabase"
+} from "@/components/ui/select";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { Database } from "@/components/types/supabase";
 
 const chartConfig = {
   desktop: {
@@ -40,73 +37,73 @@ const chartConfig = {
     label: "Financial Records",
     color: "var(--primary)",
   },
-} satisfies ChartConfig
+} satisfies ChartConfig;
 
 export function ChartAreaInteractive() {
-  const isMobile = useIsMobile()
-  const [timeRange, setTimeRange] = React.useState("90d")
-  const [chartData, setChartData] = React.useState<any[]>([])
+  const isMobile = useIsMobile();
+  const [timeRange, setTimeRange] = React.useState("90d");
+  const [chartData, setChartData] = React.useState<any[]>([]);
 
   React.useEffect(() => {
     if (isMobile) {
-      setTimeRange("7d")
+      setTimeRange("7d");
     }
-  }, [isMobile])
+  }, [isMobile]);
 
   React.useEffect(() => {
-    const supabase = createClientComponentClient<Database>()
+    const supabase = createClientComponentClient<Database>();
 
     async function fetchData() {
-      const today = new Date()
-      const startDate = new Date(today)
-      startDate.setDate(today.getDate() - 90)
+      const today = new Date();
+      const startDate = new Date(today);
+      startDate.setDate(today.getDate() - 90);
 
-      const formatDate = (date: Date) => date.toISOString().split("T")[0]
+      const formatDate = (date: Date) => date.toISOString().split("T")[0];
 
       const { data: orders } = await supabase
         .from("orders")
         .select("total, created_at")
-        .gte("created_at", formatDate(startDate))
+        .gte("created_at", formatDate(startDate));
 
       const { data: financials } = await supabase
         .from("financial_records")
         .select("amount, date")
-        .gte("date", formatDate(startDate))
+        .gte("date", formatDate(startDate));
 
-      const dateMap: Record<string, { desktop: number; mobile: number }> = {}
+      const dateMap: Record<string, { desktop: number; mobile: number }> = {};
 
       for (const order of orders || []) {
-        const date = new Date(order.created_at).toISOString().split("T")[0]
-        dateMap[date] = dateMap[date] || { desktop: 0, mobile: 0 }
-        dateMap[date].desktop += Number(order.total || 0)
+        const date = new Date(order.created_at).toISOString().split("T")[0];
+        dateMap[date] = dateMap[date] || { desktop: 0, mobile: 0 };
+        dateMap[date].desktop += Number(order.total || 0);
       }
 
       for (const record of financials || []) {
-        const date = new Date(record.date).toISOString().split("T")[0]
-        dateMap[date] = dateMap[date] || { desktop: 0, mobile: 0 }
-        dateMap[date].mobile += Number(record.amount || 0)
+        const date = new Date(record.date).toISOString().split("T")[0];
+        dateMap[date] = dateMap[date] || { desktop: 0, mobile: 0 };
+        dateMap[date].mobile += Number(record.amount || 0);
       }
 
       const sortedData = Object.entries(dateMap)
         .sort(([a], [b]) => new Date(a).getTime() - new Date(b).getTime())
-        .map(([date, values]) => ({ date, ...values }))
+        .map(([date, values]) => ({ date, ...values }));
 
-      setChartData(sortedData)
+      setChartData(sortedData);
     }
 
-    fetchData()
-  }, [])
+    fetchData();
+  }, []);
 
   const filteredData = chartData.filter((item) => {
-    const date = new Date(item.date)
-    const referenceDate = new Date()
-    let daysToSubtract = 90
-    if (timeRange === "30d") daysToSubtract = 30
-    if (timeRange === "7d") daysToSubtract = 7
-    const startDate = new Date(referenceDate)
-    startDate.setDate(referenceDate.getDate() - daysToSubtract)
-    return date >= startDate
-  })
+    const date = new Date(item.date);
+    const referenceDate = new Date();
+    let daysToSubtract = 90;
+    if (timeRange === "30d") daysToSubtract = 30;
+    if (timeRange === "7d") daysToSubtract = 7;
+    const startDate = new Date(referenceDate);
+    startDate.setDate(referenceDate.getDate() - daysToSubtract);
+    return date >= startDate;
+  });
 
   return (
     <Card className="@container/card">
@@ -148,12 +145,28 @@ export function ChartAreaInteractive() {
           <AreaChart data={filteredData}>
             <defs>
               <linearGradient id="fillDesktop" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="var(--color-desktop)" stopOpacity={1} />
-                <stop offset="95%" stopColor="var(--color-desktop)" stopOpacity={0.1} />
+                <stop
+                  offset="5%"
+                  stopColor="var(--color-desktop)"
+                  stopOpacity={1}
+                />
+                <stop
+                  offset="95%"
+                  stopColor="var(--color-desktop)"
+                  stopOpacity={0.1}
+                />
               </linearGradient>
               <linearGradient id="fillMobile" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="var(--color-mobile)" stopOpacity={0.8} />
-                <stop offset="95%" stopColor="var(--color-mobile)" stopOpacity={0.1} />
+                <stop
+                  offset="5%"
+                  stopColor="var(--color-mobile)"
+                  stopOpacity={0.8}
+                />
+                <stop
+                  offset="95%"
+                  stopColor="var(--color-mobile)"
+                  stopOpacity={0.1}
+                />
               </linearGradient>
             </defs>
             <CartesianGrid vertical={false} />
@@ -164,11 +177,11 @@ export function ChartAreaInteractive() {
               tickMargin={8}
               minTickGap={32}
               tickFormatter={(value) => {
-                const date = new Date(value)
+                const date = new Date(value);
                 return date.toLocaleDateString("pt-BR", {
                   month: "short",
                   day: "numeric",
-                })
+                });
               }}
             />
             <ChartTooltip
@@ -180,7 +193,7 @@ export function ChartAreaInteractive() {
                     return new Date(value).toLocaleDateString("pt-BR", {
                       month: "short",
                       day: "numeric",
-                    })
+                    });
                   }}
                   indicator="dot"
                 />
@@ -204,5 +217,5 @@ export function ChartAreaInteractive() {
         </ChartContainer>
       </CardContent>
     </Card>
-  )
+  );
 }

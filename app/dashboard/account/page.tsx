@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { IconSelector } from "@/components/icon-selector"
+import { IconSelector } from "@/components/icon-selector";
 import { toast } from "sonner";
 
 export default function AccountPage() {
@@ -113,7 +113,7 @@ export default function AccountPage() {
             toast.success("Avatar updated!");
           },
           "image/webp",
-          0.8
+          0.8,
         );
       };
     };
@@ -148,21 +148,27 @@ export default function AccountPage() {
 
       <Card className="mb-6">
         <CardContent className="space-y-4">
-        <label className="text-sm mb-1 block font-medium text-muted-foreground">Nome de Usuário</label>
+          <label className="text-sm mb-1 block font-medium text-muted-foreground">
+            Nome de Usuário
+          </label>
           <Input
             type="text"
             placeholder="Nome de Usuário"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
           />
-                <label className="text-sm mb-1 block font-medium text-muted-foreground">Email</label>
-                    <Input
+          <label className="text-sm mb-1 block font-medium text-muted-foreground">
+            Email
+          </label>
+          <Input
             type="email"
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
-                <label className="text-sm mb-1 block font-medium text-muted-foreground">Nome da Empresa</label>
+          <label className="text-sm mb-1 block font-medium text-muted-foreground">
+            Nome da Empresa
+          </label>
           <Input
             type="text"
             placeholder="Nome da Empresa"

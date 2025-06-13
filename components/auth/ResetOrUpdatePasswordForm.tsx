@@ -1,78 +1,78 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { toast } from "sonner"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
-import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany"
-import { PasswordInput } from "../ui/password-input"
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
+import { PasswordInput } from "../ui/password-input";
 
 export function ResetOrUpdatePasswordForm() {
-  const supabase = createClientComponentClient()
-  const router = useRouter()
-  const { user, loading } = useAuthenticatedCompany()
+  const supabase = createClientComponentClient();
+  const router = useRouter();
+  const { user, loading } = useAuthenticatedCompany();
 
-  const [newPassword, setNewPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
-  const [sessionRestored, setSessionRestored] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [sessionRestored, setSessionRestored] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Detecta se o usuário veio de um link de recuperação de senha
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (event === "PASSWORD_RECOVERY" && session) {
-          setSessionRestored(true)
+          setSessionRestored(true);
         }
-      }
-    )
+      },
+    );
 
     return () => {
-      authListener?.subscription?.unsubscribe()
-    }
-  }, [supabase])
+      authListener?.subscription?.unsubscribe();
+    };
+  }, [supabase]);
 
   // Se o usuário já estiver autenticado no sistema
   useEffect(() => {
     if (!loading && user) {
-      setSessionRestored(true)
+      setSessionRestored(true);
     }
-  }, [loading, user])
+  }, [loading, user]);
 
   const handleSubmit = async () => {
     if (!newPassword || !confirmPassword) {
-      toast.error("Preencha todos os campos.")
-      return
+      toast.error("Preencha todos os campos.");
+      return;
     }
 
     if (newPassword !== confirmPassword) {
-      toast.error("As senhas não coincidem.")
-      return
+      toast.error("As senhas não coincidem.");
+      return;
     }
 
     if (!sessionRestored) {
-      toast.error("Sessão não ativa. Acesse via link do e-mail.")
-      return
+      toast.error("Sessão não ativa. Acesse via link do e-mail.");
+      return;
     }
 
-    setIsSubmitting(true)
+    setIsSubmitting(true);
 
     const { error } = await supabase.auth.updateUser({
       password: newPassword,
-    })
+    });
 
     if (error) {
-      toast.error("Erro ao atualizar a senha.")
-      console.error(error)
+      toast.error("Erro ao atualizar a senha.");
+      console.error(error);
     } else {
-      toast.success("Senha atualizada com sucesso.")
-      router.push("/login-signin")
+      toast.success("Senha atualizada com sucesso.");
+      router.push("/login-signin");
     }
 
-    setIsSubmitting(false)
-  }
+    setIsSubmitting(false);
+  };
 
   return (
     <div className="max-w-md mx-auto py-10 space-y-6">
@@ -96,5 +96,5 @@ export function ResetOrUpdatePasswordForm() {
         {isSubmitting ? "Atualizando..." : "Salvar Senha"}
       </Button>
     </div>
-  )
+  );
 }

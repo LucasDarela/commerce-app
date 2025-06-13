@@ -33,21 +33,26 @@ interface BarrelRecord {
 
 export default function BarrelControl() {
   const { companyId } = useAuthenticatedCompany();
-  const [tabs, setTabs] = useState<{ supplier: Supplier; rows: BarrelEntry[] }[]>([]);
+  const [tabs, setTabs] = useState<
+    { supplier: Supplier; rows: BarrelEntry[] }[]
+  >([]);
   const [selectedTab, setSelectedTab] = useState<string | undefined>(undefined);
   const [searchSupplier, setSearchSupplier] = useState("");
   const [foundSuppliers, setFoundSuppliers] = useState<Supplier[]>([]);
   const [loadingSuppliers, setLoadingSuppliers] = useState(false);
   const [tabToDelete, setTabToDelete] = useState<string | null>(null);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
-  const [confirmDeleteSupplier, setConfirmDeleteSupplier] = useState<string | null>(null);
+  const [confirmDeleteSupplier, setConfirmDeleteSupplier] = useState<
+    string | null
+  >(null);
 
   // Busca inicial dos dados
   useEffect(() => {
     const fetchInitialData = async () => {
       const { data, error } = await supabase
         .from("barrel_controls")
-        .select(`
+        .select(
+          `
           supplier_id,
           suppliers: suppliers!inner(name),
           id,
@@ -61,7 +66,8 @@ export default function BarrelControl() {
           returned_50,
           total_30,
           total_50
-        `)
+        `,
+        )
         .order("date", { ascending: true });
 
       if (error) {
@@ -72,7 +78,10 @@ export default function BarrelControl() {
 
       if (!data) return;
 
-      const suppliersMap: Record<string, { supplier: Supplier; rows: BarrelEntry[] }> = {};
+      const suppliersMap: Record<
+        string,
+        { supplier: Supplier; rows: BarrelEntry[] }
+      > = {};
 
       (data as unknown as BarrelRecord[]).forEach((record) => {
         const supplierId = record.supplier_id;
@@ -144,12 +153,12 @@ export default function BarrelControl() {
   };
 
   const handleAddSupplier = (supplier: Supplier) => {
-    const exists = tabs.some(tab => tab.supplier.id === supplier.id);
+    const exists = tabs.some((tab) => tab.supplier.id === supplier.id);
     if (exists) {
       toast.error("Fornecedor já adicionado");
       return;
     }
-    setTabs(prev => [...prev, { supplier, rows: [] }]);
+    setTabs((prev) => [...prev, { supplier, rows: [] }]);
     setSelectedTab(supplier.id);
     setSearchSupplier("");
     setFoundSuppliers([]);
@@ -160,7 +169,7 @@ export default function BarrelControl() {
       toast.error("Empresa não identificada.");
       return;
     }
-  
+
     // Salvar no Supabase
     for (const tab of tabs) {
       // Primeiro apaga os registros antigos daquele fornecedor
@@ -169,15 +178,15 @@ export default function BarrelControl() {
         .delete()
         .eq("company_id", companyId)
         .eq("supplier_id", tab.supplier.id);
-  
+
       if (deleteError) {
         console.error(deleteError);
         toast.error(`Erro ao limpar dados do fornecedor ${tab.supplier.name}`);
         return;
       }
-  
+
       // Agora insere os registros atualizados
-      const insertPayload = tab.rows.map(row => ({
+      const insertPayload = tab.rows.map((row) => ({
         company_id: companyId,
         supplier_id: tab.supplier.id,
         date: row.date ? formatDateToYMD(row.date) : null,
@@ -191,20 +200,22 @@ export default function BarrelControl() {
         total_30: row.total_30,
         total_50: row.total_50,
       }));
-  
+
       if (insertPayload.length > 0) {
         const { error: insertError } = await supabase
           .from("barrel_controls")
           .insert(insertPayload);
-  
+
         if (insertError) {
           console.error(insertError);
-          toast.error(`Erro ao salvar dados do fornecedor ${tab.supplier.name}`);
+          toast.error(
+            `Erro ao salvar dados do fornecedor ${tab.supplier.name}`,
+          );
           return;
         }
       }
     }
-  
+
     toast.success("Dados salvos com sucesso!");
   };
 
@@ -213,30 +224,34 @@ export default function BarrelControl() {
       toast.error("Empresa não identificada.");
       return;
     }
-  
+
     // 1. Remove do Supabase
     const { error } = await supabase
       .from("barrel_controls")
       .delete()
       .eq("company_id", companyId)
       .eq("supplier_id", supplier.id);
-  
+
     if (error) {
       console.error(error);
       toast.error("Erro ao excluir dados do fornecedor.");
       setConfirmDeleteSupplier(null);
       return;
     }
-  
+
     // 2. Remove do frontend
-    setTabs(prev => prev.filter(tab => tab.supplier.id !== supplier.id));
-    
+    setTabs((prev) => prev.filter((tab) => tab.supplier.id !== supplier.id));
+
     // 3. Se estava na aba selecionada, troca para outra ou zera
-    setSelectedTab(prev => {
-      const remainingTabs = tabs.filter(tab => tab.supplier.id !== supplier.id);
-      return remainingTabs.length > 0 ? remainingTabs[0].supplier.id : undefined;
+    setSelectedTab((prev) => {
+      const remainingTabs = tabs.filter(
+        (tab) => tab.supplier.id !== supplier.id,
+      );
+      return remainingTabs.length > 0
+        ? remainingTabs[0].supplier.id
+        : undefined;
     });
-  
+
     setConfirmDeleteSupplier(null);
     toast.success("Fornecedor removido com sucesso!");
   };
@@ -245,55 +260,59 @@ export default function BarrelControl() {
     const [day, month, year] = date.split("/");
     return `${year}-${month}-${day}`;
   }
-  
-// Para exportar CSV
-function downloadCSV(filename: string, rows: any[]) {
-  if (rows.length === 0) return;
 
-  const headers = [
-    "Data", "Nº Nota", "Tinha 30L", "Tinha 50L",
-    "Chegou 30L", "Chegou 50L", "Devolvido 30L", "Devolvido 50L",
-    "Total 30L", "Total 50L"
-  ];
+  // Para exportar CSV
+  function downloadCSV(filename: string, rows: any[]) {
+    if (rows.length === 0) return;
 
-  const csvContent =
-    headers.join(",") +
-    "\n" +
-    rows
-      .map((row) =>
-        [
-          row.date || "",
-          row.note || "",
-          row.had_30 || 0,
-          row.had_50 || 0,
-          row.arrived_30 || 0,
-          row.arrived_50 || 0,
-          row.returned_30 || 0,
-          row.returned_50 || 0,
-          row.total_30 || 0,
-          row.total_50 || 0,
-        ].join(",")
-      )
-      .join("\n");
+    const headers = [
+      "Data",
+      "Nº Nota",
+      "Tinha 30L",
+      "Tinha 50L",
+      "Chegou 30L",
+      "Chegou 50L",
+      "Devolvido 30L",
+      "Devolvido 50L",
+      "Total 30L",
+      "Total 50L",
+    ];
 
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.setAttribute("href", url);
-  link.setAttribute("download", filename);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-}
+    const csvContent =
+      headers.join(",") +
+      "\n" +
+      rows
+        .map((row) =>
+          [
+            row.date || "",
+            row.note || "",
+            row.had_30 || 0,
+            row.had_50 || 0,
+            row.arrived_30 || 0,
+            row.arrived_50 || 0,
+            row.returned_30 || 0,
+            row.returned_50 || 0,
+            row.total_30 || 0,
+            row.total_50 || 0,
+          ].join(","),
+        )
+        .join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
 
   return (
-    
     <div className="p-4 space-y-6 mt-2">
-      
-
       {/* Input + dropdown */}
       <div className="relative ml-4">
-      <h2 className="font-bold text-xl mb-4">Controle de Barril</h2>
+        <h2 className="font-bold text-xl mb-4">Controle de Barril</h2>
         <Input
           value={searchSupplier}
           onChange={(e) => handleSearchSupplier(e.target.value)}
@@ -331,34 +350,40 @@ function downloadCSV(filename: string, rows: any[]) {
       )}
 
       {tabs.length > 0 && (
-        <Tabs value={selectedTab} onValueChange={setSelectedTab} >
-<TabsList className="flex gap-2 ml-4">
-  {tabs.map((tab) => (
-    <TabsTrigger key={tab.supplier.id} value={tab.supplier.id} className="flex items-center gap-2">
-      <span>{tab.supplier.name}</span>
-      <span
-        onClick={(e) => {
-          e.stopPropagation(); // impede que clique na lixeira selecione a tab
-          setTabToDelete(tab.supplier.id);
-          setShowConfirmDelete(true);
-        }}
-        className="hover:text-destructive transition-colors cursor-pointer"
-      >
-        <Trash2 className="h-4 w-4" />
-      </span>
-    </TabsTrigger>
-  ))}
-</TabsList>
+        <Tabs value={selectedTab} onValueChange={setSelectedTab}>
+          <TabsList className="flex gap-2 ml-4">
+            {tabs.map((tab) => (
+              <TabsTrigger
+                key={tab.supplier.id}
+                value={tab.supplier.id}
+                className="flex items-center gap-2"
+              >
+                <span>{tab.supplier.name}</span>
+                <span
+                  onClick={(e) => {
+                    e.stopPropagation(); // impede que clique na lixeira selecione a tab
+                    setTabToDelete(tab.supplier.id);
+                    setShowConfirmDelete(true);
+                  }}
+                  className="hover:text-destructive transition-colors cursor-pointer"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </span>
+              </TabsTrigger>
+            ))}
+          </TabsList>
 
           {tabs.map((tab) => (
             <TabsContent key={tab.supplier.id} value={tab.supplier.id}>
               <BarrelTable
                 rows={tab.rows}
                 setRows={(newRows) => {
-                  setTabs(prevTabs =>
-                    prevTabs.map(t =>
-                      t.supplier.id === tab.supplier.id ? { ...t, rows: newRows } : t
-                    )
+                  setTabs((prevTabs) =>
+                    prevTabs.map((t) =>
+                      t.supplier.id === tab.supplier.id
+                        ? { ...t, rows: newRows }
+                        : t,
+                    ),
                   );
                 }}
               />
@@ -373,9 +398,14 @@ function downloadCSV(filename: string, rows: any[]) {
       <div className="flex gap-2 justify-end mr-4 -mt-2">
         <Button
           onClick={() => {
-            const currentTab = tabs.find((tab) => tab.supplier.id === selectedTab);
+            const currentTab = tabs.find(
+              (tab) => tab.supplier.id === selectedTab,
+            );
             if (currentTab) {
-              downloadCSV(`controle-barris-${currentTab.supplier.name}.csv`, currentTab.rows);
+              downloadCSV(
+                `controle-barris-${currentTab.supplier.name}.csv`,
+                currentTab.rows,
+              );
             }
           }}
           variant="outline"
@@ -389,7 +419,8 @@ function downloadCSV(filename: string, rows: any[]) {
           <div className="bg-white dark:bg-zinc-900 p-6 rounded-lg shadow-lg space-y-4 w-[300px]">
             <h2 className="text-lg font-bold">Remover Fornecedor?</h2>
             <p className="text-sm text-muted-foreground">
-              Essa ação irá excluir todas as linhas do fornecedor. Deseja continuar?
+              Essa ação irá excluir todas as linhas do fornecedor. Deseja
+              continuar?
             </p>
             <div className="flex justify-end gap-2">
               <Button
@@ -410,7 +441,9 @@ function downloadCSV(filename: string, rows: any[]) {
                     .eq("company_id", companyId);
 
                   // Deleta da UI
-                  setTabs(prev => prev.filter(tab => tab.supplier.id !== tabToDelete));
+                  setTabs((prev) =>
+                    prev.filter((tab) => tab.supplier.id !== tabToDelete),
+                  );
 
                   if (selectedTab === tabToDelete) {
                     setSelectedTab(tabs[0]?.supplier.id || "");
@@ -428,6 +461,5 @@ function downloadCSV(filename: string, rows: any[]) {
         </div>
       )}
     </div>
-    
   );
 }

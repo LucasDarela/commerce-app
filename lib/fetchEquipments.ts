@@ -21,7 +21,9 @@ export const equipmentSchema = z.object({
 export type Equipment = z.infer<typeof equipmentSchema>;
 
 export async function fetchEquipments(companyId: string): Promise<Equipment[]> {
-  const { createClientComponentClient } = await import("@supabase/auth-helpers-nextjs");
+  const { createClientComponentClient } = await import(
+    "@supabase/auth-helpers-nextjs"
+  );
   const supabase = createClientComponentClient();
 
   const { data, error } = await supabase

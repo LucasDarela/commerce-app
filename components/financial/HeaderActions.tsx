@@ -1,18 +1,22 @@
 // HeaderActions.tsx
-import { Table } from "@tanstack/react-table"
-import { Button } from "@/components/ui/button"
+import { Table } from "@tanstack/react-table";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { IconChevronDown, IconLayoutColumns, IconPlus } from "@tabler/icons-react"
-import Link from "next/link"
+} from "@/components/ui/dropdown-menu";
+import {
+  IconChevronDown,
+  IconLayoutColumns,
+  IconPlus,
+} from "@tabler/icons-react";
+import Link from "next/link";
 
 type HeaderActionsProps<T> = {
-  table: Table<T>
-}
+  table: Table<T>;
+};
 
 export function HeaderActions<T>({ table }: HeaderActionsProps<T>) {
   return (
@@ -59,5 +63,5 @@ export function HeaderActions<T>({ table }: HeaderActionsProps<T>) {
         </Link>
       </div>
     </div>
-  )
+  );
 }
