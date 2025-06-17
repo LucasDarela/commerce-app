@@ -156,6 +156,7 @@ export const schema = z.object({
   due_date: z.string().optional().nullable(),
   customer_signature: z.string().nullable().optional(),
   text_note: z.string().optional().nullable(),
+  boleto_id: z.string().nullable().optional(),
 });
 
 type Sale = z.infer<typeof schema>;
@@ -382,7 +383,8 @@ export function DataTable({
         issue_date,
         due_date,
         customer_signature,
-        text_note
+        text_note,
+        boleto_id
       `,
       )
       .order("order_index", { ascending: true });
@@ -697,12 +699,21 @@ export function DataTable({
             </DropdownMenuItem>
 
             <DropdownMenuSeparator />
-
-            <DropdownMenuItem asChild>
-              <Link href={`/dashboard/orders/${row.original.id}/edit`}>
-                Editar
-              </Link>
-            </DropdownMenuItem>
+            {!row.original.boleto_id ? (
+              <DropdownMenuItem asChild>
+                <Link href={`/dashboard/orders/${row.original.id}/edit`}>
+                  Editar
+                </Link>
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem
+                disabled
+                className="text-foreground text-sm tracking-tighter"
+              >
+                Edição bloqueada
+                <br /> (Boleto gerado)
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem
               variant="destructive"
               onClick={() => deleteOrderById(row.original.id)}

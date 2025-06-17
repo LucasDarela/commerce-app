@@ -52,7 +52,13 @@ export default function Planos() {
 
   return (
     <div className="max-w-5xl mx-auto p-6">
-      <h1 className="text-3xl font-bold text-center mb-6">Escolha seu Plano</h1>
+      <div className="section-heading section-header">
+        <h2 className="section-title">Escolha seu Plano</h2>
+        <p className="section-description mt-5">
+          Temos o plano ideal para sua empresa.
+        </p>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {planos.map((plano, index) => (
           <Card key={index} className="p-6 shadow-md rounded-lg">

@@ -9,7 +9,7 @@ import {
 } from "react";
 
 const COOKIE_NAME = "active_theme";
-const DEFAULT_THEME = "blue";
+const DEFAULT_THEME = "green";
 
 function setThemeCookie(theme: string) {
   if (typeof window === "undefined") return;

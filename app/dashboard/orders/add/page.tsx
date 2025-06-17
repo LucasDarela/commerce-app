@@ -58,6 +58,7 @@ interface Customer {
   complement?: string;
   email?: string;
   price_table_id?: string;
+  fantasy_name?: string | null;
 }
 
 interface Product {
@@ -390,6 +391,10 @@ export default function AddOrder() {
     ? customers.filter(
         (customer) =>
           customer.name.toLowerCase().includes(searchCustomer.toLowerCase()) ||
+          (customer.fantasy_name &&
+            customer.fantasy_name
+              .toLowerCase()
+              .includes(searchCustomer.toLowerCase())) ||
           customer.document.includes(searchCustomer),
       )
     : [];
@@ -601,6 +606,12 @@ export default function AddOrder() {
           {/* Display selected customer fields */}
           <div className="grid grid-cols-2 gap-4">
             <Input
+              value={selectedCustomer?.fantasy_name ?? ""}
+              readOnly
+              placeholder="Nome Fantasia"
+              className="bg-muted"
+            />
+            <Input
               value={selectedCustomer?.document ?? ""}
               readOnly
               placeholder="Documento"
@@ -634,12 +645,6 @@ export default function AddOrder() {
               value={selectedCustomer?.city ?? ""}
               readOnly
               placeholder="Cidade"
-              className="bg-muted"
-            />
-            <Input
-              value={selectedCustomer?.state ?? ""}
-              readOnly
-              placeholder="Estado"
               className="bg-muted"
             />
             <Input

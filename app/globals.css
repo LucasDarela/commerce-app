@@ -239,8 +239,8 @@ body {
   --accent-foreground: hsl(313 5% 10%);
   --destructive: hsl(0 52% 30%);
   --destructive-foreground: hsl(313 5% 90%);
-  --border: hsl(313 30% 50%);
-  --input: hsl(313 30% 18%);
+  --border: hsla(313, 91%, 86%, 0.404);
+  --input: hsla(313, 64%, 76%, 0.5);
   --ring: hsl(313 64% 76%);
   --background: hsl(313 52% 95%);
   --foreground: hsl(313 5% 0%);
@@ -266,8 +266,42 @@ body {
     --accent-foreground: hsl(313 5% 90%);
     --destructive: hsl(0 52% 30%);
     --destructive-foreground: hsl(313 5% 90%);
-    --border: hsl(313 30% 18%);
+    --border: hsl(313 30% 10%);
     --input: hsl(313 30% 18%);
     --ring: hsl(313 64% 76%);
   }
+}
+
+@layer components {
+  .section-title {
+    @apply text-center text-4xl md:text-[54px] md:leading-[60px] font-bold tracking-tighter;
+  }
+
+  .section-description {
+    @apply text-center text-[22px] leading-[30px] tracking-tight;
+  }
+
+  .section-heading {
+    @apply max-w-[540px] mx-auto;
+  }
+
+  .section-header {
+    @apply space-y-6 py-10;
+  }
+
+  .card {
+    @apply p-10 border border-[#222222]/10 rounded-3xl shadow-[0_7px_14px_#EAEAEA] max-w-xs w-full;
+  }
+
+  .marcas-tab {
+    @apply mx-auto max-w-[200px] my-6;
+  }
+
+  .selected-tab {
+    @apply text-white bg-[#008200];
+  }
+}
+
+.will-change-transform {
+  will-change: transform;
 }

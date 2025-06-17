@@ -43,7 +43,7 @@ export default async function RootLayout({
   const isScaled = activeThemeValue?.endsWith("-scaled");
 
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="pt" suppressHydrationWarning>
       <body
         className={cn(
           "bg-background overscroll-none font-sans antialiased",
@@ -53,8 +53,8 @@ export default async function RootLayout({
       >
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
-          enableSystem
+          defaultTheme="light"
+          enableSystem={false}
           disableTransitionOnChange
           enableColorScheme
         >

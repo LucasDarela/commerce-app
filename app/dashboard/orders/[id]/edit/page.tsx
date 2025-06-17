@@ -87,6 +87,7 @@ type OrderFormData = z.infer<typeof orderSchema>;
 
 export default function EditOrderPage() {
   const router = useRouter();
+  const params = useParams();
   const { id } = useParams<{ id: string }>();
 
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -119,6 +120,28 @@ export default function EditOrderPage() {
   >([]);
 
   useEffect(() => {
+    async function checkIfBoletoExists() {
+      const { data, error } = await supabase
+        .from("orders")
+        .select("boleto_id")
+        .eq("id", params.id)
+        .single();
+
+      if (error) {
+        console.error("Erro ao verificar boleto:", error);
+        return;
+      }
+
+      if (data?.boleto_id) {
+        toast.error("Essa venda já possui boleto e não pode ser editada.");
+        router.push("/dashboard/orders");
+      }
+    }
+
+    checkIfBoletoExists();
+  }, [params.id]);
+
+  useEffect(() => {
     const fetchData = async () => {
       if (!id) return;
 
@@ -131,7 +154,11 @@ export default function EditOrderPage() {
         supabase.from("products").select("*"),
         supabase.from("customers").select("*"),
         supabase.from("orders").select("*").eq("id", id).single(),
-        supabase.from("order_items").select("*").eq("order_id", id),
+        supabase
+          .from("order_items")
+          .select("*")
+          .eq("order_id", id)
+          .order("id", { ascending: true }),
       ]);
 
       if (productsError || customersError || orderError || itemsError) {
@@ -153,6 +180,8 @@ export default function EditOrderPage() {
       setProducts(productsData || []);
       setCustomers(customersData || []);
       setOrder(orderData);
+      setTextNote(orderData.text_note || "");
+
       setOriginalDueDate(
         orderData.due_date ? parseISO(orderData.due_date) : null,
       );
@@ -176,7 +205,7 @@ export default function EditOrderPage() {
         setSearchCustomer(customer.name);
       }
 
-      // Produtos vinculados ao pedido
+      // ✅ Mapeando os produtos com ordem correta
       const parsedItems = orderItemsData.map((item) => {
         const product = productsData?.find((p) => p.id === item.product_id);
         return {
