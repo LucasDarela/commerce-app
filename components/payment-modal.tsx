@@ -126,13 +126,15 @@ export function PaymentModal({
           <DialogTitle>Pagamento da Nota</DialogTitle>
           <DialogDescription>
             Total da nota:{" "}
-            <strong>R$ {order.total?.toFixed(2) ?? "0,00"}</strong>
+            <strong className="font-black">
+              R$ {order.total?.toFixed(2) ?? "0,00"}
+            </strong>
           </DialogDescription>
         </DialogHeader>
-
-        {/* ✅ Seletor de método de pagamento */}
-        <div className="space-y-2">
-          <Label className="mb-2">Método de Pagamento</Label>
+        <div className="flex gap-4 space-y-2">
+          <Label className="mb-2 text-muted-foreground">
+            Método de Pagamento:
+          </Label>
           <Select
             value={paymentMethod}
             onValueChange={(val) =>
@@ -154,24 +156,31 @@ export function PaymentModal({
         </div>
 
         <div className="flex flex-col gap-4">
-          <Button
-            disabled={loading}
-            onClick={handleFullPayment}
-            className="w-full"
-          >
-            Receber Pagamento Integral
-          </Button>
+          <div className="flex gap-4">
+            <Input
+              type="number"
+              placeholder="Valor parcial"
+              value={partialValue}
+              onChange={(e) => setPartialValue(e.target.value)}
+            />
 
-          <Input
-            type="number"
-            placeholder="Valor parcial"
-            value={partialValue}
-            onChange={(e) => setPartialValue(e.target.value)}
-          />
+            <Button disabled={loading} onClick={handlePartialPayment}>
+              Receber Parcial
+            </Button>
+          </div>
+          <div className="flex text-center justify-center">
+            <p className="text-muted-foreground">ou</p>
+          </div>
 
-          <Button disabled={loading} onClick={handlePartialPayment}>
-            Receber Parcial
-          </Button>
+          <div>
+            <Button
+              disabled={loading}
+              onClick={handleFullPayment}
+              className="w-full"
+            >
+              Receber Pagamento Integral
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

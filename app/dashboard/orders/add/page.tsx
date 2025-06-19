@@ -21,7 +21,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Trash, Calendar as CalendarIcon } from "lucide-react";
 import {
@@ -107,6 +107,9 @@ export default function AddOrder() {
   );
   const [noteNumber, setNoteNumber] = useState<string>("");
   const [reservedStock, setReservedStock] = useState<number>(0);
+  const addCustomerUrl = `/dashboard/customers/add?redirect=/dashboard/orders/add&fromOrder=true`;
+  const searchParams = useSearchParams();
+  const newCustomerId = searchParams.get("newCustomerId");
   const [appointment, setAppointment] = useState({
     date: undefined as Date | undefined,
     hour: "",
@@ -437,6 +440,29 @@ export default function AddOrder() {
     fetchReservedStock();
   }, [selectedProduct, quantity]);
 
+  useEffect(() => {
+    const fetchNewCustomer = async () => {
+      if (newCustomerId && companyId) {
+        const { data, error } = await supabase
+          .from("customers")
+          .select("*")
+          .eq("id", newCustomerId)
+          .eq("company_id", companyId)
+          .single();
+
+        if (error) {
+          console.error("Erro ao buscar novo cliente:", error.message);
+          toast.error("Não foi possível carregar o cliente recém-cadastrado.");
+        } else if (data) {
+          handleSelectCustomer(data);
+          setSearchCustomer(data.name);
+        }
+      }
+    };
+
+    fetchNewCustomer();
+  }, [newCustomerId, companyId]);
+
   const {
     register,
     watch,
@@ -595,7 +621,7 @@ export default function AddOrder() {
               )}
             </div>
             <div className="col-span-2">
-              <Link href="/dashboard/customers/add" className="w-full">
+              <Link href={addCustomerUrl} className="w-full">
                 <Button variant="default" className="w-full">
                   Adicionar
                 </Button>

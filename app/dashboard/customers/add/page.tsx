@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import axios from "axios";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -35,9 +35,12 @@ const initialCliente = {
 };
 export default function CreateClient() {
   const router = useRouter();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const inputRefs = useRef<HTMLInputElement[]>([]);
   const { user, companyId, loading } = useAuthenticatedCompany();
   const [cliente, setCliente] = useState(initialCliente);
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirect");
   const [emitNf, setEmitNf] = useState(false);
   const placeholdersMap: Record<string, string> = {
     document: "CPF/CNPJ",
@@ -175,60 +178,79 @@ export default function CreateClient() {
     return resto === parseInt(cpf[10]);
   };
   const handleSubmit = async () => {
-    if (!cliente.name || !cliente.document) {
-      toast.error("Preencha os campos obrigatórios!");
-      return;
-    }
+    if (isSubmitting) return;
+    setIsSubmitting(true);
 
-    if (cliente.type === "CPF" && !validarCPF(cliente.document)) {
-      toast.error("CPF inválido!");
-      return;
-    }
+    try {
+      if (!cliente.name || !cliente.document) {
+        toast.error("Preencha os campos obrigatórios!");
+        return;
+      }
 
-    if (!companyId) {
-      toast.error("Erro ao identificar a empresa do usuário!");
-      return;
-    }
-    const documentoLimpo = cliente.document.replace(/\D/g, "");
-    const telefoneLimpo = cliente.phone.replace(/\D/g, "");
-    // 🔹 Verificar duplicidade correta (ajustado para usar company_id)
-    const { data: clienteExistente, error: consultaError } = await supabase
-      .from("customers")
-      .select("id")
-      .eq("document", cliente.document)
-      .eq("company_id", companyId)
-      .maybeSingle();
+      if (cliente.type === "CPF" && !validarCPF(cliente.document)) {
+        toast.error("CPF inválido!");
+        return;
+      }
 
-    if (consultaError && consultaError.code !== "PGRST116") {
-      toast.error("Erro ao verificar CPF/CNPJ!");
-      return;
-    }
+      if (!companyId) {
+        toast.error("Erro ao identificar a empresa do usuário!");
+        return;
+      }
+      const documentoLimpo = cliente.document.replace(/\D/g, "");
+      const telefoneLimpo = cliente.phone.replace(/\D/g, "");
+      // 🔹 Verificar duplicidade correta (ajustado para usar company_id)
+      const { data: clienteExistente, error: consultaError } = await supabase
+        .from("customers")
+        .select("id")
+        .eq("document", cliente.document)
+        .eq("company_id", companyId)
+        .maybeSingle();
 
-    if (clienteExistente) {
-      toast.error("Já existe um cliente com esse CPF/CNPJ nesta empresa!");
-      return;
-    }
+      if (consultaError && consultaError.code !== "PGRST116") {
+        toast.error("Erro ao verificar CPF/CNPJ!");
+        return;
+      }
 
-    const { error } = await supabase.from("customers").insert([
-      {
-        ...cliente,
-        document: documentoLimpo,
-        price_table_id: selectedCatalog || null,
-        company_id: companyId,
-        phone: telefoneLimpo,
-        emit_nf: emitNf,
-      },
-    ]);
+      if (clienteExistente) {
+        toast.error("Já existe um cliente com esse CPF/CNPJ nesta empresa!");
+        return;
+      }
 
-    if (error) {
-      toast.error("Erro ao cadastrar cliente: " + error.message);
-    } else {
-      toast.success("Cliente cadastrado com sucesso!");
-      setCliente({
-        ...initialCliente,
-        type: cliente.type,
-      });
-      router.refresh();
+      const { data: insertedCustomer, error } = await supabase
+        .from("customers")
+        .insert([
+          {
+            ...cliente,
+            document: documentoLimpo,
+            price_table_id: selectedCatalog || null,
+            company_id: companyId,
+            phone: telefoneLimpo,
+            emit_nf: emitNf,
+          },
+        ])
+        .select()
+        .single();
+
+      const clienteIdRecemCriado = insertedCustomer?.id;
+
+      if (error) {
+        toast.error("Erro ao cadastrar cliente: " + error.message);
+      } else {
+        toast.success("Cliente cadastrado com sucesso!");
+        setCliente({
+          ...initialCliente,
+          type: cliente.type,
+        });
+        router.refresh();
+
+        if (redirectTo) {
+          router.push(`${redirectTo}?newCustomerId=${clienteIdRecemCriado}`);
+        } else {
+          router.push("/dashboard/customers");
+        }
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
   const [catalogs, setCatalogs] = useState<{ id: string; name: string }[]>([]);
@@ -327,8 +349,12 @@ export default function CreateClient() {
           Emitir Nota Fiscal
         </label>
       </div>
-      <Button className="mt-4 w-full" onClick={handleSubmit}>
-        Cadastrar
+      <Button
+        className="mt-4 w-full"
+        onClick={handleSubmit}
+        disabled={isSubmitting}
+      >
+        {isSubmitting ? "Salvando" : "Cadastrar"}
       </Button>
     </div>
   );

@@ -50,8 +50,12 @@ export function financialColumns({
       accessorFn: (row) => row.due_date,
       filterFn: (row, columnId, filterValue) => {
         const value = row.getValue(columnId);
-        if (typeof value !== "string") return false;
-        const formatted = format(parseISO(value), "yyyy-MM-dd");
+        if (!value || typeof value !== "string") return false;
+
+        const parsedDate = parseISO(value);
+        if (isNaN(parsedDate.getTime())) return false;
+
+        const formatted = format(parsedDate, "yyyy-MM-dd");
         return formatted === filterValue;
       },
       cell: ({ row }) => {

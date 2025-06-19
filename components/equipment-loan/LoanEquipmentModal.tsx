@@ -299,7 +299,7 @@ export function LoanEquipmentModal({
               }}
             />
             {showCustomers && searchCustomer.trim() && (
-              <div className="absolute z-10 mt-1 w-full border rounded-md shadow-md max-h-40 overflow-y-auto bg-gray-500">
+              <div className="absolute z-10 mt-1 w-full border rounded-md shadow-md max-h-40 overflow-y-auto bg-gray-100">
                 {customers
                   .filter((customer) =>
                     customer.name
@@ -335,7 +335,7 @@ export function LoanEquipmentModal({
                 onBlur={() => setTimeout(() => setShowEquipments(false), 200)}
               />
               {showEquipments && filteredEquipments.length > 0 && (
-                <div className="absolute z-10 mt-1 w-full border rounded-md shadow-md bg-gray-500 max-h-40 overflow-y-auto">
+                <div className="absolute z-10 mt-1 w-full border rounded-md shadow-md bg-gray-100 max-h-40 overflow-y-auto">
                   {filteredEquipments.map((equipment) => (
                     <div
                       key={equipment.id}

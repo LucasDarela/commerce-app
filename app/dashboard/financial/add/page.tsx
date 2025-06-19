@@ -51,6 +51,34 @@ type Entry = {
   [key: string]: number | string | undefined;
 };
 
+function isValidBrazilianDate(dateStr: string): boolean {
+  if (!dateStr || typeof dateStr !== "string") return false;
+
+  const parts = dateStr.split("/");
+
+  if (parts.length !== 3) return false;
+
+  const [dd, mm, yyyy] = parts;
+
+  const day = parseInt(dd, 10);
+  const month = parseInt(mm, 10);
+  const year = parseInt(yyyy, 10);
+
+  if (isNaN(day) || isNaN(month) || isNaN(year)) return false;
+
+  if (month < 1 || month > 12) return false;
+
+  // Cria a data
+  const dateObj = new Date(year, month - 1, day);
+
+  // Confirma se o dia e o mês batem (ex: 30/02 inválido)
+  return (
+    dateObj.getFullYear() === year &&
+    dateObj.getMonth() === month - 1 &&
+    dateObj.getDate() === day
+  );
+}
+
 export default function AddFinancialRecord() {
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -145,6 +173,18 @@ export default function AddFinancialRecord() {
 
     if (!paymentMethod || paymentMethod === "") {
       toast.error("Selecione um método de pagamento antes de salvar.");
+      return;
+    }
+
+    if (!isValidBrazilianDate(issueDate)) {
+      toast.error("Data de emissão inválida. Verifique o formato e o valor.");
+      return;
+    }
+
+    if (!isValidBrazilianDate(dueDate)) {
+      toast.error(
+        "Data de vencimento inválida. Verifique o formato e o valor.",
+      );
       return;
     }
 

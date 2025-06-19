@@ -167,7 +167,6 @@ export function FinancialFilters<T>({
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">Todas</SelectItem>
-          <SelectItem value="order">Pedido</SelectItem>
           <SelectItem value="compra_produto">Compra Produto</SelectItem>
           <SelectItem value="compra_equipamento">Compra Equipamento</SelectItem>
           <SelectItem value="vale_funcionario">Vale Funcionário</SelectItem>

@@ -468,7 +468,24 @@ export function DataTable({
       size: 90,
       meta: { className: "w-[90px]" },
       filterFn: (row, columnId, filterValue) => {
-        return row.getValue(columnId) === filterValue;
+        const rowDate = row.getValue<string>(columnId);
+        if (!rowDate || typeof rowDate !== "string") return false;
+
+        const rowTime = new Date(rowDate).getTime();
+
+        // Caso seja filtro por uma data exata
+        if (typeof filterValue === "string") {
+          return rowDate === filterValue;
+        }
+
+        // Caso seja intervalo de datas
+        if (filterValue?.from && filterValue?.to) {
+          const fromTime = new Date(filterValue.from).getTime();
+          const toTime = new Date(filterValue.to).getTime();
+          return rowTime >= fromTime && rowTime <= toTime;
+        }
+
+        return true;
       },
       cell: ({ row }) => {
         const rawDate = row.original.appointment_date;
@@ -912,6 +929,32 @@ export function DataTable({
     }
   };
 
+  // DateRangeFilter
+  const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([
+    null,
+    null,
+  ]);
+  const [startDate, endDate] = dateRange;
+
+  const handleFilter = (range: [Date | null, Date | null]) => {
+    setDateRange(range);
+
+    const isoStart = range[0]?.toISOString().split("T")[0];
+    const isoEnd = range[1]?.toISOString().split("T")[0];
+
+    table.getColumn("appointment_date")?.setFilterValue({
+      from: isoStart,
+      to: isoEnd,
+    });
+  };
+
+  const clearFilter = () => {
+    setDateRange([null, null]);
+    table.getColumn("appointment_date")?.setFilterValue(undefined);
+  };
+
+  // end DateRangeFilter
+
   return (
     <>
       {isSavingOrder && (
@@ -986,30 +1029,26 @@ export function DataTable({
       </div>
       <div className="grid gap-2 px-4 lg:px-6 py-2 grid-cols-2 md:grid-cols-3 lg:grid-cols-6 items-center">
         {/* Filtro por data */}
-        <div className="relative w-full sm:w-full md:max-w-[250px] z-50">
+        <div className="relative w-full sm:w-full md:max-w-[300px] z-50">
           <DatePicker
-            selected={dateFilter}
-            onChange={(date: Date | null) => {
-              setDateFilter(date);
-              const isoDate = date?.toISOString().split("T")[0];
-              table
-                .getColumn("appointment_date")
-                ?.setFilterValue(isoDate ?? undefined);
-            }}
-            placeholderText="Filtrar por Entrega"
+            selectsRange
+            startDate={startDate}
+            endDate={endDate}
+            onChange={(update) =>
+              handleFilter(update as [Date | null, Date | null])
+            }
+            isClearable={false}
+            placeholderText="Filtrar por Período de Entrega"
             dateFormat="dd/MM/yyyy"
             customInput={<CustomDateInput />}
             popperPlacement="bottom-start"
             popperClassName="z-[9999]"
           />
 
-          {dateFilter && (
+          {(startDate || endDate) && (
             <button
               type="button"
-              onClick={() => {
-                setDateFilter(null);
-                table.getColumn("appointment_date")?.setFilterValue(undefined);
-              }}
+              onClick={clearFilter}
               className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-red-600"
             >
               <IconTrash className="w-4 h-4" />
@@ -1137,14 +1176,23 @@ export function DataTable({
       >
         <div className="overflow-x-auto scrollbar-hide">
           <TabsList className="mb-4 mx-4 lg:mx-6">
-            {monthsAvailable.map((month) => {
-              const [year, monthNum] = month.split("-");
-              return (
-                <TabsTrigger key={month} value={month} className="capitalize">
-                  {`${parseInt(monthNum, 10)}/${year}`}
-                </TabsTrigger>
-              );
-            })}
+            {monthsAvailable
+              .filter(
+                (month) => typeof month === "string" && month.includes("-"),
+              )
+              .map((month) => {
+                const [year, monthNum] = month.split("-");
+                const monthParsed = parseInt(monthNum, 10);
+
+                if (isNaN(monthParsed)) return null;
+
+                return (
+                  <TabsTrigger key={month} value={month} className="capitalize">
+                    {`${monthParsed.toString().padStart(2, "0")}/${year}`}
+                  </TabsTrigger>
+                );
+              })
+              .filter(Boolean)}
           </TabsList>
         </div>
         <TabsContent
