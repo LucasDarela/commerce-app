@@ -35,23 +35,40 @@ export default function CallToAction() {
 
   const translateY = useTransform(scrollYProgress, [0, 1], [150, -150]);
 
+  const handleScroll = (
+    event: React.MouseEvent<HTMLAnchorElement>,
+    targetId: string,
+  ) => {
+    event.preventDefault();
+    const targetElement = document.querySelector(targetId);
+    if (targetElement) {
+      window.scrollTo({
+        top: (targetElement as HTMLElement).offsetTop - 5,
+        behavior: "smooth",
+      });
+    }
+  };
+
   return (
     <section
       ref={sectionRef}
       className="relative w-full overflow-hidden bg-gradient-to-b py-24"
     >
       <div>
-        <h2 className="section-title mb-4 text-center">Teste Grátis</h2>
-        <p className="section-description text-center mt-5">
+        <h2 className="section-title mb-4 text-center text-primary">
+          Teste Grátis
+        </h2>
+        <p className="section-description text-center mt-5 text-muted-foreground">
           Realize seu teste 3 dias antes de começar a pagar
         </p>
         <div className="flex gap-2 mt-10 justify-center">
-          <button
-            onClick={scrollToRegion}
+          <Button
+            href="#plans"
+            onClick={(e) => handleScroll(e, "#plans")}
             className="sm:hidden md:flex btn btn-text gap-1 inline-flex whitespace-nowrap hover:text-gray hover:scale-105 transition"
           >
-            <Button>Teste Agora</Button>
-          </button>
+            Teste Agora
+          </Button>
         </div>
 
         {/* Imagens com efeito Parallax */}

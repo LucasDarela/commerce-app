@@ -1,88 +1,170 @@
+"use client";
+
 import Link from "next/link";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { ModeToggle } from "@/components/ui/mode-toggle";
 import { ThemeSelector } from "@/components/theme-selector";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
 import { Menu, X } from "lucide-react";
 
 export default function NavBar() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
   const toggleMenu = () => setMenuOpen(!menuOpen);
 
+  const handleScroll = (
+    event: React.MouseEvent<HTMLAnchorElement>,
+    targetId: string,
+  ) => {
+    event.preventDefault();
+    const targetElement = document.querySelector(targetId);
+    if (targetElement) {
+      window.scrollTo({
+        top: (targetElement as HTMLElement).offsetTop - 5,
+        behavior: "smooth",
+      });
+    }
+    if (toggleMenu) {
+      setMenuOpen(false);
+    }
+  };
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 10);
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   return (
-    <div>
+    <div suppressHydrationWarning>
       {/* Navbar Responsiva */}
-      <nav className="shadow-md p-4 flex items-center justify-between relative z-50">
-        {/* Logo */}
-        <div className="flex items-center gap-2">
-          <h1 className="md:text-1xl lg:text-2xl font-bold">Chopp Hub</h1>
+      <nav
+        className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 ${
+          scrolled
+            ? "bg-transparent backdrop-blur-md shadow-none"
+            : "bg-background shadow-md"
+        }`}
+      >
+        <div className="p-4 flex items-center justify-between">
+          {/* Logo */}
+          <h1 className="md:text-1xl lg:text-2xl font-bold text-primary">
+            Chopp Hub
+          </h1>
+
+          {/* Links (desktop) */}
+          <ul className="hidden md:flex gap-6 text-sm font-medium">
+            <li className="hover:text-primary" className="hover:text-primary">
+              <Link
+                href="#features"
+                onClick={(e) => handleScroll(e, "#features")}
+              >
+                Funcionalidades
+              </Link>
+            </li>
+            <li className="hover:text-primary">
+              <Link href="#plans" onClick={(e) => handleScroll(e, "#plans")}>
+                Preços
+              </Link>
+            </li>
+            <li className="hover:text-primary">
+              <Link
+                href="#testimonials"
+                onClick={(e) => handleScroll(e, "#testimonials")}
+              >
+                Clientes
+              </Link>
+            </li>
+            <li className="hover:text-primary">
+              <Link
+                href="#contact"
+                onClick={(e) => handleScroll(e, "#contact")}
+              >
+                Contato
+              </Link>
+            </li>
+            <li className="hover:text-primary">
+              <Link href="#faq" onClick={(e) => handleScroll(e, "#faq")}>
+                Ajuda
+              </Link>
+            </li>
+          </ul>
+
+          {/* Botões */}
+          <div className="flex items-center gap-4">
+            <ThemeSelector />
+            <ModeToggle />
+
+            <div className="hidden md:block">
+              <Button asChild>
+                <Link href="/login-signin">Sign In</Link>
+              </Button>
+            </div>
+
+            {/* Menu Mobile */}
+            <div className="block md:hidden">
+              <Button variant="ghost" size="icon" onClick={toggleMenu}>
+                {menuOpen ? <X size={24} /> : <Menu size={24} />}
+              </Button>
+            </div>
+          </div>
         </div>
 
-        {/* Links Centralizados (somente em desktop) */}
-        <ul className="hidden md:flex flex-1 justify-center md:gap-2 lg:gap-8 xl:gap-10 text-sm font-medium">
-          <li>
-            <Link href="#features">Funcionalidades</Link>
-          </li>
-          <li>
-            <Link href="#pricing">Preços</Link>
-          </li>
-          <li>
-            <Link href="#testimonials">Clientes</Link>
-          </li>
-          <li>
-            <Link href="#contact">Contato</Link>
-          </li>
-        </ul>
-
-        {/* Botões Sempre na Direita */}
-        <div className="flex items-center gap-4">
-          <ThemeSelector />
-          <ModeToggle />
-
-          {/* Log In Button só em desktop */}
-          <div className="hidden md:block">
-            <Button asChild>
-              <Link href="/login-signin">Log In</Link>
-            </Button>
-          </div>
-
-          {/* Menu Mobile Button só em mobile */}
-          <div className="block md:hidden">
-            <Button variant="ghost" size="icon" onClick={toggleMenu}>
-              {menuOpen ? <X size={24} /> : <Menu size={24} />}
-            </Button>
-          </div>
-        </div>
+        {/* Mobile Dropdown */}
+        {menuOpen && (
+          <ul className="bg-muted shadow-md fixed top-16 left-0 w-full flex flex-col items-center p-4 space-y-4 z-[9999]">
+            {/* links mobile */}
+          </ul>
+        )}
       </nav>
 
       {/* Dropdown do Mobile Menu */}
       {menuOpen && (
         <ul className="bg-muted shadow-md fixed top-16 left-0 w-full flex flex-col items-center p-4 space-y-4 z-[9999]">
-          <li>
-            <Link href="#features" onClick={toggleMenu}>
+          <li className="hover:text-primary">
+            <Link
+              href="#features"
+              onClick={(e) => handleScroll(e, "#features", true)}
+            >
               Funcionalidades
             </Link>
           </li>
-          <li>
-            <Link href="#pricing" onClick={toggleMenu}>
+          <li className="hover:text-primary">
+            <Link
+              href="#plans"
+              onClick={(e) => handleScroll(e, "#plans", true)}
+            >
               Preços
             </Link>
           </li>
-          <li>
-            <Link href="#testimonials" onClick={toggleMenu}>
+          <li className="hover:text-primary">
+            <Link
+              href="#testimonials"
+              onClick={(e) => handleScroll(e, "#testimonials", true)}
+            >
               Clientes
             </Link>
           </li>
-          <li>
-            <Link href="#contact" onClick={toggleMenu}>
+          <li className="hover:text-primary">
+            <Link
+              href="#contact"
+              onClick={(e) => handleScroll(e, "#contact", true)}
+            >
               Contato
+            </Link>
+          </li>
+          <li className="hover:text-primary">
+            <Link href="#faq" onClick={(e) => handleScroll(e, "#faq", true)}>
+              Ajuda
             </Link>
           </li>
           <li>
             <Button asChild>
               <Link href="/login-signin" onClick={toggleMenu}>
-                Log In
+                Sign In
               </Link>
             </Button>
           </li>

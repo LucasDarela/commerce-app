@@ -53,8 +53,10 @@ export default function Functionalities() {
   return (
     <section id="features" className="max-w-5xl mx-auto py-20 text-center">
       <div className="section-heading section-header">
-        <h2 className="section-title">Principais Funcionalidades</h2>
-        <p className="section-description mt-5">
+        <h2 className="section-title text-primary">
+          Principais Funcionalidades
+        </h2>
+        <p className="section-description mt-5 text-muted-foreground">
           Tudo o que você precisa para gerenciar sua distribuidora de forma
           simples, rápida e eficiente.
         </p>

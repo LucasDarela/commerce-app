@@ -25,14 +25,14 @@ export default async function LogInSignIn() {
         className="w-[400px] border rounded-lg pb-4 shadow-2xl"
       >
         <TabsList className="flex justify-around items-center w-full rounded-b-none h-14">
-          <TabsTrigger value="login" className="transition-all delay-150">
-            Login
-          </TabsTrigger>
           <TabsTrigger
             value="create-account"
             className="transition-all delay-150"
           >
-            Create Account
+            Criar Conta
+          </TabsTrigger>
+          <TabsTrigger value="login" className="transition-all delay-150">
+            Login
           </TabsTrigger>
         </TabsList>
         {/* Login */}
@@ -45,7 +45,7 @@ export default async function LogInSignIn() {
         </TabsContent>
       </Tabs>
       <Link href="/" className="mt-4 text-muted-foreground text-sm">
-        Voltar para Home
+        Voltar para Início
       </Link>
     </div>
   );

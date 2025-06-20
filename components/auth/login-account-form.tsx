@@ -24,21 +24,21 @@ import { PasswordInput } from "../ui/password-input";
 const formSchema = z.object({
   email: z
     .string({
-      required_error: "Email is required.",
+      required_error: "O e-mail é obrigatório.",
     })
     .email({
-      message: "Must be a valid email.",
+      message: "Deve ser um e-mail válido.",
     }),
 
   password: z
     .string({
-      required_error: "Password is required.",
+      required_error: "A senha é obrigatória.",
     })
     .min(7, {
-      message: "Password must have at least 7 characters.",
+      message: "A senha deve ter pelo menos 7 caracteres.",
     })
-    .max(12, {
-      message: "Exceded limit of 12 characters.",
+    .max(15, {
+      message: "Limite excedido de 12 caracteres.",
     }),
 });
 
@@ -70,18 +70,18 @@ export function LoginAccountForm() {
       });
 
       if (error?.status === 429) {
-        toast.error("Too many tries. Try again in a few minutes.");
+        toast.error("Muitas tentativas. Tente novamente em alguns minutos.");
       } else if (error) {
-        toast.error("Login error: " + error.message);
+        toast.error("Erro de login: " + error.message);
       } else if (session) {
-        toast.success("Login successfully!");
+        toast.success("Login com sucesso!");
         form.reset();
         router.refresh();
         router.push("/dashboard");
       }
     } catch (error) {
       console.error("LoginAccountForm:onSubmit", error);
-      toast.error("Unexpected error while trying to log in.");
+      toast.error("Erro inesperado ao tentar efetuar login.");
     } finally {
       setIsLoading(false);
     }
@@ -94,13 +94,13 @@ export function LoginAccountForm() {
     const supabase = createClientComponentClient();
 
     const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-      redirectTo: `${location.origin}/auth/reset-password`, // página que o usuário será redirecionado
+      redirectTo: `${location.origin}/auth/reset-password`,
     });
 
     if (error) {
-      toast.error("Error sending recovery email.");
+      toast.error("Erro ao enviar e-mail de recuperação.");
     } else {
-      toast.success("Check your email to reset your password.");
+      toast.success("Verifique seu e-mail para redefinir sua senha.");
       setShowReset(false);
       setResetEmail("");
     }
@@ -108,7 +108,7 @@ export function LoginAccountForm() {
 
   return (
     <div className="flex flex-col justify-center items-center space-y-2">
-      <span className="text-lg p-4">It's good to see you again.</span>
+      <span className="text-lg p-4">É bom ver você novamente.</span>
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit(onSubmit)}
@@ -132,9 +132,9 @@ export function LoginAccountForm() {
             name="password"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Password</FormLabel>
+                <FormLabel>Senha</FormLabel>
                 <FormControl>
-                  <PasswordInput placeholder="Password" {...field} />
+                  <PasswordInput placeholder="Senha" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -153,7 +153,7 @@ export function LoginAccountForm() {
           onClick={() => setShowReset(!showReset)}
           className="text-blue-600 hover:underline"
         >
-          Forgot Password?
+          Esqueceu a Senha?
         </button>
       </div>
 
@@ -161,7 +161,7 @@ export function LoginAccountForm() {
         <div className="flex flex-col gap-4 w-auto p-6">
           <Input
             type="email"
-            placeholder="Type your e-mail"
+            placeholder="Digite seu e-mail"
             value={resetEmail}
             onChange={(e) => setResetEmail(e.target.value)}
           />
@@ -170,7 +170,7 @@ export function LoginAccountForm() {
             onClick={handleResetPassword}
             className="w-full"
           >
-            Reset Password
+            Redefinir senha
           </Button>
         </div>
       )}

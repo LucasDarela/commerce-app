@@ -126,11 +126,13 @@ const TestimonialsColumn = (props: {
 
 export default function Testimonials() {
   return (
-    <section className="my-16" id="clients">
+    <section className="my-16" id="testimonials">
       <div className="container mx-auto">
         <div className="section-heading section-header">
-          <h2 className="section-title mt-5">O que nossos clientes dizem</h2>
-          <p className="section-description mt-5">
+          <h2 className="section-title mt-5 text-primary">
+            O que nossos clientes dizem
+          </h2>
+          <p className="section-description mt-5 text-muted-foreground">
             Experiências reais de quem já escolheu a qualidade e o sabor do
             nosso chopp
           </p>

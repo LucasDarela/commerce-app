@@ -12,7 +12,7 @@ export default function Footer() {
     const targetElement = document.querySelector(targetId);
     if (targetElement) {
       window.scrollTo({
-        top: (targetElement as HTMLElement).offsetTop - 80,
+        top: (targetElement as HTMLElement).offsetTop - 5,
         behavior: "smooth",
       });
     }
@@ -26,32 +26,39 @@ export default function Footer() {
         </div>
         <nav className="flex flex-col md:flex-row md:justify-center gap-6 mt-6">
           <a
-            href="#funcionalidades"
-            className="hover:text-blue-700"
-            onClick={(e) => handleScroll(e, "#funcionalidades")}
+            href="#features"
+            className="hover:text-primary"
+            onClick={(e) => handleScroll(e, "#features")}
           >
             Funcionalidades
           </a>
           <a
-            href="#precos"
-            className="hover:text-blue-700"
-            onClick={(e) => handleScroll(e, "#precos")}
+            href="#plans"
+            className="hover:text-primary"
+            onClick={(e) => handleScroll(e, "#plans")}
           >
             Preços
           </a>
           <a
-            href="#testemunhos"
-            className="hover:text-blue-700"
-            onClick={(e) => handleScroll(e, "#testemunhos")}
+            href="#testimonials"
+            className="hover:text-primary"
+            onClick={(e) => handleScroll(e, "#testimonials")}
           >
             Clientes
           </a>
           <a
-            href="#contato"
-            className="hover:text-blue-700"
-            onClick={(e) => handleScroll(e, "#contato")}
+            href="#contact"
+            className="hover:text-primary"
+            onClick={(e) => handleScroll(e, "#contact")}
           >
             Contato
+          </a>
+          <a
+            href="#faq"
+            className="hover:text-primary"
+            onClick={(e) => handleScroll(e, "#faq")}
+          >
+            Ajuda
           </a>
         </nav>
 

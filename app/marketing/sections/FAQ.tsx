@@ -7,10 +7,12 @@ import {
 
 export default function () {
   return (
-    <div className="my-16 mx-auto">
+    <div className="my-16 mx-auto" id="faq">
       <div className="section-heading section-header">
-        <h2 className="section-title mt-5">Perguntas Frequentes</h2>
-        <p className="section-description mt-5">
+        <h2 className="section-title mt-5 text-primary">
+          Perguntas Frequentes
+        </h2>
+        <p className="section-description mt-5 text-muted-foreground">
           Suas dúvidas podem ser esclarecidas a baixo
         </p>
       </div>

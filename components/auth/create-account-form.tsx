@@ -22,21 +22,21 @@ import { PasswordInput } from "../ui/password-input";
 const formSchema = z
   .object({
     email: z
-      .string({ required_error: "Email is required." })
-      .email({ message: "Must be a valid email." }),
+      .string({ required_error: "O e-mail é obrigatório." })
+      .email({ message: "Deve ser um e-mail válido." }),
 
     password: z
-      .string({ required_error: "Password is required." })
-      .min(7, { message: "Password must have at least 7 characters." })
-      .max(12, { message: "Exceeded limit of 12 characters." }),
+      .string({ required_error: "A senha é obrigatória." })
+      .min(7, { message: "A senha deve ter pelo menos 7 caracteres." })
+      .max(15, { message: "Limite excedido de 15 caracteres." }),
 
     confirmPassword: z.string({
-      required_error: "You must confirm your password.",
+      required_error: "Você deve confirmar sua senha.",
     }),
   })
   .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords must match.",
-    path: ["confirmPassword"], // mostra erro no campo correto
+    message: "As senhas devem corresponder.",
+    path: ["confirmPassword"],
   });
 
 export function CreateAccountForm() {
@@ -82,7 +82,7 @@ export function CreateAccountForm() {
 
   return (
     <div className="flex flex-col justify-center items-center space-y-2">
-      <span className="text-lg p-4">Create Your Accout Here</span>
+      <span className="text-lg p-4">Que bom ver você por aqui!</span>
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit(onSubmit)}
@@ -106,9 +106,9 @@ export function CreateAccountForm() {
             name="password"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Password</FormLabel>
+                <FormLabel>Senha</FormLabel>
                 <FormControl>
-                  <PasswordInput placeholder="Password" {...field} />
+                  <PasswordInput placeholder="Senha" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -119,16 +119,16 @@ export function CreateAccountForm() {
             name="confirmPassword"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Confirm Password</FormLabel>
+                <FormLabel>Confirme a Senha</FormLabel>
                 <FormControl>
-                  <PasswordInput placeholder="Confirm Password" {...field} />
+                  <PasswordInput placeholder="Confirme a Senha" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
           <Button type="submit" className="my-4 w-full">
-            Create Account
+            Criar Conta
           </Button>
         </form>
       </Form>
