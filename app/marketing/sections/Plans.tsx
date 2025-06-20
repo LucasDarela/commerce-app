@@ -63,7 +63,7 @@ export default function Planos() {
 
   return (
     <div className="max-w-5xl mx-auto p-6" id="plans">
-      <div className="section-heading section-header">
+      <div className="section-heading section-header mb-4">
         <h2 className="section-title text-primary">Escolha seu Plano</h2>
         <p className="section-description mt-5 text-muted-foreground">
           Temos o plano ideal para sua empresa.

@@ -7,6 +7,7 @@ import lupulo2Image from "@/app/assets/lupulo8.webp";
 import { Button } from "@/components/ui/button";
 import type { ImgHTMLAttributes } from "react";
 import type { MotionProps } from "framer-motion";
+import Link from "next/link";
 
 const MotionImage = motion<ImgHTMLAttributes<HTMLImageElement> & MotionProps>(
   "img",
@@ -63,11 +64,12 @@ export default function CallToAction() {
         </p>
         <div className="flex gap-2 mt-10 justify-center">
           <Button
-            href="#plans"
-            onClick={(e) => handleScroll(e, "#plans")}
+            asChild
             className="sm:hidden md:flex btn btn-text gap-1 inline-flex whitespace-nowrap hover:text-gray hover:scale-105 transition"
           >
-            Teste Agora
+            <Link href="#plans" onClick={(e) => handleScroll(e, "#plans")}>
+              Teste Agora
+            </Link>
           </Button>
         </div>
 

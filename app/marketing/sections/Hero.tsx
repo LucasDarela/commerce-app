@@ -37,10 +37,10 @@ export default function Hero() {
             width={200}
             height={100}
           />
-          <h2 className="text-4xl font-bold">
+          <h2 className="section-title font-bold ">
             Sitema Responsivo para sua Distribuidora
           </h2>
-          <p className="mt-4 text-lg">
+          <p className="mt-4 section-description ">
             Gerencia suas vendas através do Celular ou Computador.
           </p>
           <Button
@@ -58,8 +58,10 @@ export default function Hero() {
             width={200}
             height={100}
           />
-          <h2 className="text-4xl font-bold">Controle Total do Seu Negócio</h2>
-          <p className="mt-4 text-lg">
+          <h2 className="section-title font-bold">
+            Controle Total do Seu Negócio
+          </h2>
+          <p className="mt-4 section-description ">
             Monitore vendas, estoque e clientes em tempo real.
           </p>
           <Button
@@ -77,10 +79,10 @@ export default function Hero() {
             width={200}
             height={100}
           />
-          <h2 className="text-4xl font-bold">
+          <h2 className="section-title font-bold">
             Facilidade e Agilidade nas Entregas
           </h2>
-          <p className="mt-4 text-lg">
+          <p className="mt-4 section-description">
             Otimize seu tempo com um sistema de entregas eficiente.
           </p>
           <Button

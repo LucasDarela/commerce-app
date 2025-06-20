@@ -16,6 +16,7 @@ export default function NavBar() {
   const handleScroll = (
     event: React.MouseEvent<HTMLAnchorElement>,
     targetId: string,
+    closeMenu?: boolean,
   ) => {
     event.preventDefault();
     const targetElement = document.querySelector(targetId);
@@ -25,7 +26,7 @@ export default function NavBar() {
         behavior: "smooth",
       });
     }
-    if (toggleMenu) {
+    if (closeMenu) {
       setMenuOpen(false);
     }
   };
@@ -57,23 +58,26 @@ export default function NavBar() {
 
           {/* Links (desktop) */}
           <ul className="hidden md:flex gap-6 text-sm font-medium">
-            <li className="hover:text-primary" className="hover:text-primary">
+            <li className="hover:text-primary">
               <Link
                 href="#features"
-                onClick={(e) => handleScroll(e, "#features")}
+                onClick={(e) => handleScroll(e, "#features", true)}
               >
                 Funcionalidades
               </Link>
             </li>
             <li className="hover:text-primary">
-              <Link href="#plans" onClick={(e) => handleScroll(e, "#plans")}>
+              <Link
+                href="#plans"
+                onClick={(e) => handleScroll(e, "#plans", true)}
+              >
                 Preços
               </Link>
             </li>
             <li className="hover:text-primary">
               <Link
                 href="#testimonials"
-                onClick={(e) => handleScroll(e, "#testimonials")}
+                onClick={(e) => handleScroll(e, "#testimonials", true)}
               >
                 Clientes
               </Link>
@@ -81,13 +85,13 @@ export default function NavBar() {
             <li className="hover:text-primary">
               <Link
                 href="#contact"
-                onClick={(e) => handleScroll(e, "#contact")}
+                onClick={(e) => handleScroll(e, "#contact", true)}
               >
                 Contato
               </Link>
             </li>
             <li className="hover:text-primary">
-              <Link href="#faq" onClick={(e) => handleScroll(e, "#faq")}>
+              <Link href="#faq" onClick={(e) => handleScroll(e, "#faq", true)}>
                 Ajuda
               </Link>
             </li>
