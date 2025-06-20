@@ -14,7 +14,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-6 p-8">
+    <div className="space-y-6 px-6 mt-9">
       <h2 className="text-2xl font-bold">Configurações</h2>
       <CompanySettingsForm />
       <IntegrationsPage />

@@ -209,7 +209,7 @@ export default function BankManagement() {
   }
 
   return (
-    <div className="space-y-6 p-8">
+    <div className="space-y-6 px-6 mt-9">
       <h2 className="text-xl font-bold mb-4">Registre uma Conta Bancária</h2>
       <div className="w-full flex justify-center gap-2 pb-4">
         <Input

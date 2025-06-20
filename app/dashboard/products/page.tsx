@@ -169,7 +169,7 @@ export default function ListProduct() {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-6 mt-3">
       <h2 className="text-xl font-bold mb-4">Produtos</h2>
       <div className="mb-6 flex flex-col sm:flex-row gap-4 items-stretch">
         <Input

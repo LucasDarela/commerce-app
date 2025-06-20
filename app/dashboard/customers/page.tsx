@@ -180,7 +180,7 @@ export default function ListCustomers() {
   }
 
   return (
-    <div className="p-8">
+    <div className="p-6 mt-3">
       <h2 className="text-xl font-bold mb-4">Clientes</h2>
       <div className="mb-6 flex flex-col-2 gap-6">
         <Input

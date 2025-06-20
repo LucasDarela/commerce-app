@@ -21,7 +21,7 @@ export default function NfePage() {
   }
 
   return (
-    <Tabs defaultValue="nfe" className="w-full px-4 py-4 md:gap-6 md:py-6 ">
+    <Tabs defaultValue="nfe" className="w-full px-6 mt-4 md:gap-6 md:py-6 ">
       <TabsList>
         <TabsTrigger value="nfe">Nfe</TabsTrigger>
         <TabsTrigger value="cadastro">Cadastro</TabsTrigger>

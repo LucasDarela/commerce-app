@@ -437,7 +437,7 @@ export function DataEquipments({
           </svg>
         </div>
       )}
-      <div className="px-8">
+      <div className="px-6 mt-3">
         <h2 className="text-xl font-bold">Equipamentos</h2>
       </div>
 

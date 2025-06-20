@@ -43,7 +43,7 @@ export default function ReportsPage() {
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-5xl mx-auto">
+    <div className="p-6 space-y-6 ">
       <h1 className="text-2xl font-bold">Relatórios</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

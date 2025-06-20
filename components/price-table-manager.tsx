@@ -203,7 +203,7 @@ export function PriceTableManager() {
   }
 
   return (
-    <div className="space-y-6 p-8">
+    <div className="space-y-6 px-6 mt-9">
       <h2 className="text-xl font-bold">Catálogo Personalizado</h2>
       <Table>
         <TableHeader>

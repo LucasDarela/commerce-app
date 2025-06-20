@@ -309,7 +309,7 @@ export default function BarrelControl() {
   }
 
   return (
-    <div className="p-4 space-y-6 mt-2">
+    <div className="px-2 space-y-6 mt-9">
       {/* Input + dropdown */}
       <div className="relative ml-4">
         <h2 className="font-bold text-xl mb-4">Controle de Barril</h2>
