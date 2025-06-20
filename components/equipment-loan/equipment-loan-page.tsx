@@ -25,6 +25,8 @@ import { LoanEquipmentModal } from "@/components/equipment-loan/LoanEquipmentMod
 import { ReturnEquipmentModal } from "./ReturnEquipmentModal";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import type { Order } from "@/components/types/orders";
+import { Input } from "../ui/input";
+import { TableSkeleton } from "@/components/ui/TableSkeleton";
 
 type LoanWithDetails = {
   id: string;
@@ -56,6 +58,7 @@ export default function LoanByCustomerPage() {
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [isLoanModalOpen, setIsLoanModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [search, setSearch] = useState("");
 
   const fetchData = async () => {
     if (!companyId) return;
@@ -108,10 +111,15 @@ export default function LoanByCustomerPage() {
     }
   }, [companyId]);
 
+  if (loading) {
+    return <TableSkeleton />;
+  }
+
   return (
     <div className="w-full px-6 py-4">
       <div className="flex justify-between">
         <h1 className="text-2xl font-bold mb-6">Equipamentos por Cliente</h1>
+
         <Button onClick={() => setIsLoanModalOpen(true)}>
           Novo Empréstimo
         </Button>
@@ -122,6 +130,15 @@ export default function LoanByCustomerPage() {
           onLoanSaved={fetchData}
         />
       </div>
+      <div className="flex items-center gap-4 mb-4">
+        <Input
+          type="text"
+          placeholder="Buscar cliente por nome..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="max-w-sm"
+        />
+      </div>
 
       {groupedData.length === 0 ? (
         <p className="text-muted-foreground">
@@ -129,36 +146,40 @@ export default function LoanByCustomerPage() {
         </p>
       ) : (
         <div className="space-y-6">
-          {groupedData.map((group) => (
-            <div key={`customer-${group.customerId}`} className="mb-6">
-              <div className="flex justify-between items-center">
-                <h2 className="text-lg font-semibold text-primary">
-                  {group.customerName}
-                </h2>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    setSelectedCustomerId(group.customerId);
-                    setOpenModal(true);
-                    setSelectedItems([]);
-                  }}
-                >
-                  Retornar Itens
-                </Button>
-              </div>
-
-              <ul className="list-disc pl-6 text-sm text-muted-foreground mt-2">
-                {group.items.map((item, index) => (
-                  <li
-                    key={`${group.customerId}-${item.equipmentName}-${index}`}
+          {groupedData
+            .filter((group) =>
+              group.customerName.toLowerCase().includes(search.toLowerCase()),
+            )
+            .map((group) => (
+              <div key={`customer-${group.customerId}`} className="mb-6">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-lg font-semibold text-primary">
+                    {group.customerName}
+                  </h2>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setSelectedCustomerId(group.customerId);
+                      setOpenModal(true);
+                      setSelectedItems([]);
+                    }}
                   >
-                    {item.equipmentName} – {item.quantity}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+                    Retornar Itens
+                  </Button>
+                </div>
+
+                <ul className="list-disc pl-6 text-sm text-muted-foreground mt-2">
+                  {group.items.map((item, index) => (
+                    <li
+                      key={`${group.customerId}-${item.equipmentName}-${index}`}
+                    >
+                      {item.equipmentName} – {item.quantity}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
         </div>
       )}
 

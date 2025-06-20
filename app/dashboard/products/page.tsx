@@ -32,6 +32,7 @@ import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import { PriceTableManager } from "@/components/price-table-manager";
 import Link from "next/link";
 import { IconPlus } from "@tabler/icons-react";
+import { TableSkeleton } from "@/components/ui/TableSkeleton";
 
 type Equipment = {
   id: string;
@@ -164,11 +165,7 @@ export default function ListProduct() {
   };
 
   if (loading) {
-    return (
-      <div className="p-8 text-center text-muted-foreground">
-        Loading products...
-      </div>
-    );
+    return <TableSkeleton />;
   }
 
   return (

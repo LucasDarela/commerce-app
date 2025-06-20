@@ -57,7 +57,7 @@ export async function POST(req: Request) {
     const { error: updateError } = await supabase
       .from("orders")
       .update({
-        total_payed: cappedPayed.toString(), // garante compatibilidade com numeric
+        total_payed: cappedPayed,
         payment_status: newStatus,
         ...(payment_method && { payment_method }),
       })

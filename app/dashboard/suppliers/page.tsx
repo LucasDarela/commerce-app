@@ -25,6 +25,7 @@ import {
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import Link from "next/link";
 import { IconPlus } from "@tabler/icons-react";
+import { TableSkeleton } from "@/components/ui/TableSkeleton";
 
 // 🔹 Supplier Type
 type Supplier = {
@@ -137,6 +138,10 @@ export default function ListSuppliers() {
       }
     }
   };
+
+  if (loading) {
+    return <TableSkeleton />;
+  }
 
   return (
     <div className="p-8">

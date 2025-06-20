@@ -7,15 +7,18 @@ import DataFinancialTable from "@/components/financial/DataFinancialTable";
 import { Order } from "@/components/types/order";
 import FiscalOperationsPage from "@/components/nf/FiscalOperationForm";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TableSkeleton } from "@/components/ui/TableSkeleton";
 
 export default function NfePage() {
-  const { companyId } = useAuthenticatedCompany();
+  const { companyId, loading } = useAuthenticatedCompany();
 
   useEffect(() => {
     if (!companyId) return;
   }, [companyId]);
 
-  //   if (loading) return <p className="p-4">Loading NFe...</p>
+  if (loading) {
+    return <TableSkeleton />;
+  }
 
   return (
     <Tabs defaultValue="nfe" className="w-full px-4 py-4 md:gap-6 md:py-6 ">

@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/table";
 import { toast } from "sonner";
 import { PasswordInput } from "./ui/password-input";
+import { TableSkeleton } from "./ui/TableSkeleton";
 
 type TeamMember = {
   id: string;
@@ -33,7 +34,7 @@ type TeamMember = {
 };
 
 export default function TeamManagementPage() {
-  const { user, companyId } = useAuthenticatedCompany();
+  const { user, companyId, loading } = useAuthenticatedCompany();
   const router = useRouter();
   const [companyName, setCompanyName] = useState("");
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
@@ -176,6 +177,10 @@ export default function TeamManagementPage() {
     setTeamMembers((prev) => prev.filter((member) => member.id !== id));
     toast("Usuário Removido");
   };
+
+  if (loading) {
+    return <TableSkeleton />;
+  }
 
   return (
     <div className="space-y-6 p-8">

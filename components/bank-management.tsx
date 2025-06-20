@@ -16,6 +16,8 @@ import {
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { Card } from "./ui/card";
+import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
+import { TableSkeleton } from "./ui/TableSkeleton";
 
 interface BankAccount {
   id: string;
@@ -79,6 +81,7 @@ const defaultNewAccount: NewAccountInput = {
 };
 
 export default function BankManagement() {
+  const { loading } = useAuthenticatedCompany();
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [newAccount, setNewAccount] =
     useState<NewAccountInput>(defaultNewAccount);
@@ -200,6 +203,10 @@ export default function BankManagement() {
       setBankAccounts((prev) => prev.filter((acc) => acc.id !== id));
     }
   };
+
+  if (loading) {
+    return <TableSkeleton />;
+  }
 
   return (
     <div className="space-y-6 p-8">

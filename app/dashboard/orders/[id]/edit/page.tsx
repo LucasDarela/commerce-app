@@ -315,7 +315,70 @@ export default function EditOrderPage() {
     items.reduce((acc, item) => acc + item.standard_price * item.quantity, 0) +
     freight;
 
-  const handleUpdate = async () => {};
+  const handleUpdate = async () => {
+    if (!order || !id) return;
+
+    setLoading(true);
+
+    try {
+      const total = getTotal();
+
+      // Atualiza a venda (tabela orders)
+      const { error: orderError } = await supabase
+        .from("orders")
+        .update({
+          document_type: order.document_type,
+          note_number: order.note_number,
+          payment_method: order.payment_method,
+          days_ticket: order.days_ticket,
+          freight: freight,
+          total: total,
+          text_note: text_note,
+          appointment_date: appointment.date
+            ? appointment.date.toISOString().split("T")[0]
+            : null,
+          appointment_hour: appointment.hour,
+          appointment_local: appointment.location,
+          customer_id: selectedCustomer?.id,
+        })
+        .eq("id", id);
+
+      if (orderError) {
+        console.error(orderError);
+        toast.error("Erro ao salvar a venda.");
+        return;
+      }
+
+      // Deleta os itens antigos da tabela order_items
+      await supabase.from("order_items").delete().eq("order_id", id);
+
+      // Insere os novos itens
+      const newItems = items.map((item) => ({
+        order_id: id,
+        product_id: item.id,
+        quantity: item.quantity,
+        price: item.standard_price,
+      }));
+
+      const { error: itemsError } = await supabase
+        .from("order_items")
+        .insert(newItems);
+
+      if (itemsError) {
+        console.error(itemsError);
+        toast.error("Erro ao salvar os produtos da venda.");
+        return;
+      }
+
+      toast.success("Venda atualizada com sucesso!");
+      router.push("/dashboard/orders");
+    } catch (error) {
+      console.error(error);
+      toast.error("Erro inesperado ao salvar a venda.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSelectProduct = (index: number, productId: string) => {
     const product = products.find((p) => p.id.toString() === productId);

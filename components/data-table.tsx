@@ -321,7 +321,6 @@ export function DataTable({
   const [isProductReturnModalOpen, setIsProductReturnModalOpen] =
     useState(false);
   const [issueDateFilter, setissueDateFilter] = useState<Date | null>(null);
-
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const today = new Date();
     return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
@@ -757,7 +756,6 @@ export function DataTable({
                 Emitir NF-e
               </Link>
             </DropdownMenuItem>
-
             <DropdownMenuSeparator />
             {!row.original.customer_signature ? (
               <DropdownMenuItem asChild>
@@ -773,6 +771,14 @@ export function DataTable({
                 Edição bloqueada
               </DropdownMenuItem>
             )}
+            <DropdownMenuItem
+              onClick={() => {
+                fetchOrderProductsForReturnModal(row.original.id);
+                setSelectedCustomer(row.original);
+              }}
+            >
+              Retornar Produto
+            </DropdownMenuItem>
             <DropdownMenuItem
               variant="destructive"
               onClick={() => deleteOrderById(row.original.id)}
@@ -1680,8 +1686,8 @@ export function DataTable({
           }}
           open={isPaymentOpen}
           onClose={() => setIsPaymentOpen(false)}
-          onSuccess={() => {
-            refreshOrders();
+          onSuccess={async () => {
+            await refreshOrders();
             setIsPaymentOpen(false);
           }}
         />
@@ -1723,10 +1729,13 @@ export function DataTable({
           open={isProductReturnModalOpen}
           onClose={() => setIsProductReturnModalOpen(false)}
           items={returnProductItems}
-          orderId={selectedCustomer.id}
+          orderId={selectedCustomer?.id ?? ""}
           companyId={companyId}
           createdBy={user.id}
-          onSuccess={refreshOrders}
+          onSuccess={() => {
+            refreshOrders();
+            setIsProductReturnModalOpen(false);
+          }}
         />
       )}
     </>

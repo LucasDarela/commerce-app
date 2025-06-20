@@ -16,9 +16,10 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import { StockReservationReport } from "@/components/analytics/stockReservations";
+import { TableSkeleton } from "../ui/TableSkeleton";
 
 export default function ReportsPage() {
-  const { companyId } = useAuthenticatedCompany();
+  const { companyId, loading } = useAuthenticatedCompany();
   const [reportType, setReportType] = useState("stock_reservations");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -36,6 +37,10 @@ export default function ReportsPage() {
       supplierFilter,
     });
   };
+
+  if (loading) {
+    return <TableSkeleton />;
+  }
 
   return (
     <div className="p-6 space-y-6 max-w-5xl mx-auto">

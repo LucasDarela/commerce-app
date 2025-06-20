@@ -16,6 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { TableSkeleton } from "./ui/TableSkeleton";
 
 type Product = {
   id: string;
@@ -32,7 +33,7 @@ export function PriceTableManager() {
   const [savedCatalogs, setSavedCatalogs] = useState<Catalog[]>([]);
   const [catalogs, setCatalogs] = useState<Catalog[]>([]);
   const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
-  const { companyId } = useAuthenticatedCompany();
+  const { companyId, loading } = useAuthenticatedCompany();
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
   const [editingCatalogIndex, setEditingCatalogIndex] = useState<number | null>(
     null,
@@ -196,6 +197,10 @@ export function PriceTableManager() {
     toast.success("Catálogo deletado com sucesso.");
     setSavedCatalogs((prev) => prev.filter((_, i) => i !== catalogIndex));
   };
+
+  if (loading) {
+    return <TableSkeleton />;
+  }
 
   return (
     <div className="space-y-6 p-8">

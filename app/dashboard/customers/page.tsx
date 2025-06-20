@@ -31,6 +31,7 @@ import {
   IconPlus,
 } from "@tabler/icons-react";
 import Link from "next/link";
+import { TableSkeleton } from "@/components/ui/TableSkeleton";
 
 type Cliente = {
   id: number;
@@ -173,6 +174,10 @@ export default function ListCustomers() {
       }
     }
   };
+
+  if (loading) {
+    return <TableSkeleton />;
+  }
 
   return (
     <div className="p-8">
