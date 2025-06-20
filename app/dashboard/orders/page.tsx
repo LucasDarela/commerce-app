@@ -5,6 +5,7 @@ import { fetchOrders } from "@/lib/fetchOrders";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import { DataTable } from "@/components/data-table";
 import { Order } from "@/components/types/order";
+import { TableSkeleton } from "@/components/ui/TableSkeleton";
 
 export default function OrdersPage() {
   const { companyId } = useAuthenticatedCompany();
@@ -31,7 +32,9 @@ export default function OrdersPage() {
     getData();
   }, [companyId]);
 
-  if (loading) return <p className="p-4">Loading Orders...</p>;
+  if (loading) {
+    return <TableSkeleton />;
+  }
 
   return (
     <div className="flex flex-1 flex-col">

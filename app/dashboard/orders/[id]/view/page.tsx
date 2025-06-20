@@ -85,6 +85,69 @@ export default function ViewOrderPage() {
     setOpenSignature(false);
   };
 
+  const fetchReturnedProducts = async (orderId: string, customerId: string) => {
+    const { data: customerData, error: customerError } = await supabase
+      .from("customers")
+      .select("price_table_id")
+      .eq("id", customerId)
+      .single();
+
+    if (customerError || !customerData) {
+      console.error("Erro ao buscar price_table_id:", customerError);
+      return [];
+    }
+
+    const { data: stockMovements, error: stockError } = await supabase
+      .from("stock_movements")
+      .select(
+        `
+        quantity,
+        product_id,
+        products ( name )
+      `,
+      )
+      .eq("note_id", orderId)
+      .eq("type", "return");
+
+    if (stockError || !stockMovements) {
+      console.error("Erro ao buscar stock_movements:", stockError);
+      return [];
+    }
+
+    const devolucaoComPreco = await Promise.all(
+      stockMovements.map(async (item) => {
+        const { data: priceTableItem, error: priceError } = await supabase
+          .from("price_table_products")
+          .select("price")
+          .eq("price_table_id", customerData.price_table_id)
+          .eq("product_id", item.product_id)
+          .single();
+
+        if (priceError) {
+          console.error(
+            `Erro ao buscar preço da tabela de preços (product_id: ${item.product_id}, price_table_id: ${customerData.price_table_id}):`,
+            priceError,
+          );
+        }
+
+        if (!priceTableItem) {
+          console.warn(
+            `⚠️ Nenhum preço encontrado para o produto ${item.product_id} na tabela ${customerData.price_table_id}`,
+          );
+        }
+
+        return {
+          ...item,
+          unitPrice: priceTableItem?.price ?? 0,
+        };
+      }),
+    );
+
+    return devolucaoComPreco;
+  };
+
+  const [returnedProducts, setReturnedProducts] = useState<any[]>([]);
+
   useEffect(() => {
     const fetch = async () => {
       try {
@@ -94,11 +157,18 @@ export default function ViewOrderPage() {
         if (data?.customer_signature) {
           setSignatureData(data.customer_signature);
         }
+
+        const devolucoes = await fetchReturnedProducts(
+          id as string,
+          data.customer.id,
+        );
+        setReturnedProducts(devolucoes);
       } catch (err) {
-        console.error("Erro no fetchOrderDetails:", err);
+        console.error("Erro ao carregar espelho da venda:", err);
         toast.error("Erro ao carregar espelho da venda.");
       }
     };
+
     if (id) fetch();
   }, [id]);
 
@@ -109,6 +179,10 @@ export default function ViewOrderPage() {
   const items = order.items || [];
 
   const freight = Number(order.freight || 0);
+  const totalDevolucao = returnedProducts.reduce(
+    (sum, item) => sum + item.unitPrice * item.quantity,
+    0,
+  );
   const totalItems = items.reduce(
     (sum: number, item: any) => sum + item.quantity * item.unit_price,
     0,
@@ -147,6 +221,8 @@ export default function ViewOrderPage() {
       {/* Itens */}
       <section>
         <h2 className="font-semibold">Itens da Venda</h2>
+
+        {/* Tabela de produtos vendidos */}
         <table className="w-full text-sm border">
           <thead>
             <tr className="text-left">
@@ -169,19 +245,66 @@ export default function ViewOrderPage() {
             ))}
           </tbody>
         </table>
+
+        {/* Se houver produtos devolvidos */}
+        {returnedProducts.length > 0 && (
+          <>
+            <h3 className="mt-6 font-semibold">Produtos Devolvidos</h3>
+
+            <table className="w-full text-sm border mt-2">
+              <thead>
+                <tr className="text-left">
+                  <th className="p-2">Produto</th>
+                  <th className="p-2">Qtd Devolvida</th>
+                  <th className="p-2">Un</th>
+                  <th className="p-2">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {returnedProducts.map((item, index) => {
+                  const total = item.unitPrice * item.quantity;
+                  return (
+                    <tr key={index} className="border-t text-red-700">
+                      <td className="p-2">{item.products.name}</td>
+                      <td className="p-2">{item.quantity}</td>
+                      <td className="p-2">R$ {item.unitPrice.toFixed(2)}</td>
+                      <td className="p-2 font-semibold">
+                        R$ {total.toFixed(2)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </>
+        )}
+
+        {/* Calculo total final considerando devoluções */}
         <div className="mt-6 border-t pt-4 text-sm text-right space-y-1">
           <p>
             <strong>Frete:</strong> R$ {freight.toFixed(2)}
           </p>
+
           <p className="text-lg font-bold">
-            <strong>Total:</strong> R$ {totalFinal.toFixed(2)}
+            <strong>Total Final:</strong> R${" "}
+            {(
+              totalFinal -
+              returnedProducts.reduce(
+                (sum, item) => sum + item.unitPrice * item.quantity,
+                0,
+              )
+            ).toFixed(2)}
           </p>
         </div>
+
+        {/* Botão Assinar */}
         <div className="w-full mt-6">
           <Button className="w-full" onClick={() => setOpenSignature(true)}>
             Assinar
           </Button>
         </div>
+
+        {/* Imagem da Assinatura */}
         {signatureData && (
           <div className="flex flex-col items-center mt-4 bg-white">
             <p className="text-sm text-gray-600 mb-2">Assinatura capturada:</p>
@@ -193,6 +316,7 @@ export default function ViewOrderPage() {
           </div>
         )}
       </section>
+
       {/* Modal de Assinatura */}
       <SignatureModal
         open={openSignature}
@@ -203,6 +327,7 @@ export default function ViewOrderPage() {
       {signatureData && (
         <div className="flex flex-col gap-2 mt-4">
           <PDFDownloadLink
+            key={JSON.stringify({ signatureData, returnedProducts, items })}
             document={
               <ItemRelationPDF
                 signature={signatureData}
@@ -211,9 +336,13 @@ export default function ViewOrderPage() {
                 items={items}
                 note={order.note_number}
                 freight={order.freight}
+                returnedProducts={returnedProducts}
               />
             }
-            fileName="nota.pdf"
+            fileName={`${order.note_number} - ${customer.name}.pdf`.replace(
+              /[\/\\:*?"<>|]/g,
+              "",
+            )}
           >
             {({ loading }) => (
               <Button variant="default" className="w-full">

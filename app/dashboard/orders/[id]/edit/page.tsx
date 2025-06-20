@@ -40,6 +40,7 @@ import { orderSchema, Order as OrderType } from "@/lib/fetchOrders";
 import { generateNextNoteNumber } from "@/lib/generate-next-note-number";
 import { Textarea } from "@/components/ui/textarea";
 import { parseISO } from "date-fns";
+import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 
 interface Customer {
   id: string;
@@ -89,6 +90,7 @@ export default function EditOrderPage() {
   const router = useRouter();
   const params = useParams();
   const { id } = useParams<{ id: string }>();
+  const { user } = useAuthenticatedCompany();
 
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -313,77 +315,7 @@ export default function EditOrderPage() {
     items.reduce((acc, item) => acc + item.standard_price * item.quantity, 0) +
     freight;
 
-  const handleUpdate = async () => {
-    if (!order) return;
-    setLoading(true);
-    try {
-      const total = getTotal();
-
-      // 🔥 NOVO: monta a descrição dos produtos
-      const productsDescription = items
-        .map((item) => `${item.name} (${item.quantity}x)`)
-        .join(", ");
-
-      // 🔥 NOVO: monta o total de itens vendidos
-      const amount = items.reduce((acc, item) => acc + item.quantity, 0);
-
-      const capitalize = (text: string) =>
-        text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
-
-      // 🔥 MONTA CORRETAMENTE O OBJETO A ENVIAR PARA O SUPABASE
-      const updatedOrder = {
-        document_type: order.document_type,
-        note_number: order.note_number,
-        payment_method: order.payment_method,
-        days_ticket:
-          capitalize(order?.payment_method || "") === "Boleto"
-            ? order?.days_ticket || "12"
-            : "1",
-        total,
-        amount,
-        products: productsDescription,
-        appointment_date: appointment.date
-          ? format(appointment.date, "yyyy-MM-dd")
-          : null,
-        appointment_hour: appointment.hour,
-        appointment_local: appointment.location,
-        customer_id: selectedCustomer ? selectedCustomer.id : order.customer_id,
-        due_date: calculatedDueDate
-          ? format(calculatedDueDate, "yyyy-MM-dd")
-          : null,
-        text_note,
-      };
-
-      const { error: orderError } = await supabase
-        .from("orders")
-        .update(updatedOrder)
-        .eq("id", id);
-
-      // Atualiza itens
-      await supabase.from("order_items").delete().eq("order_id", id);
-
-      const newItems = items.map((item) => ({
-        order_id: id,
-        product_id: item.id,
-        quantity: item.quantity,
-        price: item.standard_price,
-      }));
-
-      const { error: itemsError } = await supabase
-        .from("order_items")
-        .insert(newItems);
-
-      if (orderError || itemsError) throw new Error("Erro ao atualizar venda");
-
-      toast.success("Venda atualizada com sucesso!");
-      router.push("/dashboard/orders");
-    } catch (error) {
-      console.error(error);
-      toast.error("Erro ao atualizar venda.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const handleUpdate = async () => {};
 
   const handleSelectProduct = (index: number, productId: string) => {
     const product = products.find((p) => p.id.toString() === productId);

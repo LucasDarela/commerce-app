@@ -24,6 +24,7 @@ import {
 import { LoanEquipmentModal } from "@/components/equipment-loan/LoanEquipmentModal";
 import { ReturnEquipmentModal } from "./ReturnEquipmentModal";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
+import type { Order } from "@/components/types/orders";
 
 type LoanWithDetails = {
   id: string;
@@ -46,6 +47,7 @@ type GroupedByCustomer = {
 };
 
 export default function LoanByCustomerPage() {
+  const { user, companyId, loading } = useAuthenticatedCompany();
   const [groupedData, setGroupedData] = useState<GroupedByCustomer[]>([]);
   const [openModal, setOpenModal] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(
@@ -53,7 +55,7 @@ export default function LoanByCustomerPage() {
   );
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [isLoanModalOpen, setIsLoanModalOpen] = useState(false);
-  const { companyId } = useAuthenticatedCompany();
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   const fetchData = async () => {
     if (!companyId) return;
@@ -61,7 +63,7 @@ export default function LoanByCustomerPage() {
     const { data, error } = await supabase
       .from("equipment_loans")
       .select("id, equipment_id, quantity, customer_id, customer_name")
-      .eq("status", "active"); // ou .neq("status", "returned")
+      .eq("status", "active");
 
     const { data: equipmentList } = await supabase
       .from("equipments")
@@ -164,6 +166,8 @@ export default function LoanByCustomerPage() {
         <ReturnEquipmentModal
           open={openModal}
           onOpenChange={setOpenModal}
+          order={selectedOrder}
+          user={user}
           customerId={selectedCustomerId}
           items={
             groupedData.find((g) => g.customerId === selectedCustomerId)
@@ -174,6 +178,7 @@ export default function LoanByCustomerPage() {
             setSelectedItems([]);
             fetchData();
           }}
+          onOpenProductReturnModal={() => {}}
         />
       )}
     </div>

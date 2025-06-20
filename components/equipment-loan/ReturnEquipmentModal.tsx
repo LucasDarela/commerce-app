@@ -24,8 +24,17 @@ type Props = {
   onOpenChange: (open: boolean) => void;
   customerId: string | null;
   customerName?: string;
-  items: Item[];
+  items: EquipmentItem[];
+  order?: any; // Se quiser, tipa como Order
+  user: any; // Se quiser, tipa como User
   onReturnSuccess: () => void;
+  onOpenProductReturnModal: () => void;
+};
+
+export type EquipmentItem = {
+  loanId: string;
+  equipmentName: string;
+  quantity: number;
 };
 
 export function ReturnEquipmentModal({
@@ -34,17 +43,24 @@ export function ReturnEquipmentModal({
   customerId,
   customerName,
   items,
+  order,
+  user,
   onReturnSuccess,
+  onOpenProductReturnModal,
 }: Props) {
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
 
   const handleConfirmReturn = async () => {
+    let barrisRetornados = false;
+
     if (selectedItems.length === 0) {
       const confirmed = confirm(
         "Você não realizou coletas nessa viagem, confirma?",
       );
-      if (confirmed && customerId) {
+      if (!confirmed) return;
+
+      if (customerId) {
         const { error } = await supabase
           .from("equipment_loans")
           .update({
@@ -57,24 +73,19 @@ export function ReturnEquipmentModal({
 
         if (error) {
           toast.error("Erro ao atualizar o status dos empréstimos.");
-          console.error("❌ Supabase error:", error);
+          console.error(error);
+          return;
         } else {
           toast.success("Retorno registrado como nenhum item coletado.");
-          setSelectedItems([]);
-          setQuantities({});
-          onOpenChange(false);
-          onReturnSuccess();
+          barrisRetornados = true;
         }
       }
-      return;
-    }
+    } else {
+      const updates = selectedItems.map((loanId) => ({
+        id: loanId,
+        quantity: quantities[loanId] ?? 1,
+      }));
 
-    const updates = selectedItems.map((loanId) => ({
-      id: loanId,
-      quantity: quantities[loanId] ?? 1,
-    }));
-
-    try {
       const results = await Promise.all(
         updates.map(({ id, quantity }) =>
           supabase
@@ -82,7 +93,7 @@ export function ReturnEquipmentModal({
             .update({
               status: "returned",
               return_date: new Date().toISOString().split("T")[0],
-              quantity, // salva a quantidade que foi retornada
+              quantity,
             })
             .eq("id", id),
         ),
@@ -92,16 +103,16 @@ export function ReturnEquipmentModal({
       if (hasError) {
         toast.error("Erro ao retornar um ou mais itens");
         console.error("Erros:", results);
+        return;
       } else {
-        toast.success("Itens retornados com sucesso!");
-        setSelectedItems([]);
-        setQuantities({});
-        onOpenChange(false);
-        onReturnSuccess();
+        toast.success("Itens de comodato retornados com sucesso!");
+        barrisRetornados = true;
       }
-    } catch (error) {
-      toast.error("Erro inesperado ao retornar itens");
-      console.error("❌ Erro:", error);
+    }
+
+    if (barrisRetornados) {
+      onReturnSuccess();
+      onOpenProductReturnModal();
     }
   };
 

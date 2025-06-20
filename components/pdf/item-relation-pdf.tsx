@@ -98,6 +98,7 @@ interface ItemRelationPDFProps {
   items: any[];
   signature?: string | null;
   freight?: number;
+  returnedProducts?: any[];
 }
 
 const RelationSection = ({
@@ -107,13 +108,19 @@ const RelationSection = ({
   note,
   freight = 0,
   signature,
+  returnedProducts = [],
 }: any) => {
   const totalItems = items.reduce(
     (sum: number, item: any) => sum + item.unit_price * item.quantity,
     0,
   );
 
-  const totalFinal = totalItems + Number(freight);
+  const totalDevolucao = returnedProducts.reduce(
+    (sum: number, item: any) => sum + Number(item.unitPrice) * item.quantity,
+    0,
+  );
+
+  const totalFinal = totalItems + Number(freight) - totalDevolucao;
 
   return (
     <View>
@@ -182,12 +189,62 @@ const RelationSection = ({
         ))}
       </View>
 
+      {returnedProducts && returnedProducts.length > 0 && (
+        <>
+          <Text style={{ marginTop: 10, fontWeight: "bold", color: "red" }}>
+            Produtos Devolvidos:
+          </Text>
+
+          <View style={styles.table}>
+            <View style={[styles.tableRow, { backgroundColor: "#fdd" }]}>
+              <Text style={[styles.cell, { flex: 2 }]}>Produto</Text>
+              <Text style={[styles.cell, styles.cellRight]}>Qtd</Text>
+              <Text style={[styles.cell, styles.cellRight]}>Unitário</Text>
+              <Text style={[styles.cell, styles.cellRight]}>Total</Text>
+            </View>
+
+            {returnedProducts.map((item: any, index: number) => (
+              <View key={index} style={styles.tableRow}>
+                <Text style={[styles.cell, { flex: 2 }]}>
+                  {item.products.name}
+                </Text>
+                <Text style={[styles.cell, styles.cellRight]}>
+                  {item.quantity}
+                </Text>
+                <Text style={[styles.cell, styles.cellRight]}>
+                  R$ {Number(item.unitPrice).toFixed(2)}
+                </Text>
+                <Text style={[styles.cell, styles.cellRight]}>
+                  R$ {(Number(item.unitPrice) * item.quantity).toFixed(2)}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </>
+      )}
+
+      {returnedProducts.length > 0 && (
+        <View style={styles.totalRow}>
+          <Text style={{ color: "red" }}>
+            Total de Devoluções: - R${" "}
+            {returnedProducts
+              .reduce(
+                (sum: number, item: any) =>
+                  sum + Number(item.unitPrice) * item.quantity,
+                0,
+              )
+              .toFixed(2)}
+          </Text>
+        </View>
+      )}
+
       {/* Total */}
       <View style={styles.totalRow}>
         <Text>Frete: R$ {Number(freight).toFixed(2)}</Text>
       </View>
+
       <View style={styles.totalRow}>
-        <Text style={styles.bold}>Total: R$ {totalFinal.toFixed(2)}</Text>
+        <Text style={styles.bold}>Total Final: R$ {totalFinal.toFixed(2)}</Text>
       </View>
 
       {signature && (
@@ -207,6 +264,7 @@ export function ItemRelationPDF({
   note,
   signature,
   freight,
+  returnedProducts = [],
 }: ItemRelationPDFProps) {
   return (
     <Document>
@@ -219,6 +277,7 @@ export function ItemRelationPDF({
           note={note}
           signature={signature}
           freight={freight}
+          returnedProducts={returnedProducts}
         />
       </Page>
     </Document>

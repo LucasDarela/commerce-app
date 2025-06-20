@@ -29,13 +29,11 @@ import {
   IconChevronRight,
   IconChevronsLeft,
   IconChevronsRight,
-  IconCircleCheckFilled,
   IconDotsVertical,
   IconGripVertical,
   IconLayoutColumns,
   IconLoader,
   IconPlus,
-  IconTrendingUp,
   IconTrash,
 } from "@tabler/icons-react";
 import clsx from "clsx";
@@ -54,30 +52,11 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { Area, AreaChart, CartesianGrid, XAxis } from "recharts";
 import { toast } from "sonner";
 import { z } from "zod";
-
-import { useIsMobile } from "@/hooks/use-mobile";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  ChartConfig,
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerDescription,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerTrigger,
-} from "@/components/ui/drawer";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -128,10 +107,15 @@ import { LoanEquipmentModal } from "@/components/equipment-loan/LoanEquipmentMod
 import { fetchEquipmentsForOrderProducts } from "@/lib/fetch-equipments-for-products";
 import { ReturnEquipmentModal } from "@/components/equipment-loan/ReturnEquipmentModal";
 import { getTranslatedStatus } from "@/utils/getTranslatedStatus";
-
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import CustomDateInput from "@/components/ui/CustomDateInput";
+import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
+import { parseOrderProducts } from "@/lib/orders/parseOrderProducts";
+import { ReturnProductModal } from "./products/ReturnProductModal";
+import type { Equipment } from "@/components/types/equipments";
+import type { ProductItem } from "@/components/types/products";
+import { TableSkeleton } from "./ui/TableSkeleton";
 
 //New Schema
 export const schema = z.object({
@@ -171,6 +155,12 @@ type CustomColumnDef<T> = ColumnDef<T, unknown> & {
 };
 
 type Item = {
+  loanId: string;
+  equipmentName: string;
+  quantity: number;
+};
+
+export type ReturnEquipmentItem = {
   loanId: string;
   equipmentName: string;
   quantity: number;
@@ -294,6 +284,7 @@ export function DataTable({
   const [selectedCustomer, setSelectedCustomer] = React.useState<Sale | null>(
     null,
   );
+  const { user } = useAuthenticatedCompany();
   const [sheetOpen, setSheetOpen] = React.useState(false);
   const supabase = createClientComponentClient();
   const [orders, setOrders] = useState<Order[]>([]);
@@ -302,6 +293,9 @@ export function DataTable({
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [dateInput, setDateInput] = useState("");
+  const [returnedProducts, setReturnedProducts] = useState<
+    { name: string; quantity: number }[]
+  >([]);
   const {
     accessToken,
     loading: loadingIntegration,
@@ -318,8 +312,14 @@ export function DataTable({
   const [returnModalCustomerId, setReturnModalCustomerId] = useState<
     string | null
   >(null);
-  const [returnModalItems, setReturnModalItems] = useState<Item[]>([]);
-  const [dateFilter, setDateFilter] = useState<Date | null>(null);
+  const [returnEquipmentItems, setReturnEquipmentItems] = useState<
+    ReturnEquipmentItem[]
+  >([]);
+  const [returnProductItems, setReturnProductItems] = useState<ProductItem[]>(
+    [],
+  );
+  const [isProductReturnModalOpen, setIsProductReturnModalOpen] =
+    useState(false);
   const [issueDateFilter, setissueDateFilter] = useState<Date | null>(null);
 
   const [selectedMonth, setSelectedMonth] = useState(() => {
@@ -402,19 +402,62 @@ export function DataTable({
     }
   };
 
+  const restoreStockBeforeDelete = async (orderId: string) => {
+    const { data: items, error: fetchError } = await supabase
+      .from("order_items")
+      .select("product_id, quantity")
+      .eq("order_id", orderId);
+
+    if (fetchError) {
+      console.error("Erro ao buscar itens antes da exclusão:", fetchError);
+      return;
+    }
+
+    for (const item of items ?? []) {
+      const { data: product, error: productError } = await supabase
+        .from("products")
+        .select("stock")
+        .eq("id", item.product_id)
+        .single();
+
+      if (productError) {
+        console.error("Erro ao buscar estoque do produto:", productError);
+        continue;
+      }
+
+      const newStock = (product?.stock ?? 0) + item.quantity;
+
+      const { error: updateError } = await supabase
+        .from("products")
+        .update({ stock: newStock })
+        .eq("id", item.product_id);
+
+      if (updateError) {
+        console.error("Erro ao atualizar estoque:", updateError);
+      }
+    }
+  };
+
   const deleteOrderById = async (id: string) => {
     const confirmDelete = confirm("Tem certeza que deseja excluir esta nota?");
     if (!confirmDelete) return;
 
-    const { error } = await supabase.from("orders").delete().eq("id", id);
+    try {
+      await restoreStockBeforeDelete(id);
 
-    if (error) {
-      toast.error("Erro ao deletar nota.");
-      return;
+      const { error } = await supabase.from("orders").delete().eq("id", id);
+
+      if (error) {
+        toast.error("Erro ao deletar nota.");
+        return;
+      }
+
+      toast.success("Nota excluída com sucesso!");
+      setOrders((prev) => prev.filter((order) => order.id !== id));
+    } catch (error) {
+      console.error("Erro ao excluir nota:", error);
+      toast.error("Erro inesperado ao excluir nota,");
     }
-
-    toast.success("Nota excluída com sucesso!");
-    setOrders((prev) => prev.filter((order) => order.id !== id));
   };
 
   useEffect(() => {
@@ -716,7 +759,7 @@ export function DataTable({
             </DropdownMenuItem>
 
             <DropdownMenuSeparator />
-            {!row.original.boleto_id ? (
+            {!row.original.customer_signature ? (
               <DropdownMenuItem asChild>
                 <Link href={`/dashboard/orders/${row.original.id}/edit`}>
                   Editar
@@ -728,7 +771,6 @@ export function DataTable({
                 className="text-foreground text-sm tracking-tighter"
               >
                 Edição bloqueada
-                <br /> (Boleto gerado)
               </DropdownMenuItem>
             )}
             <DropdownMenuItem
@@ -872,12 +914,51 @@ export function DataTable({
           await updateStockBasedOnOrder(selectedCustomer);
         }
 
-        toast.success(`Status atualizado para ${nextStatus}`);
+        // toast.success(`Status atualizado para ${nextStatus}`);
       } else {
         toast.error("Erro ao atualizar status.");
         console.error(error);
       }
     }
+  }
+
+  async function fetchOrderProductsForReturnModal(orderId: string) {
+    const { data, error } = await supabase
+      .from("order_items")
+      .select("product_id, quantity, products(name)")
+      .eq("order_id", orderId);
+
+    if (error || !data) {
+      toast.error("Erro ao buscar produtos da venda");
+      return;
+    }
+
+    const formatted = data.map((item) => ({
+      id: String(item.product_id),
+      name: (item as any).products.name,
+      quantity: item.quantity,
+    }));
+
+    setReturnProductItems(formatted);
+    setIsProductReturnModalOpen(true);
+  }
+
+  async function fetchReturnedProducts(orderId: string) {
+    const { data, error } = await supabase
+      .from("stock_movements")
+      .select("product_id, quantity, products(name)")
+      .eq("note_id", orderId)
+      .eq("type", "return");
+
+    if (error || !data) {
+      console.error("Erro ao buscar produtos devolvidos:", error);
+      return [];
+    }
+
+    return data.map((item) => ({
+      name: (item as any).products.name,
+      quantity: item.quantity,
+    }));
   }
 
   const monthsAvailable = React.useMemo(() => {
@@ -899,6 +980,17 @@ export function DataTable({
       table.getColumn("appointment_date")?.setFilterValue(undefined);
     }
   }, [selectedDate, table]);
+
+  useEffect(() => {
+    async function loadReturns() {
+      if (selectedCustomer?.id) {
+        const products = await fetchReturnedProducts(selectedCustomer.id);
+        setReturnedProducts(products);
+      }
+    }
+
+    loadReturns();
+  }, [selectedCustomer]);
 
   const isDisabled =
     !selectedCustomer?.customer_signature ||
@@ -954,6 +1046,10 @@ export function DataTable({
   };
 
   // end DateRangeFilter
+
+  if (loading) {
+    return <TableSkeleton />;
+  }
 
   return (
     <>
@@ -1316,6 +1412,18 @@ export function DataTable({
                         <div>
                           <strong>Quantidade:</strong> {selectedCustomer.amount}
                         </div>
+                        {selectedCustomer && returnedProducts.length > 0 && (
+                          <div>
+                            <strong>Produtos Devolvidos:</strong>
+                            <ul className="list-disc pl-4">
+                              {returnedProducts.map((product, index) => (
+                                <li key={index}>
+                                  {product.name} – {product.quantity}x
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
                         <div>
                           <strong>Localização:</strong>{" "}
                           {selectedCustomer.appointment_local}
@@ -1461,7 +1569,7 @@ export function DataTable({
                                 return;
                               }
 
-                              setReturnModalItems(formatted);
+                              setReturnEquipmentItems(formatted);
                               setReturnModalCustomerId(matchingCustomer.id);
                               setIsReturnModalOpen(true);
                             } else {
@@ -1590,17 +1698,35 @@ export function DataTable({
         initialItems={initialLoanItems}
       />
 
-      {isReturnModalOpen && returnModalItems.length > 0 && (
+      {isReturnModalOpen && returnEquipmentItems.length > 0 && (
         <ReturnEquipmentModal
           open={isReturnModalOpen}
           onOpenChange={setIsReturnModalOpen}
           customerId={returnModalCustomerId}
-          items={returnModalItems}
+          items={returnEquipmentItems}
+          order={selectedCustomer}
+          user={user}
           onReturnSuccess={() => {
             setIsReturnModalOpen(false);
             handleDeliveryStatusUpdate();
             refreshOrders();
           }}
+          onOpenProductReturnModal={() => {
+            if (selectedCustomer?.id) {
+              fetchOrderProductsForReturnModal(selectedCustomer.id);
+            }
+          }}
+        />
+      )}
+      {isProductReturnModalOpen && selectedCustomer && (
+        <ReturnProductModal
+          open={isProductReturnModalOpen}
+          onClose={() => setIsProductReturnModalOpen(false)}
+          items={returnProductItems}
+          orderId={selectedCustomer.id}
+          companyId={companyId}
+          createdBy={user.id}
+          onSuccess={refreshOrders}
         />
       )}
     </>
