@@ -116,35 +116,15 @@ import { ReturnProductModal } from "./products/ReturnProductModal";
 import type { Equipment } from "@/components/types/equipments";
 import type { ProductItem } from "@/components/types/products";
 import { TableSkeleton } from "./ui/TableSkeleton";
+import { orderSchema, type Order } from "@/components/types/orderSchema";
 
-//New Schema
-export const schema = z.object({
-  id: z.string(),
-  note_number: z.string().optional(),
-  document_type: z.string().optional(),
-  appointment_date: z.string(),
-  appointment_hour: z.string(),
-  appointment_local: z.string(),
-  customer: z.string(),
-  phone: z.string(),
-  products: z.string(),
-  freight: z.union([z.string(), z.number(), z.null()]).optional(),
-  amount: z.number(),
-  total: z.number(),
-  total_payed: z.number().optional().nullable(),
-  delivery_status: z.enum(["Entregar", "Coletar", "Coletado"]),
-  payment_status: z.enum(["Unpaid", "Paid"]),
-  payment_method: z.enum(["Pix", "Dinheiro", "Boleto", "Cartao"]),
-  order_index: z.number().nullable().optional(),
-  issue_date: z.string().optional().nullable(),
-  due_date: z.string().optional().nullable(),
-  customer_signature: z.string().nullable().optional(),
-  text_note: z.string().optional().nullable(),
-  boleto_id: z.string().nullable().optional(),
-});
+type Sale = z.infer<typeof orderSchema>;
 
-type Sale = z.infer<typeof schema>;
-type Order = z.infer<typeof schema>;
+type DataTableProps = {
+  data: z.infer<typeof orderSchema>[];
+  companyId: string;
+  onRowClick?: (order: z.infer<typeof orderSchema>) => void;
+};
 
 type CustomColumnMeta = {
   className?: string;
@@ -166,7 +146,6 @@ export type ReturnEquipmentItem = {
   quantity: number;
 };
 
-// Create a separate component for the drag handle
 function DragHandle({ id }: { id: string }) {
   const { attributes, listeners } = useSortable({ id });
 
@@ -184,7 +163,13 @@ function DragHandle({ id }: { id: string }) {
   );
 }
 
-function DraggableRow({ row }: { row: Row<Order> }) {
+function DraggableRow({
+  row,
+  onClick,
+}: {
+  row: Row<Order>;
+  onClick?: (order: Order) => void;
+}) {
   const { transform, transition, setNodeRef, isDragging } = useSortable({
     id: row.original.id,
   });
@@ -194,11 +179,12 @@ function DraggableRow({ row }: { row: Row<Order> }) {
       ref={setNodeRef}
       data-state={row.getIsSelected() && "selected"}
       data-dragging={isDragging}
-      className="relative z-0 data-[dragging=true]:z-10 data-[dragging=true]:opacity-80"
+      className="relative z-0 data-[dragging=true]:z-10 data-[dragging=true]:opacity-80 cursor-pointer"
       style={{
         transform: CSS.Transform.toString(transform),
         transition,
       }}
+      onClick={() => onClick?.(row.original)} // ✅ aplica o clique aqui
     >
       {row.getVisibleCells().map((cell) => {
         const isDragCell = cell.column.id === "drag";
@@ -269,18 +255,11 @@ async function parseProductsWithIds(
     .filter((p) => p.id !== 0);
 }
 
-interface DataTableProps {
-  data: Order[];
-  companyId: string;
-}
-
 export function DataTable({
   data: initialData,
   companyId,
-}: {
-  data: z.infer<typeof schema>[];
-  companyId: string;
-}) {
+  onRowClick,
+}: DataTableProps) {
   const [selectedCustomer, setSelectedCustomer] = React.useState<Sale | null>(
     null,
   );
@@ -393,7 +372,7 @@ export function DataTable({
       return;
     }
 
-    const parsed = schema.array().safeParse(data);
+    const parsed = orderSchema.array().safeParse(data);
     if (parsed.success) {
       setOrders(parsed.data);
     } else {
@@ -480,7 +459,7 @@ export function DataTable({
         return;
       }
 
-      const parsed = schema.array().safeParse(data);
+      const parsed = orderSchema.array().safeParse(data);
       if (parsed.success) {
         setOrders(parsed.data);
       } else {

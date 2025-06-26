@@ -44,18 +44,19 @@ export async function POST(req: Request) {
 
     // Valida campos obrigatórios
     const requiredFields = [
+      "order_id",
       "nome",
       "document",
       "email",
       "total",
       "days_ticket",
-      "order_id",
       "zip_code",
       "address",
       "number",
       "neighborhood",
       "city",
       "state",
+      "phone",
     ];
 
     for (const field of requiredFields) {
@@ -97,16 +98,30 @@ export async function POST(req: Request) {
     dueDate.setDate(dueDate.getDate() + daysToExpire);
     const formattedDueDate = dueDate.toISOString();
 
-    const idempotencyKey = `${cleanDoc}-${body.order_id}`;
+    // Buscar o pedido já existente no Supabase
+    const { data: existingOrder, error: orderFetchError } = await supabase
+      .from("orders")
+      .select("id, total, days_ticket, customer, phone")
+      .eq("id", body.order_id)
+      .single();
+
+    if (orderFetchError || !existingOrder) {
+      return NextResponse.json(
+        { error: "Pedido não encontrado" },
+        { status: 404 },
+      );
+    }
+
+    const idempotencyKey = `${cleanDoc}-${existingOrder.id}`;
 
     const paymentData = {
       transaction_amount: Number(body.total),
       payment_method_id: "bolbradesco",
       description: company.name,
       date_of_expiration: formattedDueDate,
-      external_reference: body.order_id,
+      external_reference: existingOrder.id,
       notification_url:
-        body.notification_url || "https://seusite.com/api/mp-notify",
+        body.notification_url || "https://chopphub.com/api/mp-notify",
       payer: {
         email: body.email,
         first_name,
@@ -125,6 +140,16 @@ export async function POST(req: Request) {
         },
       },
     };
+
+    console.log(
+      "External Reference enviado para o Mercado Pago:",
+      existingOrder.id,
+    );
+
+    console.log(
+      "📤 Payload completo para MP:",
+      JSON.stringify(paymentData, null, 2),
+    );
 
     // 🔥 Enviar para o Mercado Pago
     const response = await fetch("https://api.mercadopago.com/v1/payments", {
@@ -160,6 +185,11 @@ export async function POST(req: Request) {
       );
     }
 
+    console.log(
+      "📥 Resposta da criação do pagamento:",
+      JSON.stringify(data, null, 2),
+    );
+
     // Atualizar pedido no Supabase
     await supabase
       .from("orders")
@@ -171,13 +201,20 @@ export async function POST(req: Request) {
         boleto_id: data.id,
         boleto_expiration_date: data.date_of_expiration,
       })
-      .eq("id", body.order_id);
+      .eq("id", existingOrder.id);
 
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch (error: any) {
     console.error("❌ Erro interno:", error);
+
     return NextResponse.json(
-      { error: "Erro interno ao gerar boleto" },
+      {
+        error: "Erro interno ao gerar boleto",
+        details: {
+          message: error?.message || "Erro desconhecido",
+          stack: error?.stack || null,
+        },
+      },
       { status: 500 },
     );
   }

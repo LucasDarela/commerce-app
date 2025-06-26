@@ -1,35 +1,11 @@
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { z } from "zod";
+import { orderSchema, type Order } from "@/components/types/orderSchema";
+import { OrderWithSource } from "@/components/types/orderSchema";
 
-export const orderSchema = z.object({
-  id: z.string().optional(),
-  appointment_date: z
-    .string({ required_error: "A data do agendamento é obrigatória" })
-    .min(1, "A data do agendamento é obrigatória"),
-  appointment_hour: z.string(),
-  appointment_local: z.string(),
-  customer: z.string(),
-  phone: z.string(),
-  amount: z.number(),
-  products: z.string(),
-  delivery_status: z.enum(["Entregar", "Coletar", "Coletado"]),
-  payment_method: z
-    .enum(["Pix", "Dinheiro", "Boleto", "Cartao"])
-    .default("Pix"),
-  payment_status: z.enum(["Unpaid", "Paid"]),
-  days_ticket: z.union([z.string(), z.number()]).optional(),
-  freight: z.union([z.string(), z.number(), z.null()]).optional(),
-  note_number: z.string().optional(),
-  document_type: z.string().optional(),
-  total: z.number(),
-  issue_date: z.string().nullable().optional(),
-  due_date: z.string().nullable().optional(),
-  text_note: z.string().nullable().optional(),
-});
-
-export type Order = z.infer<typeof orderSchema>;
-
-export async function fetchOrders(companyId: string): Promise<Order[]> {
+export async function fetchOrders(
+  companyId: string,
+): Promise<OrderWithSource[]> {
   const supabase = createClientComponentClient();
 
   const { data, error } = await supabase
@@ -37,10 +13,12 @@ export async function fetchOrders(companyId: string): Promise<Order[]> {
     .select(
       `
     id,
+    customer_id,
     appointment_date,
     appointment_hour,
     appointment_local,
     customer,
+    customer_signature,
     phone,
     amount,
     products,
@@ -52,32 +30,54 @@ export async function fetchOrders(companyId: string): Promise<Order[]> {
     note_number,
     document_type,
     total,
+    total_payed,
     issue_date,
     due_date,
-    text_note
+    text_note,
+    boleto_id,    
+    order_items (
+      product_id,
+      quantity,
+      price,
+      product:products (
+        name,
+        code
+      )
+    )
   `,
     )
     .eq("company_id", companyId)
     .order("appointment_date", { ascending: false });
+
+  console.log("DATA CRUA DO SUPABASE >>>", data);
 
   if (error) {
     console.error("Erro ao buscar pedidos:", JSON.stringify(error, null, 2));
     return [];
   }
 
-  const result = z.array(orderSchema).safeParse(data);
+  // ✅ Aqui o SAFE DATA - Garantindo que nunca venha undefined
+  const safeData = (data ?? []).map((o) => ({
+    ...o,
+    appointment_hour: o.appointment_hour ?? null,
+    appointment_local: o.appointment_local ?? null,
+    days_ticket: String(o.days_ticket ?? ""),
+    freight: o.freight ?? 0,
+    total_payed: o.total_payed ?? 0,
+    source: "order" as const,
+    order_items: o.order_items ?? [],
+  }));
+
+  const result = z.array(orderSchema).safeParse(safeData);
 
   if (!result.success) {
     console.error("Erro ao validar schema:", result.error);
     return [];
   }
 
-  // Se quiser renomear os campos manualmente:
   return result.data.map((order) => ({
     ...order,
-    id: order.id ?? crypto.randomUUID(),
-    date: order.appointment_date,
-    hour: order.appointment_hour,
-    location: order.appointment_local,
+    order_items: order.order_items ?? [],
+    source: "order",
   }));
 }

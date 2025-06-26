@@ -1,3 +1,4 @@
+//components/financial/schema.ts
 import { z } from "zod";
 
 export const paymentMethodEnum = z.enum([
@@ -6,29 +7,6 @@ export const paymentMethodEnum = z.enum([
   "Boleto",
   "Pix",
 ]);
-
-export const orderSchema = z.object({
-  id: z.string(),
-  appointment_date: z.string(),
-  appointment_hour: z.string(),
-  appointment_local: z.string(),
-  customer: z.string(),
-  phone: z.string(),
-  amount: z.number(),
-  products: z.string(),
-  delivery_status: z.enum(["Entregar", "Coletar", "Coletado"]),
-  payment_method: paymentMethodEnum,
-  payment_status: z.enum(["Unpaid", "Paid"]),
-  days_ticket: z.union([z.string(), z.number()]).optional(),
-  freight: z.union([z.string(), z.number(), z.null()]).optional(),
-  note_number: z.string().optional(),
-  document_type: z.string().optional(),
-  total: z.number(),
-  total_payed: z.number().optional(),
-  issue_date: z.string().nullable().optional(),
-  due_date: z.string().nullable().optional(),
-  source: z.literal("order"),
-});
 
 export const financialSchema = z.object({
   id: z.string(),
@@ -49,3 +27,5 @@ export const financialSchema = z.object({
   phone: z.string().optional(),
   total_payed: z.preprocess((val) => Number(val ?? 0), z.number().optional()),
 });
+
+export type FinancialRecord = z.infer<typeof financialSchema>;

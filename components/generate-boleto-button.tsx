@@ -60,6 +60,7 @@ export function GenerateBoletoButton({
         neighborhood: cliente.neighborhood,
         city: cliente.city,
         state: cliente.state,
+        phone: cliente.phone,
       };
 
       // ✅ Agora sim: criar boleto

@@ -14,7 +14,6 @@ import { FinancialFilters as Filters } from "./Filters";
 import { HeaderActions } from "./HeaderActions";
 import { PaymentSheet } from "./PaymentSheet";
 import { mapToFinancialPaymentMethod, groupByDueMonth } from "./utils";
-import { orderSchema, financialSchema } from "./schema";
 import {
   useReactTable,
   getCoreRowModel,
@@ -23,8 +22,6 @@ import {
   getSortedRowModel,
 } from "@tanstack/react-table";
 import { financialColumns } from "./columns";
-import { FinancialRecord as FinancialRecordType } from "@/components/types/financial";
-import { Order as OrderType } from "@/components/types/orders";
 import type { SortingState, ColumnFiltersState } from "@tanstack/react-table";
 import { isOrder } from "./utils";
 import {
@@ -36,13 +33,11 @@ import { exportTableToCSV } from "@/lib/exportCsv";
 import { Button } from "../ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../ui/tabs";
 import { MonthlyFinancialTable } from "./MonthlyFinancialTable";
+import { orderSchema, type Order } from "@/components/types/orderSchema";
+import { FinancialRecord as FinancialRecordType } from "@/components/types/financial";
+import { financialSchema, type FinancialRecord } from "./schema";
 
-export type Sale = z.infer<typeof orderSchema>;
-export type Order = z.infer<typeof orderSchema>;
-export type FinancialRecord = z.infer<typeof financialSchema>;
-export type CombinedRecord =
-  | (Order & { source: "order" })
-  | (FinancialRecord & { source: "financial" });
+export type CombinedRecord = Order | FinancialRecord;
 
 export default function DataFinancialTable() {
   useEffect(() => {});

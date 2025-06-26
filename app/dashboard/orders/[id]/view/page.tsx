@@ -152,6 +152,7 @@ export default function ViewOrderPage() {
     const fetch = async () => {
       try {
         const data = await fetchOrderDetails(id as string);
+        if (!data || !data.customer) return;
         setOrder(data);
 
         if (data?.customer_signature) {

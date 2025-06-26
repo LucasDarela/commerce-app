@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { fetchOrders } from "@/lib/fetchOrders";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import DataFinancialTable from "@/components/financial/DataFinancialTable";
-import { Order } from "@/components/types/order";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
+import type { Order } from "@/components/types/orderSchema";
 
 export default function FinancialPage() {
   const { companyId } = useAuthenticatedCompany();

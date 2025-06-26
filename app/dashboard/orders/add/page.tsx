@@ -37,9 +37,9 @@ import { getReservedStock } from "@/lib/stock/getReservedStock";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { orderSchema, Order as OrderType } from "@/lib/fetchOrders";
 import { generateNextNoteNumber } from "@/lib/generate-next-note-number";
 import { Textarea } from "@/components/ui/textarea";
+import { orderSchema, type Order } from "@/components/types/orderSchema";
 
 type OrderFormData = z.infer<typeof orderSchema> & { id?: string };
 
@@ -69,22 +69,22 @@ interface Product {
   stock: number;
 }
 
-interface Order {
-  document_type?: string;
-  note_number?: string;
-  payment_method?: string;
-  days_ticket?: string;
-  freight?: number;
-  total?: number;
-  amount?: number;
-  products?: string;
-  appointment_date?: string | null;
-  appointment_hour?: string;
-  appointment_local?: string;
-  customer_id?: string;
-  issue_date?: string;
-  text_note?: string;
-}
+// interface Order {
+//   document_type?: string;
+//   note_number?: string;
+//   payment_method?: string;
+//   days_ticket?: string;
+//   freight?: number;
+//   total?: number;
+//   amount?: number;
+//   products?: string;
+//   appointment_date?: string | null;
+//   appointment_hour?: string;
+//   appointment_local?: string;
+//   customer_id?: string;
+//   issue_date?: string;
+//   text_note?: string;
+// }
 
 export default function AddOrder() {
   const router = useRouter();
@@ -112,10 +112,10 @@ export default function AddOrder() {
   const newCustomerId = searchParams.get("newCustomerId");
   const [appointment, setAppointment] = useState({
     date: undefined as Date | undefined,
-    hour: "",
+    hour: "00:00",
     location: "",
   });
-  const [order, setOrder] = useState<Order>({
+  const [order, setOrder] = useState<Partial<Order>>({
     issue_date: new Date().toISOString().split("T")[0],
     document_type: "internal",
   });
@@ -363,6 +363,8 @@ export default function AddOrder() {
         return;
       }
 
+      console.log("Items antes de salvar order_items:", items);
+
       const orderItems = items.map((item) => ({
         order_id: insertedOrder.id,
         product_id: item.id,
@@ -536,14 +538,21 @@ export default function AddOrder() {
                 let days = "0";
                 if (value.toLowerCase() === "boleto") days = "12";
 
+                if (!["Pix", "Dinheiro", "Cartao", "Boleto"].includes(value))
+                  return;
+
                 setOrder((prev) => ({
                   ...prev,
-                  payment_method: value,
+                  payment_method: value as
+                    | "Pix"
+                    | "Dinheiro"
+                    | "Cartao"
+                    | "Boleto",
                   days_ticket: days,
                 }));
               }}
             >
-              <SelectTrigger className="w-full border rounded-md shadow-sm">
+              <SelectTrigger className="w-full border rounded-md shadow-sm truncate">
                 <SelectValue placeholder="Pagamento" />
               </SelectTrigger>
               <SelectContent className="w-full shadow-md rounded-md">
@@ -756,67 +765,73 @@ export default function AddOrder() {
           </div>
 
           {/* Seção da Tabela Editável */}
-          <Table className="mt-4">
-            <TableHeader>
-              <TableRow>
-                <TableHead>Produto</TableHead>
-                <TableHead>Quantidade</TableHead>
-                <TableHead>Preço</TableHead>
-                <TableHead>Excluir</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {items.map((item, index) => (
-                <TableRow key={index}>
-                  <TableCell>
-                    <Select
-                      value={item.id}
-                      onValueChange={(value) => handleEditProduct(index, value)}
-                    >
-                      <SelectTrigger className="w-[300px] truncate border rounded-md shadow-sm">
-                        <SelectValue
-                          placeholder="Produto"
-                          defaultValue={item.name}
-                        />
-                      </SelectTrigger>
-                      <SelectContent className="shadow-md rounded-md">
-                        {products.map((product) => (
-                          <SelectItem
-                            key={product.id}
-                            value={product.id.toString()}
-                          >
-                            {product.code} - {product.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      type="number"
-                      value={item.quantity}
-                      onChange={(e) =>
-                        handleEditQuantity(index, e.target.value)
-                      }
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      type="number"
-                      value={item.standard_price}
-                      onChange={(e) => handleEditPrice(index, e.target.value)}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Trash
-                      className="cursor-pointer text-red-500"
-                      onClick={() => removeItem(index)}
-                    />
-                  </TableCell>
+          <div className="w-full overflow-x-auto">
+            <Table className="table-fixed w-full min-w-[600px] mt-4">
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[300px]">Produto</TableHead>
+                  <TableHead className="w-[100px]">Quantidade</TableHead>
+                  <TableHead className="w-[120px]">Preço</TableHead>
+                  <TableHead className="w-[60px]">Excluir</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {items.map((item, index) => (
+                  <TableRow key={index}>
+                    <TableCell>
+                      <Select
+                        value={item.id}
+                        onValueChange={(value) =>
+                          handleEditProduct(index, value)
+                        }
+                      >
+                        <SelectTrigger className="w-[300px] truncate border rounded-md shadow-sm">
+                          <SelectValue
+                            placeholder="Produto"
+                            defaultValue={item.name}
+                          />
+                        </SelectTrigger>
+                        <SelectContent className="shadow-md rounded-md">
+                          {products.map((product) => (
+                            <SelectItem
+                              key={product.id}
+                              value={product.id.toString()}
+                            >
+                              {product.code} - {product.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell className="w-[100px]">
+                      <Input
+                        className="w-full text-left"
+                        type="number"
+                        value={item.quantity}
+                        onChange={(e) =>
+                          handleEditQuantity(index, e.target.value)
+                        }
+                      />
+                    </TableCell>
+                    <TableCell className="w-[120px]">
+                      <Input
+                        className="w-full text-left"
+                        type="number"
+                        value={item.standard_price}
+                        onChange={(e) => handleEditPrice(index, e.target.value)}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Trash
+                        className="cursor-pointer text-red-500"
+                        onClick={() => removeItem(index)}
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 
@@ -867,6 +882,7 @@ export default function AddOrder() {
               <Input
                 type="time"
                 placeholder="Horário"
+                className="w-full max-w-[140px] sm:max-w-full"
                 value={appointment.hour}
                 onChange={(e) =>
                   setAppointment({ ...appointment, hour: e.target.value })

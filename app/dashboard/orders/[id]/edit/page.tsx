@@ -36,11 +36,11 @@ import { getReservedStock } from "@/lib/stock/getReservedStock";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { orderSchema, Order as OrderType } from "@/lib/fetchOrders";
 import { generateNextNoteNumber } from "@/lib/generate-next-note-number";
 import { Textarea } from "@/components/ui/textarea";
 import { parseISO } from "date-fns";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
+import { orderSchema, type Order } from "@/components/types/orderSchema";
 
 interface Customer {
   id: string;
@@ -59,6 +59,8 @@ interface Customer {
   price_table_id?: string;
 }
 
+type PaymentMethod = "Pix" | "Dinheiro" | "Cartao" | "Boleto";
+
 interface Product {
   id: number;
   code: string;
@@ -67,30 +69,19 @@ interface Product {
   stock: number;
 }
 
-interface Order {
-  document_type?: string;
-  note_number?: string;
-  payment_method?: string;
-  days_ticket?: string;
-  freight?: number;
-  total?: number;
-  amount?: number;
-  products?: string;
-  appointment_date?: string | null;
-  appointment_hour?: string;
-  appointment_local?: string;
-  customer_id?: string;
-  issue_date?: string;
-  text_note?: string;
-  due_date?: string;
-}
+type EditableOrder = Partial<Order> & { customer_id?: string };
+
 type OrderFormData = z.infer<typeof orderSchema>;
+
+function formatProductsForOrder(items: { name: string; quantity: number }[]) {
+  return items.map((item) => `${item.name} (x${item.quantity})`).join(", ");
+}
 
 export default function EditOrderPage() {
   const router = useRouter();
   const params = useParams();
   const { id } = useParams<{ id: string }>();
-  const { user } = useAuthenticatedCompany();
+  const { companyId, user } = useAuthenticatedCompany();
 
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -100,7 +91,7 @@ export default function EditOrderPage() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [searchCustomer, setSearchCustomer] = useState("");
   const [showCustomers, setShowCustomers] = useState(false);
-  const [order, setOrder] = useState<Order | null>(null);
+  const [order, setOrder] = useState<EditableOrder | null>(null);
   const [items, setItems] = useState<any[]>([]);
   const [quantity, setQuantity] = useState<number>(1);
   const [standardPrice, setStandardPrice] = useState<number | "">("");
@@ -334,6 +325,8 @@ export default function EditOrderPage() {
           freight: freight,
           total: total,
           text_note: text_note,
+          amount: items.reduce((sum, item) => sum + item.quantity, 0),
+          products: formatProductsForOrder(items),
           appointment_date: appointment.date
             ? appointment.date.toISOString().split("T")[0]
             : null,
@@ -469,18 +462,26 @@ export default function EditOrderPage() {
   return (
     <div className="w-full max-w-4xl mx-auto p-6 rounded-lg shadow-md">
       <h1 className="text-2xl font-bold mb-4">Editar Venda</h1>
-      {/* Informações do Documento */}
+      {/* Select Document Type */}
       <Card className="mb-6">
         <CardContent className="space-y-4">
           <h2 className="text-xl font-bold mb-4">Informações do Documento</h2>
-          <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex gap-4 w-full">
             <Select
-              value={order?.document_type || ""}
-              onValueChange={(value) =>
-                setOrder({ ...order, document_type: value })
-              }
+              value={order.document_type}
+              onValueChange={async (value) => {
+                let generatedNoteNumber = order.note_number;
+                if (value === "internal" && companyId) {
+                  generatedNoteNumber = await generateNextNoteNumber(companyId);
+                }
+                setOrder((prev) => ({
+                  ...prev,
+                  document_type: value,
+                  note_number: generatedNoteNumber,
+                }));
+              }}
             >
-              <SelectTrigger className="border rounded-md shadow-sm w-full">
+              <SelectTrigger className="w-full border rounded-md shadow-sm">
                 <SelectValue placeholder="Tipo de Documento" />
               </SelectTrigger>
               <SelectContent className="shadow-md rounded-md">
@@ -489,12 +490,15 @@ export default function EditOrderPage() {
               </SelectContent>
             </Select>
             <Input
-              placeholder="Numero da Nota"
+              type="text"
+              placeholder="Número da Nota"
               value={order?.note_number || ""}
               onChange={(e) =>
-                setOrder({ ...order, note_number: e.target.value })
+                setOrder((prev) => ({ ...prev, note_number: e.target.value }))
               }
+              className="w-full"
             />
+
             <div className="flex items-center gap-2 w-full">
               <span className="text-sm text-muted-foreground font-medium hidden sm:inline">
                 Emissão:
@@ -519,15 +523,22 @@ export default function EditOrderPage() {
                 let days = "0";
                 if (value.toLowerCase() === "boleto") days = "12";
 
+                if (!["Pix", "Dinheiro", "Cartao", "Boleto"].includes(value))
+                  return;
+
                 setOrder((prev) => ({
                   ...prev,
-                  payment_method: value,
+                  payment_method: value as
+                    | "Pix"
+                    | "Dinheiro"
+                    | "Cartao"
+                    | "Boleto",
                   days_ticket: days,
                 }));
               }}
             >
               <SelectTrigger className="w-full border rounded-md shadow-sm">
-                <SelectValue placeholder="Forma de Pagamento" />
+                <SelectValue placeholder="Pagamento" />
               </SelectTrigger>
               <SelectContent className="w-full shadow-md rounded-md">
                 <SelectItem value="Pix">Pix</SelectItem>
@@ -555,17 +566,14 @@ export default function EditOrderPage() {
                   : ""
               }`}
             />
+
             <div className="flex items-center gap-2 w-full">
               <span className="text-sm text-muted-foreground font-medium hidden sm:inline">
                 Vencimento:
               </span>
               <Input
                 id="due_date"
-                value={
-                  calculatedDueDate
-                    ? format(calculatedDueDate, "dd/MM/yyyy")
-                    : ""
-                }
+                value={dueDate}
                 readOnly
                 className="cursor-not-allowed bg-muted w-full"
               />
@@ -677,11 +685,14 @@ export default function EditOrderPage() {
                 <SelectValue placeholder="Selecionar Produto" />
               </SelectTrigger>
               <SelectContent className="shadow-md rounded-md z-50">
-                {products.map((product) => (
-                  <SelectItem key={product.id} value={product.id.toString()}>
-                    {product.code} - {product.name}
-                  </SelectItem>
-                ))}
+                {products
+                  .slice()
+                  .sort((a, b) => Number(a.code) - Number(b.code))
+                  .map((product) => (
+                    <SelectItem key={product.id} value={product.id.toString()}>
+                      {product.code} - {product.name}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
 
@@ -693,64 +704,76 @@ export default function EditOrderPage() {
             </Button>
           </div>
 
-          {/* Área da Tabela de Produtos */}
-          <Table className="mt-4">
-            <TableHeader>
-              <TableRow>
-                <TableHead>Produto</TableHead>
-                <TableHead>Qtd</TableHead>
-                <TableHead>Preço</TableHead>
-                <TableHead>Excluir</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {items.map((item, index) => (
-                <TableRow key={index}>
-                  <TableCell>
-                    <Select
-                      value={item.id}
-                      onValueChange={(value) =>
-                        handleChangeProduct(index, value)
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecionar Produto" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {products.map((p) => (
-                          <SelectItem key={p.id} value={p.id.toString()}>
-                            {p.code} - {p.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      type="number"
-                      value={item.quantity}
-                      onChange={(e) =>
-                        handleChangeQuantity(index, e.target.value)
-                      }
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      type="number"
-                      value={item.standard_price}
-                      onChange={(e) => handleChangePrice(index, e.target.value)}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Trash
-                      className="cursor-pointer text-red-500"
-                      onClick={() => removeItem(index)}
-                    />
-                  </TableCell>
+          {/* Seção da Tabela Editável */}
+          <div className="w-full overflow-x-auto">
+            <Table className="table-fixed w-full min-w-[600px] mt-4">
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[300px]">Produto</TableHead>
+                  <TableHead className="w-[100px]">Quantidade</TableHead>
+                  <TableHead className="w-[120px]">Preço</TableHead>
+                  <TableHead className="w-[60px]">Excluir</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {items.map((item, index) => (
+                  <TableRow key={index}>
+                    <TableCell>
+                      <Select
+                        value={item.id}
+                        onValueChange={(value) =>
+                          handleChangeProduct(index, value)
+                        }
+                      >
+                        <SelectTrigger className="w-[300px] truncate border rounded-md shadow-sm">
+                          <SelectValue
+                            placeholder="Produto"
+                            defaultValue={item.name}
+                          />
+                        </SelectTrigger>
+                        <SelectContent className="shadow-md rounded-md">
+                          {products.map((product) => (
+                            <SelectItem
+                              key={product.id}
+                              value={product.id.toString()}
+                            >
+                              {product.code} - {product.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell className="w-[100px]">
+                      <Input
+                        className="w-full text-left"
+                        type="number"
+                        value={item.quantity}
+                        onChange={(e) =>
+                          handleChangeQuantity(index, e.target.value)
+                        }
+                      />
+                    </TableCell>
+                    <TableCell className="w-[120px]">
+                      <Input
+                        className="w-full text-left"
+                        type="number"
+                        value={item.standard_price}
+                        onChange={(e) =>
+                          handleChangePrice(index, e.target.value)
+                        }
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Trash
+                        className="cursor-pointer text-red-500"
+                        onClick={() => removeItem(index)}
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 
@@ -801,6 +824,7 @@ export default function EditOrderPage() {
               <Input
                 type="time"
                 placeholder="Horário"
+                className="w-full max-w-[140px] sm:max-w-full"
                 value={appointment.hour}
                 onChange={(e) =>
                   setAppointment({ ...appointment, hour: e.target.value })

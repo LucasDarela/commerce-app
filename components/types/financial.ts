@@ -1,3 +1,4 @@
+//components/types/financial.ts
 import { z } from "zod";
 import {
   financialSchema,

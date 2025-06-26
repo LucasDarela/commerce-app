@@ -23,8 +23,8 @@ import {
   SortableContext,
 } from "@dnd-kit/sortable";
 import type { CustomColumnDef } from "./columns";
-import type { Order } from "@/components/financial/DataFinancialTable";
-import type { FinancialRecord } from "@/components/financial/DataFinancialTable";
+import type { Order } from "@/components/types/orderSchema";
+import type { FinancialRecord } from "@/components/types/financial";
 
 type Props<T> = {
   table: Table<T>;

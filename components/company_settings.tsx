@@ -1,19 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
-import { PasswordInput } from "./ui/password-input";
+import Image from "next/image";
 
 export default function CompanySettingsForm() {
   const { companyId } = useAuthenticatedCompany();
   const [loading, setLoading] = useState(false);
-
   const [focusToken, setFocusToken] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [logoUrl, setLogoUrl] = useState("/default-logo.png");
+  const [logoFile, setLogoFile] = useState<File | null>(null);
 
   const [formData, setFormData] = useState({
     document: "",
@@ -51,9 +53,39 @@ export default function CompanySettingsForm() {
           Object.entries(data).map(([key, value]) => [key, value ?? ""]),
         ),
       }));
+      if (data.logo_url) {
+        setLogoUrl(data.logo_url);
+      }
     };
     fetchCompany();
   }, [companyId]);
+
+  const handleLogoUpload = async () => {
+    if (!logoFile || !companyId) return null;
+
+    const filePath = `${companyId}/${logoFile.name}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("companylogos")
+      .upload(filePath, logoFile, { upsert: true });
+
+    if (uploadError) {
+      toast.error("Erro ao fazer upload da imagem.");
+      console.error(uploadError);
+      return null;
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from("companylogos")
+      .getPublicUrl(filePath);
+
+    return publicUrlData.publicUrl;
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
 
   const handleCnpjSearch = async () => {
     if (formData.document.length !== 14) {
@@ -84,20 +116,38 @@ export default function CompanySettingsForm() {
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+  const handleImageClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setLogoFile(file);
+      setLogoUrl(URL.createObjectURL(file));
+    }
   };
 
   const handleSubmit = async () => {
     setLoading(true);
+    let uploadedLogoUrl = logoUrl;
+
+    if (logoFile) {
+      const url = await handleLogoUpload();
+      if (url) uploadedLogoUrl = url;
+    }
     const { error } = await supabase
       .from("companies")
-      .update(formData)
+      .update({
+        ...formData,
+        logo_url: uploadedLogoUrl,
+      })
       .eq("id", companyId);
 
     if (error) {
-      toast.error("Erro ao atualizar dados da empresa");
+      toast.error("Erro ao salvar empresa.");
+      console.error(error);
+      setLoading(false);
       return;
     }
 
@@ -125,11 +175,33 @@ export default function CompanySettingsForm() {
 
       toast.success("Dados de NF-e salvos com sucesso!");
     }
+    setLoading(false);
   };
 
   return (
     <div className="p-6 space-y-4">
       <h2 className="text-xl font-bold">Configure os dados da sua empresa</h2>
+      {/* Pré-visualização da logo */}
+      <div className="mb-4">
+        <Image
+          src={logoUrl}
+          alt="Logo da Empresa"
+          width={120}
+          height={120}
+          className="rounded shadow border cursor-pointer hover:opacity-80 transition"
+          onClick={handleImageClick}
+        />
+        <Label className="mt-2 text-sm text-muted-foreground">
+          Clique para adicionar sua logo .png
+        </Label>
+        <Input
+          type="file"
+          accept="image/*"
+          onChange={handleFileChange}
+          ref={fileInputRef}
+          className="hidden"
+        />
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <Label className="mb-2">CNPJ</Label>

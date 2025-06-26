@@ -103,29 +103,10 @@ import { PaymentModal } from "@/components/payment-modal";
 import { YourFinancialRecords } from "@/components/your-financial-modal";
 import { ActionsCell } from "@/components/actions-cell";
 import { mapToFinancial } from "@/utils/mapPaymentMethod";
-
-//New Schema
-export const schema = z.object({
-  id: z.string(),
-  appointment_date: z.string(),
-  appointment_hour: z.string(),
-  appointment_local: z.string(),
-  customer: z.string(),
-  phone: z.string(),
-  amount: z.number(),
-  products: z.string(),
-  delivery_status: z.enum(["Entregar", "Coletar", "Coletado"]),
-  payment_method: z.enum(["Pix", "Dinheiro", "Boleto", "Cartao"]),
-  payment_status: z.enum(["Unpaid", "Paid"]),
-  days_ticket: z.union([z.string(), z.number()]).optional(),
-  freight: z.union([z.string(), z.number(), z.null()]).optional(),
-  note_number: z.string().optional(),
-  document_type: z.string().optional(),
-  total: z.number(),
-  total_payed: z.number().optional(),
-  issue_date: z.string().nullable().optional(),
-  due_date: z.string().nullable().optional(),
-});
+import {
+  orderSchema,
+  type Order as BaseOrder,
+} from "@/components/types/orderSchema";
 
 const financialSchema = z.object({
   id: z.string(),
@@ -144,10 +125,10 @@ const financialSchema = z.object({
   notes: z.string().optional(),
 });
 
-type Sale = z.infer<typeof schema>;
-type Order = z.infer<typeof schema> & { source: "order" };
+type Sale = z.infer<typeof orderSchema>;
+type Order = BaseOrder & { source: "order" };
 type FinancialRecord = z.infer<typeof financialSchema> & {
-  source: "order" | "financial";
+  source: "financial";
   phone?: string;
 };
 
@@ -158,6 +139,8 @@ type CustomColumnMeta = {
 type CustomColumnDef<T> = ColumnDef<T, unknown> & {
   meta?: CustomColumnMeta;
 };
+
+type FinancialRow = Row<CombinedRecord>;
 
 // function mapToFinancialPaymentMethod(
 //   method: string) {
@@ -192,7 +175,7 @@ function DragHandle({ id }: { id: string }) {
   );
 }
 
-function DraggableRow({ row }: { row: Row<FinancialRecord> }) {
+function DraggableRow({ row }: { row: Row<CombinedRecord> }) {
   const { transform, transition, setNodeRef, isDragging } = useSortable({
     id: row.original.id,
   });
@@ -237,6 +220,10 @@ function isOrder(record: any): record is Order {
 function isFinancial(record: any): record is FinancialRecord {
   return record.source === "financial";
 }
+
+type CombinedRecord =
+  | (Order & { source: "order" })
+  | (FinancialRecord & { source: "financial" });
 
 export default function DataFinancialTable() {
   const [selectedCustomer, setSelectedCustomer] = React.useState<Sale | null>(
@@ -336,9 +323,9 @@ export default function DataFinancialTable() {
       return;
     }
 
-    const parsed = schema.array().safeParse(data);
+    const parsed = orderSchema.array().safeParse(data);
     if (parsed.success) {
-      setOrders(parsed.data.map((o) => ({ ...o, source: "order" })));
+      setOrders(parsed.data.map((o) => ({ ...o, source: "order" }) as Order));
     } else {
       console.error("Erro ao validar schema Zod:", parsed.error);
     }
@@ -382,7 +369,7 @@ export default function DataFinancialTable() {
     ]);
 
     // Parse dos pedidos
-    const parsedOrders = schema.array().safeParse(ordersRes.data);
+    const parsedOrders = orderSchema.array().safeParse(ordersRes.data);
     if (parsedOrders.success) {
       setOrders(parsedOrders.data.map((o) => ({ ...o, source: "order" })));
     } else {
@@ -416,31 +403,10 @@ export default function DataFinancialTable() {
     fetchAll();
   }, []);
 
-  const combinedData: FinancialRecord[] = [
-    ...orders.map(
-      (o): FinancialRecord => ({
-        id: o.id,
-        issue_date: o.issue_date || "",
-        due_date: o.due_date || null,
-        amount: o.total,
-        status: o.payment_status === "Paid" ? "Paid" : "Unpaid",
-        payment_method: mapToFinancial(o.payment_method),
-        supplier_id: "",
-        supplier: o.customer || "Cliente",
-        company_id: "",
-        category: "order",
-        description: o.customer || "Pedido",
-        type: "output" as const,
-        notes: "",
-        source: "order",
-        phone: o.phone || "",
-      }),
-    ),
-    ...financialRecords,
-  ];
+  const combinedData: CombinedRecord[] = [...orders, ...financialRecords];
 
   //const columns
-  const columns: CustomColumnDef<FinancialRecord>[] = [
+  const columns: CustomColumnDef<CombinedRecord>[] = [
     {
       id: "drag",
       header: () => null,
@@ -460,7 +426,7 @@ export default function DataFinancialTable() {
         const formatted = format(parseISO(value), "yyyy-MM-dd");
         return formatted === filterValue;
       },
-      cell: ({ row }) => {
+      cell: ({ row }: { row: Row<CombinedRecord> }) => {
         const rawDate = row.original.issue_date;
         if (!rawDate) return "—";
         const [year, month, day] = rawDate.split("-");
@@ -477,7 +443,7 @@ export default function DataFinancialTable() {
         const formatted = format(parseISO(value), "yyyy-MM-dd");
         return formatted === filterValue;
       },
-      cell: ({ row }) => {
+      cell: ({ row }: { row: Row<CombinedRecord> }) => {
         const rawDate = row.original.due_date;
         if (!rawDate) return "—";
         const [year, month, day] = rawDate.split("-");
@@ -487,18 +453,18 @@ export default function DataFinancialTable() {
     {
       id: "customer_or_supplier",
       header: "Fornecedor / Cliente",
-      accessorFn: (row) => {
-        if (isOrder(row)) return row.customer;
-        if (isFinancial(row))
+      accessorFn: (record) => {
+        if (isOrder(record)) return record.customer;
+        if (isFinancial(record))
           return (
-            suppliers.find((s) => s.id === row.supplier_id)?.name ||
-            row.supplier
+            suppliers.find((s) => s.id === record.supplier_id)?.name ||
+            record.supplier
           );
         return "—";
       },
       filterFn: "includesString",
       meta: { className: "w-[250px] truncate uppercase" },
-      cell: ({ row }) => {
+      cell: ({ row }: { row: Row<CombinedRecord> }) => {
         const record = row.original;
         if (isOrder(record)) return record.customer || "—";
         if (isFinancial(record)) {
@@ -513,7 +479,7 @@ export default function DataFinancialTable() {
       header: "Telefone",
       accessorFn: (row) => (isOrder(row) ? row.phone : ""),
       meta: { className: "truncate" },
-      cell: ({ row }) => {
+      cell: ({ row }: { row: Row<CombinedRecord> }) => {
         if (row.original.source !== "order") return "—";
 
         const rawPhone = isOrder(row.original) ? row.original.phone : "";
@@ -559,22 +525,29 @@ export default function DataFinancialTable() {
       accessorKey: "category",
       header: "Categoria",
       meta: { className: " uppercase truncate" },
-      cell: ({ row }) => row.original.category,
+      cell: ({ row }: { row: Row<CombinedRecord> }) => {
+        const record = row.original;
+        if (isFinancial(record)) return record.category;
+        return "—";
+      },
     },
     {
       accessorKey: "type",
       header: "Tipo",
       meta: { className: " uppercase truncate" },
-      cell: ({ row }) => {
-        const type = row.original.type;
-        return type === "input" ? "Nota de Entrada" : "Nota de Saída";
+      cell: ({ row }: { row: Row<CombinedRecord> }) => {
+        const record = row.original;
+        if (isFinancial(record)) {
+          return record.type === "input" ? "Nota de Entrada" : "Nota de Saída";
+        }
+        return "—";
       },
     },
     {
       accessorKey: "payment_method",
       header: "Método",
       meta: { className: "uppercase truncate" },
-      cell: ({ row }) => {
+      cell: ({ row }: { row: Row<CombinedRecord> }) => {
         const method = row.original.payment_method;
         const methodMap: Record<string, string> = {
           Pix: "Pix",
@@ -590,7 +563,7 @@ export default function DataFinancialTable() {
       accessorKey: "payment_status",
       header: "Pagamento",
       meta: { className: "uppercase truncate" },
-      cell: ({ row }) => {
+      cell: ({ row }: { row: Row<CombinedRecord> }) => {
         const data = row.original as Order | FinancialRecord;
 
         const status = isFinancial(data)
@@ -610,13 +583,13 @@ export default function DataFinancialTable() {
       accessorKey: "remaining",
       header: "Restante",
       meta: { className: "text-right uppercase truncate" },
-      cell: ({ row }) => {
-        const total =
-          Number(
-            isOrder(row.original) ? row.original.total : row.original.amount,
-          ) || 0;
-        const total_payed = isOrder(row.original)
-          ? Number(row.original.total_payed ?? 0)
+      cell: ({ row }: { row: Row<CombinedRecord> }) => {
+        const record = row.original;
+        const total = isOrder(record)
+          ? Number(record.total)
+          : Number(record.amount);
+        const total_payed = isOrder(record)
+          ? Number(record.total_payed ?? 0)
           : 0;
         const remaining = total - total_payed;
         return `R$ ${remaining.toFixed(2).replace(".", ",")}`;
@@ -626,13 +599,12 @@ export default function DataFinancialTable() {
       accessorKey: "total",
       header: "Total",
       meta: { className: "text-right uppercase" },
-      cell: ({ row }) => {
-        const raw = isOrder(row.original)
-          ? row.original.total
-          : (row.original as FinancialRecord).amount;
-
-        const value = Number(raw) || 0;
-        return `R$ ${value.toFixed(2).replace(".", ",")}`;
+      cell: ({ row }: { row: Row<CombinedRecord> }) => {
+        const record = row.original;
+        const total = isOrder(record)
+          ? Number(record.total)
+          : Number(record.amount);
+        return `R$ ${total.toFixed(2).replace(".", ",")}`;
       },
     },
     {
@@ -640,7 +612,7 @@ export default function DataFinancialTable() {
       header: "",
       size: 50,
       meta: { className: "w-[50px]" },
-      cell: ({ row }) => {},
+      cell: ({ row }: { row: Row<CombinedRecord> }) => {},
     },
   ];
 
@@ -665,7 +637,7 @@ export default function DataFinancialTable() {
     [orders],
   );
 
-  const table = useReactTable<FinancialRecord>({
+  const table = useReactTable<CombinedRecord>({
     data: combinedData,
     columns,
     state: {

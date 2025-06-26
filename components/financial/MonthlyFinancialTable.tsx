@@ -1,5 +1,4 @@
 // components/financial/MonthlyFinancialTable.tsx
-
 "use client";
 
 import * as React from "react";
@@ -14,7 +13,8 @@ import {
 import { DataTableConfig } from "./DataTableConfig";
 import { CombinedRecord } from "./DataFinancialTable";
 import { TablePagination } from "@/components/ui/pagination";
-import type { Order, FinancialRecord } from "./DataFinancialTable";
+import type { FinancialRecord } from "@/components/types/financial";
+import type { Order } from "@/components/types/orderSchema";
 
 type MonthlyFinancialTableProps = {
   table: ReturnType<typeof useReactTable<CombinedRecord>>;
