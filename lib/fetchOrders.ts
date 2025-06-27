@@ -39,9 +39,9 @@ export async function fetchOrders(
       product_id,
       quantity,
       price,
-      product:products (
-        name,
-        code
+      product:products!order_items_product_id_fkey (
+      name,
+      code
       )
     )
   `,

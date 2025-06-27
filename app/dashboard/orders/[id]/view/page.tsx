@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { GenerateBoletoButton } from "@/components/generate-boleto-button";
 import { SignatureModal } from "@/components/signature-modal";
 import { supabase } from "@/lib/supabase";
+import type { OrderItem } from "@/components/types/orders";
+import type { Product } from "@/components/types/products";
 
 export default function ViewOrderPage() {
   const { id } = useParams();
@@ -152,6 +154,7 @@ export default function ViewOrderPage() {
     const fetch = async () => {
       try {
         const data = await fetchOrderDetails(id as string);
+        console.log("🧾 Dados do pedido:", data);
         if (!data || !data.customer) return;
         setOrder(data);
 
@@ -177,7 +180,14 @@ export default function ViewOrderPage() {
 
   const company = order.company;
   const customer = order.customer;
-  const items = order.items || [];
+  const items: OrderItem[] = (order.items ?? []).map((item: any) => ({
+    ...item,
+    product: {
+      name: item.product?.name || item.products?.name || "Produto",
+      code: item.product?.code || item.products?.code || "000",
+    },
+    price: item.price ?? 0,
+  }));
 
   const freight = Number(order.freight || 0);
   const totalDevolucao = returnedProducts.reduce(
@@ -185,7 +195,7 @@ export default function ViewOrderPage() {
     0,
   );
   const totalItems = items.reduce(
-    (sum: number, item: any) => sum + item.quantity * item.unit_price,
+    (sum: number, item: any) => sum + item.quantity * item.price,
     0,
   );
   const totalFinal = totalItems + freight;
@@ -234,16 +244,19 @@ export default function ViewOrderPage() {
             </tr>
           </thead>
           <tbody>
-            {items.map((item: any) => (
-              <tr key={item.id} className="border-t">
-                <td className="p-2">{item.name}</td>
-                <td className="p-2">{item.quantity}</td>
-                <td className="p-2">R$ {item.unit_price.toFixed(2)}</td>
-                <td className="p-2 font-semibold">
-                  R$ {(item.quantity * item.unit_price).toFixed(2)}
-                </td>
-              </tr>
-            ))}
+            {items.map((item: any, index: number) => {
+              console.log("🔍 Item:", item);
+              return (
+                <tr key={item.id ?? `fallback-${index}`} className="border-t">
+                  <td className="p-2">{item.product?.name}</td>
+                  <td className="p-2">{item.quantity}</td>
+                  <td className="p-2">R$ {(item.price ?? 0).toFixed(2)}</td>
+                  <td className="p-2 font-semibold">
+                    R$ {(item.quantity * (item.price ?? 0)).toFixed(2)}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
 
@@ -331,11 +344,16 @@ export default function ViewOrderPage() {
             key={JSON.stringify({ signatureData, returnedProducts, items })}
             document={
               <ItemRelationPDF
-                signature={signatureData}
-                company={company}
-                customer={customer}
-                items={items}
+                company={order.company}
+                customer={order.customer}
+                items={(order.items ?? []).map((item: any) => ({
+                  name: item.product?.name ?? "Produto",
+                  code: item.product?.code ?? "000",
+                  quantity: item.quantity,
+                  unit_price: item.price ?? 0,
+                }))}
                 note={order.note_number}
+                signature={order.customer_signature}
                 freight={order.freight}
                 returnedProducts={returnedProducts}
               />

@@ -180,10 +180,13 @@ const RelationSection = ({
             <Text style={[styles.cell, { flex: 2 }]}>{item.name}</Text>
             <Text style={[styles.cell, styles.cellRight]}>{item.quantity}</Text>
             <Text style={[styles.cell, styles.cellRight]}>
-              R$ {item.unit_price.toFixed(2)}
+              R$ {(Number(item.unit_price) || 0).toFixed(2)}
             </Text>
             <Text style={[styles.cell, styles.cellRight]}>
-              R$ {(item.quantity * item.unit_price).toFixed(2)}
+              R${" "}
+              {((item.quantity || 0) * (Number(item.unit_price) || 0)).toFixed(
+                2,
+              )}
             </Text>
           </View>
         ))}
@@ -206,16 +209,16 @@ const RelationSection = ({
             {returnedProducts.map((item: any, index: number) => (
               <View key={index} style={styles.tableRow}>
                 <Text style={[styles.cell, { flex: 2 }]}>
-                  {item.products.name}
+                  {item.product.name}
                 </Text>
                 <Text style={[styles.cell, styles.cellRight]}>
                   {item.quantity}
                 </Text>
                 <Text style={[styles.cell, styles.cellRight]}>
-                  R$ {Number(item.unitPrice).toFixed(2)}
+                  R$ {Number(item.price).toFixed(2)}
                 </Text>
                 <Text style={[styles.cell, styles.cellRight]}>
-                  R$ {(Number(item.unitPrice) * item.quantity).toFixed(2)}
+                  R$ {(Number(item.price) * item.quantity).toFixed(2)}
                 </Text>
               </View>
             ))}

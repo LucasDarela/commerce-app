@@ -30,25 +30,30 @@ type OrderDetails = {
   payment_method: string;
   delivery_status: string;
   payment_status: string;
-  order_items: OrderItem[];
+  items: OrderItem[];
+  quantity: number;
+  price: number;
+  product_id: string;
+  products: {
+    name: string;
+    code: string;
+  } | null;
 };
 
 export async function fetchOrderDetails(
   orderId: string,
 ): Promise<OrderDetails | null> {
+  console.log("Buscando pedido ID:", orderId);
   const { data, error } = await supabase
     .from("orders")
     .select(
       `
       *,
       customers:customers(*),
-      companies:companies!fk_company_id(*),
+      company:companies!fk_company_id(*),
       order_items(
-        id,
-        quantity,
-        price,
-        product_id,
-        products(name, code)
+        *,
+      product:products!order_items_product_id_fkey (name, code)
       )
     `,
     )
@@ -63,7 +68,7 @@ export async function fetchOrderDetails(
   return {
     id: data.id,
     customer: data.customers,
-    company: data.companies,
+    company: data.company,
     note_number: data.note_number,
     document_type: data.document_type,
     issue_date: data.issue_date,
@@ -79,6 +84,18 @@ export async function fetchOrderDetails(
     payment_method: data.payment_method,
     delivery_status: data.delivery_status,
     payment_status: data.payment_status,
-    order_items: data.order_items ?? [],
+    items: (data.order_items ?? []).map((item: any) => ({
+      id: item.id,
+      quantity: item.quantity,
+      price: item.price,
+      product: {
+        name: item.product?.name ?? "Produto",
+        code: item.product?.code ?? "000",
+      },
+    })),
+    quantity: 0,
+    price: 0,
+    product_id: "",
+    products: null,
   };
 }
