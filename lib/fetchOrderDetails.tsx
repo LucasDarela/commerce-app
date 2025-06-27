@@ -5,7 +5,7 @@ type OrderItem = {
   id: string;
   quantity: number;
   price: number;
-  product: {
+  product?: {
     name: string;
     code: string;
   };

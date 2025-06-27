@@ -105,7 +105,7 @@ export default function ViewOrderPage() {
         `
         quantity,
         product_id,
-        products ( name )
+        product:products ( name, code )
       `,
       )
       .eq("note_id", orderId)
@@ -166,6 +166,7 @@ export default function ViewOrderPage() {
           id as string,
           data.customer.id,
         );
+        console.log("🔄 Produtos retornados:", devolucoes);
         setReturnedProducts(devolucoes);
       } catch (err) {
         console.error("Erro ao carregar espelho da venda:", err);
@@ -183,8 +184,8 @@ export default function ViewOrderPage() {
   const items: OrderItem[] = (order.items ?? []).map((item: any) => ({
     ...item,
     product: {
-      name: item.product?.name || item.products?.name || "Produto",
-      code: item.product?.code || item.products?.code || "000",
+      name: item.product?.name || item.product?.name || "Produto",
+      code: item.product?.code || item.product?.code || "000",
     },
     price: item.price ?? 0,
   }));
@@ -276,12 +277,16 @@ export default function ViewOrderPage() {
               </thead>
               <tbody>
                 {returnedProducts.map((item, index) => {
-                  const total = item.unitPrice * item.quantity;
+                  const productName = item.product?.name || "Produto";
+                  const productCode = item.product?.code || "000";
+                  const unitPrice = item.unitPrice ?? 0;
+                  const total = item.quantity * unitPrice;
+
                   return (
                     <tr key={index} className="border-t text-red-700">
-                      <td className="p-2">{item.products.name}</td>
+                      <td className="p-2">{productName}</td>
                       <td className="p-2">{item.quantity}</td>
-                      <td className="p-2">R$ {item.unitPrice.toFixed(2)}</td>
+                      <td className="p-2">R$ {unitPrice.toFixed(2)}</td>
                       <td className="p-2 font-semibold">
                         R$ {total.toFixed(2)}
                       </td>
@@ -355,7 +360,12 @@ export default function ViewOrderPage() {
                 note={order.note_number}
                 signature={order.customer_signature}
                 freight={order.freight}
-                returnedProducts={returnedProducts}
+                returnedProducts={returnedProducts.map((item) => ({
+                  name: item.product?.name ?? "Produto",
+                  code: item.product?.code ?? "000",
+                  quantity: item.quantity,
+                  unit_price: item.unitPrice ?? 0,
+                }))}
               />
             }
             fileName={`${order.note_number} - ${customer.name}.pdf`.replace(
