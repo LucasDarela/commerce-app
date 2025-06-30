@@ -49,8 +49,6 @@ export async function fetchOrders(
     .eq("company_id", companyId)
     .order("appointment_date", { ascending: false });
 
-  console.log("DATA CRUA DO SUPABASE >>>", data);
-
   if (error) {
     console.error("Erro ao buscar pedidos:", JSON.stringify(error, null, 2));
     return [];

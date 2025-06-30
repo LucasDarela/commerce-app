@@ -21,32 +21,34 @@ import { Checkbox } from "../ui/checkbox";
 import { Pencil, Trash } from "lucide-react";
 
 const formSchema = z.object({
-  name: z.string().min(2, "Informe o nome da operação"),
   description: z.string().optional(),
   cfop: z.string().min(2),
+  ncm: z.string().length(8, "O NCM deve ter exatamente 8 dígitos"),
   pis: z.string().min(1),
   cofins: z.string().min(1),
-  operation_type: z.enum([
-    "sale",
-    "purchase",
-    "return",
-    "correction",
-    "devolution",
-  ]),
-  operation_id: z.coerce.number().optional(), // ou .string() dependendo do banco
+  operation_id: z.coerce
+    .number({
+      invalid_type_error: "Informe o código da operação",
+    })
+    .min(1, "Informe o código da operação"),
   group: z.string().optional(),
   specification: z.string().optional(),
   cst_icms: z.string().optional(),
   ipi: z.string().optional(),
   state: z.string().length(2, "UF inválido").optional(),
+  natureza_operacao: z.string().min(1),
+  tipo_documento: z.enum(["0", "1"]),
+  local_destino: z.enum(["1", "2", "3"]),
+  finalidade_emissao: z.enum(["1", "2", "3", "4"]),
+  consumidor_final: z.enum(["0", "1"]),
+  presenca_comprador: z.enum(["0", "1", "2", "3", "4", "9"]),
+  modalidade_frete: z.enum(["0", "1", "2", "9"]),
+  icms_origem: z.enum(["0", "1", "2", "4", "5", "6", "7"]),
 });
 
 type FiscalOperationFormData = z.infer<typeof formSchema>;
 
-const OPERATION_OPTIONS: {
-  label: string;
-  value: FiscalOperationFormData["operation_type"];
-}[] = [
+const OPERATION_OPTIONS = [
   { label: "Venda", value: "sale" },
   { label: "Compra", value: "purchase" },
   { label: "Retorno", value: "return" },
@@ -60,8 +62,16 @@ export default function FiscalOperationsPage() {
   const [editId, setEditId] = useState<number | null>(null);
   const form = useForm<FiscalOperationFormData>({
     resolver: zodResolver(formSchema),
+    defaultValues: {
+      finalidade_emissao: "1",
+      tipo_documento: "1",
+      local_destino: "1",
+      consumidor_final: "1",
+      presenca_comprador: "1",
+      modalidade_frete: "0",
+      icms_origem: "0",
+    },
   });
-  const selected = form.watch("operation_type");
 
   const fetchOperations = async () => {
     if (!companyId) return;
@@ -89,9 +99,7 @@ export default function FiscalOperationsPage() {
       return;
     }
 
-    // Se está editando (editId existe)
     if (editId) {
-      // Se encontrou um registro com o mesmo código mas com ID diferente
       if (existing && existing.id !== editId) {
         toast.error("Já existe uma operação com esse código");
         return;
@@ -110,7 +118,6 @@ export default function FiscalOperationsPage() {
         fetchOperations();
       }
     } else {
-      // Se encontrou um registro com o mesmo código
       if (existing) {
         toast.error("Já existe uma operação com esse código");
         return;
@@ -131,9 +138,7 @@ export default function FiscalOperationsPage() {
 
   const handleEdit = (op: any) => {
     setEditId(op.id);
-    form.reset({
-      ...op,
-    });
+    form.reset({ ...op });
   };
 
   const handleDelete = async (id: number) => {
@@ -153,120 +158,225 @@ export default function FiscalOperationsPage() {
   }, [companyId]);
 
   return (
-    <div className="p-6 space-y-4">
-      <h2 className="text-xl font-bold">Cadastro de Operações Fiscais</h2>
-
-      {/* Linha completa para os checkboxes */}
-      <div className="w-full">
-        <Label className="mb-1 block text-sm font-medium">
-          Tipo da Operação
-        </Label>
-        <div className="flex flex-wrap md:flex-nowrap md:gap-3 px-3 py-2 mt-1">
-          {OPERATION_OPTIONS.map((opt) => (
-            <label
-              key={opt.value}
-              className="flex items-center space-x-1 text-sm mr-4 mb-2 md:mb-0 cursor-pointer"
-            >
-              <Checkbox
-                checked={selected === opt.value}
-                onCheckedChange={() =>
-                  form.setValue("operation_type", opt.value)
-                }
-              />
-              <span className="text-xs text-muted-foreground">{opt.label}</span>
-            </label>
-          ))}
-        </div>
-      </div>
-
-      {/* Grid de campos */}
-      <form
-        onSubmit={form.handleSubmit(onSubmit)}
-        className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4"
-      >
+    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 p-6">
+      {/* Dados NF-e */}
+      <div className="grid grid-cols-2 gap-4">
         <div>
-          <Label className="py-2">Código da Operação</Label>
-          <Input {...form.register("operation_id")} />
+          <Label className="pb-1">Identificador</Label>
+          <Input placeholder="ex: 01" {...form.register("operation_id")} />
         </div>
         <div>
-          <Label className="py-2">Nome da Operação</Label>
-          <Input {...form.register("name")} />
-        </div>
-        <div>
-          <Label className="py-2">Grupo(null)</Label>
-          <Input {...form.register("group")} />
-        </div>
-        <div>
-          <Label className="py-2">Expecificação(null)</Label>
-          <Input {...form.register("specification")} />
-        </div>
-        <div>
-          <Label className="py-2">CFOP</Label>
-          <Input {...form.register("cfop")} />
-        </div>
-        <div>
-          <Label className="py-2">CST ICMS</Label>
-          <Input {...form.register("cst_icms")} />
-        </div>
-        <div>
-          <Label className="py-2">IPI</Label>
-          <Input {...form.register("ipi")} />
-        </div>
-        <div>
-          <Label className="py-2">PIS</Label>
-          <Input {...form.register("pis")} />
-        </div>
-        <div>
-          <Label className="py-2">COFINS</Label>
-          <Input {...form.register("cofins")} />
-        </div>
-        <div className="w-full">
-          <Label className="py-2">Estado</Label>
-          <Select onValueChange={(val) => form.setValue("state", val)}>
+          <Label className="pb-1">Tipo de Documento</Label>
+          <Select
+            value={form.watch("tipo_documento")}
+            onValueChange={(value) =>
+              form.setValue("tipo_documento", value as any)
+            }
+          >
             <SelectTrigger className="w-full">
-              <SelectValue placeholder="Selecione o estado" />
+              <SelectValue placeholder="Selecione" />
             </SelectTrigger>
-            <SelectContent className="w-full">
-              <SelectItem value="AC">Acre</SelectItem>
-              <SelectItem value="AL">Alagoas</SelectItem>
-              <SelectItem value="AP">Amapá</SelectItem>
-              <SelectItem value="AM">Amazonas</SelectItem>
-              <SelectItem value="BA">Bahia</SelectItem>
-              <SelectItem value="CE">Ceará</SelectItem>
-              <SelectItem value="DF">Distrito Federal</SelectItem>
-              <SelectItem value="ES">Espírito Santo</SelectItem>
-              <SelectItem value="GO">Goiás</SelectItem>
-              <SelectItem value="MA">Maranhão</SelectItem>
-              <SelectItem value="MT">Mato Grosso</SelectItem>
-              <SelectItem value="MS">Mato Grosso do Sul</SelectItem>
-              <SelectItem value="MG">Minas Gerais</SelectItem>
-              <SelectItem value="PA">Pará</SelectItem>
-              <SelectItem value="PB">Paraíba</SelectItem>
-              <SelectItem value="PR">Paraná</SelectItem>
-              <SelectItem value="PE">Pernambuco</SelectItem>
-              <SelectItem value="PI">Piauí</SelectItem>
-              <SelectItem value="RJ">Rio de Janeiro</SelectItem>
-              <SelectItem value="RN">Rio Grande do Norte</SelectItem>
-              <SelectItem value="RS">Rio Grande do Sul</SelectItem>
-              <SelectItem value="RO">Rondônia</SelectItem>
-              <SelectItem value="RR">Roraima</SelectItem>
-              <SelectItem value="SC">Santa Catarina</SelectItem>
-              <SelectItem value="SP">São Paulo</SelectItem>
-              <SelectItem value="SE">Sergipe</SelectItem>
-              <SelectItem value="TO">Tocantins</SelectItem>
+            <SelectContent>
+              <SelectItem value="0">Entrada</SelectItem>
+              <SelectItem value="1">Saída</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label className="pb-1">Finalidade da Emissão</Label>
+          <Select
+            value={form.watch("finalidade_emissao")}
+            onValueChange={(value) =>
+              form.setValue("finalidade_emissao", value as any)
+            }
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Selecione" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1">Normal</SelectItem>
+              <SelectItem value="2">Complementar</SelectItem>
+              <SelectItem value="3">Ajuste</SelectItem>
+              <SelectItem value="4">Devolução</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label className="pb-1">Natureza da Operação</Label>
+          <Input
+            placeholder="ex: Venda de Produto"
+            {...form.register("natureza_operacao")}
+          />
+        </div>
+
+        <div>
+          <Label className="pb-1">Local de Destino</Label>
+          <Select
+            value={form.watch("local_destino")}
+            onValueChange={(value) =>
+              form.setValue("local_destino", value as any)
+            }
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Selecione" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1">Interna</SelectItem>
+              <SelectItem value="2">Interestadual</SelectItem>
+              <SelectItem value="3">Exterior</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
-        <div className="col-span-1 md:col-span-2">
-          <Button type="submit" className="mt-2 w-full md:w-auto">
-            {editId ? "Atualizar Operação" : "Salvar Operação"}
-          </Button>
+        <div>
+          <Label className="pb-1">Consumidor Final</Label>
+          <Select
+            value={form.watch("consumidor_final")}
+            onValueChange={(value) =>
+              form.setValue("consumidor_final", value as any)
+            }
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Sim" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="0">Não</SelectItem>
+              <SelectItem value="1">Sim</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-      </form>
+        <div>
+          <Label className="pb-1">Presença do Comprador</Label>
+          <Select
+            value={form.watch("presenca_comprador")}
+            onValueChange={(value) =>
+              form.setValue("presenca_comprador", value as any)
+            }
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Selecione" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="0">
+                Não se aplica (por exemplo, para a Nota Fiscal complementar ou
+                de ajuste)
+              </SelectItem>
+              <SelectItem value="1"> Operação presencial</SelectItem>
+              <SelectItem value="2">
+                Operação não presencial, pela Internet
+              </SelectItem>
+              <SelectItem value="3">
+                Operação não presencial, Teleatendimento
+              </SelectItem>
+              <SelectItem value="4">
+                NFC-e em operação com entrega em domicílio
+              </SelectItem>
+              <SelectItem value="9">Operação não presencial, outros</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label className="pb-1">Modalidade do Frete</Label>
+          <Select
+            value={form.watch("modalidade_frete")}
+            onValueChange={(value) =>
+              form.setValue("modalidade_frete", value as any)
+            }
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Selecione" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="0"> Por conta do emitente</SelectItem>
+              <SelectItem value="1"> Por conta do destinatário</SelectItem>
+              <SelectItem value="2"> Por conta de terceiros</SelectItem>
+              <SelectItem value="9"> Sem frete</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label className="pb-1">Origem</Label>
+          <Select
+            value={form.watch("icms_origem")}
+            onValueChange={(value) =>
+              form.setValue("icms_origem", value as any)
+            }
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Selecione" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="0"> Nacional</SelectItem>
+              <SelectItem value="1">
+                {" "}
+                Estrangeira (importação direta)
+              </SelectItem>
+              <SelectItem value="2">
+                {" "}
+                Estrangeira (adquirida no mercado interno)
+              </SelectItem>
+              <SelectItem value="3">
+                {" "}
+                Nacional com mais de 40% de conteúdo estrangeiro
+              </SelectItem>
+              <SelectItem value="4">
+                {" "}
+                Nacional produzida através de processos produtivos básicos
+              </SelectItem>
+              <SelectItem value="5">
+                {" "}
+                Nacional com menos de 40% de conteúdo estrangeiro
+              </SelectItem>
+              <SelectItem value="6">
+                {" "}
+                Estrangeira (importação direta) sem produto nacional similar
+              </SelectItem>
+              <SelectItem value="7">
+                {" "}
+                Estrangeira (adquirida no mercado interno) sem produto nacional
+                similar
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label className="pb-1">CFOP</Label>
+          <Input {...form.register("cfop")} />
+        </div>
+        <div>
+          <Label className="pb-1">NCM</Label>
+          <Input {...form.register("ncm")} />
+        </div>
+        <div>
+          <Label className="pb-1">PIS</Label>
+          <Input {...form.register("pis")} />
+        </div>
+        <div>
+          <Label className="pb-1">COFINS</Label>
+          <Input {...form.register("cofins")} />
+        </div>
+        <div>
+          <Label className="pb-1">CST ICMS</Label>
+          <Input {...form.register("cst_icms")} />
+        </div>
+        <div>
+          <Label className="pb-1">IPI</Label>
+          <Input {...form.register("ipi")} />
+        </div>
+        <div>
+          <Label className="pb-1">Estado (UF)</Label>
+          <Input {...form.register("state")} maxLength={2} />
+        </div>
+      </div>
 
+      <div className="pt-4 pb-4">
+        <Button type="submit" className="mt-2 w-full md:w-auto">
+          {editId ? "Atualizar Operação" : "Salvar Operação"}
+        </Button>
+      </div>
+      <hr className="my-4" />
       {/* Lista de operações cadastradas */}
-      <div className="pt-6">
+      <div className="pt-4">
         <h3 className="font-medium mb-2">Operações já cadastradas</h3>
         <ul className="space-y-1">
           {operations.map((op) => (
@@ -276,7 +386,9 @@ export default function FiscalOperationsPage() {
             >
               <div>
                 <strong>
-                  {op.operation_id} - {op.name} - ({op.operation_type})
+                  {op.operation_id} -{" "}
+                  {op.tipo_documento === "0" ? "Entrada" : "Saída"} -{" "}
+                  {op.natureza_operacao}
                 </strong>{" "}
                 - CFOP: {op.cfop}, CST ICMS: {op.cst_icms}, IPI: {op.ipi}, PIS:{" "}
                 {op.pis}, COFINS: {op.cofins}, Estado: {op.state}
@@ -301,6 +413,6 @@ export default function FiscalOperationsPage() {
           ))}
         </ul>
       </div>
-    </div>
+    </form>
   );
 }

@@ -9,6 +9,23 @@ import { supabase } from "@/lib/supabase";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import Image from "next/image";
 
+function isValidCPF(cpf: string): boolean {
+  cpf = cpf.replace(/\D/g, "");
+  if (cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) return false;
+
+  let sum = 0;
+  for (let i = 0; i < 9; i++) sum += Number(cpf[i]) * (10 - i);
+  let firstCheck = (sum * 10) % 11;
+  if (firstCheck === 10) firstCheck = 0;
+  if (firstCheck !== Number(cpf[9])) return false;
+
+  sum = 0;
+  for (let i = 0; i < 10; i++) sum += Number(cpf[i]) * (11 - i);
+  let secondCheck = (sum * 10) % 11;
+  if (secondCheck === 10) secondCheck = 0;
+  return secondCheck === Number(cpf[10]);
+}
+
 export default function CompanySettingsForm() {
   const { companyId } = useAuthenticatedCompany();
   const [loading, setLoading] = useState(false);
@@ -31,6 +48,7 @@ export default function CompanySettingsForm() {
     phone: "",
     email: "",
     state_registration: "",
+    cpf_emitente: "",
   });
 
   useEffect(() => {
@@ -130,6 +148,11 @@ export default function CompanySettingsForm() {
 
   const handleSubmit = async () => {
     setLoading(true);
+    if (!isValidCPF(formData.cpf_emitente)) {
+      toast.error("CPF do emitente inválido");
+      setLoading(false);
+      return;
+    }
     let uploadedLogoUrl = logoUrl;
 
     if (logoFile) {
@@ -302,6 +325,10 @@ export default function CompanySettingsForm() {
             onChange={handleChange}
           />
         </div>
+      </div>
+      {/* div nfe  */}
+      <h3 className="text-xl font-bold">NFe</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <Label className="mb-2 w-[200px]">Token da Focus NFe</Label>
           <Input
@@ -311,7 +338,22 @@ export default function CompanySettingsForm() {
             placeholder="Ex: a7ff01da-xxxx-xxxx-xxxx-44c75d490245"
           />
         </div>
+        <div>
+          <Label className="mb-2 w-[200px]">CPF Sócio Emitente NFe</Label>
+          <Input
+            name="cpf_emitente"
+            value={formData.cpf_emitente.replace(/\D/g, "")}
+            onChange={handleChange}
+            maxLength={11}
+            placeholder="Somente números (ex: 12345678909)"
+          />
+        </div>
       </div>
+
+      <p className="text-sm italic text-muted-foreground">
+        Para evitar erros de emissão NFe, preencha corretamente todos os campos
+        a cima.
+      </p>
 
       <Button onClick={handleSubmit} disabled={loading} className="mt-4">
         {loading ? "Salvando..." : "Salvar Empresa"}

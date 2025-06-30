@@ -14,18 +14,13 @@ export async function POST(req: Request) {
 
     if (!companyId || !invoiceData) {
       return NextResponse.json(
-        { error: "Parâmetros inválidos" },
+        { error: "companyId e invoiceData são obrigatórios" },
         { status: 400 },
       );
     }
 
-    console.log(
-      "🧾 Dados recebidos para emissão de NF-e:",
-      JSON.stringify(invoiceData, null, 2),
-    );
-
     const parseResult = invoiceSchema.safeParse(invoiceData);
-
+    console.log("invoiceData:", JSON.stringify(invoiceData, null, 2));
     if (!parseResult.success) {
       console.error(
         "❌ Erro de validação da NF-e:",
@@ -40,11 +35,48 @@ export async function POST(req: Request) {
       );
     }
 
+    console.log("🧾 Emitindo NF-e com os dados:", parseResult.data);
+
     const result = await emitInvoice({
       companyId,
-      invoiceData: parseResult.data, // melhor usar os dados validados
+      invoiceData: parseResult.data,
       supabaseClient: supabase,
     });
+
+    // Extrai os dados necessários para armazenar
+    const { ref, status } = result;
+    const orderId = invoiceData.order_id; // Certifique-se que está incluso no payload
+    const customerName = invoiceData.nome_destinatario;
+    const total = invoiceData.valor_total;
+    const naturezaOperacao = invoiceData.natureza_operacao;
+    const emissao = invoiceData.data_emissao;
+
+    // Insere na tabela invoices
+    const { error: insertError } = await supabase.from("invoices").insert([
+      {
+        company_id: companyId,
+        order_id: orderId,
+        numero: result.numero,
+        serie: result.serie,
+        chave_nfe: result.chave,
+        status: result.status,
+        ref: result.ref,
+        valor_total: invoiceData.valor_total,
+        xml_url: result.xml_url,
+        danfe_url: result.danfe_url,
+        data_emissao: result.data_emissao,
+        natureza_operacao: invoiceData.natureza_operacao,
+        customer_name: customerName,
+      },
+    ]);
+
+    if (insertError) {
+      console.error("❌ Erro ao salvar nota em invoices:", insertError);
+      return NextResponse.json(
+        { error: "NF-e emitida, mas não foi possível salvar no banco" },
+        { status: 500 },
+      );
+    }
 
     return NextResponse.json(result);
   } catch (err: any) {

@@ -342,6 +342,7 @@ export function DataTable({
       .select(
         `
         id,
+        customer_id,
         note_number,
         document_type,
         appointment_date,
@@ -607,17 +608,6 @@ export function DataTable({
       ),
     },
     {
-      accessorKey: "appointment_local",
-      header: "Localização",
-      size: 250,
-      meta: { className: "w-[250px]" },
-      cell: ({ row }) => (
-        <div className="whitespace-pre-wrap lowercase text-muted-foreground">
-          {row.original.appointment_local || ""}
-        </div>
-      ),
-    },
-    {
       accessorKey: "text_note",
       header: "Observação",
       size: 250,
@@ -625,6 +615,17 @@ export function DataTable({
       cell: ({ row }) => (
         <div className="whitespace-pre-wrap lowercase text-muted-foreground">
           {row.original.text_note || ""}
+        </div>
+      ),
+    },
+    {
+      accessorKey: "appointment_local",
+      header: "Localização",
+      size: 250,
+      meta: { className: "w-[250px]" },
+      cell: ({ row }) => (
+        <div className="whitespace-pre-wrap lowercase text-muted-foreground">
+          {row.original.appointment_local || ""}
         </div>
       ),
     },

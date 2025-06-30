@@ -37,6 +37,11 @@ type Cliente = {
   emit_nf?: boolean;
 };
 
+function limparNumero(valor: string | number | null | undefined) {
+  if (typeof valor !== "string") return "";
+  return valor.replace(/\D/g, "");
+}
+
 export default function EditClient() {
   const router = useRouter();
   const { id } = useParams();
@@ -202,7 +207,12 @@ export default function EditClient() {
     delete clienteToUpdate.id;
     delete clienteToUpdate.created_at;
 
-    clienteToUpdate.phone = cliente.phone.replace(/\D/g, "");
+    // Limpar e converter phone e number para tipo number
+    const phoneCleaned = limparNumero(cliente.phone);
+    clienteToUpdate.phone = phoneCleaned ? String(Number(phoneCleaned)) : "";
+
+    const numberCleaned = limparNumero(cliente.number);
+    clienteToUpdate.number = numberCleaned ? String(Number(numberCleaned)) : "";
 
     const { error } = await supabase
       .from("customers")

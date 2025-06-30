@@ -33,6 +33,7 @@ import { PriceTableManager } from "@/components/price-table-manager";
 import Link from "next/link";
 import { IconPlus } from "@tabler/icons-react";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
+import { ExportProductsButton } from "@/components/products/ExportProductsButton";
 
 type Equipment = {
   id: string;
@@ -230,6 +231,9 @@ export default function ListProduct() {
             )}
           </TableBody>
         </Table>
+      </div>
+      <div className="flex justify-end w-full my-4">
+        <ExportProductsButton />
       </div>
 
       {selectedProduct && (

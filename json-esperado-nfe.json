@@ -1,0 +1,68 @@
+{
+  // "natureza_operacao": "Remessa",
+  // "data_emissao":"2017-04-15",
+  // "data_entrada_saida":"2017-04-15",
+  // "tipo_documento": 1,
+  // "finalidade_emissao":1,
+  // "cnpj_emitente":"SEU_CNPJ",
+  // "cpf_emitente": "SEU_CPF", 
+  //  - esse nao tem no json post 
+  //  - já tenho o campo preenchido corretamente pelo frontend no backend, 
+  //  - verificar se está enviando corretamente agora..
+  // "nome_emitente": "Sua Raz\u00e3o Social Ltda",
+  // "nome_fantasia_emitente": "Fantasia do Emitente",
+  // "logradouro_emitente": "Rua Quinze de Abril",
+  // "numero_emitente": 999,
+  // "bairro_emitente":"Jd Paulistano",
+  // "municipio_emitente":"S\u00e3o Paulo",
+  // "uf_emitente": "SP",
+  // "cep_emitente":"01454-600",
+  // "inscricao_estadual_emitente": "SUA_INSCRICAO_ESTADUAL",
+  // "nome_destinatario": "NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL",
+  // "cpf_destinatario":"03055054911",
+  // "inscricao_estadual_destinatario":null,
+  // "telefone_destinatario": 1196185555, - esse nao tem no json post
+  // "logradouro_destinatario": "Rua S\u00e3o Janu\u00e1rio",
+  // "numero_destinatario": 99,
+  // "bairro_destinatario":"Crespo",
+  // "municipio_destinatario": "Manaus",
+  // "uf_destinatario": "AM",
+  // "pais_destinatario": "Brasil",
+  // "cep_destinatario":69073178,
+  // "valor_frete": 0.0,
+  // "valor_seguro": 0,
+  // "valor_total": 47.23,
+  // "valor_produtos": 47.23,
+  // "modalidade_frete": 0, - esse nao tem no json post
+
+  "items": [
+    {
+      "numero_item": 1,  - nao tem no json codigo
+      // "codigo_produto": 1232, - erro no json post
+      // "descricao": "Cartu00f5es de Visita",  - erro no json post está enviando como nome, mas deve ser descricao
+      // "cfop": 5923,
+      // "unidade_comercial": "un", - erro no json post
+      // "quantidade_comercial": 100, - erro no json post
+      // "valor_unitario_comercial": 0.4723, - erro no json post
+      // "valor_unitario_tributavel": 0.4723, - erro no json post
+      // "unidade_tributavel": "un", - erro no json post
+      // "codigo_ncm": 49111090,  - erro no json post
+      // "quantidade_tributavel": 100, - erro no json post
+      // "valor_bruto": 47.23, - nao tem no json
+
+      // "icms_situacao_tributaria": 41,  - nao tem no json
+
+      // "icms_origem": 0,  - nao tem no json
+
+      // "pis_situacao_tributaria": "07",- erro no json post
+      // "cofins_situacao_tributaria": "07"  - erro no json post
+
+
+      ipi tambem nao tem aqui mas tem no json post
+      valor_frete tem no json post mas nao tem aqu
+      inscricao estadual destinatario, caso retorne vazia, tem q retornar null
+    
+    }
+  ]
+}
+

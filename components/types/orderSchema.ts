@@ -42,7 +42,7 @@ export const orderSchema = z.object({
         product: z
           .object({
             name: z.string(),
-            code: z.string(),
+            code: z.number(),
           })
           .nullable(),
       }),

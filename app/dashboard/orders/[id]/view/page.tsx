@@ -12,12 +12,23 @@ import { SignatureModal } from "@/components/signature-modal";
 import { supabase } from "@/lib/supabase";
 import type { OrderItem } from "@/components/types/orders";
 import type { Product } from "@/components/types/products";
+import { getCompanyLogoAsDataUrl } from "@/components/pdf/CompanyLogoAsDataUrl";
 
 export default function ViewOrderPage() {
   const { id } = useParams();
   const [order, setOrder] = useState<any>(null);
   const [openSignature, setOpenSignature] = useState(false);
   const [signatureData, setSignatureData] = useState<string | null>(null);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+
+  // useEffect(() => {
+  //   async function loadLogo() {
+  //     const logo = await getCompanyLogoAsDataUrl(company.id); // garanta que company.id esteja disponível
+  //     setLogoUrl(logo);
+  //   }
+
+  //   loadLogo();
+  // }, [company.id]);
 
   const handleSaveSignature = async (dataUrl: string) => {
     if (!dataUrl) return;
@@ -168,6 +179,9 @@ export default function ViewOrderPage() {
         );
         console.log("🔄 Produtos retornados:", devolucoes);
         setReturnedProducts(devolucoes);
+
+        const logo = await getCompanyLogoAsDataUrl(data.company.id);
+        setLogoUrl(logo);
       } catch (err) {
         console.error("Erro ao carregar espelho da venda:", err);
         toast.error("Erro ao carregar espelho da venda.");
@@ -199,7 +213,21 @@ export default function ViewOrderPage() {
     (sum: number, item: any) => sum + item.quantity * item.price,
     0,
   );
-  const totalFinal = totalItems + freight;
+  const totalFinal = (totalItems || 0) + (freight || 0);
+
+  const itemsForPdf = (order.items ?? []).map((item: any) => ({
+    name: item.product?.name ?? "Produto",
+    code: item.product?.code ?? "000",
+    quantity: item.quantity,
+    unit_price: item.price ?? 0,
+  }));
+
+  const returnedItemsForPdf = returnedProducts.map((item) => ({
+    name: item.product?.name ?? "Produto",
+    code: item.product?.code ?? "000",
+    quantity: item.quantity,
+    unit_price: item.unitPrice ?? 0,
+  }));
 
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-6">
@@ -345,41 +373,33 @@ export default function ViewOrderPage() {
       {/* Só aparece depois que assinar */}
       {signatureData && (
         <div className="flex flex-col gap-2 mt-4">
-          <PDFDownloadLink
-            key={JSON.stringify({ signatureData, returnedProducts, items })}
-            document={
-              <ItemRelationPDF
-                company={order.company}
-                customer={order.customer}
-                items={(order.items ?? []).map((item: any) => ({
-                  name: item.product?.name ?? "Produto",
-                  code: item.product?.code ?? "000",
-                  quantity: item.quantity,
-                  unit_price: item.price ?? 0,
-                }))}
-                note={order.note_number}
-                signature={order.customer_signature}
-                freight={order.freight}
-                returnedProducts={returnedProducts.map((item) => ({
-                  name: item.product?.name ?? "Produto",
-                  code: item.product?.code ?? "000",
-                  quantity: item.quantity,
-                  unit_price: item.unitPrice ?? 0,
-                }))}
-              />
-            }
-            fileName={`${order.note_number} - ${customer.name}.pdf`.replace(
-              /[\/\\:*?"<>|]/g,
-              "",
-            )}
-          >
-            {({ loading }) => (
-              <Button variant="default" className="w-full">
-                {loading ? "Gerando PDF..." : "Download PDF"}
-              </Button>
-            )}
-          </PDFDownloadLink>
-
+          {logoUrl && (
+            <PDFDownloadLink
+              key={JSON.stringify({ signatureData, returnedProducts, items })}
+              document={
+                <ItemRelationPDF
+                  company={order.company}
+                  customer={order.customer}
+                  items={itemsForPdf}
+                  note={order.note_number}
+                  logoUrl={logoUrl}
+                  signature={order.customer_signature}
+                  freight={order.freight}
+                  returnedProducts={returnedItemsForPdf}
+                />
+              }
+              fileName={`${order.note_number} - ${customer.name}.pdf`.replace(
+                /[\/\\:*?"<>|]/g,
+                "",
+              )}
+            >
+              {({ loading }) => (
+                <Button variant="default" className="w-full">
+                  {loading ? "Gerando PDF..." : "Download PDF"}
+                </Button>
+              )}
+            </PDFDownloadLink>
+          )}
           {order.payment_method?.toLowerCase() === "boleto" && (
             <GenerateBoletoButton
               orderId={order.id}

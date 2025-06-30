@@ -7,7 +7,8 @@ import {
   Image,
 } from "@react-pdf/renderer";
 import dayjs from "dayjs";
-import logo from "@/app/assets/logo-bk.png";
+// import logo from "@/app/assets/logo-bk.png";
+// import { getCompanyLogoAsDataUrl } from "./CompanyLogoAsDataUrl";
 
 const styles = StyleSheet.create({
   page: {
@@ -99,7 +100,10 @@ interface ItemRelationPDFProps {
   signature?: string | null;
   freight?: number;
   returnedProducts?: any[];
+  logoUrl?: string | null;
 }
+
+interface RelationSectionProps extends ItemRelationPDFProps {}
 
 const RelationSection = ({
   company,
@@ -109,6 +113,7 @@ const RelationSection = ({
   freight = 0,
   signature,
   returnedProducts = [],
+  logoUrl,
 }: any) => {
   const totalItems = items.reduce(
     (sum: number, item: any) => sum + item.unit_price * item.quantity,
@@ -126,7 +131,11 @@ const RelationSection = ({
     <View>
       {/* Cabeçalho */}
       <View style={styles.header}>
-        <Image src={logo.src} style={styles.logo} />
+        {logoUrl ? (
+          <Image src={logoUrl} style={styles.logo} />
+        ) : (
+          <Text style={{ color: "red", fontSize: 8 }}>Logo não carregada</Text>
+        )}
         <View>
           <Text>
             Nota: <Text style={styles.bold}>{note ?? "000000"}</Text>
@@ -268,6 +277,7 @@ export function ItemRelationPDF({
   signature,
   freight,
   returnedProducts = [],
+  logoUrl,
 }: ItemRelationPDFProps) {
   return (
     <Document>
@@ -281,6 +291,7 @@ export function ItemRelationPDF({
           signature={signature}
           freight={freight}
           returnedProducts={returnedProducts}
+          logoUrl={logoUrl}
         />
       </Page>
     </Document>

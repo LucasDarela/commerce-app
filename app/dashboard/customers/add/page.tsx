@@ -33,6 +33,13 @@ const initialCliente = {
   state_registration: "",
   emit_nf: "",
 };
+
+function limparNumero(valor: string | null | undefined): number | null {
+  if (!valor) return null;
+  const limpo = valor.replace(/\D/g, "");
+  return limpo ? Number(limpo) : null;
+}
+
 export default function CreateClient() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -202,7 +209,7 @@ export default function CreateClient() {
       const { data: clienteExistente, error: consultaError } = await supabase
         .from("customers")
         .select("id")
-        .eq("document", cliente.document)
+        .eq("document", documentoLimpo)
         .eq("company_id", companyId)
         .maybeSingle();
 
@@ -216,15 +223,20 @@ export default function CreateClient() {
         return;
       }
 
+      // Limpar e converter telefone e número
+      const telefoneNumerico = limparNumero(cliente.phone);
+      const numeroEnderecoNumerico = limparNumero(cliente.number);
+
       const { data: insertedCustomer, error } = await supabase
         .from("customers")
         .insert([
           {
             ...cliente,
             document: documentoLimpo,
+            phone: telefoneNumerico,
+            number: numeroEnderecoNumerico,
             price_table_id: selectedCatalog || null,
             company_id: companyId,
-            phone: telefoneLimpo,
             emit_nf: emitNf,
           },
         ])

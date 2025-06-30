@@ -455,8 +455,8 @@ export default function EditOrderPage() {
   const issueDate = order?.issue_date ?? new Date().toISOString().split("T")[0];
   const daysTicket = Number(order?.days_ticket ?? 0);
   // Converter issueDate para Date
-  const dueDate = order?.due_date
-    ? format(parseISO(order.due_date), "dd/MM/yyyy")
+  const dueDate = calculatedDueDate
+    ? format(calculatedDueDate, "dd/MM/yyyy")
     : "";
 
   return (

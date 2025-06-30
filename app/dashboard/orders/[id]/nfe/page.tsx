@@ -14,6 +14,7 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
+import { format } from "date-fns";
 
 export default function EmitNfePage() {
   const { id } = useParams();
@@ -85,7 +86,10 @@ export default function EmitNfePage() {
         );
       }
 
-      if (ops) setOperations(ops);
+      if (ops) {
+        const ordered = ops.sort((a, b) => a.operation_id - b.operation_id);
+        setOperations(ordered);
+      }
       if (companyData) setEmissor(companyData); // 👈 Aqui define o emissor com base no companyId
     };
 
@@ -100,65 +104,85 @@ export default function EmitNfePage() {
     if (!emissor) return toast.error("Emissor não definido");
     if (products.length === 0) return toast.error("Nenhum produto na venda");
 
+    const hoje = format(new Date(), "yyyy-MM-dd");
+    const totalProdutos = products.reduce(
+      (acc, p) => acc + Number(p.price) * p.quantity,
+      0,
+    );
+
+    const invoiceData = {
+      ambiente: "2",
+      ref: order.note_number,
+      order_id: id,
+      data_emissao: hoje,
+      data_entrada_saida: hoje,
+      natureza_operacao: operacaoFiscal.natureza_operacao,
+      tipo_documento: Number(operacaoFiscal.tipo_documento),
+      finalidade_emissao: Number(operacaoFiscal.finalidade_emissao),
+      modalidade_frete: 0,
+      valor_frete: order.freight ? Number(order.freight) : 0,
+      valor_seguro: 0,
+      valor_produtos: totalProdutos,
+      valor_total: totalProdutos,
+
+      // Emitente
+      nome_emitente: emissor.corporate_name,
+      nome_fantasia_emitente: emissor.trade_name,
+      cnpj_emitente: emissor.document?.replace(/\D/g, "") ?? "",
+      inscricao_estadual_emitente: emissor.state_registration,
+      logradouro_emitente: emissor.address,
+      numero_emitente: String(emissor.number ?? "S/N"),
+      bairro_emitente: emissor.neighborhood,
+      municipio_emitente: emissor.city,
+      uf_emitente: emissor.state,
+      cep_emitente: emissor.zip_code?.replace(/\D/g, "") ?? "",
+
+      // Destinatário
+      nome_destinatario: customer.name,
+      cpf_destinatario: customer.document?.replace(/\D/g, "") ?? "",
+      telefone_destinatario: String(customer.phone ?? "")
+        .replace(/\D/g, "")
+        .replace(/^55/, ""),
+      inscricao_estadual_destinatario:
+        customer.state_registration?.trim() || "ISENTO",
+      logradouro_destinatario: customer.address,
+      numero_destinatario: String(customer.number ?? "S/N"),
+      bairro_destinatario: customer.neighborhood ?? "",
+      municipio_destinatario: customer.city,
+      uf_destinatario: customer.state,
+      cep_destinatario: customer.zip_code?.replace(/\D/g, "") ?? "",
+      pais_destinatario: "Brasil",
+
+      presenca_comprador: operacaoFiscal.presenca_comprador || "1",
+
+      items: products.map((p, index) => ({
+        numero_item: index + 1,
+        codigo_produto: String(p.code ?? ""), // obrigatório
+        descricao: p.name ?? "", // obrigatório
+        cfop: String(operacaoFiscal.cfop).padStart(4, "0"), // deve ter 4 dígitos
+        unidade_comercial: p.unit ?? "UN",
+        quantidade_comercial: Number(p.quantity),
+        valor_unitario_comercial: Number(p.price),
+        valor_unitario_tributavel: Number(p.price),
+        unidade_tributavel: p.unit ?? "UN",
+        codigo_ncm: String(operacaoFiscal.ncm).padStart(8, "0"), // deve ter 8 dígitos
+        quantidade_tributavel: Number(p.quantity),
+        valor_bruto: Number(p.price) * Number(p.quantity),
+        icms_situacao_tributaria: String(operacaoFiscal.cst_icms ?? ""),
+        icms_origem: String(operacaoFiscal.icms_origem ?? "0"),
+        pis_situacao_tributaria: Number(operacaoFiscal.pis),
+        cofins_situacao_tributaria: Number(operacaoFiscal.cofins),
+        // ipi_situacao_tributaria: String(operacaoFiscal.ipi ?? "99"),
+      })),
+    };
+
     try {
       const response = await fetch("/api/nfe/create", {
         method: "POST",
-        body: JSON.stringify({
-          companyId,
-          invoiceData: {
-            ambiente: "2",
-            cliente: {
-              nome: customer.name,
-              cpf_cnpj: customer.document?.replace(/\D/g, "") ?? "",
-              ie: customer.state_registration ?? "",
-              endereco: {
-                logradouro: customer.address,
-                numero: customer.number ?? "S/N",
-                bairro: customer.neighborhood ?? "",
-                municipio: customer.city,
-                uf: customer.state,
-                cep: customer.zip_code?.replace(/\D/g, "") ?? "",
-              },
-            },
-            produtos: products.map((p) => ({
-              nome: p.name,
-              codigo: p.code,
-              ncm: p.ncm,
-              cfop: operacaoFiscal.cfop,
-              cst: operacaoFiscal.cst_icms,
-              unidade: p.unit ?? "UN",
-              quantidade: p.quantity,
-              valor_unitario: Number(p.price),
-              valor_total: Number(p.price) * p.quantity,
-              pis: operacaoFiscal.pis,
-              cofins: operacaoFiscal.cofins,
-              ipi: operacaoFiscal.ipi,
-            })),
-            emissor: {
-              razao_social: emissor.corporate_name,
-              nome_fantasia: emissor.trade_name,
-              cnpj: emissor.document?.replace(/\D/g, "") ?? "",
-              ie: emissor.state_registration,
-              endereco: {
-                logradouro: emissor.address,
-                numero: emissor.number ?? "S/N",
-                bairro: emissor.neighborhood,
-                municipio: emissor.city,
-                uf: emissor.state,
-                cep: emissor.zip_code?.replace(/\D/g, "") ?? "",
-              },
-            },
-            natureza_operacao: operacaoFiscal.name,
-            finalidade_emissao: "1",
-            modelo: "55",
-            pagamentos: [
-              {
-                forma_pagamento: mapPaymentMethod(order.payment_method),
-                valor: Number(order.total),
-              },
-            ],
-          },
-        }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ companyId, invoiceData }),
       });
 
       const result = await response.json();
@@ -167,15 +191,16 @@ export default function EmitNfePage() {
       toast.success(
         `NF-e emitida com sucesso! Número: ${result.numero || "--"}`,
       );
-      router.push("/dashboard/orders");
+      router.push("/dashboard/nfe");
     } catch (err: any) {
       toast.error("Erro ao emitir NF-e: " + err.message);
     }
   };
 
   return (
-    <div className="p-6 space-y-4 max-w-3xl mx-auto">
+    <div className="p-6 space-y-4 ">
       <h1 className="text-xl font-bold">Emissão de NF-e</h1>
+      <p>Revise os dados antes de emitir a nota</p>
 
       <Label>Tipo de Operação Fiscal</Label>
       <Select onValueChange={setSelectedOperation}>
@@ -184,8 +209,10 @@ export default function EmitNfePage() {
         </SelectTrigger>
         <SelectContent>
           {operations.map((op) => (
-            <SelectItem key={op.id} value={op.id}>
-              {op.operation_id} - {op.name} - CFOP {op.cfop}
+            <SelectItem key={op.id} value={String(op.id)}>
+              {op.operation_id} - {op.natureza_operacao} -{" "}
+              {op.tipo_documento === "0" ? "Entrada" : "Saída"} - Estado{" "}
+              {op.state} - CFOP - {op.cfop}
             </SelectItem>
           ))}
         </SelectContent>

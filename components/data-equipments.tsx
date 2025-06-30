@@ -112,13 +112,14 @@ import {
 import Link from "next/link";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { Equipment } from "@/components/types/equipments";
+import { ExportEquipmentsButton } from "./equipments/ExportEquipmentButton";
 
 //New Schema
 export const equipmentSchema = z.object({
   id: z.string(),
   name: z.string(),
   type: z.string().nullable().optional(),
-  code: z.string().nullable().optional(),
+  code: z.number().nullable().optional(),
   stock: z.number(),
   value: z.number().nullable().optional(),
   company_id: z.string(),
@@ -700,6 +701,9 @@ export function DataEquipments({
                 </Button>
               </div>
             </div>
+          </div>
+          <div className="flex justify-end w-full">
+            <ExportEquipmentsButton />
           </div>
         </TabsContent>
       </Tabs>

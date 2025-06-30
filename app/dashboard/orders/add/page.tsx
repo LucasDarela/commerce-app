@@ -29,7 +29,7 @@ import {
   PopoverTrigger,
   PopoverContent,
 } from "@/components/ui/popover";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
@@ -129,10 +129,9 @@ export default function AddOrder() {
   const daysTicket = Number(order?.days_ticket ?? 0);
 
   // Converter issueDate para Date
-  const dueDate = format(
-    new Date(new Date(issueDate).getTime() + daysTicket * 24 * 60 * 60 * 1000),
-    "dd/MM/yyyy",
-  );
+  const dueDate = order?.due_date
+    ? format(parseISO(order.due_date), "dd/MM/yyyy")
+    : "";
 
   const [loading, setLoading] = useState<boolean>(false);
   const isSubmittingRef = useRef(false);
