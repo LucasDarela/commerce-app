@@ -111,7 +111,7 @@ export default function EmitNfePage() {
     );
 
     const invoiceData = {
-      ambiente: "2",
+      ambiente: "1",
       ref: order.note_number,
       order_id: id,
       data_emissao: hoje,

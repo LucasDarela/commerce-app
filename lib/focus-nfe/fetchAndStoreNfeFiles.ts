@@ -16,10 +16,10 @@ export async function fetchAndStoreNfeFiles(ref: string, invoiceId: string) {
   try {
     // Busca XML e PDF da Focus
     const [xmlRes, pdfRes] = await Promise.all([
-      fetch(`https://homologacao.focusnfe.com.br/v2/nfe/${ref}.xml`, {
+      fetch(`https://api.focusnfe.com.br/v2/nfe/${ref}.xml`, {
         headers,
       }),
-      fetch(`https://homologacao.focusnfe.com.br/v2/nfe/${ref}.pdf`, {
+      fetch(`https://api.focusnfe.com.br/v2/nfe/${ref}.pdf`, {
         headers,
       }),
     ]);

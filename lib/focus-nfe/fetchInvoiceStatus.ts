@@ -3,7 +3,7 @@ import axios from "axios";
 export async function fetchInvoiceStatus(ref: string) {
   try {
     const { data } = await axios.get(
-      `https://homologacao.focusnfe.com.br/v2/nfe/${ref}`,
+      `https://api.focusnfe.com.br/v2/nfe/${ref}`,
       {
         headers: {
           Authorization: `Token token=${process.env.FOCUS_NFE_API_KEY}`,

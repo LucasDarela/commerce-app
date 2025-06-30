@@ -35,7 +35,7 @@ export async function emitInvoice({
     const authHeader = `Basic ${Buffer.from(`${token}:`).toString("base64")}`;
 
     const response = await axios.post(
-      "https://homologacao.focusnfe.com.br/v2/nfe",
+      "https://api.focusnfe.com.br/v2/nfe",
       invoiceData,
       {
         headers: {
