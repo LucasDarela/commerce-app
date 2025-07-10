@@ -3,14 +3,28 @@ import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!, // ⚠️ Use a chave service_role apenas no backend
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
 );
 
-const FOCUS_TOKEN = process.env.FOCUS_TOKEN!;
+export async function fetchAndStoreNfeFiles(
+  ref: string,
+  invoiceId: string,
+  companyId: string,
+) {
+  const { data: creds, error: credError } = await supabase
+    .from("nfe_credentials")
+    .select("focus_token")
+    .eq("company_id", companyId)
+    .single();
 
-export async function fetchAndStoreNfeFiles(ref: string, invoiceId: string) {
+  if (credError || !creds?.focus_token) {
+    throw new Error("Token da empresa não encontrado para emissão da NF-e");
+  }
+
+  const token = creds.focus_token;
+
   const headers = {
-    Authorization: `Token token=${FOCUS_TOKEN}`,
+    Authorization: `Basic ${Buffer.from(`${token}:x`).toString("base64")}`,
   };
 
   try {

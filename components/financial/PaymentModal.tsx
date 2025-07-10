@@ -13,7 +13,7 @@ type Props = {
   order: FinancialRecord;
   open: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (id: string) => void;
 };
 
 export function FinancialPaymentModal({
@@ -52,7 +52,7 @@ export function FinancialPaymentModal({
                 }
 
                 toast.success("Nota paga com sucesso!");
-                onSuccess();
+                onSuccess(order.id);
                 onClose();
               }}
             >

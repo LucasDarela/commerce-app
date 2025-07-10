@@ -6,9 +6,9 @@ export const invoiceSchema = z.object({
   ambiente: z.enum(["1", "2"]),
   order_id: z.string().uuid(),
   natureza_operacao: z.string().min(1, "Obrigatório"),
-  data_emissao: z.string(), // formato YYYY-MM-DD
+  data_emissao: z.string(),
   data_entrada_saida: z.string(),
-  tipo_documento: z.union([z.literal(0), z.literal(1)]), // 0 ou 1
+  tipo_documento: z.union([z.literal(0), z.literal(1)]),
   finalidade_emissao: z.union([
     z.literal(1),
     z.literal(2),
@@ -79,7 +79,6 @@ export const invoiceSchema = z.object({
         z.literal(99),
       ]),
       cofins_situacao_tributaria: z.number().int().min(1).max(99),
-      // ipi_situacao_tributaria: z.string().optional(),
     }),
   ),
 });

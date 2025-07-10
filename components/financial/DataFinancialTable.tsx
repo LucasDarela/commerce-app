@@ -102,6 +102,14 @@ export default function DataFinancialTable() {
     [supabase, orders, financialRecords],
   );
 
+  const handleUpdateRecord = (id: string) => {
+    setFinancialRecords((prev) =>
+      prev.map((record) =>
+        record.id === id ? { ...record, status: "Paid" } : record,
+      ),
+    );
+  };
+
   const columns = useMemo(
     () =>
       financialColumns({
@@ -443,8 +451,17 @@ export default function DataFinancialTable() {
         <FinancialPaymentModal
           order={selectedOrder as FinancialRecord}
           open={isPaymentOpen}
-          onClose={() => setIsPaymentOpen(false)}
-          onSuccess={fetchAll}
+          onClose={() => {
+            setIsPaymentOpen(false);
+            setSelectedOrder(null);
+          }}
+          onSuccess={(id) => {
+            setFinancialRecords((prev) =>
+              prev.map((record) =>
+                record.id === id ? { ...record, status: "Paid" } : record,
+              ),
+            );
+          }}
         />
       )}
     </>

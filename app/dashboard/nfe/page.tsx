@@ -24,6 +24,7 @@ import { InvoicesFilters } from "@/components/nf/InvoicesFilters";
 import RefreshButton from "@/components/nf/RefreshButton";
 import ViewDanfeButton from "@/components/nf/ViewDanfeButton";
 import { Database } from "@/components/types/supabase";
+import { InvoiceStatusButton } from "@/components/nf/InvoiceStatusButton";
 
 const supabase = createClientComponentClient<Database>();
 
@@ -97,7 +98,7 @@ export default function NfePage() {
     );
   });
 
-  if (loading) {
+  if (loading || !companyId) {
     return <TableSkeleton />;
   }
 
@@ -125,6 +126,7 @@ export default function NfePage() {
                 <InvoiceStatusIndicator status={invoice.status} />
                 {invoice.customer_name || "Destinatário"}
               </CardTitle>
+
               <CardDescription className="flex gap-4 flex-wrap">
                 <div>Número: {invoice.numero || "--"}</div>
                 <div>Natureza: {invoice.natureza_operacao || "Venda"}</div>
@@ -141,12 +143,23 @@ export default function NfePage() {
                     : "R$ 0,00"}
                 </div>
               </CardDescription>
+
               <CardAction className="flex gap-4">
-                {invoice.status === "processando_autorizacao" && (
-                  <RefreshButton
-                    refId={invoice.ref}
-                    setInvoices={setInvoices}
-                  />
+                {(invoice.status === "processando_autorizacao" ||
+                  invoice.status === "erro_autorizacao") && (
+                  <>
+                    {invoice.status === "processando_autorizacao" && (
+                      <RefreshButton
+                        refId={invoice.ref}
+                        companyId={invoice.company_id}
+                        setInvoices={setInvoices}
+                      />
+                    )}
+                    <InvoiceStatusButton
+                      refId={invoice.ref}
+                      companyId={companyId!}
+                    />
+                  </>
                 )}
                 {invoice.danfe_url && (
                   <ViewDanfeButton

@@ -230,18 +230,22 @@ export default function AddFinancialRecord() {
       .maybeSingle();
 
     if (isRecurring && recurrenceCount > 1) {
-      const intervalMap = {
-        daily: 1,
-        weekly: 7,
-        monthly: 30,
-      };
-
-      const baseDate = new Date(toISODate(dueDate));
       const entriesToInsert = [];
+
+      // Converte a data de vencimento (dd/mm/yyyy) para objeto Date corretamente
+      const [dd, mm, yyyy] = dueDate.split("/").map(Number);
+      const baseDate = new Date(yyyy, mm - 1, dd); // cuidado: mês é 0-based
 
       for (let i = 1; i < recurrenceCount; i++) {
         const newDate = new Date(baseDate);
-        newDate.setDate(newDate.getDate() + i * intervalMap[recurrenceType]);
+
+        if (recurrenceType === "monthly") {
+          newDate.setMonth(baseDate.getMonth() + i);
+        } else if (recurrenceType === "weekly") {
+          newDate.setDate(baseDate.getDate() + i * 7);
+        } else if (recurrenceType === "daily") {
+          newDate.setDate(baseDate.getDate() + i);
+        }
 
         entriesToInsert.push({
           ...record,

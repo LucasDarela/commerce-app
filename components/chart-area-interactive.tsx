@@ -67,8 +67,8 @@ export function ChartAreaInteractive() {
 
       const { data: financials } = await supabase
         .from("financial_records")
-        .select("amount, date")
-        .gte("date", formatDate(startDate));
+        .select("amount, due_date, issue_date")
+        .gte("due_date, issue_date", formatDate(startDate));
 
       const dateMap: Record<string, { desktop: number; mobile: number }> = {};
 
@@ -79,7 +79,7 @@ export function ChartAreaInteractive() {
       }
 
       for (const record of financials || []) {
-        const date = new Date(record.date).toISOString().split("T")[0];
+        const date = new Date(record.issue_date).toISOString().split("T")[0];
         dateMap[date] = dateMap[date] || { desktop: 0, mobile: 0 };
         dateMap[date].mobile += Number(record.amount || 0);
       }

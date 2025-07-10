@@ -29,10 +29,10 @@ type Cliente = {
   neighborhood: string;
   city: string;
   state: string;
-  number: string;
+  number: string | null;
   complement: string;
-  phone: string;
-  email: string;
+  phone: string | null;
+  email: string | null;
   state_registration?: string;
   emit_nf?: boolean;
 };
@@ -207,12 +207,21 @@ export default function EditClient() {
     delete clienteToUpdate.id;
     delete clienteToUpdate.created_at;
 
+    if (!clienteToUpdate.email) {
+      clienteToUpdate.email = null;
+    }
+
     // Limpar e converter phone e number para tipo number
     const phoneCleaned = limparNumero(cliente.phone);
-    clienteToUpdate.phone = phoneCleaned ? String(Number(phoneCleaned)) : "";
+    clienteToUpdate.phone = phoneCleaned ? String(Number(phoneCleaned)) : null;
 
     const numberCleaned = limparNumero(cliente.number);
-    clienteToUpdate.number = numberCleaned ? String(Number(numberCleaned)) : "";
+    clienteToUpdate.number = numberCleaned
+      ? String(Number(numberCleaned))
+      : null;
+
+    // Força o valor de 'type' para garantir integridade
+    clienteToUpdate.type = cliente.type === "CNPJ" ? "CNPJ" : "CPF";
 
     const { error } = await supabase
       .from("customers")
@@ -280,16 +289,7 @@ export default function EditClient() {
             type={campo === "email" ? "email" : "text"}
             name={campo}
             placeholder={placeholdersMap[campo]}
-            value={
-              typeof cliente[campo as keyof typeof cliente] === "boolean"
-                ? cliente[campo as keyof typeof cliente]
-                  ? "Sim"
-                  : "Não"
-                : ((cliente[campo as keyof typeof cliente] as
-                    | string
-                    | number
-                    | undefined) ?? "")
-            }
+            value={String(cliente[campo as keyof typeof cliente] ?? "")}
             onChange={handleChange}
             onBlur={campo === "zip_code" ? buscarEndereco : undefined}
             onKeyDown={(e) => handleKeyDown(e, index)}

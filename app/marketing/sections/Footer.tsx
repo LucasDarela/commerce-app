@@ -19,11 +19,15 @@ export default function Footer() {
   };
 
   return (
-    <footer className="bg-black text-[#BCBCBC] text-sm py-10 text-center z-10">
+    <footer
+      id="footer"
+      className="bg-black text-[#BCBCBC] text-sm py-10 text-center z-10"
+    >
       <div className="container mx-auto">
         <div className="inline-flex relative">
           <h2 className="relative text-xl font-bold">Chopp Hub</h2>
         </div>
+
         <nav className="flex flex-col md:flex-row md:justify-center gap-6 mt-6">
           <a
             href="#features"
@@ -61,6 +65,10 @@ export default function Footer() {
             Ajuda
           </a>
         </nav>
+        <div className="flex gap-4 justify-center mt-8">
+          <h3>(48) 9 9990-0074</h3>
+          <h4>contato@chopphub.com</h4>
+        </div>
 
         <div className="flex flex-col items-center gap-6 mt-6">
           <p className="mt-6">

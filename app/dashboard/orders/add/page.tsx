@@ -133,6 +133,29 @@ export default function AddOrder() {
     ? format(parseISO(order.due_date), "dd/MM/yyyy")
     : "";
 
+  useEffect(() => {
+    if (!appointment.date) return;
+
+    const method = order?.payment_method?.toLowerCase() ?? "";
+    const days = Number(order?.days_ticket ?? 0);
+
+    let due: string;
+
+    if (["pix", "dinheiro", "cartao"].includes(method)) {
+      due = format(appointment.date, "yyyy-MM-dd");
+    } else {
+      const calculatedDate = new Date(
+        appointment.date.getTime() + days * 24 * 60 * 60 * 1000,
+      );
+      due = format(calculatedDate, "yyyy-MM-dd");
+    }
+
+    setOrder((prev) => ({
+      ...prev,
+      due_date: due,
+    }));
+  }, [appointment.date, order?.payment_method, order?.days_ticket]);
+
   const [loading, setLoading] = useState<boolean>(false);
   const isSubmittingRef = useRef(false);
 

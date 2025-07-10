@@ -30,16 +30,21 @@ export async function emitInvoice({
     JSON.stringify(invoiceData, null, 2),
   );
 
+  console.log("📦 Payload enviado:", JSON.stringify(invoiceData, null, 2));
+
   try {
     const token = cred.focus_token;
-    const authHeader = `Basic ${Buffer.from(`${token}:`).toString("base64")}`;
+    const authHeader = `Basic ${Buffer.from(`${token}:x`).toString("base64")}`;
 
     const response = await axios.post(
       "https://api.focusnfe.com.br/v2/nfe",
       invoiceData,
       {
+        auth: {
+          username: token,
+          password: "x",
+        },
         headers: {
-          Authorization: authHeader,
           "Content-Type": "application/json",
         },
       },

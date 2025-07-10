@@ -19,8 +19,8 @@ export async function POST(req: Request) {
       );
     }
 
+    // 🧪 Validação do schema
     const parseResult = invoiceSchema.safeParse(invoiceData);
-    console.log("invoiceData:", JSON.stringify(invoiceData, null, 2));
     if (!parseResult.success) {
       console.error(
         "❌ Erro de validação da NF-e:",
@@ -35,38 +35,50 @@ export async function POST(req: Request) {
       );
     }
 
-    console.log("🧾 Emitindo NF-e com os dados:", parseResult.data);
+    // ✅ Gera o próximo número da NF-e com base na empresa
+    const { data: lastInvoice, error: fetchError } = await supabase
+      .from("invoices")
+      .select("numero")
+      .eq("company_id", companyId)
+      .order("numero", { ascending: false })
+      .limit(1);
+
+    if (fetchError) {
+      console.error("Erro ao buscar último número de nota:", fetchError);
+      return NextResponse.json(
+        { error: "Erro ao buscar sequência de notas" },
+        { status: 500 },
+      );
+    }
+
+    const nextNumero = lastInvoice?.[0]?.numero ? lastInvoice[0].numero + 1 : 1;
+    invoiceData.numero = nextNumero;
+    invoiceData.serie = "1";
+
+    console.log("🧾 Emitindo NF-e com os dados:", invoiceData);
 
     const result = await emitInvoice({
       companyId,
-      invoiceData: parseResult.data,
+      invoiceData,
       supabaseClient: supabase,
     });
-
-    // Extrai os dados necessários para armazenar
-    const { ref, status } = result;
-    const orderId = invoiceData.order_id; // Certifique-se que está incluso no payload
-    const customerName = invoiceData.nome_destinatario;
-    const total = invoiceData.valor_total;
-    const naturezaOperacao = invoiceData.natureza_operacao;
-    const emissao = invoiceData.data_emissao;
 
     // Insere na tabela invoices
     const { error: insertError } = await supabase.from("invoices").insert([
       {
         company_id: companyId,
-        order_id: orderId,
-        numero: result.numero,
-        serie: result.serie,
+        order_id: invoiceData.order_id,
+        numero: nextNumero,
+        serie: invoiceData.serie,
         chave_nfe: result.chave,
         status: result.status,
         ref: result.ref,
         valor_total: invoiceData.valor_total,
         xml_url: result.xml_url,
         danfe_url: result.danfe_url,
-        data_emissao: result.data_emissao,
+        data_emissao: invoiceData.data_emissao,
         natureza_operacao: invoiceData.natureza_operacao,
-        customer_name: customerName,
+        customer_name: invoiceData.nome_destinatario,
       },
     ]);
 
@@ -77,12 +89,11 @@ export async function POST(req: Request) {
         { status: 500 },
       );
     }
-
-    return NextResponse.json(result);
   } catch (err: any) {
-    console.error("Erro na emissão da nota:", err);
+    console.error("❌ Erro ao emitir NF-e:", err);
+
     return NextResponse.json(
-      { error: err.message || "Erro interno" },
+      { error: err?.message || "Erro interno", detalhes: err },
       { status: 500 },
     );
   }

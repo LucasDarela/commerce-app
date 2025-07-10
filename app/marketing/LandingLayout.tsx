@@ -17,6 +17,7 @@ import CallToAction from "./sections/CallToAction";
 import FAQ from "./sections/FAQ";
 import Functionalities from "./sections/Functionalities";
 import Hero from "./sections/Hero";
+import { ScrollToTopButton } from "@/components/ui/ScrollToTopButton";
 
 export default function LandingLayout() {
   const handleScroll = (
@@ -54,6 +55,7 @@ export default function LandingLayout() {
       <CallToAction />
       <FAQ />
       <Footer />
+      <ScrollToTopButton />
     </div>
   );
 }

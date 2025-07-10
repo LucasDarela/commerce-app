@@ -6,14 +6,22 @@ import { toast } from "sonner";
 
 type Props = {
   refId: string;
+  companyId: string;
   setInvoices: React.Dispatch<React.SetStateAction<any[]>>;
 };
 
-export default function RefreshButton({ refId, setInvoices }: Props) {
+export default function RefreshButton({
+  refId,
+  companyId,
+  setInvoices,
+}: Props) {
   const handleRefresh = async () => {
     const res = await fetch("/api/nfe/status", {
       method: "POST",
-      body: JSON.stringify({ ref: refId }),
+      body: JSON.stringify({
+        ref: refId,
+        companyId: companyId,
+      }),
     });
 
     if (res.ok) {
@@ -28,5 +36,9 @@ export default function RefreshButton({ refId, setInvoices }: Props) {
     }
   };
 
-  return <Button onClick={handleRefresh}>Atualizar Status</Button>;
+  return (
+    <Button variant="secondary" onClick={handleRefresh}>
+      Atualizar Status
+    </Button>
+  );
 }

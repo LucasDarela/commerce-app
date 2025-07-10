@@ -84,8 +84,8 @@ export default function NavBar() {
             </li>
             <li className="hover:text-primary">
               <Link
-                href="#contact"
-                onClick={(e) => handleScroll(e, "#contact", true)}
+                href="#footer"
+                onClick={(e) => handleScroll(e, "#footer", true)}
               >
                 Contato
               </Link>
@@ -154,8 +154,8 @@ export default function NavBar() {
           </li>
           <li className="hover:text-primary">
             <Link
-              href="#contact"
-              onClick={(e) => handleScroll(e, "#contact", true)}
+              href="#footer"
+              onClick={(e) => handleScroll(e, "#footer", true)}
             >
               Contato
             </Link>

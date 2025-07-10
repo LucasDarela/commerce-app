@@ -32,10 +32,11 @@ export default function Hero() {
         <div className="p-10">
           <Image
             src={heroImage1}
-            alt="Imagem 1"
+            alt="Sitema Responsivo para sua Distribuidora"
             className="mx-auto mb-6 rounded-lg"
             width={200}
             height={100}
+            priority
           />
           <h2 className="section-title font-bold ">
             Sitema Responsivo para sua Distribuidora
@@ -53,7 +54,7 @@ export default function Hero() {
         <div className="p-10">
           <Image
             src={heroImage2}
-            alt="Imagem 2"
+            alt="Controle Total do Seu Negócio"
             className="mx-auto mb-6 rounded-lg"
             width={200}
             height={100}
@@ -74,7 +75,7 @@ export default function Hero() {
         <div className="p-10">
           <Image
             src={heroImage3}
-            alt="Imagem 3"
+            alt="Facilidade e Agilidade nas Entregas"
             className="mx-auto mb-6 rounded-lg"
             width={200}
             height={100}

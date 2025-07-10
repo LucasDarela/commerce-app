@@ -4,16 +4,16 @@ import { fetchAndStoreNfeFiles } from "@/lib/focus-nfe/fetchAndStoreNfeFiles";
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { ref, invoiceId } = body;
+    const { ref, invoiceId, companyId } = body;
 
-    if (!ref || !invoiceId) {
+    if (!ref || !invoiceId || !companyId) {
       return NextResponse.json(
-        { error: "ref e invoiceId são obrigatórios" },
+        { error: "ref, invoiceId e companyId são obrigatórios" },
         { status: 400 },
       );
     }
 
-    const result = await fetchAndStoreNfeFiles(ref, invoiceId);
+    const result = await fetchAndStoreNfeFiles(ref, invoiceId, companyId);
 
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 500 });
@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       success: true,
       xmlUrl: result.xmlUrl,
-      danfeUrl: result.pdfUrl, // pdf já é a DANFE
+      danfeUrl: result.pdfUrl,
     });
   } catch (error: any) {
     console.error("Erro na rota /api/nfe/fetch-files:", error.message);

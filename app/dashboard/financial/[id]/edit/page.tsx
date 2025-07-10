@@ -41,7 +41,9 @@ interface ProductEntry {
 }
 
 function toISODate(dateStr: string): string {
-  const [dd, mm, yyyy] = dateStr.split("/");
+  const parts = dateStr.split("/");
+  if (parts.length !== 3) return "";
+  const [dd, mm, yyyy] = parts;
   return `${yyyy}-${mm}-${dd}`;
 }
 
@@ -444,14 +446,23 @@ export default function EditFinancialRecord() {
   }, [id, selectedCategory]);
 
   const formatDate = (value: string) => {
-    const cleaned = value.replace(/\D/g, "").slice(0, 8); // remove tudo que não for número
+    if (!value) return "";
+
+    // Verifica se está no formato ISO (yyyy-mm-dd)
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      const [yyyy, mm, dd] = value.split("-");
+      return `${dd}/${mm}/${yyyy}`;
+    }
+
+    // Caso seja valor digitado manualmente
+    const cleaned = value.replace(/\D/g, "").slice(0, 8);
     const parts = [];
 
-    if (cleaned.length > 2) {
+    if (cleaned.length >= 2) {
       parts.push(cleaned.slice(0, 2));
-      if (cleaned.length > 4) {
+      if (cleaned.length >= 4) {
         parts.push(cleaned.slice(2, 4));
-        parts.push(cleaned.slice(4));
+        parts.push(cleaned.slice(4, 8));
       } else {
         parts.push(cleaned.slice(2));
       }
