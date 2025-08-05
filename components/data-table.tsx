@@ -473,7 +473,6 @@ export function DataTable({
     fetchOrders();
   }, []);
 
-  //const columns
   const columns: CustomColumnDef<Order>[] = [
     {
       id: "drag",
@@ -833,10 +832,9 @@ export function DataTable({
 
     const newData = arrayMove(orders, oldIndex, newIndex);
 
-    setOrders(newData); // Atualiza visualmente imediatamente
-    setIsSavingOrder(true); // Ativa o spinner
+    setOrders(newData);
+    setIsSavingOrder(true);
 
-    // Atualiza Supabase em paralelo
     Promise.all(
       newData.map((item, index) =>
         supabase
@@ -880,13 +878,11 @@ export function DataTable({
         .eq("id", selectedCustomer.id);
 
       if (!error) {
-        // Atualiza o painel lateral
         setSelectedCustomer({
           ...selectedCustomer,
           delivery_status: nextStatus,
         });
 
-        // Atualiza a tabela sem recarregar tudo
         setOrders((prev) =>
           prev.map((order) =>
             order.id === selectedCustomer.id
@@ -895,12 +891,9 @@ export function DataTable({
           ),
         );
 
-        // Atualiza estoque se necessário
         if (nextStatus === "Coletado") {
           await updateStockBasedOnOrder(selectedCustomer);
         }
-
-        // toast.success(`Status atualizado para ${nextStatus}`);
       } else {
         toast.error("Erro ao atualizar status.");
         console.error(error);
@@ -960,7 +953,7 @@ export function DataTable({
 
   useEffect(() => {
     if (selectedDate) {
-      const formatted = selectedDate.toISOString().split("T")[0]; // yyyy-mm-dd
+      const formatted = selectedDate.toISOString().split("T")[0];
       table.getColumn("appointment_date")?.setFilterValue(formatted);
     } else {
       table.getColumn("appointment_date")?.setFilterValue(undefined);
@@ -998,7 +991,7 @@ export function DataTable({
         console.error("Erro da API:", data);
         toast.error(`Erro ao emitir NF: ${data.error || "Erro desconhecido"}`);
       } else {
-        console.log("Resposta da Focus:", data); // 👈 aqui você vê o payload
+        console.log("Resposta da Focus:", data);
         toast.success("NF-e emitida com sucesso!");
       }
     } catch (err) {
@@ -1030,8 +1023,6 @@ export function DataTable({
     setDateRange([null, null]);
     table.getColumn("appointment_date")?.setFilterValue(undefined);
   };
-
-  // end DateRangeFilter
 
   if (loading) {
     return <TableSkeleton />;

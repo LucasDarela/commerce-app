@@ -228,7 +228,6 @@ export default function DataFinancialTable() {
     });
   }, [groupedByMonth]);
 
-  // ✅ Inicializar diretamente com o último mês disponível
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
     const month = String(now.getMonth() + 1).padStart(2, "0");

@@ -1,5 +1,5 @@
 import { ColumnDef, AccessorFnColumnDef } from "@tanstack/react-table";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, isWithinInterval } from "date-fns";
 import {
   Tooltip,
   TooltipContent,
@@ -49,14 +49,44 @@ export function financialColumns({
       meta: { className: "truncate" },
       accessorFn: (row) => row.due_date,
       filterFn: (row, columnId, filterValue) => {
-        const value = row.getValue(columnId);
-        if (!value || typeof value !== "string") return false;
+        let value = row.getValue(columnId);
 
-        const parsedDate = parseISO(value);
-        if (isNaN(parsedDate.getTime())) return false;
+        if (!value) return false;
 
-        const formatted = format(parsedDate, "yyyy-MM-dd");
-        return formatted === filterValue;
+        // 🔹 Normalizar sempre para string YYYY-MM-DD
+        let dateStr: string;
+
+        if (value instanceof Date) {
+          dateStr = value.toISOString().split("T")[0]; // date puro
+        } else if (typeof value === "string") {
+          dateStr = value.includes("T") ? value.split("T")[0] : value; // text ou timestamp
+        } else {
+          return false;
+        }
+
+        // 🔹 Filtro de data única
+        if (typeof filterValue === "string") {
+          return dateStr === filterValue;
+        }
+
+        // 🔹 Filtro por intervalo
+        if (filterValue?.from || filterValue?.to) {
+          const fromDate = filterValue.from ? new Date(filterValue.from) : null;
+          const toDate = filterValue.to ? new Date(filterValue.to) : null;
+          const currentDate = new Date(dateStr);
+
+          if (fromDate && toDate) {
+            return currentDate >= fromDate && currentDate <= toDate;
+          }
+          if (fromDate) {
+            return currentDate >= fromDate;
+          }
+          if (toDate) {
+            return currentDate <= toDate;
+          }
+        }
+
+        return true;
       },
       cell: ({ row }) => {
         const rawDate = row.original.due_date;

@@ -15,6 +15,7 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import CustomDateInput from "@/components/ui/CustomDateInput";
 import { IconTrash } from "@tabler/icons-react";
+import { useEffect, useState } from "react";
 
 type Props<T> = {
   table: Table<T>;
@@ -56,9 +57,33 @@ export function FinancialFilters<T>({
     }
   }
 
+  // DateRangeFilter
+  const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([
+    null,
+    null,
+  ]);
+  const [startDate, endDate] = dateRange;
+
+  const handleFilter = (range: [Date | null, Date | null]) => {
+    setDateRange(range);
+
+    const isoStart = range[0]?.toISOString().split("T")[0];
+    const isoEnd = range[1]?.toISOString().split("T")[0];
+
+    table.getColumn("due_date")?.setFilterValue({
+      from: isoStart,
+      to: isoEnd,
+    });
+  };
+
+  const clearFilter = () => {
+    setDateRange([null, null]);
+    table.getColumn("due_date")?.setFilterValue(undefined);
+  };
+
   return (
     <div className="grid gap-2 px-4 lg:px-6 grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 items-center">
-      <div className="relative w-full min-w-[70px]">
+      {/* <div className="relative w-full min-w-[70px]">
         <DatePicker
           selected={
             dueDateInput
@@ -97,6 +122,33 @@ export function FinancialFilters<T>({
               setDueDateInput("");
               table.getColumn("due_date")?.setFilterValue(undefined);
             }}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-red-600"
+          >
+            <IconTrash className="w-4 h-4" />
+          </button>
+        )}
+      </div> */}
+
+      <div className="relative w-full sm:w-full md:max-w-[300px] z-50">
+        <DatePicker
+          selectsRange
+          startDate={startDate}
+          endDate={endDate}
+          onChange={(update) =>
+            handleFilter(update as [Date | null, Date | null])
+          }
+          isClearable={false}
+          placeholderText="Filtrar por Período de Entrega"
+          dateFormat="dd/MM/yyyy"
+          customInput={<CustomDateInput />}
+          popperPlacement="bottom-start"
+          popperClassName="z-[9999]"
+        />
+
+        {(startDate || endDate) && (
+          <button
+            type="button"
+            onClick={clearFilter}
             className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-red-600"
           >
             <IconTrash className="w-4 h-4" />
