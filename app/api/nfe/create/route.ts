@@ -35,27 +35,23 @@ export async function POST(req: Request) {
       );
     }
 
-    // ✅ Gera o próximo número da NF-e com base na empresa
-    const { data: lastInvoice, error: fetchError } = await supabase
+    // Busca o último número emitido para a empresa
+    const { data: lastInvoice } = await supabase
       .from("invoices")
       .select("numero")
       .eq("company_id", companyId)
       .order("numero", { ascending: false })
       .limit(1);
 
-    if (fetchError) {
-      console.error("Erro ao buscar último número de nota:", fetchError);
-      return NextResponse.json(
-        { error: "Erro ao buscar sequência de notas" },
-        { status: 500 },
-      );
+    let nextNumero = 1;
+    if (lastInvoice && lastInvoice.length > 0) {
+      nextNumero = Number(lastInvoice[0].numero) + 1; // sempre incrementa
     }
 
-    const nextNumero = lastInvoice?.[0]?.numero ? lastInvoice[0].numero + 1 : 1;
     invoiceData.numero = nextNumero;
     invoiceData.serie = "1";
 
-    console.log("🧾 Emitindo NF-e com os dados:", invoiceData);
+    console.log("🧾 Emitindo NF-e:", invoiceData);
 
     const result = await emitInvoice({
       companyId,
@@ -63,19 +59,19 @@ export async function POST(req: Request) {
       supabaseClient: supabase,
     });
 
-    // Insere na tabela invoices
+    // Salva no banco
     const { error: insertError } = await supabase.from("invoices").insert([
       {
         company_id: companyId,
         order_id: invoiceData.order_id,
         numero: nextNumero,
         serie: invoiceData.serie,
-        chave_nfe: result.chave,
+        chave_nfe: result.chave || null,
         status: result.status,
         ref: result.ref,
         valor_total: invoiceData.valor_total,
-        xml_url: result.xml_url,
-        danfe_url: result.danfe_url,
+        xml_url: result.xml_url || null,
+        danfe_url: result.danfe_url || null,
         data_emissao: invoiceData.data_emissao,
         natureza_operacao: invoiceData.natureza_operacao,
         customer_name: invoiceData.nome_destinatario,
@@ -83,15 +79,15 @@ export async function POST(req: Request) {
     ]);
 
     if (insertError) {
-      console.error("❌ Erro ao salvar nota em invoices:", insertError);
+      console.error("❌ Erro ao salvar nota:", insertError);
       return NextResponse.json(
         { error: "NF-e emitida, mas não foi possível salvar no banco" },
         { status: 500 },
       );
     }
+    return NextResponse.json({ success: true, result });
   } catch (err: any) {
     console.error("❌ Erro ao emitir NF-e:", err);
-
     return NextResponse.json(
       { error: err?.message || "Erro interno", detalhes: err },
       { status: 500 },
