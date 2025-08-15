@@ -1,3 +1,4 @@
+//components/equipment-loan/ReturnEquipmentModal.tsx
 "use client";
 
 import { useState } from "react";
@@ -51,69 +52,134 @@ export function ReturnEquipmentModal({
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
 
-  const handleConfirmReturn = async () => {
-    let barrisRetornados = false;
+  // const handleConfirmReturn = async () => {
+  //   let barrisRetornados = false;
 
+  //   if (selectedItems.length === 0) {
+  //     const confirmed = confirm(
+  //       "Você não realizou coletas nessa viagem, confirma?",
+  //     );
+  //     if (!confirmed) return;
+
+  //     if (customerId) {
+  //       const { error } = await supabase
+  //         .from("equipment_loans")
+  //         .update({
+  //           status: "returned",
+  //           return_date: new Date().toISOString().split("T")[0],
+  //           quantity: 0,
+  //         })
+  //         .eq("customer_id", customerId)
+  //         .eq("status", "delivered");
+
+  //       if (error) {
+  //         toast.error("Erro ao atualizar o status dos empréstimos.");
+  //         console.error(error);
+  //         return;
+  //       } else {
+  //         toast.success("Retorno registrado como nenhum item coletado.");
+  //         barrisRetornados = true;
+  //       }
+  //     }
+  //   } else {
+  //     const updates = selectedItems.map((loanId) => ({
+  //       id: loanId,
+  //       quantity: quantities[loanId] ?? 1,
+  //     }));
+
+  //     const results = await Promise.all(
+  //       updates.map(({ id, quantity }) =>
+  //         supabase
+  //           .from("equipment_loans")
+  //           .update({
+  //             status: "returned",
+  //             return_date: new Date().toISOString().split("T")[0],
+  //             quantity,
+  //           })
+  //           .eq("id", id),
+  //       ),
+  //     );
+
+  //     const hasError = results.some((res) => res.error);
+  //     if (hasError) {
+  //       toast.error("Erro ao retornar um ou mais itens");
+  //       console.error("Erros:", results);
+  //       return;
+  //     } else {
+  //       toast.success("Itens de comodato retornados com sucesso!");
+  //       barrisRetornados = true;
+  //     }
+  //   }
+
+  //   if (barrisRetornados) {
+  //     onReturnSuccess();
+  //     onOpenProductReturnModal();
+  //   }
+  // };
+
+  const handleConfirmReturn = async () => {
+    // Se nada foi selecionado, não altere a base (apenas confirma a viagem sem coleta)
     if (selectedItems.length === 0) {
       const confirmed = confirm(
         "Você não realizou coletas nessa viagem, confirma?",
       );
       if (!confirmed) return;
-
-      if (customerId) {
-        const { error } = await supabase
-          .from("equipment_loans")
-          .update({
-            status: "returned",
-            return_date: new Date().toISOString().split("T")[0],
-            quantity: 0,
-          })
-          .eq("customer_id", customerId)
-          .eq("status", "delivered");
-
-        if (error) {
-          toast.error("Erro ao atualizar o status dos empréstimos.");
-          console.error(error);
-          return;
-        } else {
-          toast.success("Retorno registrado como nenhum item coletado.");
-          barrisRetornados = true;
-        }
-      }
-    } else {
-      const updates = selectedItems.map((loanId) => ({
-        id: loanId,
-        quantity: quantities[loanId] ?? 1,
-      }));
-
-      const results = await Promise.all(
-        updates.map(({ id, quantity }) =>
-          supabase
-            .from("equipment_loans")
-            .update({
-              status: "returned",
-              return_date: new Date().toISOString().split("T")[0],
-              quantity,
-            })
-            .eq("id", id),
-        ),
-      );
-
-      const hasError = results.some((res) => res.error);
-      if (hasError) {
-        toast.error("Erro ao retornar um ou mais itens");
-        console.error("Erros:", results);
-        return;
-      } else {
-        toast.success("Itens de comodato retornados com sucesso!");
-        barrisRetornados = true;
-      }
-    }
-
-    if (barrisRetornados) {
+      toast.success("Viagem registrada sem coletas.");
       onReturnSuccess();
       onOpenProductReturnModal();
+      return;
     }
+
+    const itemById = new Map(items.map((i) => [i.loanId, i]));
+    const today = new Date().toISOString().split("T")[0];
+
+    const updates = selectedItems.map(async (loanId) => {
+      const original = itemById.get(loanId);
+      if (!original) return { error: new Error("Item não encontrado") };
+
+      // qtd devolvida informada no input
+      const returnedQty = Math.max(
+        1,
+        Math.min(original.quantity, quantities[loanId] ?? 1),
+      );
+
+      // o que fica com o cliente
+      const remaining = Math.max(0, original.quantity - returnedQty);
+
+      if (remaining > 0) {
+        // Ainda há itens emprestados → mantém ativo e atualiza para o remanescente
+        return await supabase
+          .from("equipment_loans")
+          .update({
+            quantity: remaining, // 💡 remanescente
+            status: "active", // ou "delivered", padronize
+            return_date: today, // opcional: data do último retorno parcial
+          })
+          .eq("id", loanId);
+      } else {
+        // Tudo devolvido → encerra o comodato
+        return await supabase
+          .from("equipment_loans")
+          .update({
+            quantity: 0,
+            status: "returned",
+            return_date: today,
+          })
+          .eq("id", loanId);
+      }
+    });
+
+    const results = await Promise.all(updates);
+    const hasError = results.some((r) => (r as any).error);
+    if (hasError) {
+      console.error(results);
+      toast.error("Erro ao registrar retorno de um ou mais itens.");
+      return;
+    }
+
+    toast.success("Retorno registrado com sucesso!");
+    onReturnSuccess();
+    onOpenProductReturnModal();
   };
 
   return (

@@ -32,6 +32,7 @@ import {
 } from "@tabler/icons-react";
 import Link from "next/link";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
+import { SyncAsaasButton } from "@/components/asaas/SyncCustomerBtn";
 
 type Cliente = {
   id: number;
@@ -296,8 +297,9 @@ export default function ListCustomers() {
             </p>
             <div className="space-y-2">
               <p>
-                <strong>Nome:</strong> {selectedCliente.name}
+                <strong>Nome:</strong> {selectedCliente.name}{" "}
               </p>
+
               {selectedCliente.fantasy_name && (
                 <p>
                   <strong>Nome Fantasia:</strong> {selectedCliente.fantasy_name}
@@ -354,6 +356,9 @@ export default function ListCustomers() {
                 <strong>Emite NFe:</strong>{" "}
                 {selectedCliente.emit_nf === true ? "Sim" : "Não"}
               </p>
+            </div>
+            <div>
+              <SyncAsaasButton customerId={selectedCliente.id} />
             </div>
             <DialogFooter className="w-full">
               <div className="grid grid-cols-4 gap-4 w-full">

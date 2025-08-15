@@ -225,7 +225,7 @@ export default function ListProduct() {
             ) : (
               <TableRow>
                 <TableCell colSpan={6} className="text-center">
-                  No products found...
+                  Nenhum produto encontrado...
                 </TableCell>
               </TableRow>
             )}

@@ -1,3 +1,4 @@
+//components/equipment-loan/LoanEquipmentModal.tsx
 "use client";
 
 import {
@@ -47,6 +48,7 @@ export function LoanEquipmentModal({
   const [selectedEquipmentId, setSelectedEquipmentId] = useState("");
   const [searchEquipment, setSearchEquipment] = useState("");
   const [showEquipments, setShowEquipments] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [noteDate, setNoteDate] = useState(
     () => new Date().toISOString().split("T")[0],
   );
@@ -99,78 +101,83 @@ export function LoanEquipmentModal({
   };
 
   const handleSubmit = async () => {
-    if (!companyId || !selectedCustomer || loanItems.length === 0) {
-      toast.error("Preencha todos os campos");
-      return;
-    }
+    if (isSubmitting) return;
+    setIsSubmitting(true);
 
-    // 1. Buscar o maior número de nota já existente
-    const { data: existingNotes, error: fetchError } = await supabase
-      .from("equipment_loans")
-      .select("note_number")
-      .order("note_number", { ascending: false })
-      .limit(1);
-
-    if (fetchError) {
-      toast.error("Erro ao consultar notas anteriores.");
-      return;
-    }
-
-    const lastNumber = parseInt(existingNotes?.[0]?.note_number || "0", 10);
-    const nextNoteNumber = (lastNumber + 1).toString().padStart(4, "0");
-    setNoteNumber(nextNoteNumber);
-    // 2. Verificar se o note_number já existe (proteção contra duplicidade)
-    const { data: checkDuplicate, error: checkError } = await supabase
-      .from("equipment_loans")
-      .select("id")
-      .eq("note_number", nextNoteNumber)
-      .maybeSingle();
-
-    if (checkError) {
-      toast.error("Erro ao validar duplicidade de nota.");
-      return;
-    }
-
-    if (checkDuplicate) {
-      toast.error("Erro: número de nota já existe. Tente novamente.");
-      return;
-    }
-
-    const grouped = new Map<
-      string,
-      { equipment_id: string; name: string; quantity: number }
-    >();
-
-    for (const item of loanItems) {
-      const key = item.equipment_id;
-      if (grouped.has(key)) {
-        grouped.get(key)!.quantity += item.quantity;
-      } else {
-        grouped.set(key, {
-          equipment_id: item.equipment_id,
-          name: item.name,
-          quantity: item.quantity,
-        });
+    try {
+      if (!companyId || !selectedCustomer || loanItems.length === 0) {
+        toast.error("Preencha todos os campos");
+        return;
       }
-    }
-    const inserts = Array.from(grouped.values()).map((item) => ({
-      company_id: companyId,
-      customer_id: selectedCustomer.id,
-      customer_name: selectedCustomer.name,
-      equipment_id: item.equipment_id,
-      loan_date: noteDate,
-      note_number: nextNoteNumber,
-      note_date: noteDate,
-      quantity: item.quantity,
-      status: "active",
-    }));
-    toast.loading("Salvando empréstimo...");
-    const { error } = await supabase.from("equipment_loans").insert(inserts);
-    toast.dismiss();
-    if (error) {
-      console.error(error);
-      toast.error("Erro ao salvar empréstimo");
-    } else {
+
+      // 1. Buscar o maior número de nota já existente
+      const { data: existingNotes, error: fetchError } = await supabase
+        .from("equipment_loans")
+        .select("note_number")
+        .eq("company_id", companyId)
+        .order("note_number", { ascending: false })
+        .limit(1);
+
+      if (fetchError) {
+        toast.error("Erro ao consultar notas anteriores.");
+        return;
+      }
+
+      const lastNumber = parseInt(existingNotes?.[0]?.note_number || "0", 10);
+      const nextNoteNumber = (lastNumber + 1).toString().padStart(4, "0");
+      setNoteNumber(nextNoteNumber);
+      // 2. Verificar se o note_number já existe (proteção contra duplicidade)
+      const { data: checkDuplicate, error: checkError } = await supabase
+        .from("equipment_loans")
+        .select("id")
+        .eq("note_number", nextNoteNumber)
+        .maybeSingle();
+
+      if (checkError) {
+        toast.error("Erro ao validar duplicidade de nota.");
+        return;
+      }
+
+      if (checkDuplicate) {
+        toast.error("Erro: número de nota já existe. Tente novamente.");
+        return;
+      }
+
+      const grouped = new Map<
+        string,
+        { equipment_id: string; name: string; quantity: number }
+      >();
+
+      for (const item of loanItems) {
+        const key = item.equipment_id;
+        if (grouped.has(key)) {
+          grouped.get(key)!.quantity += item.quantity;
+        } else {
+          grouped.set(key, {
+            equipment_id: item.equipment_id,
+            name: item.name,
+            quantity: item.quantity,
+          });
+        }
+      }
+      const inserts = Array.from(grouped.values()).map((item) => ({
+        company_id: companyId,
+        customer_id: selectedCustomer.id,
+        customer_name: selectedCustomer.name,
+        equipment_id: item.equipment_id,
+        loan_date: noteDate,
+        note_number: nextNoteNumber,
+        note_date: noteDate,
+        quantity: item.quantity,
+        status: "active",
+      }));
+      toast.loading("Salvando empréstimo...");
+      const { error } = await supabase.from("equipment_loans").insert(inserts);
+      toast.dismiss();
+      if (error) {
+        console.error(error);
+        toast.error("Erro ao salvar empréstimo");
+      }
       toast.success("Empréstimo registrado com sucesso");
       setLoanItems([]);
       setSearchCustomer("");
@@ -179,6 +186,8 @@ export function LoanEquipmentModal({
       setSearchEquipment("");
       onLoanSaved?.();
       onOpenChange(false);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 

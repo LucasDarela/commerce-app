@@ -6,10 +6,14 @@ import { ModeToggle } from "@/components/ui/mode-toggle";
 import { ThemeSelector } from "@/components/theme-selector";
 import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 
 export default function NavBar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  const supabase = createClientComponentClient();
 
   const toggleMenu = () => setMenuOpen(!menuOpen);
 
@@ -39,6 +43,29 @@ export default function NavBar() {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  // 🔹 Verifica se o usuário está logado
+  useEffect(() => {
+    async function checkLogin() {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      setIsLoggedIn(!!session?.user);
+    }
+
+    checkLogin();
+
+    // Atualiza estado quando o usuário logar/deslogar
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setIsLoggedIn(!!session?.user);
+      },
+    );
+
+    return () => {
+      listener.subscription.unsubscribe();
+    };
+  }, [supabase]);
 
   return (
     <div suppressHydrationWarning>
@@ -104,7 +131,9 @@ export default function NavBar() {
 
             <div className="hidden md:block">
               <Button asChild>
-                <Link href="/login-signin">Sign In</Link>
+                <Link href={isLoggedIn ? "/dashboard" : "/login-signin"}>
+                  {isLoggedIn ? "Dashboard" : "Sign In"}
+                </Link>
               </Button>
             </div>
 
@@ -167,8 +196,11 @@ export default function NavBar() {
           </li>
           <li>
             <Button asChild>
-              <Link href="/login-signin" onClick={toggleMenu}>
-                Sign In
+              <Link
+                href={isLoggedIn ? "/dashboard" : "/login-signin"}
+                onClick={toggleMenu}
+              >
+                {isLoggedIn ? "Dashboard" : "Sign In"}
               </Link>
             </Button>
           </li>

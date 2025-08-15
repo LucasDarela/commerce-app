@@ -1,11 +1,9 @@
 "use client";
 
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
 import {
   Select,
   SelectContent,
@@ -16,99 +14,152 @@ import {
 import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
 
+type Provider = "mercado_pago" | "asaas";
+
+type IntegrationRow = {
+  provider: Provider;
+  access_token: string | null;
+};
+
+function providerLabel(p: string) {
+  if (p === "mercado_pago") return "Mercado Pago";
+  if (p === "asaas") return "ASAAS";
+  return p;
+}
+
+// Heurística leve só para alertar o usuário se colou token do provedor "errado"
+function detectProviderFromToken(token: string): Provider | "unknown" {
+  const t = token.trim();
+  // Mercado Pago costuma ser APP_USR-xxxxx ou TEST-xxxxx
+  if (/^(APP_USR|TEST)-[A-Za-z0-9-_]+$/i.test(t)) return "mercado_pago";
+  // ASAAS costuma ser prod_xxx... ou test_xxx...
+  if (/^(prod|test)_[A-Za-z0-9]{20,}$/i.test(t)) return "asaas";
+  return "unknown";
+}
+
 export default function IntegrationsPage() {
   const supabase = createClientComponentClient();
-  const [integration, setIntegration] = useState<null | {
-    provider: string;
-    access_token: string;
-  }>(null);
+  const [integrations, setIntegrations] = useState<IntegrationRow[]>([]);
   const [loading, setLoading] = useState(true);
+
   const [addingNew, setAddingNew] = useState(false);
-  const [provider, setProvider] = useState("mercado_pago");
+  const [provider, setProvider] = useState<Provider>("mercado_pago");
   const [token, setToken] = useState("");
   const [saving, setSaving] = useState(false);
-  const [disconnecting, setDisconnecting] = useState(false);
-  const router = useRouter();
+  const [disconnecting, setDisconnecting] = useState<string | null>(null);
 
-  async function fetchIntegration() {
+  async function fetchIntegrations() {
+    setLoading(true);
     const { data, error } = await supabase
       .from("company_integrations")
-      .select("provider, access_token")
-      .eq("provider", "mercado_pago")
-      .maybeSingle();
-
+      .select("provider, access_token");
     if (error) {
       console.error(error);
-      toast.error("Erro ao buscar integração");
+      toast.error("Erro ao buscar integrações");
+    } else {
+      setIntegrations((data ?? []) as IntegrationRow[]);
     }
-
-    setIntegration(data);
     setLoading(false);
   }
 
   useEffect(() => {
-    fetchIntegration();
+    fetchIntegrations();
   }, []);
+
+  const hasAny = useMemo(
+    () => integrations.some((i) => !!i.access_token),
+    [integrations],
+  );
 
   if (loading) return <div>Carregando integrações...</div>;
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 mb-8">
       <h1 className="text-xl font-bold">Integrações</h1>
 
-      {integration && integration.access_token && !addingNew ? (
-        <div className="flex flex-col gap-2 rounded-lg border p-4">
-          <div className="flex flex-col">
-            <h2 className="text-xl font-semibold">Mercado Pago</h2>
-            <p className="text-sm mt-1 text-green-600">Integração ativa ✅</p>
-          </div>
+      {/* Lista cada provider encontrado */}
+      {integrations.map((row) => {
+        const active = !!row.access_token;
+        return (
+          <div
+            key={row.provider}
+            className="flex flex-col gap-2 rounded-lg border p-4"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-semibold">
+                  {providerLabel(row.provider)}
+                </h2>
+                {active ? (
+                  <p className="text-sm mt-1 text-green-600">
+                    Integração ativa ✅
+                  </p>
+                ) : (
+                  <p className="text-sm mt-1 text-muted-foreground">
+                    Sem token cadastrado
+                  </p>
+                )}
+              </div>
 
-          <div className="flex items-center gap-2 mt-4">
-            <Button
-              onClick={async () => {
-                const confirm = window.confirm(
-                  "Deseja realmente desconectar esta integração?",
-                );
-                if (!confirm) return;
-
-                setDisconnecting(true);
-                const res = await fetch(
-                  `/api/integrations?provider=${provider}`,
-                  { method: "DELETE" },
-                );
-                setDisconnecting(false);
-
-                if (res.ok) {
-                  toast.success("Integração desconectada com sucesso!");
-                  setIntegration(null);
-                  setAddingNew(false);
-                } else {
-                  toast.error("Erro ao desconectar integração.");
-                }
-              }}
-              variant="destructive"
-              disabled={disconnecting}
-            >
-              {disconnecting && (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              {active && (
+                <Button
+                  onClick={async () => {
+                    const ok = window.confirm(
+                      `Desconectar ${providerLabel(row.provider)}?`,
+                    );
+                    if (!ok) return;
+                    setDisconnecting(row.provider);
+                    const res = await fetch(
+                      `/api/integrations?provider=${row.provider}`,
+                      { method: "DELETE" },
+                    );
+                    setDisconnecting(null);
+                    if (res.ok) {
+                      toast.success("Integração desconectada!");
+                      fetchIntegrations();
+                    } else {
+                      toast.error("Erro ao desconectar integração.");
+                    }
+                  }}
+                  variant="destructive"
+                  disabled={disconnecting === row.provider}
+                >
+                  {disconnecting === row.provider && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  Desconectar
+                </Button>
               )}
-              Desconectar
-            </Button>
+            </div>
           </div>
+        );
+      })}
+
+      {/* Se nenhuma ativa, call-to-action */}
+      {!hasAny && !addingNew && (
+        <div className="rounded-lg border p-4">
+          <p className="mb-4 text-amber-600">Nenhuma integração ativa.</p>
+          <Button onClick={() => setAddingNew(true)} className="bg-primary">
+            Adicionar Integração
+          </Button>
         </div>
-      ) : addingNew ? (
+      )}
+
+      {/* Form para adicionar/atualizar integração */}
+      {addingNew && (
         <div className="rounded-lg border p-4 space-y-4">
           <h2 className="text-xl font-semibold">Adicionar Integração</h2>
 
-          <Select value={provider} onValueChange={setProvider} disabled>
-            <SelectTrigger className="w-[200px]">
+          <Select
+            value={provider}
+            onValueChange={(v) => setProvider(v as Provider)}
+          >
+            <SelectTrigger className="w-[240px]">
               <SelectValue placeholder="Selecionar provedor" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="mercado_pago">Mercado Pago</SelectItem>
-              <SelectItem value="asaas" disabled>
-                Asaas (em breve)
-              </SelectItem>
+              <SelectItem value="asaas">ASAAS</SelectItem>
             </SelectContent>
           </Select>
 
@@ -121,22 +172,36 @@ export default function IntegrationsPage() {
           <div className="flex gap-2">
             <Button
               onClick={async () => {
-                if (!token) return toast.error("Informe o token");
+                const trimmed = token.trim();
+                if (!trimmed) return toast.error("Informe o token");
+
+                // Aviso se o formato do token não casa com o provedor escolhido
+                const guessed = detectProviderFromToken(trimmed);
+                if (guessed !== "unknown" && guessed !== provider) {
+                  const proceed = window.confirm(
+                    `O token parece ser de ${providerLabel(guessed)}, mas você selecionou ${providerLabel(provider)}. Continuar mesmo assim?`,
+                  );
+                  if (!proceed) return;
+                }
 
                 setSaving(true);
                 const res = await fetch("/api/integrations", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ provider, access_token: token }),
+                  body: JSON.stringify({ provider, access_token: trimmed }),
                 });
                 setSaving(false);
 
                 if (res.ok) {
                   toast.success("Integração salva!");
-                  fetchIntegration();
+                  setToken("");
                   setAddingNew(false);
+                  fetchIntegrations();
                 } else {
-                  toast.error("Erro ao salvar integração");
+                  const { error } = await res
+                    .json()
+                    .catch(() => ({ error: "" }));
+                  toast.error(error || "Erro ao salvar integração");
                 }
               }}
               className="bg-primary"
@@ -145,6 +210,7 @@ export default function IntegrationsPage() {
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Salvar
             </Button>
+
             <Button
               variant="outline"
               onClick={() => setAddingNew(false)}
@@ -154,16 +220,14 @@ export default function IntegrationsPage() {
             </Button>
           </div>
         </div>
-      ) : (
-        <div className="rounded-lg border p-4">
-          <h2 className="text-xl font-semibold mb-2">Mercado Pago</h2>
-          <p className="mb-4 text-red-600">Nenhuma integração ativa.</p>
-
-          <Button onClick={() => setAddingNew(true)} className="bg-primary">
-            Adicionar Integração
-          </Button>
-        </div>
       )}
+
+      {/* Botão para adicionar outra integração quando já existe alguma */}
+      {/* {hasAny && !addingNew && (
+        <Button variant="outline" onClick={() => setAddingNew(true)}>
+          Adicionar outra integração
+        </Button>
+      )} */}
     </div>
   );
 }

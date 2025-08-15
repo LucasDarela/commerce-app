@@ -223,12 +223,6 @@ export default function EditOrderPage() {
       const available = selectedProduct.stock - reserved;
 
       setReservedStock(reserved);
-
-      if (quantity > available) {
-        toast.warning(
-          "Atenção: quantidade maior que o estoque disponível para a data.",
-        );
-      }
     };
 
     fetchReservedStock();

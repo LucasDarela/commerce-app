@@ -101,7 +101,8 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
-import { supabase } from "@/lib/supabase";
+import type { SupabaseClient } from "@supabase/supabase-js";
+// import { supabase } from "@/lib/supabase";
 import { PaymentModal } from "@/components/payment-modal";
 import { LoanEquipmentModal } from "@/components/equipment-loan/LoanEquipmentModal";
 import { fetchEquipmentsForOrderProducts } from "@/lib/fetch-equipments-for-products";
@@ -208,10 +209,23 @@ function DraggableRow({
   );
 }
 
-async function updateStockBasedOnOrder(order: Order) {
-  const items = await parseProductsWithIds(order.products);
+// async function updateStockBasedOnOrder(order: Order) {
+//   const items = await parseProductsWithIds(supabaseClient, order.products);
+//   for (const item of items) {
+//     await supabase.rpc("decrement_stock", {
+//       product_id: item.id,
+//       quantity: item.quantity,
+//     });
+//   }
+// }
+
+async function updateStockBasedOnOrder(
+  supabaseClient: SupabaseClient,
+  order: Order,
+) {
+  const items = await parseProductsWithIds(supabaseClient, order.products);
   for (const item of items) {
-    await supabase.rpc("decrement_stock", {
+    await supabaseClient.rpc("decrement_stock", {
       product_id: item.id,
       quantity: item.quantity,
     });
@@ -224,6 +238,7 @@ type ParsedProduct = {
 };
 
 async function parseProductsWithIds(
+  supabaseClient: SupabaseClient,
   products: string,
 ): Promise<{ id: number; quantity: number }[]> {
   if (!products) return [];
@@ -231,13 +246,12 @@ async function parseProductsWithIds(
   const parsed = products.split(",").map((entry) => {
     const match = entry.trim().match(/^(.+?) \((\d+)x\)$/);
     if (!match) return { name: entry.trim(), quantity: 1 };
-
     const [, name, quantity] = match;
     return { name: name.trim(), quantity: Number(quantity) };
   });
 
   const names = parsed.map((p) => p.name);
-  const { data, error } = await supabase
+  const { data, error } = await supabaseClient
     .from("products")
     .select("id, name")
     .in("name", names);
@@ -892,7 +906,7 @@ export function DataTable({
         );
 
         if (nextStatus === "Coletado") {
-          await updateStockBasedOnOrder(selectedCustomer);
+          await updateStockBasedOnOrder(supabase, selectedCustomer);
         }
       } else {
         toast.error("Erro ao atualizar status.");
@@ -970,6 +984,53 @@ export function DataTable({
 
     loadReturns();
   }, [selectedCustomer]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel("orders-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "orders" },
+        (payload: any) => {
+          setOrders((prev) => {
+            const next = Array.isArray(prev) ? [...prev] : [];
+
+            // 🔧 pegue o id de forma segura
+            const newRow = (payload.new ?? {}) as { id?: string };
+            const oldRow = (payload.old ?? {}) as { id?: string };
+            const rowId = newRow.id ?? oldRow.id;
+
+            const idx =
+              rowId != null ? next.findIndex((o) => o.id === rowId) : -1;
+
+            switch (payload.eventType) {
+              case "INSERT": {
+                if (idx === -1) next.unshift(payload.new as any); // tipar se tiver seu tipo Order
+                return next;
+              }
+              case "UPDATE": {
+                if (idx !== -1)
+                  next[idx] = { ...next[idx], ...(payload.new as any) };
+                return next;
+              }
+              case "DELETE": {
+                if (idx !== -1) next.splice(idx, 1);
+                return next;
+              }
+              default:
+                return prev;
+            }
+          });
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+    // Dica: se `supabase` for singleton importado de "@/lib/supabase", você pode deixar []
+    // para não re-assinar a cada render.
+  }, []);
 
   const isDisabled =
     !selectedCustomer?.customer_signature ||
@@ -1324,9 +1385,9 @@ export function DataTable({
                     <TableRow>
                       <TableCell
                         colSpan={columns.length}
-                        className="h-24 text-center"
+                        className="h-30 text-center"
                       >
-                        No results.
+                        Crie sua primeira venda
                       </TableCell>
                     </TableRow>
                   )}
