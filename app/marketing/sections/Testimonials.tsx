@@ -133,8 +133,8 @@ export default function Testimonials() {
             O que nossos clientes dizem
           </h2>
           <p className="section-description mt-5 text-muted-foreground">
-            Experiências reais de quem já escolheu a qualidade e o sabor do
-            nosso chopp
+            Experiências reais de quem já escolheu a qualidade do nosso
+            software.
           </p>
         </div>
         <div className="flex justify-center gap-6 mt-10 [mask-image:linear-gradient(to_bottom,transparent,black_25%,black_75%,transparent)] max-h-[738px] overflow-hidden">

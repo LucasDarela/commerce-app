@@ -564,7 +564,7 @@ export function DataEquipments({
                         colSpan={columns.length}
                         className="h-24 text-center"
                       >
-                        No results.
+                        Nada por aqui...
                       </TableCell>
                     </TableRow>
                   )}

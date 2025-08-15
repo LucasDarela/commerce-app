@@ -12,17 +12,12 @@ const planos = [
     preco: "R$100/mês",
     descricao:
       "Ideal para pequenas operações começarem a organizar seu financeiro.",
-    periodoTeste: "3 dias grátis",
     funcionalidades: [
       "Dashboard básico",
-      "Cadastro de clientes e fornecedores",
       "Gestão financeira (entradas e saídas)",
+      "1 usuário logado",
     ],
-    restricoes: [
-      "Sem agendamentos",
-      "Sem controle de delivery",
-      "Apenas 1 usuário cadastrado",
-    ],
+    restricoes: ["Sem agendamentos", "Sem controle de delivery"],
     destaque: false,
   },
   {
@@ -30,14 +25,13 @@ const planos = [
     preco: "R$400/mês",
     descricao:
       "Para equipes que precisam de mais usuários e recursos sem limites.",
-    periodoTeste: "3 dias grátis com todas as funções liberadas",
     funcionalidades: [
       "Todas as funções liberadas",
       "Agendamentos e controle de delivery",
       "Até 5 usuários simultâneos",
       "Suporte prioritário",
     ],
-    restricoes: ["Usuários adicionais via contato com suporte"],
+    restricoes: ["+5 usuários adicionar via suporte"],
     destaque: true,
   },
   {
@@ -45,7 +39,6 @@ const planos = [
     preco: "R$300/mês",
     descricao:
       "Perfeito para quem já precisa de agendamentos e controle de entregas.",
-    periodoTeste: "3 dias grátis com todas as funções liberadas",
     funcionalidades: [
       "Todas as funções habilitadas",
       "Agendamentos de delivery",
@@ -66,7 +59,7 @@ export default function Planos() {
       <div className="section-heading section-header mb-4">
         <h2 className="section-title text-primary">Escolha seu Plano</h2>
         <p className="section-description mt-5 text-muted-foreground">
-          Temos o plano ideal para sua empresa.
+          Temos o plano ideal para sua empresa. Teste grátis por 3 dias.
         </p>
       </div>
 
@@ -90,24 +83,15 @@ export default function Planos() {
               <CardContent className="flex flex-col flex-1">
                 <h2 className="text-2xl font-bold text-center">{plano.nome}</h2>
                 <p className="text-center text-gray-500 mt-1">{plano.preco}</p>
-                <p className="text-center text-sm text-muted-foreground mt-2">
+                <p className="text-center text-xs text-muted-foreground mt-2 italic">
                   {plano.descricao}
                 </p>
 
                 <div className="mt-4">
-                  <p className="font-semibold text-blue-600">
-                    Período de Teste:
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {plano.periodoTeste}
-                  </p>
-                </div>
-
-                <div className="mt-4">
-                  <p className="font-semibold text-blue-600">
+                  <p className="font-semibold text-sm text-blue-600">
                     Funcionalidades:
                   </p>
-                  <ul className="text-sm space-y-2 mt-1">
+                  <ul className="text-xs mt-1">
                     {plano.funcionalidades.map((func, i) => (
                       <li key={i} className="flex items-center">
                         <Check className="text-green-500 mr-2" size={16} />{" "}
@@ -119,8 +103,10 @@ export default function Planos() {
 
                 {plano.restricoes && (
                   <div className="mt-4">
-                    <p className="font-semibold text-red-600">Restrições:</p>
-                    <ul className="text-sm space-y-2 mt-1">
+                    <p className="font-semibold text-sm text-red-600">
+                      Restrições:
+                    </p>
+                    <ul className="text-xs mt-1">
                       {plano.restricoes.map((rest, i) => (
                         <li key={i} className="flex items-center">
                           <X className="text-red-500 mr-2" size={16} /> {rest}

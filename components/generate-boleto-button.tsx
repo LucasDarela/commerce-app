@@ -361,6 +361,7 @@ function GenerateBoletoAsaasButton({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          orderId,
           customerId: cliente.id, // uuid do customers
           value,
           dueDate,

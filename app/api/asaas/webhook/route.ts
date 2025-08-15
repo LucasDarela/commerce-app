@@ -79,7 +79,6 @@ export async function POST(req: Request) {
         ? payment.value
         : null;
 
-  // 5) atualiza financial_records pelo invoice_number
   //    (opcional: também pode filtrar company_id se você guardar em metadados)
   const updatePayload: Record<string, any> = {
     status,
@@ -88,17 +87,23 @@ export async function POST(req: Request) {
     updatePayload.total_payed = totalPayed;
   }
 
-  const { error: updErr } = await supabase
-    .from("financial_records")
-    .update(updatePayload)
-    .eq("invoice_number", payment.id);
+  const updateOrder: Record<string, any> = {
+    payment_status: status, // "Paid" | "Unpaid"
+    total_payed: totalPayed ?? 0, // se usar
+    // opcional: marque data do pagamento, status do boleto etc.
+    // boleto_paid_at: new Date().toISOString(),
+  };
 
-  if (updErr) {
+  const { error: updOrderErr } = await supabase
+    .from("orders")
+    .update(updateOrder)
+    .eq("boleto_id", payment.id);
+
+  if (updOrderErr) {
     console.error(
-      "❌ webhook asaas: erro ao atualizar financial_records:",
-      updErr.message,
+      "❌ webhook asaas: erro ao atualizar orders:",
+      updOrderErr.message,
     );
-    // ainda responde 200 pra não re-tentar infinito, mas loga para investigar
   }
 
   // 6) resposta

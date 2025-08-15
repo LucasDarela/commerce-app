@@ -121,7 +121,6 @@ export default function ViewOrderPage() {
   const [initialLoanItems, setInitialLoanItems] =
     useState<{ equipment_id: string; name: string; quantity: number }[]>();
 
-  // 🔵 Modal de retorno de equipamentos
   const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
   const [returnModalCustomerId, setReturnModalCustomerId] = useState<
     string | null
@@ -217,7 +216,6 @@ export default function ViewOrderPage() {
     if (id) fetch();
   }, [id]);
 
-  // ✅ GUARDA ANTES DE USAR `order`
   if (loading || !order) {
     return <TableSkeleton />;
   }
@@ -253,80 +251,14 @@ export default function ViewOrderPage() {
     unit_price: item.unitPrice ?? 0,
   }));
 
-  // const handleSaveSignature = async (dataUrl: string) => {
-  //   if (!dataUrl) return;
-
-  //   if (order?.stock_updated) {
-  //     toast.info("✔️ Estoque já foi atualizado para este pedido.");
-  //     return;
-  //   }
-
-  //   await supabase
-  //     .from("orders")
-  //     .update({ customer_signature: assinaturaBase64 })
-  //     .eq("id", order.id);
-
-  //   setOrder((prev) =>
-  //     prev ? { ...prev, customer_signature: assinaturaBase64 } : prev,
-  //   );
-
-  //   if (error) {
-  //     toast.error("Erro ao salvar assinatura no banco.");
-  //     console.error("Erro ao atualizar assinatura:", error);
-  //     return;
-  //   }
-
-  //   const { data: items, error: itemsError } = await supabase
-  //     .from("order_items")
-  //     .select("product_id, quantity")
-  //     .eq("order_id", id);
-
-  //   if (itemsError) {
-  //     console.error("Erro ao buscar itens da venda:", itemsError);
-  //     toast.error("Erro ao buscar itens para atualizar estoque.");
-  //     return;
-  //   }
-
-  //   for (const item of items) {
-  //     const { data: product, error: productError } = await supabase
-  //       .from("products")
-  //       .select("stock")
-  //       .eq("id", item.product_id)
-  //       .single();
-
-  //     if (productError || product?.stock == null) {
-  //       console.error("Erro ao buscar produto:", productError);
-  //       continue;
-  //     }
-
-  //     const novoEstoque = (product.stock ?? 0) - item.quantity;
-
-  //     const { error: updateError } = await supabase
-  //       .from("products")
-  //       .update({ stock: novoEstoque })
-  //       .eq("id", item.product_id);
-
-  //     if (updateError) {
-  //       console.error("Erro ao atualizar estoque:", updateError);
-  //     }
-  //   }
-
-  //   toast.success("✔️ Estoque atualizado com sucesso.");
-  //   await supabase.from("orders").update({ stock_updated: true }).eq("id", id);
-  //   setSignatureData(dataUrl);
-  //   setOpenSignature(false);
-  // };
-
   const handleSaveSignature = async (dataUrl: string) => {
     if (!dataUrl) return;
 
-    // evita rodar duas vezes
     if (order?.stock_updated) {
       toast.info("✔️ Estoque já foi atualizado para este pedido.");
       return;
     }
 
-    // 1) salva a assinatura no banco
     const { error: saveError } = await supabase
       .from("orders")
       .update({ customer_signature: dataUrl })
@@ -338,13 +270,11 @@ export default function ViewOrderPage() {
       return;
     }
 
-    // 2) atualiza estado local imediatamente -> habilita o botão sem reload
     setOrder((prev: any) =>
       prev ? { ...prev, customer_signature: dataUrl } : prev,
     );
     setSignatureData(dataUrl);
 
-    // 3) busca itens da venda
     const { data: items, error: itemsError } = await supabase
       .from("order_items")
       .select("product_id, quantity")
@@ -356,7 +286,6 @@ export default function ViewOrderPage() {
       return;
     }
 
-    // 4) atualiza estoque de cada produto
     for (const item of items ?? []) {
       const { data: product, error: productError } = await supabase
         .from("products")
@@ -380,17 +309,10 @@ export default function ViewOrderPage() {
         console.error("Erro ao atualizar estoque:", updateError);
       }
     }
-
-    toast.success("✔️ Estoque atualizado com sucesso.");
-
-    // 5) marca a flag para não processar de novo
     await supabase.from("orders").update({ stock_updated: true }).eq("id", id);
-
-    // 6) fecha o modal
     setOpenSignature(false);
   };
 
-  // --------- atualização de status simples (reutilizada nos modais) ----------
   const markOrderStatus = async (next: "Coletar" | "Coletado") => {
     const { error } = await supabase
       .from("orders")
@@ -437,7 +359,6 @@ export default function ViewOrderPage() {
           order.products ||
           "";
 
-        // seu helper atual aceita string (se você já atualizou para (supabase, order), troque a chamada)
         const equipmentItems =
           await fetchEquipmentsForOrderProducts(productsStr);
 
@@ -453,7 +374,6 @@ export default function ViewOrderPage() {
         return;
       }
 
-      // COLETAR -> abrir modal de retorno
       if (order.delivery_status === "Coletar") {
         const customer = await resolveCustomer(supabase, order);
         if (!customer) {
@@ -489,7 +409,6 @@ export default function ViewOrderPage() {
         return;
       }
 
-      // fallback: alternar status direto
       const next =
         order.delivery_status === "Entregar" ? "Coletar" : "Coletado";
 

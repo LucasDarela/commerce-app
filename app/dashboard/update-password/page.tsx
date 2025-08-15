@@ -34,7 +34,7 @@ import { ResetOrUpdatePasswordForm } from "@/components/auth/ResetOrUpdatePasswo
 
 //   const handleResetPassword = async () => {
 //     if (!password || !confirm) {
-//       return toast.error("Preencha os dois campos.")
+//       return toast.error("ois campos.")
 //     }
 
 //     if (password !== confirm) {

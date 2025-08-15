@@ -46,7 +46,8 @@ export default function Hero() {
           </p>
           <Button
             asChild
-            className="mt-6 transition transform duration-200 hover:scale-105"
+            className="mt-6 transition transform duration-200 hover:scale-105 text-primary"
+            variant="secondary"
           >
             <Link href="#plans">Experimente Agora</Link>
           </Button>
@@ -67,7 +68,8 @@ export default function Hero() {
           </p>
           <Button
             asChild
-            className="mt-6 transition transform duration-200 hover:scale-105"
+            className="mt-6 transition transform duration-200 hover:scale-105 text-primary"
+            variant="secondary"
           >
             <Link href="#plans">Teste Grátis</Link>
           </Button>
@@ -88,7 +90,8 @@ export default function Hero() {
           </p>
           <Button
             asChild
-            className="mt-6 transition transform duration-200 hover:scale-105"
+            className="mt-6 transition transform duration-200 hover:scale-105 text-primary"
+            variant="secondary"
           >
             <Link href="#plans">Confira os Planos</Link>
           </Button>

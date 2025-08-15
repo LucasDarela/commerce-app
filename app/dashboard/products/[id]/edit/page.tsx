@@ -29,13 +29,7 @@ type Product = {
   aplication: string;
   loan_product_code?: string;
   stock: number;
-  ncm: string;
-  cfop: string;
-  csosn: string;
   unit: string;
-  icms_rate: string;
-  pis_rate: string;
-  cofins_rate: string;
   percentage_taxes?: string;
   description?: string;
 };
@@ -63,13 +57,7 @@ export default function EditProduct() {
     aplication: "",
     loan_product_code: "",
     stock: 0,
-    ncm: "",
-    cfop: "",
-    csosn: "",
     unit: "",
-    icms_rate: "",
-    pis_rate: "",
-    cofins_rate: "",
     percentage_taxes: "",
     description: "",
   });
@@ -128,15 +116,7 @@ export default function EditProduct() {
       return;
     }
 
-    if (!product.ncm || !product.cfop || !product.csosn || !product.unit) {
-      toast.error(
-        "Preencha os dados fiscais obrigatórios (NCM, CFOP, CSOSN, Unidade).",
-      );
-      setLoading(false);
-      return;
-    }
-
-    const { error } = await supabase
+    const { error: updateError } = await supabase
       .from("products")
       .update({
         code: product.code,
@@ -148,14 +128,7 @@ export default function EditProduct() {
         material_origin: product.material_origin,
         aplication: product.aplication || null,
         loan_product_code: product.loan_product_code || null,
-        cfop: product.cfop,
-        csosn: product.csosn,
         unit: product.unit,
-        icms_rate: product.icms_rate ? parseFloat(product.icms_rate) : null,
-        pis_rate: product.pis_rate ? parseFloat(product.pis_rate) : null,
-        cofins_rate: product.cofins_rate
-          ? parseFloat(product.cofins_rate)
-          : null,
         description: product.description || null,
         percentage_taxes: product.percentage_taxes
           ? parseFloat(product.percentage_taxes)
@@ -163,12 +136,16 @@ export default function EditProduct() {
       })
       .eq("id", productId);
 
-    if (!companyId || !product.loan_product_code) {
-      console.error("❌ Dados faltando:", {
-        companyId,
-        loan_product_code: product.loan_product_code,
-      });
-      toast.error("Erro: empresa ou equipamento não encontrado.");
+    // antes de salvar, valide só os obrigatórios do produto
+    if (!product.name || !product.standard_price || !product.material_class) {
+      toast.error("Preencha os campos obrigatórios!");
+      setLoading(false);
+      return;
+    }
+
+    // só precisa de companyId se for vincular equipamento
+    if (product.loan_product_code && !companyId) {
+      toast.error("Empresa não encontrada para vincular equipamento.");
       setLoading(false);
       return;
     }

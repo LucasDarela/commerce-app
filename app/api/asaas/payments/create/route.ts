@@ -17,7 +17,7 @@ const bodySchema = z.object({
   discountDueDateLimitDays: z.number().int().nonnegative().optional(),
   finePercent: z.number().nonnegative().max(2).optional(),
   interestPercentMonth: z.number().nonnegative().max(1).optional(),
-  orderId: z.string().optional(),
+  orderId: z.string().uuid().optional(), // <- usaremos para atualizar orders
 });
 
 export async function POST(req: Request) {
@@ -34,13 +34,13 @@ export async function POST(req: Request) {
       discountDueDateLimitDays,
       finePercent,
       interestPercentMonth,
+      orderId,
     } = bodySchema.parse(await req.json());
 
-    // Normaliza ID (sua coluna é uuid)
     const idFilter =
       typeof customerId === "number" ? String(customerId) : customerId;
 
-    // company_id do usuário logado
+    // company_id do usuário
     const { data: comp, error: compErr } = await supabase
       .from("current_user_company_id")
       .select("company_id")
@@ -52,7 +52,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // pega cliente (tenant-safe)
+    // cliente (tenant-safe)
     const { data: local, error: cliErr } = await supabase
       .from("customers")
       .select("id, company_id, name, asaas_customer_id")
@@ -67,20 +67,13 @@ export async function POST(req: Request) {
         { error: "Cliente não encontrado" },
         { status: 404 },
       );
-    if (!local.asaas_customer_id) {
+    if (!local.asaas_customer_id)
       return NextResponse.json(
         { error: "Cliente não sincronizado com o Asaas" },
         { status: 400 },
       );
-    }
-    if (!local.name) {
-      return NextResponse.json(
-        { error: "Cliente sem nome (supplier é obrigatório)" },
-        { status: 400 },
-      );
-    }
 
-    // monta payload do Asaas
+    // payload Asaas
     const payload: Record<string, any> = {
       customer: local.asaas_customer_id,
       billingType: "BOLETO",
@@ -89,24 +82,19 @@ export async function POST(req: Request) {
       description,
       postalService: postalService ?? false,
     };
-
-    // encargos opcionais
-    if (typeof finePercent === "number") {
+    if (typeof finePercent === "number")
       payload.fine = { value: finePercent, type: "PERCENTAGE" };
-    }
-    if (typeof interestPercentMonth === "number") {
+    if (typeof interestPercentMonth === "number")
       payload.interest = {
         value: interestPercentMonth,
         type: "PERCENTAGE_PER_MONTH",
       };
-    }
-    if (typeof discountValue === "number" && discountValue > 0) {
+    if (typeof discountValue === "number" && discountValue > 0)
       payload.discount = {
         value: discountValue,
         type: "FIXED",
         dueDateLimitDays: discountDueDateLimitDays ?? 0,
       };
-    }
 
     console.log("➡️ Criando boleto no Asaas com payload:", payload);
 
@@ -115,44 +103,47 @@ export async function POST(req: Request) {
       body: JSON.stringify(payload),
     });
 
-    // campos úteis (variam por ambiente/conta)
     const digitableLine =
       created.identificationField ?? created.digitableLine ?? null;
     const barcode = created.bankSlipBarcode ?? null;
     const boletoUrl = created.bankSlipUrl ?? created.invoiceUrl ?? null;
-    // 👉 salvar em financial_records
-    const issueDate = new Date().toISOString().slice(0, 10); // YYYY-MM-DD (TEXT na sua tabela)
-    const frInsert = {
-      company_id: comp.company_id,
-      issue_date: issueDate,
-      supplier: local.name, // NOT NULL
-      description: description ?? `Boleto ASAAS #${created.id}`,
-      category: null,
-      amount: value,
-      status: "Unpaid",
-      due_date: dueDate,
-      notes: [
-        digitableLine ? `Linha digitável: ${digitableLine}` : null,
-        boletoUrl ? `URL: ${boletoUrl}` : null,
-        barcode ? `Código de barras: ${barcode}` : null,
-      ]
-        .filter(Boolean)
-        .join(" | "),
-      payment_method: "BOLETO",
-      invoice_number: created.id,
-      type: "input",
-      bank_account_id: null,
-      supplier_id: null,
-      // total_payed: default = 0
-    };
 
-    const { error: frErr } = await supabase
-      .from("financial_records")
-      .insert(frInsert);
-    if (frErr) {
-      console.error("❌ Erro ao salvar financial_records:", frErr.message);
-      // escolha: retornar 400 ou apenas logar
-      // return NextResponse.json({ error: "Falha ao registrar em financial_records" }, { status: 400 });
+    if (orderId) {
+      // garante que o pedido pertence à mesma company
+      const { data: orderRow } = await supabase
+        .from("orders")
+        .select("id, company_id")
+        .eq("id", orderId)
+        .maybeSingle();
+
+      if (!orderRow || orderRow.company_id !== comp.company_id) {
+        return NextResponse.json(
+          { error: "Pedido inválido para este usuário/empresa" },
+          { status: 403 },
+        );
+      }
+
+      const issueDate = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      const update: Record<string, any> = {
+        boleto_id: created.id,
+        boleto_url: boletoUrl,
+        boleto_digitable_line: digitableLine,
+        boleto_barcode_number: barcode,
+        due_date: dueDate,
+        issue_date: issueDate,
+        payment_status: "Unpaid", // se quiser marcar como pendente
+      };
+
+      const { error: updErr } = await supabase
+        .from("orders")
+        .update(update)
+        .eq("id", orderId);
+      if (updErr) {
+        console.error(
+          "❌ Falha ao atualizar order com dados do boleto:",
+          updErr.message,
+        );
+      }
     }
 
     const response = {

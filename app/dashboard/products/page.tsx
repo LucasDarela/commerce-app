@@ -256,13 +256,14 @@ export default function ListProduct() {
                 <strong>Preço Compra:</strong> {selectedProduct.standard_price}
               </p>
               <p>
-                <strong>Estoque:</strong> {selectedProduct.stock}
+                <strong>Estoque:</strong> {selectedProduct.stock ?? 0}
               </p>
               <p>
                 <strong>Comodato:</strong>{" "}
-                {equipmentMap[selectedProduct.loan_product_code ?? ""] ?? ""}
+                {equipmentMap[selectedProduct.loan_product_code ?? ""] ??
+                  "Sem equipamento vinculado"}
               </p>
-              <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+              {/* <Collapsible open={isOpen} onOpenChange={setIsOpen}>
                 <CollapsibleTrigger asChild>
                   <Button
                     variant="ghost"
@@ -312,7 +313,7 @@ export default function ListProduct() {
                     <strong>COFINS:</strong> {selectedProduct.cofins_rate}
                   </p>
                 </CollapsibleContent>
-              </Collapsible>
+              </Collapsible> */}
             </div>
 
             <DialogFooter className="w-full">
