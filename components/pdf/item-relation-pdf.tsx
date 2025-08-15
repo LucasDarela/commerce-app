@@ -149,15 +149,15 @@ const RelationSection = ({
       {/* Empresa e Cliente */}
       <View style={styles.row}>
         <View style={[styles.section, { flex: 1, marginRight: 4 }]}>
-          <Text style={styles.bold}>{company.name}</Text>
-          <Text>{company.document}</Text>
+          <Text style={styles.bold}>{company?.trade_name}</Text>
+          <Text>{company?.document}</Text>
           <Text>
-            {company.address}, {company.number}
+            {company?.address}, {company?.number}
           </Text>
           <Text>
-            {company.city} - {company.state}, {company.zip_code}
+            {company?.city} - {company?.state}, {company?.zip_code}
           </Text>
-          <Text>{company.phone}</Text>
+          <Text>{company?.phone}</Text>
         </View>
         <View style={[styles.section, { flex: 1, marginLeft: 4 }]}>
           <Text style={styles.bold}>{customer.name}</Text>

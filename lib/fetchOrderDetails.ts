@@ -130,14 +130,27 @@ export async function fetchOrderDetails(
     .from("orders")
     .select(
       `
+    *,
+    customers:customers(*),
+    company:companies!fk_company_id(
+      id,
+      name,
+      trade_name,
+      document,
+      email,
+      phone,
+      address,
+      number,
+      neighborhood,
+      city,
+      state,
+      zip_code
+    ),
+    order_items(
       *,
-      customers:customers(*),
-      company:companies!fk_company_id(*),
-      order_items(
-        *,
-        product:products!order_items_product_id_fkey (name, code)
-      )
-    `,
+      product:products!order_items_product_id_fkey (name, code)
+    )
+  `,
     )
     .eq("id", orderId)
     .single();
@@ -150,7 +163,20 @@ export async function fetchOrderDetails(
   return {
     id: data.id,
     // company no formato que seu tipo espera:
-    company: { id: data.company?.id, name: data.company?.name },
+    company: {
+      id: data.company?.id,
+      name: data.company?.name ?? null,
+      trade_name: data.company?.trade_name ?? data.company?.name ?? null,
+      document: data.company?.document ?? null,
+      email: data.company?.email ?? null,
+      phone: data.company?.phone ?? null,
+      address: data.company?.address ?? null,
+      number: data.company?.number ?? null,
+      neighborhood: data.company?.neighborhood ?? null,
+      city: data.company?.city ?? null,
+      state: data.company?.state ?? null,
+      zip_code: data.company?.zip_code ?? null,
+    },
     // cliente completo (já contém phone, address, etc)
     customer: data.customers,
     note_number: data.note_number ?? undefined,

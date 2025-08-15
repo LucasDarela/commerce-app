@@ -48,7 +48,6 @@ export default function LandingLayout() {
   return (
     <div>
       <NavBar />
-      {/*
       <Hero />
       <Functionalities />
       <Plans />
@@ -56,10 +55,7 @@ export default function LandingLayout() {
       <CallToAction />
       <FAQ />
       <Footer />
-      <ScrollToTopButton /> */}
-      <div className="flex items-center justify-center min-h-screen">
-        <h1>Site em Desenvolvimento...</h1>
-      </div>
+      <ScrollToTopButton />
     </div>
   );
 }

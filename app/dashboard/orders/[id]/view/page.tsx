@@ -204,7 +204,7 @@ export default function ViewOrderPage() {
         );
         setReturnedProducts(devolucoes);
 
-        const logo = await getCompanyLogoAsDataUrl(data.company.id);
+        const logo = await getCompanyLogoAsDataUrl(data.company?.id ?? null);
         setLogoUrl(logo);
       } catch (err) {
         console.error("Erro ao carregar espelho da venda:", err);

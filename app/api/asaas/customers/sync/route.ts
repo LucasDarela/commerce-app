@@ -18,18 +18,50 @@ function normalizeCpfCnpj(v?: string | null) {
   return v ? v.replace(/\D/g, "") : undefined;
 }
 
+// helpers no topo do arquivo
+function normalizePhoneBR(v?: string | null) {
+  if (!v) return undefined;
+  let d = String(v).replace(/\D/g, ""); // só dígitos
+  if (d.startsWith("55")) d = d.slice(2); // remove código do país
+  // (opcional) remove zero à esquerda do DDD, se existir
+  if (d.length >= 1 && d[0] === "0") d = d.slice(1);
+  // retorna só se tiver 10 (fixo) ou 11 (celular) dígitos
+  if (d.length === 10 || d.length === 11) return d;
+  // se vier algo diferente, ainda assim devolve dígitos para não perder dado
+  return d || undefined;
+}
+
 /** Mapeia seu modelo -> payload do Asaas (com alguns campos extras suportados) */
 function mapToAsaasCustomer(row: any): AsaasCustomer & Record<string, any> {
+  // normaliza telefones
+  const phoneDigits = normalizePhoneBR(row?.phone);
+  const mobileDigits = normalizePhoneBR(row?.mobile_phone ?? row?.cellphone);
+
+  // Regra: se só houver um número, decide campo por tamanho (11 = mobile)
+  let phone: string | undefined = undefined;
+  let mobilePhone: string | undefined = undefined;
+
+  if (mobileDigits) {
+    // se já temos um “mobile” vindo do banco, usa aqui
+    mobilePhone = mobileDigits;
+  }
+  if (phoneDigits) {
+    if (!mobilePhone && phoneDigits.length === 11) {
+      // 11 dígitos típico de celular com 9 -> tratar como mobilePhone
+      mobilePhone = phoneDigits;
+    } else {
+      phone = phoneDigits;
+    }
+  }
   return {
     name: row?.name ?? "",
     cpfCnpj: normalizeCpfCnpj(row?.document),
     email: row?.email || undefined,
-    mobilePhone: row?.phone || undefined,
+    mobilePhone,
     postalCode: row?.zip_code?.replace(/\D/g, "") || undefined,
     address: row?.address || undefined,
     addressNumber: row?.number || undefined,
     complement: row?.complement || undefined,
-    // extras que o Asaas aceita
     company: row?.fantasy_name || undefined,
     stateInscription: row?.state_registration || undefined,
     externalReference: row?.id,

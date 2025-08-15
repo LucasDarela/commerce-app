@@ -1,4 +1,3 @@
-// components/types/orderDetails.ts
 export type OrderDetails = {
   id: string;
   payment_method: string;
@@ -8,8 +7,22 @@ export type OrderDetails = {
   note_number?: string;
   customer_signature?: string | null;
   document_type: string | null;
+  company_id?: string;
   // usado no PDF/logo:
-  company: { id: string; name?: string };
+  company: {
+    id: string;
+    name?: string | null;
+    trade_name?: string | null;
+    document?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    address?: string | null;
+    number?: string | number | null;
+    neighborhood?: string | null;
+    city?: string | null;
+    state?: string | null;
+    zip_code?: string | null;
+  };
 
   // a view usa estes campos do cliente:
   customer: {

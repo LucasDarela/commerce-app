@@ -120,7 +120,7 @@
 // }
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
@@ -132,6 +132,24 @@ function addDays(base: Date, days: number) {
   const d = new Date(base);
   d.setDate(d.getDate() + days);
   return d;
+}
+
+function openBoleto(url: string) {
+  if (!url) return;
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  if (isMobile) {
+    // abre na mesma aba (mais confiável em mobile/PWA)
+    window.location.href = url;
+  } else {
+    // desktop: nova aba
+    const a = document.createElement("a");
+    a.href = url;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
 }
 
 type Provider = "asaas" | "mercado_pago" | null;
@@ -233,7 +251,7 @@ function GenerateBoletoMPButton({
 
       if (order.boleto_url) {
         toast.success("✅ Boleto já gerado.");
-        window.open(order.boleto_url, "_blank");
+        openBoleto(order.boleto_url);
         return;
       }
 
@@ -284,7 +302,7 @@ function GenerateBoletoMPButton({
       }
 
       toast.success("🎉 Boleto (Mercado Pago) gerado!");
-      window.open(updatedOrder.boleto_url, "_blank");
+      openBoleto(updatedOrder.boleto_url);
     } catch (e: any) {
       console.error("❌ MP:", e);
       toast.error(e?.message || "Erro inesperado (MP).");
@@ -329,7 +347,7 @@ function GenerateBoletoAsaasButton({
 
       if (order.boleto_url) {
         toast.success("✅ Boleto já gerado.");
-        window.open(order.boleto_url, "_blank");
+        openBoleto(order.boleto_url);
         return;
       }
 
@@ -366,7 +384,7 @@ function GenerateBoletoAsaasButton({
       }
 
       toast.success("🎉 Boleto (Asaas) gerado!");
-      if (json.boletoUrl) window.open(json.boletoUrl, "_blank");
+      if (json.boletoUrl) openBoleto(json.boletoUrl);
     } catch (e: any) {
       console.error("❌ Asaas:", e);
       toast.error(e?.message || "Erro ao criar boleto (Asaas)");
