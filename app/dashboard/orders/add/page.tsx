@@ -40,6 +40,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { generateNextNoteNumber } from "@/lib/generate-next-note-number";
 import { Textarea } from "@/components/ui/textarea";
 import { orderSchema, type Order } from "@/components/types/orderSchema";
+import React, { useMemo } from "react";
 
 type OrderFormData = z.infer<typeof orderSchema> & { id?: string };
 
@@ -490,6 +491,12 @@ export default function AddOrder() {
     resolver: zodResolver(orderSchema),
   });
 
+  const productById = useMemo(() => {
+    const m = new Map<string, (typeof products)[number]>();
+    products.forEach((p) => m.set(String(p.id), p));
+    return m;
+  }, [products]);
+
   return (
     <div className="w-full max-w-4xl mx-auto p-6 rounded-lg shadow-md">
       <h1 className="text-2xl font-bold mb-4">Criar Venda</h1>
@@ -792,59 +799,55 @@ export default function AddOrder() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {items.map((item, index) => (
-                  <TableRow key={index}>
-                    <TableCell>
-                      <Select
-                        value={item.id}
-                        onValueChange={(value) =>
-                          handleEditProduct(index, value)
-                        }
-                      >
-                        <SelectTrigger className="w-[300px] truncate border rounded-md shadow-sm">
-                          <SelectValue
-                            placeholder="Produto"
-                            defaultValue={item.name}
-                          />
-                        </SelectTrigger>
-                        <SelectContent className="shadow-md rounded-md">
-                          {products.map((product) => (
-                            <SelectItem
-                              key={product.id}
-                              value={product.id.toString()}
-                            >
-                              {product.code} - {product.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell className="w-[100px]">
-                      <Input
-                        className="w-full text-left"
-                        type="number"
-                        value={item.quantity}
-                        onChange={(e) =>
-                          handleEditQuantity(index, e.target.value)
-                        }
-                      />
-                    </TableCell>
-                    <TableCell className="w-[120px]">
-                      <Input
-                        className="w-full text-left"
-                        type="number"
-                        value={item.standard_price}
-                        onChange={(e) => handleEditPrice(index, e.target.value)}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Trash
-                        className="cursor-pointer text-red-500"
-                        onClick={() => removeItem(index)}
-                      />
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {items.map((item, index) => {
+                  const p = productById.get(String(item.id));
+                  const label = p
+                    ? `${p.code} - ${p.name}`
+                    : "Produto indisponível";
+
+                  return (
+                    <TableRow key={index}>
+                      <TableCell>
+                        {/* 2) Produto fixo (não editável) */}
+                        <div className="w-[300px] truncate rounded-md border bg-muted/40 px-3 py-2 text-sm select-none">
+                          {label}
+                        </div>
+                        {/* Se preferir aparência de input:
+          <Input value={label} readOnly className="w-[300px] cursor-default select-none bg-muted/40" />
+          */}
+                      </TableCell>
+
+                      <TableCell className="w-[100px]">
+                        <Input
+                          className="w-full text-left"
+                          type="number"
+                          value={item.quantity}
+                          onChange={(e) =>
+                            handleEditQuantity(index, e.target.value)
+                          }
+                        />
+                      </TableCell>
+
+                      <TableCell className="w-[120px]">
+                        <Input
+                          className="w-full text-left"
+                          type="number"
+                          value={item.standard_price}
+                          onChange={(e) =>
+                            handleEditPrice(index, e.target.value)
+                          }
+                        />
+                      </TableCell>
+
+                      <TableCell>
+                        <Trash
+                          className="cursor-pointer text-red-500"
+                          onClick={() => removeItem(index)}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
