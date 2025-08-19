@@ -42,13 +42,15 @@ export async function POST(req: Request) {
       );
     }
 
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL!;
+    const siteUrl =
+      process.env.NEXT_PUBLIC_SITE_URL ||
+      (typeof window !== "undefined" ? window.location.origin : "");
     const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
       data: {
-        company_id: cu.company_id, // <- herda a empresa do admin
-        invited_role: role || "normal", // <- papéis de convite
+        company_id: cu.company_id,
+        invited_role: role || "normal",
       },
-      redirectTo: `${siteUrl}/auth/callback?next=/set-password`,
+      redirectTo: `${siteUrl}/auth/callback?type=invite&next=/set-password`,
     });
 
     if (error)
