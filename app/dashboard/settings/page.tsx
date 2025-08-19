@@ -5,6 +5,7 @@ import TeamManagementPage from "@/components/team-management";
 import CompanySettingsForm from "@/components/company_settings";
 import IntegrationsPage from "./integrations/page";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
+import RegisterBankAccount from "../register-bank-account/page";
 
 export default function SettingsPage() {
   const { user, companyId, loading } = useAuthenticatedCompany();
@@ -18,6 +19,8 @@ export default function SettingsPage() {
       <h2 className="text-2xl font-bold">Configurações</h2>
       <CompanySettingsForm />
       <IntegrationsPage />
+      <TeamManagementPage />
+      <RegisterBankAccount />
     </div>
   );
 }

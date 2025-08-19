@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -18,54 +17,76 @@ import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { PasswordInput } from "../ui/password-input";
+import { useState } from "react";
 
 const formSchema = z
   .object({
     email: z
       .string({ required_error: "O e-mail é obrigatório." })
-      .email({ message: "Deve ser um e-mail válido." }),
-
+      .email("Deve ser um e-mail válido."),
     password: z
       .string({ required_error: "A senha é obrigatória." })
-      .min(7, { message: "A senha deve ter pelo menos 7 caracteres." })
-      .max(15, { message: "Limite excedido de 15 caracteres." }),
-
+      .min(7, "A senha deve ter pelo menos 7 caracteres.")
+      .max(15, "Limite excedido de 15 caracteres."),
     confirmPassword: z.string({
       required_error: "Você deve confirmar sua senha.",
     }),
   })
-  .refine((data) => data.password === data.confirmPassword, {
+  .refine((d) => d.password === d.confirmPassword, {
     message: "As senhas devem corresponder.",
     path: ["confirmPassword"],
   });
 
 export function CreateAccountForm() {
   const router = useRouter();
+  const [loading, setLoading] = useState(false);
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      email: "",
-      password: "",
-      confirmPassword: "",
-    },
+    defaultValues: { email: "", password: "", confirmPassword: "" },
   });
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
+      setLoading(true);
+
       const supabase = createClientComponentClient();
       const { email, password } = values;
 
+      const siteUrl =
+        process.env.NEXT_PUBLIC_SITE_URL ||
+        (typeof window !== "undefined" ? window.location.origin : "");
+
       const { data, error } = await supabase.auth.signUp({
         email,
-        password,
+        password, // senha já criada aqui (cadastro normal)
         options: {
-          emailRedirectTo: `${location.origin}/auth/callback`,
+          // fluxo normal: não usar /set-password
+          emailRedirectTo: `${siteUrl}/auth/callback?type=signup&next=/marketing/registration-confirmed`,
         },
       });
 
       if (error) {
-        console.error("Erro no signUp:", error.message);
-        toast.error("Erro ao criar conta. Tente novamente.");
+        // mensagens mais amigáveis
+        if ((error as any)?.code === "user_already_exists") {
+          toast.error("Este e-mail já está em uso.");
+        } else {
+          console.error("Erro no signUp:", error);
+          toast.error("Erro ao criar conta. Tente novamente.");
+        }
+        return;
+      }
+
+      // Caso peculiar do Supabase: usuário pode existir e vir sem erro
+      if (data.user && (data.user as any).identities?.length === 0) {
+        toast.error("Este e-mail já está em uso.");
+        return;
+      }
+
+      if (data.session) {
+        // confirmação de e-mail desativada → já autenticado
+        toast.success("Conta criada com sucesso!");
+        router.replace("/marketing/registration-confirmed");
         return;
       }
 
@@ -74,9 +95,11 @@ export function CreateAccountForm() {
         form.reset();
         router.push("/login-signin");
       }
-    } catch (error) {
-      console.error("CreateAccountForm", error);
+    } catch (err) {
+      console.error("CreateAccountForm", err);
       toast.error("Erro inesperado. Tente novamente.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -95,7 +118,12 @@ export function CreateAccountForm() {
               <FormItem>
                 <FormLabel>E-mail</FormLabel>
                 <FormControl>
-                  <Input placeholder="E-mail" {...field} />
+                  <Input
+                    type="email"
+                    autoComplete="email"
+                    placeholder="E-mail"
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -108,7 +136,11 @@ export function CreateAccountForm() {
               <FormItem>
                 <FormLabel>Senha</FormLabel>
                 <FormControl>
-                  <PasswordInput placeholder="Senha" {...field} />
+                  <PasswordInput
+                    placeholder="Senha"
+                    autoComplete="new-password"
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -121,14 +153,19 @@ export function CreateAccountForm() {
               <FormItem>
                 <FormLabel>Confirme a Senha</FormLabel>
                 <FormControl>
-                  <PasswordInput placeholder="Confirme a Senha" {...field} />
+                  <PasswordInput
+                    placeholder="Confirme a Senha"
+                    autoComplete="new-password"
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
-          <Button type="submit" className="my-4 w-full">
-            Criar Conta
+
+          <Button type="submit" className="my-4 w-full" disabled={loading}>
+            {loading ? "Criando..." : "Criar Conta"}
           </Button>
         </form>
       </Form>

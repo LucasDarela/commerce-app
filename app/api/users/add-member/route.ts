@@ -1,81 +1,68 @@
 // app/api/users/add-member/route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { cookies } from "next/headers";
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 
-const supabase = createClient(
+const admin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 );
 
 export async function POST(req: Request) {
-  const body = await req.json();
-  const { email, password, company_id } = body;
+  try {
+    const supa = createRouteHandlerClient({ cookies });
+    const {
+      data: { user: inviter },
+    } = await supa.auth.getUser();
+    if (!inviter)
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-  // 1️⃣ Cria o usuário no Auth
-  const { data: signUpData, error: signUpError } =
-    await supabase.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: false,
-    });
+    const { email, role } = await req.json();
 
-  if (signUpError || !signUpData.user) {
-    console.error("Erro ao criar usuário:", signUpError?.message);
-    return NextResponse.json({ error: signUpError?.message }, { status: 400 });
-  }
-
-  const user_id = signUpData.user.id;
-
-  // 2️⃣ Aguarda o profile ser criado pela trigger on_auth_user_created
-  let profileCreated = false;
-  let attempts = 0;
-
-  while (!profileCreated && attempts < 10) {
-    const { data: profileData } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("id", user_id)
+    // pega a company do admin autenticado
+    const { data: cu, error: cuErr } = await admin
+      .from("company_users")
+      .select("company_id, role")
+      .eq("user_id", inviter.id)
       .maybeSingle();
 
-    if (profileData?.id) {
-      profileCreated = true;
-    } else {
-      await new Promise((res) => setTimeout(res, 500)); // espera 500ms
-      attempts++;
+    if (cuErr || !cu?.company_id) {
+      return NextResponse.json(
+        { error: "Company not found for inviter" },
+        { status: 400 },
+      );
     }
-  }
 
-  if (!profileCreated) {
+    // opcional: só admin pode convidar admin
+    if (role === "admin" && cu.role !== "admin") {
+      return NextResponse.json(
+        { error: "Somente administradores podem convidar admins." },
+        { status: 403 },
+      );
+    }
+
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL!;
+    const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
+      data: {
+        company_id: cu.company_id, // <- herda a empresa do admin
+        invited_role: role || "normal", // <- papéis de convite
+      },
+      redirectTo: `${siteUrl}/auth/callback?next=/set-password`,
+    });
+
+    if (error)
+      return NextResponse.json({ error: error.message }, { status: 400 });
+
     return NextResponse.json(
-      { error: "Perfil não foi criado automaticamente." },
-      { status: 400 },
+      { ok: true, userId: data.user?.id },
+      { status: 200 },
+    );
+  } catch (e: any) {
+    console.error("[add-member] error:", e?.message || e);
+    return NextResponse.json(
+      { error: "Erro interno no add-member." },
+      { status: 500 },
     );
   }
-
-  // 3️⃣ Atualiza o profile com company_id
-  const { error: updateProfileError } = await supabase
-    .from("profiles")
-    .update({ company_id })
-    .eq("id", user_id);
-
-  if (updateProfileError) {
-    console.error("Erro ao atualizar profile:", updateProfileError.message);
-    return NextResponse.json(
-      { error: updateProfileError.message },
-      { status: 400 },
-    );
-  }
-
-  // 4️⃣ Insere na company_users
-  const { error: insertError } = await supabase.from("company_users").insert({
-    user_id,
-    company_id,
-  });
-
-  if (insertError) {
-    console.error("Erro ao vincular company_users:", insertError.message);
-    return NextResponse.json({ error: insertError.message }, { status: 400 });
-  }
-
-  return NextResponse.json({ success: true });
 }

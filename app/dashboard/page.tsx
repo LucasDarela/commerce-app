@@ -16,6 +16,15 @@ export default async function DashboardPage() {
   if (!user) {
     redirect("/login-signin");
   }
+
+  const { data: cu, error } = await supabase
+    .from("company_users")
+    .select("role")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (error || cu?.role !== "admin") redirect("/dashboard/forbidden");
+
   return (
     <div className="flex flex-1 flex-col">
       <div className="@container/main flex flex-1 flex-col gap-2">
