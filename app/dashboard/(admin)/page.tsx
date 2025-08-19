@@ -1,4 +1,6 @@
 // app/dashboard/(admin)/page.tsx
+"use client";
+
 import { ChartAreaInteractive } from "@/components/chart-area-interactive";
 import { SectionCards } from "@/components/dashboard/SectionCardsServer";
 
