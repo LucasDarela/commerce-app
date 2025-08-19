@@ -15,7 +15,6 @@ export default async function AdminGateLayout({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login-signin");
 
-  // verifica se é admin (ajuste a query conforme seu esquema)
   const { data: cu, error } = await supabase
     .from("company_users")
     .select("role")

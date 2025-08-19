@@ -1,8 +1,14 @@
 // app/dashboard/(admin)/page.tsx
-"use client";
-
-import { ChartAreaInteractive } from "@/components/chart-area-interactive";
+import dynamic from "next/dynamic";
 import { SectionCards } from "@/components/dashboard/SectionCardsServer";
+
+const ChartAreaInteractive = dynamic(
+  () =>
+    import("@/components/chart-area-interactive").then(
+      (m) => m.ChartAreaInteractive,
+    ),
+  { ssr: false },
+);
 
 export default async function DashboardPage() {
   return (
