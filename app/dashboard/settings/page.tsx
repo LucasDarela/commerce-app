@@ -18,8 +18,8 @@ export default function SettingsPage() {
     <div className="space-y-6 px-6 mt-9">
       <h2 className="text-2xl font-bold">Configurações</h2>
       <CompanySettingsForm />
-      <IntegrationsPage />
       <TeamManagementPage />
+      <IntegrationsPage />
       <RegisterBankAccount />
     </div>
   );
