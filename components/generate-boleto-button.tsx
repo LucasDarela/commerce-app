@@ -340,6 +340,7 @@ function GenerateBoletoAsaasButton({
         .select(`*, customers:customers(*)`)
         .eq("id", orderId)
         .single();
+
       if (error || !order || !order.customers) {
         toast.error("⚠️ Dados do cliente não encontrados.");
         return;
@@ -351,32 +352,38 @@ function GenerateBoletoAsaasButton({
         return;
       }
 
-      const cliente = order.customers;
-      const days =
-        typeof order.days_ticket === "number" ? order.days_ticket : 0;
-      const dueDate = formatYMD(addDays(new Date(), days));
+      // const cliente = order.customers;
+      // const days =
+      //   typeof order.days_ticket === "number" ? order.days_ticket : 0;
+      // const dueDate = formatYMD(addDays(new Date(), days));
+      // const value = Number(order.total || 0);
+
+      const appt = order.appointment_date
+        ? String(order.appointment_date).slice(0, 10)
+        : new Date().toISOString().slice(0, 10);
+
       const value = Number(order.total || 0);
+      const cliente = order.customers;
 
       const res = await fetch("/api/asaas/payments/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           orderId,
-          customerId: cliente.id, // uuid do customers
+          customerId: cliente.id,
           value,
-          dueDate,
+          appointmentDate: appt,
           description: `Pedido #${order.note_number}`,
         }),
       });
       const json = await res.json();
       console.log("🔎 Asaas /payments/create:", json);
-
       if (!res.ok) {
+        console.error("Asaas error:", json);
         toast.error(json.error || "Falha ao criar boleto (Asaas)");
         return;
       }
 
-      // opcional: manter a URL no pedido para reabrir depois
       if (json.boletoUrl) {
         await supabase
           .from("orders")

@@ -8,9 +8,9 @@ import { asaasFetch } from "@/lib/asaas";
 const bodySchema = z.object({
   customerId: z.union([z.string(), z.number()]),
   value: z.number().positive(),
-  dueDate: z
+  appointmentDate: z
     .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "dueDate deve ser YYYY-MM-DD"),
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "appointmentDate deve ser YYYY-MM-DD"),
   description: z.string().optional(),
   postalService: z.boolean().optional(),
   discountValue: z.number().nonnegative().optional(),
@@ -27,7 +27,7 @@ export async function POST(req: Request) {
     const {
       customerId,
       value,
-      dueDate,
+      appointmentDate,
       description,
       postalService,
       discountValue,
@@ -36,6 +36,13 @@ export async function POST(req: Request) {
       interestPercentMonth,
       orderId,
     } = bodySchema.parse(await req.json());
+
+    // ✅ dueDate = appointmentDate + 12 dias (retroativo)
+    // cuidado com timezone; concateno "T00:00:00" para não pular dia
+    const base = new Date(`${appointmentDate}T00:00:00`);
+    const plus12 = new Date(base);
+    plus12.setDate(plus12.getDate() + 12);
+    const dueDate = plus12.toISOString().slice(0, 10); // YYYY-MM-DD
 
     const idFilter =
       typeof customerId === "number" ? String(customerId) : customerId;
@@ -123,7 +130,7 @@ export async function POST(req: Request) {
         );
       }
 
-      const issueDate = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      const issueDate = appointmentDate;
       const update: Record<string, any> = {
         boleto_id: created.id,
         boleto_url: boletoUrl,
@@ -131,7 +138,7 @@ export async function POST(req: Request) {
         boleto_barcode_number: barcode,
         due_date: dueDate,
         issue_date: issueDate,
-        payment_status: "Unpaid", // se quiser marcar como pendente
+        payment_status: "Unpaid",
       };
 
       const { error: updErr } = await supabase
