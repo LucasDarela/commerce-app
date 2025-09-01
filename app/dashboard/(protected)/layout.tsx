@@ -1,4 +1,4 @@
-// app/dashboard/(admin)/layout.tsx
+// app/dashboard/(protected)/layout.tsx
 export const runtime = "nodejs";
 
 import { redirect } from "next/navigation";
@@ -10,8 +10,6 @@ export default async function AdminGateLayout({
   children: React.ReactNode;
 }) {
   const supabase = supabaseServer();
-
-  // precisa estar logado
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -23,9 +21,7 @@ export default async function AdminGateLayout({
     .eq("user_id", user.id)
     .maybeSingle();
 
-  if (error || cu?.role !== "admin") {
-    redirect("/dashboard/forbidden");
-  }
+  if (error || cu?.role !== "admin") redirect("/dashboard/forbidden");
 
   return <>{children}</>;
 }
