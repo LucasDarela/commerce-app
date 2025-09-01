@@ -1,4 +1,7 @@
 // app/dashboard/(admin)/page.tsx
+export const runtime = "nodejs";
+
+import "./_client-ref";
 import { ChartAreaInteractive } from "@/components/chart-area-interactive";
 import { SectionCards } from "@/components/dashboard/SectionCardsServer";
 

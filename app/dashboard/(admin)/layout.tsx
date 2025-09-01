@@ -1,4 +1,6 @@
 // app/dashboard/(admin)/layout.tsx
+export const runtime = "nodejs";
+
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabaseServer";
 
