@@ -1,16 +1,7 @@
-// app/dashboard/(protected)/page.tsx
 export const runtime = "nodejs";
 
-import dynamic from "next/dynamic";
 import { SectionCards } from "@/components/dashboard/SectionCardsServer";
-
-const ChartAreaInteractive = dynamic(
-  () =>
-    import("@/components/chart-area-interactive").then(
-      (m) => m.ChartAreaInteractive,
-    ),
-  { ssr: false },
-);
+import ClientChart from "./ClientChart";
 
 export default async function DashboardPage() {
   return (
@@ -19,7 +10,7 @@ export default async function DashboardPage() {
         <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
           <SectionCards />
           <div className="px-4 lg:px-6">
-            <ChartAreaInteractive />
+            <ClientChart />
           </div>
         </div>
       </div>

@@ -1,8 +1,15 @@
 "use client";
-import { ChartAreaInteractive } from "@/components/chart-area-interactive";
-// se seu export for default, troque a linha acima para:
-// import ChartAreaInteractive from "@/components/chart-area-interactive";
+
+import dynamic from "next/dynamic";
+
+const Chart = dynamic(
+  () =>
+    import("@/components/chart-area-interactive").then(
+      (m) => m.ChartAreaInteractive,
+    ),
+  { ssr: false },
+);
 
 export default function ClientChart() {
-  return <ChartAreaInteractive />;
+  return <Chart />;
 }
