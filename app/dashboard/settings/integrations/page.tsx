@@ -19,6 +19,7 @@ type Provider = "mercado_pago" | "asaas";
 type IntegrationRow = {
   provider: Provider;
   access_token: string | null;
+  webhook_token: string | null;
 };
 
 function providerLabel(p: string) {
@@ -45,6 +46,7 @@ export default function IntegrationsPage() {
   const [addingNew, setAddingNew] = useState(false);
   const [provider, setProvider] = useState<Provider>("mercado_pago");
   const [token, setToken] = useState("");
+  const [webhookToken, setWebhookToken] = useState("");
   const [saving, setSaving] = useState(false);
   const [disconnecting, setDisconnecting] = useState<string | null>(null);
 
@@ -52,7 +54,7 @@ export default function IntegrationsPage() {
     setLoading(true);
     const { data, error } = await supabase
       .from("company_integrations")
-      .select("provider, access_token");
+      .select("provider, access_token, webhook_token");
     if (error) {
       console.error(error);
       toast.error("Erro ao buscar integrações");
@@ -169,13 +171,27 @@ export default function IntegrationsPage() {
             onChange={(e) => setToken(e.target.value)}
           />
 
+          <div className="flex items-center gap-2">
+            <Input
+              placeholder="Webhook Token"
+              value={webhookToken}
+              onChange={(e) => setWebhookToken(e.target.value)}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setWebhookToken(crypto.randomUUID())}
+            >
+              Gerar
+            </Button>
+          </div>
+
           <div className="flex gap-2">
             <Button
               onClick={async () => {
                 const trimmed = token.trim();
                 if (!trimmed) return toast.error("Informe o token");
 
-                // Aviso se o formato do token não casa com o provedor escolhido
                 const guessed = detectProviderFromToken(trimmed);
                 if (guessed !== "unknown" && guessed !== provider) {
                   const proceed = window.confirm(
@@ -188,13 +204,18 @@ export default function IntegrationsPage() {
                 const res = await fetch("/api/integrations", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ provider, access_token: trimmed }),
+                  body: JSON.stringify({
+                    provider,
+                    access_token: token.trim(),
+                    webhook_token: webhookToken.trim() || null,
+                  }),
                 });
                 setSaving(false);
 
                 if (res.ok) {
                   toast.success("Integração salva!");
                   setToken("");
+                  setWebhookToken("");
                   setAddingNew(false);
                   fetchIntegrations();
                 } else {

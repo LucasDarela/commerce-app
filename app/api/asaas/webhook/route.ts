@@ -1,23 +1,17 @@
+// app/api/asaas/webhook/route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-
-// ⚙️ configure no .env
-// SUPABASE_URL=...
-// SUPABASE_SERVICE_ROLE_KEY=...
-// ASAAS_WEBHOOK_TOKEN=algum_token_unico
 
 type AsaasPayment = {
   id: string;
   value?: number;
   netValue?: number;
-  status?: string; // PENDING, RECEIVED, CONFIRMED, REFUNDED, OVERDUE, etc.
-  // ...outros campos do Asaas
+  status?: string;
 };
-
 type AsaasWebhook = {
   event?: string;
   payment?: AsaasPayment;
-  data?: { payment?: AsaasPayment }; // alguns formatos embalam em data.payment
+  data?: { payment?: AsaasPayment };
 };
 
 function mapAsaasToFRStatus(asaasStatus?: string): "Paid" | "Unpaid" {
@@ -26,28 +20,24 @@ function mapAsaasToFRStatus(asaasStatus?: string): "Paid" | "Unpaid" {
     case "CONFIRMED":
     case "RECEIVED_IN_CASH":
     case "RECEIVED_IN_BANK":
-    case "REFUNDED": // escolha: manter como Paid; ajuste se quiser outro estado
       return "Paid";
-    case "PENDING":
-    case "OVERDUE":
-    case "CANCELLED":
-    case "DELETED":
     default:
       return "Unpaid";
   }
 }
 
 export async function POST(req: Request) {
-  // 1) valida segredo do webhook
+  // 0) token enviado pelo Asaas
   const tokenHeader =
     req.headers.get("asaas-access-token") ||
-    req.headers.get("x-asaas-access-token"); // fallback se configurar com outro nome
-  const expected = process.env.ASAAS_WEBHOOK_TOKEN;
-  if (!expected || tokenHeader !== expected) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    req.headers.get("x-asaas-access-token") ||
+    req.headers.get("authorization"); // fallback opcional
+
+  if (!tokenHeader) {
+    return NextResponse.json({ error: "missing token" }, { status: 401 });
   }
 
-  // 2) parse body
+  // 1) parse do body
   let body: AsaasWebhook;
   try {
     body = (await req.json()) as AsaasWebhook;
@@ -55,22 +45,37 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "invalid json" }, { status: 400 });
   }
 
-  const event = body.event || "";
   const payment: AsaasPayment =
     body.payment || body.data?.payment || ({} as AsaasPayment);
-
   if (!payment?.id) {
     return NextResponse.json({ error: "payment id missing" }, { status: 400 });
   }
 
-  // 3) prepara supabase (service role - ignora RLS com segurança)
-  const supabase = createClient(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } },
-  );
+  // 2) conecta Supabase com Service Role (server-only)
+  const SUPABASE_URL =
+    process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!SUPABASE_URL || !SERVICE_ROLE) {
+    return NextResponse.json({ error: "server env missing" }, { status: 500 });
+  }
+  const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, {
+    auth: { persistSession: false },
+  });
 
-  // 4) mapeia status e valores
+  // 3) resolve a empresa pelo webhook_token
+  const { data: integ, error } = await supabase
+    .from("company_integrations")
+    .select("company_id, provider, webhook_token")
+    .eq("provider", "asaas")
+    .eq("webhook_token", tokenHeader.trim())
+    .maybeSingle();
+
+  if (error || !integ) {
+    // token não corresponde a nenhuma empresa
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  // 4) mapeia status e atualiza os pedidos dessa empresa
   const status = mapAsaasToFRStatus(payment.status);
   const totalPayed =
     typeof payment.netValue === "number"
@@ -79,38 +84,27 @@ export async function POST(req: Request) {
         ? payment.value
         : null;
 
-  //    (opcional: também pode filtrar company_id se você guardar em metadados)
-  const updatePayload: Record<string, any> = {
-    status,
-  };
-  if (totalPayed !== null) {
-    updatePayload.total_payed = totalPayed;
-  }
-
   const updateOrder: Record<string, any> = {
     payment_status: status, // "Paid" | "Unpaid"
-    total_payed: totalPayed ?? 0, // se usar
-    // opcional: marque data do pagamento, status do boleto etc.
-    // boleto_paid_at: new Date().toISOString(),
   };
+  if (totalPayed !== null) updateOrder.total_payed = totalPayed;
 
-  const { error: updOrderErr } = await supabase
+  const { error: updErr } = await supabase
     .from("orders")
     .update(updateOrder)
+    .eq("company_id", integ.company_id) // garante multi-tenant
     .eq("boleto_id", payment.id);
 
-  if (updOrderErr) {
-    console.error(
-      "❌ webhook asaas: erro ao atualizar orders:",
-      updOrderErr.message,
-    );
+  if (updErr) {
+    console.error("webhook asaas: erro ao atualizar orders:", updErr);
+    // ainda retornamos 200 para o Asaas não re-tentar indefinidamente
   }
 
-  // 6) resposta
   return NextResponse.json({
     ok: true,
-    event,
-    invoice_number: payment.id,
+    company_id: integ.company_id,
+    event: body.event ?? null,
+    payment_id: payment.id,
     status_applied: status,
     total_payed: totalPayed,
   });

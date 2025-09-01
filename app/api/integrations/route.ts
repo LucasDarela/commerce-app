@@ -16,7 +16,6 @@ async function getCompanyIdForUser(
     throw new Error("Not authenticated");
   }
 
-  // Padrão com view segura (SECURITY DEFINER) que retorna company_id
   const { data: row, error } = await supabase
     .from("current_user_company_id")
     .select("company_id")
@@ -28,7 +27,6 @@ async function getCompanyIdForUser(
   }
 
   if (!row?.company_id) {
-    // Se cair aqui, a view pode não estar com SECURITY DEFINER, ou o usuário não está vinculado
     throw new Error("company_id não encontrado para o usuário atual");
   }
 
@@ -38,9 +36,12 @@ async function getCompanyIdForUser(
 export async function POST(req: Request) {
   const supabase = createRouteHandlerClient<Database>({ cookies });
   try {
+    // ✅ parse body só uma vez
     const body = await req.json().catch(() => ({}));
     const provider = body?.provider as Provider | undefined;
-    const access_token = (body?.access_token ?? "").trim();
+    const access_token: string = (body?.access_token ?? "").trim();
+    const webhook_token: string | null =
+      (body?.webhook_token ?? "").trim() || null;
 
     if (!provider || !access_token) {
       return NextResponse.json(
@@ -54,34 +55,28 @@ export async function POST(req: Request) {
 
     const companyId = await getCompanyIdForUser(supabase);
 
-    // delete + insert (sem ON CONFLICT)
-    const del = await supabase
+    // ✅ prefira UPSERT com unique (company_id, provider)
+    const { error: upsertErr } = await supabase
       .from("company_integrations")
-      .delete()
-      .eq("company_id", companyId)
-      .eq("provider", provider);
+      .upsert(
+        {
+          company_id: companyId,
+          provider,
+          access_token,
+          webhook_token, // <-- salva também
+        },
+        { onConflict: "company_id,provider" },
+      );
 
-    if (del.error) {
-      console.error("[integrations] delete error:", del.error);
+    if (upsertErr) {
+      console.error("[integrations] upsert error:", upsertErr);
       return NextResponse.json(
-        { error: `Delete falhou: ${del.error.message}` },
+        { error: `Upsert falhou: ${upsertErr.message}` },
         { status: 400 },
       );
     }
 
-    const ins = await supabase
-      .from("company_integrations")
-      .insert({ company_id: companyId, provider, access_token });
-
-    if (ins.error) {
-      console.error("[integrations] insert error:", ins.error);
-      return NextResponse.json(
-        { error: `Insert falhou: ${ins.error.message}` },
-        { status: 400 },
-      );
-    }
-
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true }, { status: 201 });
   } catch (e: any) {
     console.error("[integrations] unexpected:", e);
     return NextResponse.json(
@@ -92,7 +87,7 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const supabase = createRouteHandlerClient({ cookies });
+  const supabase = createRouteHandlerClient<Database>({ cookies });
   try {
     const { searchParams } = new URL(req.url);
     const provider = searchParams.get("provider") as Provider | null;
@@ -105,16 +100,16 @@ export async function DELETE(req: Request) {
 
     const companyId = await getCompanyIdForUser(supabase);
 
-    const del = await supabase
+    const { error: delErr } = await supabase
       .from("company_integrations")
       .delete()
       .eq("company_id", companyId)
       .eq("provider", provider);
 
-    if (del.error) {
-      console.error("[integrations] delete error:", del.error);
+    if (delErr) {
+      console.error("[integrations] delete error:", delErr);
       return NextResponse.json(
-        { error: `Delete falhou: ${del.error.message}` },
+        { error: `Delete falhou: ${delErr.message}` },
         { status: 400 },
       );
     }
