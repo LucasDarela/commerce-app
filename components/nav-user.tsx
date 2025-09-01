@@ -118,19 +118,6 @@ export function NavUser({
                 <IconCreditCard className="mr-2 h-4 w-4" />
                 Pagamento
               </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => router.push("/dashboard/notifications")}
-              >
-                <div className="relative flex items-center">
-                  <IconNotification className="mr-2 h-4 w-4" />
-                  Notificações
-                  {unreadCount && unreadCount > 0 && (
-                    <span className="ml-2 inline-flex items-center justify-center text-xs font-bold text-white bg-red-500 rounded-full w-5 h-5">
-                      {unreadCount > 9 ? "9+" : unreadCount}
-                    </span>
-                  )}
-                </div>
-              </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout}>

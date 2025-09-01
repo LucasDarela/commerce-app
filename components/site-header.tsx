@@ -7,6 +7,7 @@ import { ThemeSelector } from "./theme-selector";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import NotificationsBell from "@/components/notifications/NotificationsBell";
 
 export function SiteHeader() {
   const pathname = usePathname();
@@ -58,6 +59,7 @@ export function SiteHeader() {
         <div className="ml-auto flex items-center gap-2">
           <ThemeSelector />
           <ModeToggle />
+          <NotificationsBell />
         </div>
       </div>
     </header>

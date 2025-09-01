@@ -3,11 +3,9 @@
 import { useEffect, useState } from "react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { NavUser } from "./nav-user";
-import { useUnreadNotifications } from "@/hooks/useUnreadNotifications";
 
 export default function NavUserWrapper() {
   const supabase = createClientComponentClient();
-  const unreadCount = useUnreadNotifications();
   const [userData, setUserData] = useState<{
     name: string;
     email: string;
@@ -43,5 +41,5 @@ export default function NavUserWrapper() {
 
   if (!userData) return null;
 
-  return <NavUser user={userData} unreadCount={unreadCount} />;
+  return <NavUser user={userData} />;
 }
