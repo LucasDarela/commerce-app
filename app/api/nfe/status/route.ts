@@ -1,89 +1,91 @@
 // app/api/nfe/status/route.ts
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
-import { createServerComponentClient } from "@supabase/auth-helpers-nextjs";
 import { cookies } from "next/headers";
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import { fetchInvoiceStatus } from "@/lib/focus-nfe/fetchInvoiceStatus";
 
-export async function GET(req: Request) {
-  const supabase = createServerComponentClient({ cookies });
+export async function POST(req: Request) {
+  const supabase = createRouteHandlerClient({ cookies });
 
-  const { searchParams } = new URL(req.url);
-  const ref = searchParams.get("ref");
-  const companyId = searchParams.get("companyId");
+  try {
+    const { ref, companyId: companyIdFromBody } = await req.json();
+    if (!ref) {
+      return NextResponse.json(
+        { error: "ref é obrigatório" },
+        { status: 400, headers: { "Cache-Control": "no-store" } },
+      );
+    }
 
-  if (!ref || !companyId) {
+    let companyId: string | undefined = companyIdFromBody;
+    if (!companyId) {
+      const {
+        data: { user },
+        error: userErr,
+      } = await supabase.auth.getUser();
+      if (userErr || !user) {
+        return NextResponse.json(
+          { error: "Não autenticado" },
+          { status: 401, headers: { "Cache-Control": "no-store" } },
+        );
+      }
+      const { data: cu } = await supabase
+        .from("company_users")
+        .select("company_id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      companyId = cu?.company_id ?? undefined;
+    }
+
+    if (!companyId) {
+      return NextResponse.json(
+        { error: "companyId não encontrado" },
+        { status: 400, headers: { "Cache-Control": "no-store" } },
+      );
+    }
+
+    const res = await fetchInvoiceStatus({ supabase, companyId, ref });
+
+    if ("error" in res) {
+      return NextResponse.json(
+        { error: res.error, mensagem_sefaz: res.mensagem_sefaz ?? null },
+        { status: 502, headers: { "Cache-Control": "no-store" } },
+      );
+    }
+
+    const { data, mensagem_sefaz } = res;
+
+    const { error: updateError } = await supabase
+      .from("invoices")
+      .update({
+        status: data?.status ?? null,
+        numero: data?.numero ?? null,
+        serie: data?.serie ?? null,
+        chave_nfe: data?.chave ?? null,
+        xml_url: data?.xml_url ?? null,
+        danfe_url: data?.danfe_url ?? null,
+        data_emissao: data?.data_emissao ?? null,
+      })
+      .eq("ref", ref)
+      .eq("company_id", companyId);
+
+    if (updateError) {
+      return NextResponse.json(
+        { error: updateError.message },
+        { status: 500, headers: { "Cache-Control": "no-store" } },
+      );
+    }
+
     return NextResponse.json(
-      { error: "Parâmetros 'ref' e 'companyId' são obrigatórios." },
-      { status: 400 },
+      { success: true, data, mensagem_sefaz: mensagem_sefaz ?? null },
+      { status: 200, headers: { "Cache-Control": "no-store" } },
+    );
+  } catch (e: any) {
+    return NextResponse.json(
+      { error: e?.message ?? "Erro interno" },
+      { status: 500, headers: { "Cache-Control": "no-store" } },
     );
   }
-
-  const { data, error } = await fetchInvoiceStatus(ref, companyId);
-  if (error) {
-    return NextResponse.json({ error }, { status: 500 });
-  }
-
-  // Atualiza nota no Supabase
-  const { error: updateError } = await supabase
-    .from("invoices")
-    .update({
-      status: data.status,
-      numero: data.numero,
-      serie: data.serie,
-      chave_nfe: data.chave,
-      xml_url: data.xml_url,
-      danfe_url: data.danfe_url,
-      data_emissao: data.data_emissao,
-    })
-    .eq("ref", ref);
-
-  if (updateError) {
-    return NextResponse.json({ error: updateError.message }, { status: 500 });
-  }
-
-  return NextResponse.json({ data });
 }
-
-// // app/api/nfe/status/route.ts
-// import { NextResponse } from "next/server";
-// import { createServerComponentClient } from "@supabase/auth-helpers-nextjs";
-// import { cookies } from "next/headers";
-// import { fetchInvoiceStatus } from "@/lib/focus-nfe/fetchInvoiceStatus"; // você irá criar esse helper
-
-// export async function POST(req: Request) {
-//   const supabase = createServerComponentClient({ cookies });
-//   const { ref, companyId } = await req.json();
-//   console.log({ ref, companyId });
-
-//   if (!ref || !companyId) {
-//     return NextResponse.json(
-//       { error: "ref e companyId obrigatórios" },
-//       { status: 400 },
-//     );
-//   }
-
-//   const { data, error } = await fetchInvoiceStatus(ref, companyId);
-//   if (error) {
-//     return NextResponse.json({ error }, { status: 500 });
-//   }
-
-//   // Atualiza nota no Supabase
-//   const { error: updateError } = await supabase
-//     .from("invoices")
-//     .update({
-//       status: data.status,
-//       numero: data.numero,
-//       serie: data.serie,
-//       chave_nfe: data.chave,
-//       xml_url: data.xml_url,
-//       danfe_url: data.danfe_url,
-//       data_emissao: data.data_emissao,
-//     })
-//     .eq("ref", ref);
-
-//   if (updateError) {
-//     return NextResponse.json({ error: updateError.message }, { status: 500 });
-//   }
-
-//   return NextResponse.json({ success: true, updated: data });
-// }

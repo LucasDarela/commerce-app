@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
 interface ViewDanfeButtonProps {
-  url: string | null; // Pode vir null do Supabase
+  url: string | null;
   invoiceId: string;
   ref: string;
 }
@@ -33,8 +33,7 @@ export default function ViewDanfeButton({
         return;
       }
 
-      // Abre em nova aba
-      window.open(result.danfeUrl, "_blank");
+      window.open(result.pdfUrl, "_blank");
     } catch (err: any) {
       toast.error("Erro ao buscar DANFE: " + err.message);
     } finally {
@@ -44,19 +43,26 @@ export default function ViewDanfeButton({
 
   if (url && url.endsWith(".pdf")) {
     return (
-      <a
-        href={url}
-        target="_blank"
-        rel="noopener noreferrer"
-        title="Abrir DANFE em PDF"
-      >
-        <Button variant="secondary">Ver DANFE</Button>
-      </a>
+      <Button asChild variant="secondary" className="cursor-pointer">
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Abrir DANFE em PDF"
+        >
+          Ver DANFE
+        </a>
+      </Button>
     );
   }
 
   return (
-    <Button variant="secondary" onClick={handleClick} disabled={loading}>
+    <Button
+      variant="secondary"
+      onClick={handleClick}
+      disabled={loading}
+      className="cursor-pointer"
+    >
       {loading ? "Carregando..." : "Buscar DANFE"}
     </Button>
   );

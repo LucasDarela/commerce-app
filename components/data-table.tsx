@@ -118,6 +118,8 @@ import type { Equipment } from "@/components/types/equipments";
 import type { ProductItem } from "@/components/types/products";
 import { TableSkeleton } from "./ui/TableSkeleton";
 import { orderSchema, type Order } from "@/components/types/orderSchema";
+import EmitNfeMenuItem from "./nf/EmitNfeMenuItem";
+import { DeleteOrderButton } from "@/components/orders/DeleteOrderButton";
 
 type Sale = z.infer<typeof orderSchema>;
 
@@ -208,16 +210,6 @@ function DraggableRow({
     </TableRow>
   );
 }
-
-// async function updateStockBasedOnOrder(order: Order) {
-//   const items = await parseProductsWithIds(supabaseClient, order.products);
-//   for (const item of items) {
-//     await supabase.rpc("decrement_stock", {
-//       product_id: item.id,
-//       quantity: item.quantity,
-//     });
-//   }
-// }
 
 async function updateStockBasedOnOrder(
   supabaseClient: SupabaseClient,
@@ -377,7 +369,12 @@ export function DataTable({
         due_date,
         customer_signature,
         text_note,
-        boleto_id
+        boleto_id,
+        customer_rel:customers!sales_customer_id_fkey (
+          id,
+          name,
+          emit_nf
+        )
       `,
       )
       .order("order_index", { ascending: true });
@@ -386,6 +383,22 @@ export function DataTable({
       console.error("Erro ao buscar pedidos:", error);
       return;
     }
+
+    console.table(
+      (data ?? []).map((r) => {
+        const cr = (r as any).customer_rel;
+        const crEmit = Array.isArray(cr) ? cr[0]?.emit_nf : cr?.emit_nf; // 👈 cobre os 2 casos
+        return {
+          id: r.id,
+          order_emit_nf: (r as any).emit_nf,
+          customer_emit_nf: crEmit,
+          typeof_order_emit_nf: typeof (r as any).emit_nf,
+          typeof_customer_emit_nf: typeof crEmit,
+        };
+      }),
+    );
+
+    console.log("orders payload", JSON.parse(JSON.stringify(data)));
 
     const parsed = orderSchema.array().safeParse(data);
     if (parsed.success) {
@@ -428,28 +441,6 @@ export function DataTable({
       if (updateError) {
         console.error("Erro ao atualizar estoque:", updateError);
       }
-    }
-  };
-
-  const deleteOrderById = async (id: string) => {
-    const confirmDelete = confirm("Tem certeza que deseja excluir esta nota?");
-    if (!confirmDelete) return;
-
-    try {
-      await restoreStockBeforeDelete(id);
-
-      const { error } = await supabase.from("orders").delete().eq("id", id);
-
-      if (error) {
-        toast.error("Erro ao deletar nota.");
-        return;
-      }
-
-      toast.success("Nota excluída com sucesso!");
-      setOrders((prev) => prev.filter((order) => order.id !== id));
-    } catch (error) {
-      console.error("Erro ao excluir nota:", error);
-      toast.error("Erro inesperado ao excluir nota,");
     }
   };
 
@@ -713,74 +704,88 @@ export function DataTable({
       header: "",
       size: 50,
       meta: { className: "w-[50px]" },
-      cell: ({ row }) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-muted-foreground"
-            >
-              <IconDotsVertical size={16} />
-            </Button>
-          </DropdownMenuTrigger>
-
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem asChild>
-              <a
-                href={`/dashboard/orders/${row.original.id}/view`}
-                rel="noopener noreferrer"
-                className="w-full text-left"
+      cell: ({ row }) => {
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground"
               >
-                Ver Espelho
-              </a>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => {
-                setSelectedOrder(row.original);
-                setIsPaymentOpen(true);
-              }}
-            >
-              Pagar
-            </DropdownMenuItem>
+                <IconDotsVertical size={16} />
+              </Button>
+            </DropdownMenuTrigger>
 
-            <DropdownMenuItem asChild>
-              <Link href={`/dashboard/orders/${row.original.id}/nfe`}>
-                Emitir NF-e
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            {!row.original.customer_signature ? (
+            <DropdownMenuContent align="end">
               <DropdownMenuItem asChild>
-                <Link href={`/dashboard/orders/${row.original.id}/edit`}>
-                  Editar
-                </Link>
+                <a
+                  href={`/dashboard/orders/${row.original.id}/view`}
+                  rel="noopener noreferrer"
+                  className="w-full text-left"
+                >
+                  Ver Espelho
+                </a>
               </DropdownMenuItem>
-            ) : (
+
               <DropdownMenuItem
-                disabled
-                className="text-foreground text-sm tracking-tighter"
+                onClick={() => {
+                  setSelectedOrder(row.original);
+                  setIsPaymentOpen(true);
+                }}
               >
-                Edição bloqueada
+                Pagar
               </DropdownMenuItem>
-            )}
-            <DropdownMenuItem
-              onClick={() => {
-                fetchOrderProductsForReturnModal(row.original.id);
-                setSelectedCustomer(row.original);
-              }}
-            >
-              Retornar Produto
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              variant="destructive"
-              onClick={() => deleteOrderById(row.original.id)}
-            >
-              Deletar
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ),
+              <EmitNfeMenuItem
+                orderId={row.original.id}
+                customerId={row.original.customer_id}
+                emitNfFromOrder={(row.original as any)?.emit_nf}
+                emitNfFromCustomer={
+                  (row.original as any)?.customer_rel?.emit_nf
+                }
+                showDebug={false}
+              />
+
+              <DropdownMenuSeparator />
+
+              {!row.original.customer_signature ? (
+                <DropdownMenuItem asChild>
+                  <Link href={`/dashboard/orders/${row.original.id}/edit`}>
+                    Editar
+                  </Link>
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem
+                  disabled
+                  className="text-foreground text-sm tracking-tighter"
+                >
+                  Edição bloqueada
+                </DropdownMenuItem>
+              )}
+
+              <DropdownMenuItem
+                onClick={() => {
+                  fetchOrderProductsForReturnModal(row.original.id);
+                  setSelectedCustomer(row.original);
+                }}
+              >
+                Retornar Produto
+              </DropdownMenuItem>
+
+              <DeleteOrderButton
+                orderId={row.original.id}
+                asDropdownItem
+                onDeleted={() => {
+                  // ATENÇÃO: use o mesmo setter de estado que povoa a tabela
+                  setData((prev) =>
+                    prev.filter((o) => o.id !== row.original.id),
+                  );
+                }}
+              />
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
     },
   ];
 
@@ -1028,9 +1033,56 @@ export function DataTable({
     return () => {
       supabase.removeChannel(channel);
     };
-    // Dica: se `supabase` for singleton importado de "@/lib/supabase", você pode deixar []
-    // para não re-assinar a cada render.
   }, []);
+
+  useEffect(() => {
+    if (!companyId) return;
+
+    // garante que a tabela tenha Realtime habilitado no Supabase Dashboard
+    const channel = supabase
+      .channel("orders-realtime")
+      // DELETE
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "orders" },
+        (payload) => {
+          const oldRow = payload.old as { id: string; company_id?: string };
+          if (oldRow?.company_id && oldRow.company_id !== companyId) return;
+          setData((prev) => prev.filter((o) => o.id !== oldRow.id));
+        },
+      )
+      // INSERT
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "orders" },
+        (payload) => {
+          const newRow = payload.new as any;
+          if (newRow?.company_id && newRow.company_id !== companyId) return;
+          setData((prev) => {
+            // evita duplicar se já estiver na lista
+            if (prev.some((o) => o.id === newRow.id)) return prev;
+            return [newRow, ...prev];
+          });
+        },
+      )
+      // UPDATE
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "orders" },
+        (payload) => {
+          const newRow = payload.new as any;
+          if (newRow?.company_id && newRow.company_id !== companyId) return;
+          setData((prev) =>
+            prev.map((o) => (o.id === newRow.id ? { ...o, ...newRow } : o)),
+          );
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [companyId, setData]);
 
   const isDisabled =
     !selectedCustomer?.customer_signature ||

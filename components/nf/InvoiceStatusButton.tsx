@@ -18,27 +18,39 @@ export function InvoiceStatusButton({
   const handleClick = async () => {
     setLoading(true);
     try {
-      const res = await fetch(
-        `/api/nfe/status?ref=${refId}&companyId=${companyId}`,
-      );
-      const { data, error } = await res.json();
+      const res = await fetch("/api/nfe/status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ref: refId, companyId }),
+      });
+      const payload = await res.json();
 
-      if (error) {
-        toast.error("Erro ao buscar status da NF-e: " + error);
-      } else if (data?.mensagem_sefaz) {
+      if (!res.ok) {
+        const msg =
+          payload?.focus?.mensagem ||
+          payload?.error ||
+          "Erro ao buscar status da NF-e";
+        toast.error(msg);
+        return;
+      }
+
+      const { updated, mensagem_sefaz } = payload as {
+        updated: any;
+        mensagem_sefaz?: string;
+      };
+
+      if (mensagem_sefaz) {
         toast(
           <div className="text-left">
             <p className="font-semibold">Mensagem da SEFAZ:</p>
-            <p>{data.mensagem_sefaz}</p>
+            <p>{mensagem_sefaz}</p>
           </div>,
-          {
-            duration: 8000,
-          },
+          { duration: 8000 },
         );
       } else {
         toast.info("NF-e não possui mensagem de rejeição.");
       }
-    } catch (err: any) {
+    } catch (e: any) {
       toast.error("Erro ao consultar a NF-e.");
     } finally {
       setLoading(false);

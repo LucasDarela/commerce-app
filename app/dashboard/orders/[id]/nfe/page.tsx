@@ -15,6 +15,7 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { format } from "date-fns";
+import Link from "next/link";
 
 export default function EmitNfePage() {
   const { id } = useParams();
@@ -110,9 +111,63 @@ export default function EmitNfePage() {
       0,
     );
 
+    const icmsCode = String(
+      operacaoFiscal.icms_situacao_tributaria ?? "",
+    ).trim(); // <- digitável pelo usuário: "102", "500", "60", etc.
+
+    // se o usuário digitar "60", valide se ST veio completo
+    if (icmsCode === "60") {
+      const faltaST =
+        operacaoFiscal.vbc_st_ret == null ||
+        operacaoFiscal.pst == null ||
+        operacaoFiscal.vicms_substituto == null ||
+        operacaoFiscal.vicms_st_ret == null;
+
+      if (faltaST) {
+        toast.error(
+          "Para ICMS 60 (ST) é obrigatório informar vbc_st_ret, pst, vicms_substituto e vicms_st_ret.",
+        );
+        return; // não envia a nota
+      }
+    }
+
+    const items = products.map((p, index) => ({
+      numero_item: index + 1,
+      codigo_produto: String(p.code ?? ""),
+      descricao: p.name ?? "",
+      cfop: String(operacaoFiscal.cfop).padStart(4, "0"),
+      unidade_comercial: p.unit ?? "UN",
+      quantidade_comercial: Number(p.quantity),
+      valor_unitario_comercial: Number(p.price),
+      valor_unitario_tributavel: Number(p.price),
+      unidade_tributavel: p.unit ?? "UN",
+      codigo_ncm: String(operacaoFiscal.ncm).padStart(8, "0"),
+      quantidade_tributavel: Number(p.quantity),
+      valor_bruto: Number(p.price) * Number(p.quantity),
+      icms_origem: String(operacaoFiscal.icms_origem ?? "0"),
+      icms_situacao_tributaria: icmsCode,
+      pis_situacao_tributaria: String(operacaoFiscal.pis ?? "").padStart(
+        2,
+        "0",
+      ),
+      cofins_situacao_tributaria: String(operacaoFiscal.cofins ?? "").padStart(
+        2,
+        "0",
+      ),
+      // Só envie os campos de ST se for 60
+      ...(icmsCode === "60"
+        ? {
+            vbc_st_ret: Number(operacaoFiscal.vbc_st_ret),
+            pst: Number(operacaoFiscal.pst),
+            vicms_substituto: Number(operacaoFiscal.vicms_substituto),
+            vicms_st_ret: Number(operacaoFiscal.vicms_st_ret),
+          }
+        : {}),
+    }));
+
     const invoiceData = {
       ambiente: "1",
-      ref: order.note_number,
+      note_number: order.note_number,
       order_id: id,
       data_emissao: hoje,
       data_entrada_saida: hoje,
@@ -124,7 +179,6 @@ export default function EmitNfePage() {
       valor_seguro: 0,
       valor_produtos: totalProdutos,
       valor_total: totalProdutos,
-
       // Emitente
       nome_emitente: emissor.corporate_name,
       nome_fantasia_emitente: emissor.trade_name,
@@ -136,10 +190,12 @@ export default function EmitNfePage() {
       municipio_emitente: emissor.city,
       uf_emitente: emissor.state,
       cep_emitente: emissor.zip_code?.replace(/\D/g, "") ?? "",
-
       // Destinatário
+      // Documento dinâmico
+      ...(customer.document?.replace(/\D/g, "").length === 14
+        ? { cnpj_destinatario: customer.document.replace(/\D/g, "") }
+        : { cpf_destinatario: customer.document.replace(/\D/g, "") }),
       nome_destinatario: customer.name,
-      cpf_destinatario: customer.document?.replace(/\D/g, "") ?? "",
       telefone_destinatario: String(customer.phone ?? "")
         .replace(/\D/g, "")
         .replace(/^55/, ""),
@@ -152,48 +208,53 @@ export default function EmitNfePage() {
       uf_destinatario: customer.state,
       cep_destinatario: customer.zip_code?.replace(/\D/g, "") ?? "",
       pais_destinatario: "Brasil",
-
       presenca_comprador: operacaoFiscal.presenca_comprador || "1",
-
-      items: products.map((p, index) => ({
-        numero_item: index + 1,
-        codigo_produto: String(p.code ?? ""), // obrigatório
-        descricao: p.name ?? "", // obrigatório
-        cfop: String(operacaoFiscal.cfop).padStart(4, "0"), // deve ter 4 dígitos
-        unidade_comercial: p.unit ?? "UN",
-        quantidade_comercial: Number(p.quantity),
-        valor_unitario_comercial: Number(p.price),
-        valor_unitario_tributavel: Number(p.price),
-        unidade_tributavel: p.unit ?? "UN",
-        codigo_ncm: String(operacaoFiscal.ncm).padStart(8, "0"), // deve ter 8 dígitos
-        quantidade_tributavel: Number(p.quantity),
-        valor_bruto: Number(p.price) * Number(p.quantity),
-        icms_situacao_tributaria: String(operacaoFiscal.cst_icms ?? ""),
-        icms_origem: String(operacaoFiscal.icms_origem ?? "0"),
-        pis_situacao_tributaria: Number(operacaoFiscal.pis),
-        cofins_situacao_tributaria: Number(operacaoFiscal.cofins),
-        // ipi_situacao_tributaria: String(operacaoFiscal.ipi ?? "99"),
-      })),
+      items,
     };
 
     try {
-      const response = await fetch("/api/nfe/create", {
+      const r = await fetch("/api/nfe/create", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ companyId, invoiceData }),
       });
 
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Erro desconhecido");
+      // leia como texto e tente parsear
+      const raw = await r.text();
+      let body: any = null;
+      try {
+        body = raw ? JSON.parse(raw) : null;
+      } catch {}
 
+      if (!r.ok || body?.success !== true) {
+        const msg =
+          body?.detalhes_texto ||
+          body?.error ||
+          body?.mensagem_sefaz ||
+          body?.focus?.mensagem ||
+          body?.focus?.erros?.[0]?.mensagem ||
+          `Falha ao emitir NF-e (HTTP ${r.status})`;
+
+        console.error("Erro Focus (response):", { status: r.status, body });
+        toast.error(msg);
+        return;
+      }
+
+      // sucesso garantido pelo backend
       toast.success(
-        `NF-e emitida com sucesso! Número: ${result.numero || "--"}`,
+        <div>
+          NF-e enviada para autorização!{" "}
+          <Link href="/dashboard/nfe" className="underline font-medium">
+            Acesse aqui
+          </Link>{" "}
+          para verificar o status.
+        </div>,
+        { duration: 6000 },
       );
-      router.push("/dashboard/nfe");
     } catch (err: any) {
-      toast.error("Erro ao emitir NF-e: " + err.message);
+      // erros de rede/JS
+      console.error("Erro de rede/JS ao emitir NF-e:", err);
+      toast.error("Erro de rede ao emitir NF-e. Tente novamente.");
     }
   };
 

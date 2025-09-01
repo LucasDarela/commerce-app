@@ -14,7 +14,7 @@ export function InvoiceStatusIndicator({
   if (!status) return null;
 
   const color =
-    status === "autorizada"
+    status === "autorizado"
       ? "text-green-500"
       : status === "erro_autorizacao"
         ? "text-red-500"
@@ -27,7 +27,7 @@ export function InvoiceStatusIndicator({
         : Clock;
 
   const label =
-    status === "autorizada" ? "" : status === "erro_autorizacao" ? "" : "";
+    status === "autorizado" ? "" : status === "erro_autorizacao" ? "" : "";
 
   return (
     <div className="flex items-center gap-2">

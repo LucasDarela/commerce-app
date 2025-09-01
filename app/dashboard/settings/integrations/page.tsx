@@ -74,7 +74,7 @@ export default function IntegrationsPage() {
   if (loading) return <div>Carregando integrações...</div>;
 
   return (
-    <div className="p-6 space-y-6 mb-8">
+    <div className="space-y-6 py-8">
       <h1 className="text-xl font-bold">Integrações</h1>
 
       {/* Lista cada provider encontrado */}
@@ -221,13 +221,6 @@ export default function IntegrationsPage() {
           </div>
         </div>
       )}
-
-      {/* Botão para adicionar outra integração quando já existe alguma */}
-      {/* {hasAny && !addingNew && (
-        <Button variant="outline" onClick={() => setAddingNew(true)}>
-          Adicionar outra integração
-        </Button>
-      )} */}
     </div>
   );
 }

@@ -1,77 +1,297 @@
 // lib/focus-nfe/emitInvoice.ts
-import axios from "axios";
-import { Buffer } from "buffer";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { buildPisFields, buildCofinsFields } from "./buildTaxes";
 
-interface EmitInvoiceParams {
+type EmitParams = {
   companyId: string;
-  invoiceData: any;
-  supabaseClient: any;
-}
+  invoiceData: any; // já validado no invoiceSchema
+  supabaseClient: SupabaseClient;
+};
+
+const pad2 = (v: any) => String(v ?? "").padStart(2, "0");
+const onlyDigits = (s?: string | null) => (s || "").replace(/\D/g, "");
+const to8Digits = (v?: string) => {
+  const only = (v ?? "").replace(/\D/g, "");
+  return only.length === 8 ? only : "";
+};
 
 export async function emitInvoice({
   companyId,
   invoiceData,
   supabaseClient,
-}: EmitInvoiceParams) {
-  const { data: cred, error } = await supabaseClient
+}: EmitParams) {
+  // 1) Credenciais Focus + ambiente
+  const { data: cred, error: credErr } = await supabaseClient
     .from("nfe_credentials")
-    .select("focus_token")
+    .select("id, company_id, focus_token, environment")
     .eq("company_id", companyId)
-    .single();
+    .maybeSingle();
 
-  if (error || !cred?.focus_token) {
-    console.error("❌ Token da Focus não encontrado ou inválido");
-    throw new Error("Token da Focus NFe não encontrado");
+  if (credErr || !cred?.focus_token) {
+    throw new Error("Token da Focus NFe não configurado para essa empresa.");
   }
 
-  console.log("🔧 Token da empresa:", cred.focus_token);
+  const env = (cred.environment ?? "homologacao") as "homologacao" | "producao";
+  const baseURL =
+    env === "producao"
+      ? "https://api.focusnfe.com.br/v2"
+      : "https://homologacao.focusnfe.com.br/v2";
+
+  const token = String(cred.focus_token)
+    .trim()
+    .replace(/\r?\n|\r/g, "");
+  const auth = `Basic ${Buffer.from(`${token}:`).toString("base64")}`;
+
+  // 2) Busca regime tributário da empresa (CRT)
+  // 1 = Simples; 4 = MEI; 3 = Regime normal
+  const { data: comp } = await supabaseClient
+    .from("companies")
+    .select("regime_tributario")
+    .eq("id", companyId)
+    .maybeSingle();
+
+  const crt = Number(comp?.regime_tributario);
+  const isSN = crt === 1 || crt === 4;
+
+  // 3) Normalizações de emitente/destinatário
+  if (invoiceData?.emitente?.cpf_cnpj)
+    invoiceData.emitente.cpf_cnpj = onlyDigits(invoiceData.emitente.cpf_cnpj);
+  if (invoiceData?.emitente?.endereco?.cep)
+    invoiceData.emitente.endereco.cep = onlyDigits(
+      invoiceData.emitente.endereco.cep,
+    );
+
+  if (invoiceData?.destinatario?.cpf_cnpj)
+    invoiceData.destinatario.cpf_cnpj = onlyDigits(
+      invoiceData.destinatario.cpf_cnpj,
+    );
+  if (invoiceData?.destinatario?.telefone)
+    invoiceData.destinatario.telefone = onlyDigits(
+      invoiceData.destinatario.telefone,
+    );
+  if (invoiceData?.destinatario?.endereco?.cep)
+    invoiceData.destinatario.endereco.cep = onlyDigits(
+      invoiceData.destinatario.endereco.cep,
+    );
+
+  // 4) Montagem dos itens no formato Focus
+  // const payloadItems = (invoiceData.items || invoiceData.itens || []).map(
+  //   (it: any) => {
+  //     // CSOSN (SN/MEI) x CST (Regime normal)
+  //     const csosn = (it.csosn_icms ?? "").toString();
+  //     const cst = pad2(it.cst_icms ?? "60");
+
+  //     const icmsCode = isSN
+  //       ? csosn || "500" // SN/MEI => CSOSN (fallback 500 = ST cobrado anteriormente)
+  //       : cst || "60"; // Normal => CST (fallback 60 = ST cobrado anteriormente)
+
+  //     return {
+  //       numero_item: it.numero_item,
+  //       codigo_produto: it.codigo_produto,
+  //       descricao: it.descricao,
+  //       cfop: it.cfop,
+
+  //       // NCM deve ter 8 dígitos
+  //       codigo_ncm: to8Digits(it.codigo_ncm ?? it.ncm),
+
+  //       // Quantidades/valores
+  //       unidade_comercial: it.unidade_comercial,
+  //       quantidade_comercial: it.quantidade_comercial,
+  //       valor_unitario_comercial: it.valor_unitario_comercial,
+
+  //       unidade_tributavel: it.unidade_tributavel,
+  //       quantidade_tributavel: it.quantidade_tributavel,
+  //       valor_unitario_tributavel: it.valor_unitario_tributavel,
+
+  //       // Nome esperado pela Focus
+  //       valor_bruto_produto: it.valor_bruto,
+
+  //       // ICMS
+  //       icms_origem: it.icms_origem,
+  //       icms_situacao_tributaria: String(
+  //         it.icms_situacao_tributaria ?? "",
+  //       ).trim(),
+
+  //       // PIS/COFINS sempre como strings de 2 dígitos quando aplicável
+  //       ...buildPisFields({
+  //         ...it,
+  //         // garantir que o builder receba base/aliquota/valor se for o caso de 01/99
+  //         valor_base_calculo_pis: it.valor_base_calculo_pis,
+  //         aliquota_pis: it.aliquota_pis,
+  //         valor_pis: it.valor_pis,
+  //         valor_bruto: it.valor_bruto,
+  //       }),
+  //       ...buildCofinsFields({
+  //         ...it,
+  //         valor_base_calculo_cofins: it.valor_base_calculo_cofins,
+  //         aliquota_cofins: it.aliquota_cofins,
+  //         valor_cofins: it.valor_cofins,
+  //         valor_bruto: it.valor_bruto,
+  //       }),
+  //     };
+  //   },
+  // );
+  const items: any[] =
+    (invoiceData as any).itens ?? (invoiceData as any).items ?? [];
+
+  const payload = {
+    // envie apenas os campos aceitos pela Focus (opcional, mas limpo)
+    ref: invoiceData.ref,
+    ambiente: invoiceData.ambiente,
+    note_number: invoiceData.note_number,
+    order_id: invoiceData.order_id,
+    data_emissao: invoiceData.data_emissao,
+    data_entrada_saida: invoiceData.data_entrada_saida,
+    natureza_operacao: invoiceData.natureza_operacao,
+    tipo_documento: invoiceData.tipo_documento,
+    finalidade_emissao: invoiceData.finalidade_emissao,
+    modalidade_frete: invoiceData.modalidade_frete,
+    valor_frete: invoiceData.valor_frete,
+    valor_seguro: invoiceData.valor_seguro,
+    valor_produtos: invoiceData.valor_produtos,
+    valor_total: invoiceData.valor_total,
+    nome_emitente: invoiceData.nome_emitente,
+    nome_fantasia_emitente: invoiceData.nome_fantasia_emitente,
+    cnpj_emitente: invoiceData.cnpj_emitente,
+    inscricao_estadual_emitente: invoiceData.inscricao_estadual_emitente,
+    logradouro_emitente: invoiceData.logradouro_emitente,
+    numero_emitente: invoiceData.numero_emitente,
+    bairro_emitente: invoiceData.bairro_emitente,
+    municipio_emitente: invoiceData.municipio_emitente,
+    uf_emitente: invoiceData.uf_emitente,
+    cep_emitente: invoiceData.cep_emitente,
+
+    // destinatário (cpf_ OU cnpj_)
+    cpf_destinatario: (invoiceData as any).cpf_destinatario,
+    cnpj_destinatario: (invoiceData as any).cnpj_destinatario,
+    nome_destinatario: invoiceData.nome_destinatario,
+    telefone_destinatario: invoiceData.telefone_destinatario,
+    inscricao_estadual_destinatario:
+      invoiceData.inscricao_estadual_destinatario,
+    logradouro_destinatario: invoiceData.logradouro_destinatario,
+    numero_destinatario: invoiceData.numero_destinatario,
+    bairro_destinatario: invoiceData.bairro_destinatario,
+    municipio_destinatario: invoiceData.municipio_destinatario,
+    uf_destinatario: invoiceData.uf_destinatario,
+    cep_destinatario: invoiceData.cep_destinatario,
+    pais_destinatario: invoiceData.pais_destinatario,
+
+    presenca_comprador: invoiceData.presenca_comprador,
+    serie: invoiceData.serie ?? "1",
+
+    // 👈 AQUI: envie o ARRAY completo
+    itens: items.map((it) => ({
+      numero_item: it.numero_item,
+      codigo_produto: it.codigo_produto,
+      descricao: it.descricao,
+      cfop: it.cfop,
+      codigo_ncm: it.codigo_ncm,
+      unidade_comercial: it.unidade_comercial,
+      quantidade_comercial: it.quantidade_comercial,
+      valor_unitario_comercial: it.valor_unitario_comercial,
+      unidade_tributavel: it.unidade_tributavel,
+      quantidade_tributavel: it.quantidade_tributavel,
+      valor_unitario_tributavel: it.valor_unitario_tributavel,
+
+      // A Focus aceita "valor_bruto_produto". Se você usava "valor_bruto", normalize:
+      valor_bruto_produto: it.valor_bruto ?? it.valor_bruto_produto,
+
+      icms_origem: String(it.icms_origem ?? "0"),
+      icms_situacao_tributaria: String(it.icms_situacao_tributaria ?? ""),
+
+      pis_situacao_tributaria: String(
+        it.pis_situacao_tributaria ?? "",
+      ).padStart(2, "0"),
+      cofins_situacao_tributaria: String(
+        it.cofins_situicao_tributaria ?? it.cofins_situacao_tributaria ?? "",
+      ).padStart(2, "0"),
+
+      // Campos ST (somente se houver)
+      ...(String(it.icms_situacao_tributaria) === "60"
+        ? {
+            vbc_st_ret: Number(it.vbc_st_ret),
+            pst: Number(it.pst),
+            vicms_substituto: Number(it.vicms_substituto),
+            vicms_st_ret: Number(it.vicms_st_ret),
+          }
+        : {}),
+    })),
+  };
+
+  console.log("[FOCUS PAYLOAD] itens:", payload.itens?.length);
+
+  // 5) Referência que vai na query (?ref=)
+  const ref =
+    invoiceData?.ref ||
+    `c${companyId}_s${invoiceData.serie || 1}_n${invoiceData.numero ?? "auto"}`;
+
+  // 6) Sanitize: remove undefined/null
+  const finalPayload = JSON.parse(JSON.stringify({ ...payload }));
+
+  for (const it of payload.itens) {
+    if (String(it.icms_situacao_tributaria) === "60") {
+      const falta =
+        it.vbc_st_ret == null ||
+        it.pst == null ||
+        it.vicms_substituto == null ||
+        it.vicms_st_ret == null;
+      if (falta) {
+        throw new Error(
+          "ICMS 60 (ST) sem os campos obrigatórios: vbc_st_ret, pst, vicms_substituto, vicms_st_ret.",
+        );
+      }
+    }
+  }
+
+  // (debug opcional)
   console.log(
-    "📤 Enviando para Focus com payload:",
-    JSON.stringify(invoiceData, null, 2),
+    "[FOCUS PAYLOAD]",
+    JSON.stringify({ ref, ...finalPayload }, null, 2),
   );
 
-  console.log("📦 Payload enviado:", JSON.stringify(invoiceData, null, 2));
+  // 7) Chamada Focus
+  const url = `${baseURL}/nfe?ref=${encodeURIComponent(ref)}`;
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: auth,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(finalPayload),
+  });
 
+  const rawText = await resp.text();
+  let body: any = rawText;
   try {
-    const token = cred.focus_token;
-    const authHeader = `Basic ${Buffer.from(`${token}:x`).toString("base64")}`;
-
-    const response = await axios.post(
-      "https://api.focusnfe.com.br/v2/nfe",
-      invoiceData,
-      {
-        auth: {
-          username: token,
-          password: "x",
-        },
-        headers: {
-          "Content-Type": "application/json",
-        },
-      },
-    );
-
-    console.log("✅ Resposta da Focus:", response.data);
-    return response.data;
-  } catch (err: any) {
-    const data = err.response?.data;
-
-    console.error(
-      "❌ Erro da Focus:",
-      JSON.stringify(data || err.message, null, 2),
-    );
-
-    // Se a resposta da API da Focus tiver array de erros
-    if (data?.erros) {
-      const mensagens = data.erros.map((e: any) => e.mensagem).join(" | ");
-      throw new Error(`Erro na Focus: ${mensagens}`);
-    }
-
-    // Caso o erro seja um objeto mais simples
-    if (typeof data === "string") {
-      throw new Error(`Erro da Focus: ${data}`);
-    }
-
-    // Erro genérico
-    throw new Error("Erro desconhecido ao comunicar com a Focus NFe");
+    body = JSON.parse(rawText);
+  } catch {
+    // às vezes vem HTML/texto em 5xx
   }
+
+  if (!resp.ok) {
+    const erros = Array.isArray(body?.erros) ? body.erros : [];
+    const detalhePrimario =
+      body?.mensagem ||
+      erros
+        .map((e: any) => `${e?.campo ?? ""} ${e?.mensagem ?? ""}`.trim())
+        .filter(Boolean)
+        .join(" | ") ||
+      `Focus retornou status ${resp.status}`;
+
+    const e: any = new Error(detalhePrimario);
+    e.focus = body;
+    e.status = resp.status;
+    e.erros = erros;
+    throw e;
+  }
+
+  return {
+    status: body?.status,
+    ref: body?.referencia || ref,
+    chave: body?.chave_nfe || null,
+    xml_url: body?.links?.xml || null,
+    danfe_url: body?.links?.danfe || null,
+    raw: body,
+  };
 }

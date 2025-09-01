@@ -10,6 +10,7 @@ import FiscalOperationsPage from "@/components/nf/FiscalOperationForm";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
 import { InvoiceStatusIndicator } from "@/components/nf/InvoiceStatusIndicator";
+import FetchLinksButton from "@/components/nf/FetchLinksButton";
 import {
   Card,
   CardAction,
@@ -25,6 +26,27 @@ import RefreshButton from "@/components/nf/RefreshButton";
 import ViewDanfeButton from "@/components/nf/ViewDanfeButton";
 import { Database } from "@/components/types/supabase";
 import { InvoiceStatusButton } from "@/components/nf/InvoiceStatusButton";
+import Link from "next/link";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  IconChevronDown,
+  IconChevronLeft,
+  IconChevronRight,
+  IconChevronsLeft,
+  IconChevronsRight,
+  IconDotsVertical,
+  IconGripVertical,
+  IconLayoutColumns,
+  IconLoader,
+  IconPlus,
+  IconTrash,
+} from "@tabler/icons-react";
 
 const supabase = createClientComponentClient<Database>();
 
@@ -53,7 +75,6 @@ export default function NfePage() {
       } else {
         setInvoices(data);
       }
-      console.log("Notas encontradas:", data);
     };
 
     if (companyId) {
@@ -97,6 +118,28 @@ export default function NfePage() {
       matchesValor
     );
   });
+  // helpers
+  const isAuthorized = (s?: string) =>
+    (s || "").toLowerCase().includes("autorizad");
+
+  const isProcessing = (s?: string) =>
+    (s || "").toLowerCase().trim() === "processando_autorizacao";
+
+  // Mostra motivo se:
+  // - bate em padrões comuns de erro/rejeição/denegação, OU
+  // - fallback: não está processando, não está autorizado e não tem DANFE
+  const shouldShowReason = (status?: string, danfeUrl?: string) => {
+    const v = (status || "").toLowerCase().trim();
+    const looksError =
+      v.includes("erro") || v.includes("rejeit") || v.includes("deneg");
+    const fallback = !isProcessing(v) && !isAuthorized(v) && !danfeUrl;
+    return looksError || fallback;
+  };
+
+  const canShowDanfe = (s?: string, url?: string) => {
+    const v = (s || "").toLowerCase().trim();
+    return !!url && (v.includes("autorizad") || v.includes("cancelad"));
+  };
 
   if (loading || !companyId) {
     return <TableSkeleton />;
@@ -128,7 +171,8 @@ export default function NfePage() {
               </CardTitle>
 
               <CardDescription className="flex gap-4 flex-wrap">
-                <div>Número: {invoice.numero || "--"}</div>
+                <div>Nº NFe: {invoice.numero ?? "--"}</div>
+                <div>Nº Pedido: {invoice.note_number ?? "--"}</div>
                 <div>Natureza: {invoice.natureza_operacao || "Venda"}</div>
                 <div>
                   Emissão:{" "}
@@ -143,31 +187,66 @@ export default function NfePage() {
                     : "R$ 0,00"}
                 </div>
               </CardDescription>
-
               <CardAction className="flex gap-4">
-                {(invoice.status === "processando_autorizacao" ||
-                  invoice.status === "erro_autorizacao") && (
-                  <>
-                    {invoice.status === "processando_autorizacao" && (
-                      <RefreshButton
-                        refId={invoice.ref}
-                        companyId={invoice.company_id}
-                        setInvoices={setInvoices}
-                      />
-                    )}
-                    <InvoiceStatusButton
-                      refId={invoice.ref}
-                      companyId={companyId!}
-                    />
-                  </>
+                <Button asChild variant="secondary">
+                  <Link
+                    href={`/dashboard/orders/${invoice.order_id}/view`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Ver Espelho
+                  </Link>
+                </Button>
+                {isProcessing(invoice.status) && (
+                  <RefreshButton
+                    refId={invoice.ref}
+                    companyId={invoice.company_id}
+                    setInvoices={setInvoices}
+                  />
                 )}
-                {invoice.danfe_url && (
+
+                {shouldShowReason(invoice.status, invoice.danfe_url) && (
+                  <InvoiceStatusButton
+                    refId={invoice.ref}
+                    companyId={companyId!}
+                  />
+                )}
+
+                {canShowDanfe(invoice.status, invoice.danfe_url) && (
                   <ViewDanfeButton
-                    url={invoice.pdf_url}
+                    url={invoice.danfe_url}
                     ref={invoice.ref}
                     invoiceId={invoice.id}
                   />
                 )}
+                {/* se autorizada e sem danfe/xml, exibe o botão */}
+                {isAuthorized(invoice.status) &&
+                  (!invoice.danfe_url || !invoice.xml_url) && (
+                    <FetchLinksButton
+                      refId={invoice.ref}
+                      companyId={invoice.company_id}
+                      invoiceId={invoice.id}
+                      setInvoices={setInvoices}
+                    />
+                  )}
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-muted-foreground"
+                    >
+                      <IconDotsVertical size={16} />
+                    </Button>
+                  </DropdownMenuTrigger>
+
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem>Cancelar</DropdownMenuItem>
+                    <DropdownMenuItem>Inutilizar</DropdownMenuItem>
+                    <DropdownMenuItem>Carta de Correção</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </CardAction>
             </CardHeader>
           </Card>

@@ -184,7 +184,7 @@ export default function TeamManagementPage() {
   if (loading) return <div className="p-8">Carregando…</div>;
 
   return (
-    <div className="space-y-6 p-8">
+    <div className="space-y-6 py-8">
       <h2 className="text-xl font-bold">Gerencie sua Equipe</h2>
 
       <div className="grid grid-cols-3 gap-4">
