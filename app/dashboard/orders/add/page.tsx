@@ -41,6 +41,8 @@ import { generateNextNoteNumber } from "@/lib/generate-next-note-number";
 import { Textarea } from "@/components/ui/textarea";
 import { orderSchema, type Order } from "@/components/types/orderSchema";
 import React, { useMemo } from "react";
+import { useOverdueCheck } from "@/components/billing/useOverdueCheck";
+import { OverdueModal } from "@/components/billing/OverdueModal";
 
 type OrderFormData = z.infer<typeof orderSchema> & { id?: string };
 
@@ -70,22 +72,12 @@ interface Product {
   stock: number;
 }
 
-// interface Order {
-//   document_type?: string;
-//   note_number?: string;
-//   payment_method?: string;
-//   days_ticket?: string;
-//   freight?: number;
-//   total?: number;
-//   amount?: number;
-//   products?: string;
-//   appointment_date?: string | null;
-//   appointment_hour?: string;
-//   appointment_local?: string;
-//   customer_id?: string;
-//   issue_date?: string;
-//   text_note?: string;
-// }
+type LineItem = {
+  id: number | string;
+  name: string;
+  quantity: number;
+  standard_price: number;
+};
 
 export default function AddOrder() {
   const router = useRouter();
@@ -102,15 +94,16 @@ export default function AddOrder() {
   const [standardPrice, setStandardPrice] = useState<number | "">("");
   const [freight, setFreight] = useState<number>(0);
   const [text_note, setTextNote] = useState<string>("");
-  const [items, setItems] = useState<any[]>([]);
+  const [orderItems, setOrderItems] = useState<LineItem[]>([]);
+  const [overdueOpen, setOverdueOpen] = useState(false);
   const [catalogPrices, setCatalogPrices] = useState<Record<string, number>>(
     {},
   );
-  const [noteNumber, setNoteNumber] = useState<string>("");
   const [reservedStock, setReservedStock] = useState<number>(0);
   const addCustomerUrl = `/dashboard/customers/add?redirect=/dashboard/orders/add&fromOrder=true`;
   const searchParams = useSearchParams();
   const newCustomerId = searchParams.get("newCustomerId");
+  const { check, items: overdueItems, error: overdueError } = useOverdueCheck();
   const [appointment, setAppointment] = useState({
     date: undefined as Date | undefined,
     hour: "00:00",
@@ -129,7 +122,6 @@ export default function AddOrder() {
   const issueDate = order?.issue_date ?? new Date().toISOString().split("T")[0];
   const daysTicket = Number(order?.days_ticket ?? 0);
 
-  // Converter issueDate para Date
   const dueDate = order?.due_date
     ? format(parseISO(order.due_date), "dd/MM/yyyy")
     : "";
@@ -207,6 +199,12 @@ export default function AddOrder() {
     setOrder((prev) => ({ ...prev, customer_id: customer.id }));
     setSearchCustomer(customer.name);
     setShowCustomers(false);
+
+    const r = await check(customer.id, companyId);
+    console.debug("[overdue-check][page] response:", r);
+    if (overdueError) toast.error(overdueError);
+    setOverdueOpen(!!r?.hasOverdue);
+
     if (customer.price_table_id) {
       const { data, error } = await supabase
         .from("price_table_products")
@@ -220,7 +218,7 @@ export default function AddOrder() {
       } else {
         const pricesMap: Record<string, number> = {};
         data.forEach((item) => {
-          pricesMap[item.product_id] = item.price;
+          pricesMap[String(item.product_id)] = item.price;
         });
         setCatalogPrices(pricesMap);
       }
@@ -231,10 +229,11 @@ export default function AddOrder() {
 
   const addItem = () => {
     if (selectedProduct && standardPrice !== "") {
-      setItems([
-        ...items,
+      setOrderItems((prev) => [
+        ...prev,
         {
-          ...selectedProduct,
+          id: selectedProduct.id,
+          name: selectedProduct.name,
           quantity,
           standard_price: Number(standardPrice),
         },
@@ -243,55 +242,50 @@ export default function AddOrder() {
       setQuantity(1);
       setStandardPrice("");
     } else {
-      toast.error("Select a product and price.");
+      toast.error("Selecione um produto e defina o preço.");
     }
   };
 
   const removeItem = (index: number) => {
-    setItems(items.filter((_, i) => i !== index));
+    setOrderItems((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleEditProduct = (index: number, productId: string) => {
     const product = products.find((p) => p.id.toString() === productId);
     if (!product) return;
-
-    setItems((prevItems) => {
-      const updatedItems = [...prevItems];
-      updatedItems[index] = {
-        ...updatedItems[index],
+    setOrderItems((prev) => {
+      const next = [...prev];
+      next[index] = {
+        ...next[index],
         id: product.id,
         name: product.name,
         standard_price: product.standard_price,
       };
-      return updatedItems;
+      return next;
     });
   };
 
   const handleEditQuantity = (index: number, quantity: string) => {
-    setItems((prevItems) => {
-      const updatedItems = [...prevItems];
-      updatedItems[index] = {
-        ...updatedItems[index],
-        quantity: Number(quantity) || 0,
-      };
-      return updatedItems;
+    setOrderItems((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], quantity: Number(quantity) || 0 };
+      return next;
     });
   };
 
   const handleEditPrice = (index: number, price: string) => {
-    setItems((prevItems) => {
-      const updatedItems = [...prevItems];
-      updatedItems[index] = {
-        ...updatedItems[index],
-        standard_price: Number(price) || 0,
-      };
-      return updatedItems;
+    setOrderItems((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], standard_price: Number(price) || 0 };
+      return next;
     });
   };
 
   const getTotal = () =>
-    items.reduce((acc, item) => acc + item.standard_price * item.quantity, 0) +
-    freight;
+    orderItems.reduce(
+      (acc, item) => acc + item.standard_price * item.quantity,
+      0,
+    ) + freight;
 
   const generateNoteNumber = (type: string) => {
     const timestamp = Date.now().toString().slice(-6);
@@ -302,7 +296,7 @@ export default function AddOrder() {
     if (isSubmittingRef.current) return;
     isSubmittingRef.current = true;
     try {
-      if (!order || !order.customer_id || items.length === 0) {
+      if (!order || !order.customer_id || orderItems.length === 0) {
         toast.error("Selecione o cliente e pelomenos um produto.");
         isSubmittingRef.current = false;
         return;
@@ -322,8 +316,8 @@ export default function AddOrder() {
 
       setLoading(true);
 
-      const amount = items.reduce((acc, item) => acc + item.quantity, 0);
-      const productsDescription = items
+      const amount = orderItems.reduce((acc, item) => acc + item.quantity, 0);
+      const productsDescription = orderItems
         .map((item) => `${item.name} (${item.quantity}x)`)
         .join(", ");
       const total = getTotal();
@@ -386,9 +380,9 @@ export default function AddOrder() {
         return;
       }
 
-      console.log("Items antes de salvar order_items:", items);
+      console.log("Items antes de salvar order_items:", orderItems);
 
-      const orderItems = items.map((item) => ({
+      const itemsPayload = orderItems.map((item) => ({
         order_id: insertedOrder.id,
         product_id: item.id,
         quantity: item.quantity,
@@ -397,7 +391,7 @@ export default function AddOrder() {
 
       const { error: itemError } = await supabase
         .from("order_items")
-        .insert(orderItems);
+        .insert(itemsPayload);
 
       if (itemError) {
         toast.error("❌ Ordem criada mas ERRO ao inserir itens.");
@@ -429,7 +423,6 @@ export default function AddOrder() {
 
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Fecha o dropdown ao clicar fora
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -449,10 +442,7 @@ export default function AddOrder() {
   useEffect(() => {
     const fetchReservedStock = async () => {
       if (!selectedProduct) return;
-
       const reserved = await getReservedStock(selectedProduct.id);
-      const available = selectedProduct.stock - reserved;
-
       setReservedStock(reserved);
     };
 
@@ -727,7 +717,7 @@ export default function AddOrder() {
                 const product = products.find((p) => p.id.toString() === value);
                 if (product) {
                   setSelectedProduct(product);
-                  const catalogPrice = catalogPrices[product.id];
+                  const catalogPrice = catalogPrices[String(product.id)];
                   setStandardPrice(
                     typeof catalogPrice === "number"
                       ? catalogPrice
@@ -758,8 +748,8 @@ export default function AddOrder() {
               className="col-span-2 w-full cursor-pointer"
               onClick={() => {
                 if (selectedProduct && standardPrice !== "") {
-                  setItems([
-                    ...items,
+                  setOrderItems((prev) => [
+                    ...prev,
                     {
                       id: selectedProduct.id,
                       name: selectedProduct.name,
@@ -799,7 +789,7 @@ export default function AddOrder() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {items.map((item, index) => {
+                {orderItems.map((item, index) => {
                   const p = productById.get(String(item.id));
                   const label = p
                     ? `${p.code} - ${p.name}`
@@ -948,6 +938,14 @@ export default function AddOrder() {
           </div>
         </CardContent>
       </Card>
+      <OverdueModal
+        open={overdueOpen}
+        items={overdueItems}
+        onClose={() => setOverdueOpen(false)}
+        onProceed={() => {
+          setOverdueOpen(false);
+        }}
+      />
     </div>
   );
 }

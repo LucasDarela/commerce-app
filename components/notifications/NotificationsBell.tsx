@@ -151,7 +151,7 @@ export default function NotificationBell() {
                   }`}
                 >
                   {/* conteúdo */}
-                  <div className="min-w-0 max-h-4">
+                  <div className="min-w-0 max-h-8">
                     <div className="font-medium text-sm truncate">
                       {n.title}
                     </div>

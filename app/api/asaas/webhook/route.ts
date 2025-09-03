@@ -32,9 +32,8 @@ export async function POST(req: Request) {
     req.headers.get("x-asaas-access-token") ||
     req.headers.get("authorization");
 
-  if (!tokenHeader) {
+  if (!tokenHeader)
     return NextResponse.json({ error: "missing token" }, { status: 401 });
-  }
 
   let body: AsaasWebhook;
   try {
@@ -45,34 +44,34 @@ export async function POST(req: Request) {
 
   const payment: AsaasPayment =
     body.payment || body.data?.payment || ({} as AsaasPayment);
-  if (!payment?.id) {
+  if (!payment?.id)
     return NextResponse.json({ error: "payment id missing" }, { status: 400 });
-  }
 
   const SUPABASE_URL =
     process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
   const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!SUPABASE_URL || !SERVICE_ROLE) {
+  if (!SUPABASE_URL || !SERVICE_ROLE)
     return NextResponse.json({ error: "server env missing" }, { status: 500 });
-  }
+
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, {
     auth: { persistSession: false },
   });
 
   // resolve empresa pelo token do webhook
-  const { data: integ, error } = await supabase
+  const { data: integ, error: integErr } = await supabase
     .from("company_integrations")
     .select("company_id")
     .eq("provider", "asaas")
     .eq("webhook_token", tokenHeader.trim())
     .maybeSingle();
 
-  if (error || !integ) {
+  if (integErr || !integ)
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
 
   const companyId = integ.company_id;
+  // ...
   const status = mapAsaasToFRStatus(payment.status);
+  const isPaid = status === "Paid";
   const totalPayed =
     typeof payment.netValue === "number"
       ? payment.netValue
@@ -80,8 +79,28 @@ export async function POST(req: Request) {
         ? payment.value
         : null;
 
+  // Atualiza pedido (se houver match)
   const updateOrder: Record<string, any> = { payment_status: status };
-  if (totalPayed !== null) updateOrder.total_payed = totalPayed;
+
+  if (isPaid) {
+    const { data: orderRow, error: orderErr } = await supabase
+      .from("orders")
+      .select("id, total, total_payed")
+      .eq("company_id", companyId)
+      .eq("boleto_id", payment.id)
+      .maybeSingle();
+
+    if (!orderErr && orderRow) {
+      const alreadyClosed =
+        Number(orderRow.total_payed ?? 0) >= Number(orderRow.total ?? 0);
+
+      if (!alreadyClosed) {
+        updateOrder.total_payed = orderRow.total;
+      }
+    }
+  } else if (totalPayed !== null) {
+    updateOrder.total_payed = totalPayed;
+  }
 
   const { error: updErr } = await supabase
     .from("orders")
@@ -91,22 +110,44 @@ export async function POST(req: Request) {
 
   if (updErr) {
     console.error("webhook asaas: erro ao atualizar orders:", updErr);
-    // seguimos criando notificação mesmo assim
   }
 
-  // 🔔 inserir notificação (use só colunas que EXISTEM na sua tabela)
-  // sua página busca: id, title, description, date, read
-  const title = "Pagamento recebido (Asaas)";
-  const description = `Cobrança ${payment.id} marcada como PAGA. Valor líquido: R$ ${
-    totalPayed != null ? Number(totalPayed).toFixed(2) : "—"
-  }`;
+  // 1) tenta achar o pedido pela cobrança (boleto_id)
+  const { data: order } = await supabase
+    .from("orders")
+    .select("id, number, customer_id")
+    .eq("company_id", companyId)
+    .eq("boleto_id", payment.id)
+    .maybeSingle();
+
+  // 2) se achou o pedido, busca o nome do cliente
+  let customerName: string | null = null;
+  if (order?.customer_id) {
+    const { data: customer } = await supabase
+      .from("customers")
+      .select("name")
+      .eq("company_id", companyId)
+      .eq("id", order.customer_id)
+      .maybeSingle();
+    customerName = customer?.name ?? null;
+  }
+
+  const orderNumber = order?.number ?? order?.id ?? null;
+
+  // 🔔 montar texto rico (sem alterar schema/colunas)
+  const title = "Pagamento recebido";
+  const header =
+    `Cobrança ` +
+    `(${customerName ?? "Cliente desconhecido"})` +
+    (orderNumber ? ` - Pedido #${orderNumber}` : "") +
+    ` - marcada como Paga`;
+  const valueLine = `Valor líquido: R$ ${totalPayed != null ? Number(totalPayed).toFixed(2) : "—"}`;
+  const description = `${header}\n${valueLine}`;
 
   const notifPayload: any = {
     title,
-    description,
-    // se sua tabela tiver company_id e for NOT NULL, inclua:
+    description, // sua UI já mostra em múltiplas linhas; \n quebra a linha
     company_id: companyId,
-    // se sua coluna "date" tem default, pode omitir; senão use:
     date: new Date().toISOString(),
     read: false,
   };
@@ -114,10 +155,7 @@ export async function POST(req: Request) {
   const { error: notifErr } = await supabase
     .from("notifications")
     .insert(notifPayload);
-
-  if (notifErr) {
-    console.error("❌ Falha ao inserir notificação:", notifErr);
-  }
+  if (notifErr) console.error("❌ Falha ao inserir notificação:", notifErr);
 
   return NextResponse.json({
     ok: true,
