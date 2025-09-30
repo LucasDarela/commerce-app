@@ -1,14 +1,18 @@
 // app/api/stripe/cancel/route.ts
-
 export const runtime = "nodejs";
+
 import { NextResponse } from "next/server";
-import { createServerComponentClient } from "@supabase/auth-helpers-nextjs";
-import { cookies } from "next/headers";
+import { createClient } from "@supabase/supabase-js";
 import Stripe from "stripe";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2025-08-27.basil",
 });
+
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+);
 
 export async function POST(req: Request) {
   try {
@@ -19,8 +23,6 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
-
-    const supabase = createServerComponentClient({ cookies });
 
     // Busca a assinatura no Supabase
     const { data: subscription, error: fetchError } = await supabase
