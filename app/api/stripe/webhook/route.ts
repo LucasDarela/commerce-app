@@ -1,4 +1,5 @@
 // app/api/stripe/webhook/route.ts
+export const runtime = "nodejs";
 import { buffer } from "micro";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
