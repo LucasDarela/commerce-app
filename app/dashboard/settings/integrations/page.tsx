@@ -77,7 +77,7 @@ export default function IntegrationsPage() {
 
   return (
     <div className="space-y-6 py-8">
-      <h1 className="text-xl font-bold">Integrações</h1>
+      <h1 className="text-xl font-bold">Integração de Boletos</h1>
 
       {/* Lista cada provider encontrado */}
       {integrations.map((row) => {

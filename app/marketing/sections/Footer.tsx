@@ -66,13 +66,14 @@ export default function Footer() {
           </a>
         </nav>
         <div className="flex gap-4 justify-center mt-8">
-          <h3>(48) 9 9990-0074</h3>
+          <h3>0800 0909 0909</h3>
           <h4>contato@chopphub.com</h4>
         </div>
 
         <div className="flex flex-col items-center gap-6 mt-6">
           <p className="mt-6">
-            © 2025 Chopp Hub. Todos os direitos reservados.
+            © 2025 <span className="font-bold">Loading Tecnology</span>. Todos
+            os direitos reservados.
           </p>
         </div>
       </div>

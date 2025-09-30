@@ -120,6 +120,7 @@ export default function EditClient() {
           ),
           price_table_id: data.price_table_id || "",
           emit_nf: data.emit_nf ?? false,
+          phone: formatarTelefone(String(data.phone || "")),
         });
       }
       setLoading(false);

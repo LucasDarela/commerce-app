@@ -124,7 +124,7 @@ export default function AddProduct() {
       ]);
     }
 
-    toast.success("Product successfully added!");
+    toast.success("🍻 Produto adicionado com sucesso!");
     router.push("/dashboard/products");
     setSubmitting(false);
   };

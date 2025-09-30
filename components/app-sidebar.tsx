@@ -5,7 +5,6 @@ import NavUserWrapper from "@/components/nav-user-wrapper";
 import Link from "next/link";
 import { CompanyBrand } from "@/components/company-brand";
 import {
-  IconCamera,
   IconChartBar,
   IconDashboard,
   IconDatabase,
@@ -31,6 +30,7 @@ import {
   IconRefresh,
   IconCirclePlusFilled,
   IconFileDots,
+  IconTruckDelivery,
 } from "@tabler/icons-react";
 
 import { NavDocuments } from "@/components/nav-documents";
@@ -96,6 +96,11 @@ const data = {
       title: "Vendas",
       url: "/dashboard/orders",
       icon: IconShoppingCart,
+    },
+    {
+      title: "Rotas",
+      url: "/dashboard/routes-delivery",
+      icon: IconTruckDelivery,
     },
     {
       title: "Comodatos",

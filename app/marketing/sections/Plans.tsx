@@ -59,7 +59,8 @@ export default function Planos() {
       <div className="section-heading section-header mb-4">
         <h2 className="section-title text-primary">Escolha seu Plano</h2>
         <p className="section-description mt-5 text-muted-foreground">
-          Temos o plano ideal para sua empresa. Teste grátis por 3 dias.
+          Temos o plano ideal para sua empresa. Teste grátis por{" "}
+          <span className="font-bold">10 dias</span>.
         </p>
       </div>
 

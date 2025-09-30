@@ -175,7 +175,7 @@ export default function ListProduct() {
       <div className="mb-6 flex flex-col sm:flex-row gap-4 items-stretch">
         <Input
           type="text"
-          placeholder="Search by Code or Name..."
+          placeholder="Pesquise por Código ou Nome..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="w-full h-8 p-2 border rounded-md"

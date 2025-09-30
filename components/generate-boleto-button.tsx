@@ -18,10 +18,8 @@ function openBoleto(url: string) {
   if (!url) return;
   const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   if (isMobile) {
-    // abre na mesma aba (mais confiável em mobile/PWA)
     window.location.href = url;
   } else {
-    // desktop: nova aba
     const a = document.createElement("a");
     a.href = url;
     a.target = "_blank";
@@ -59,7 +57,6 @@ export function GenerateBoletoButtons({
           setProvider(null);
           return;
         }
-        // integrações ativas (se tiver coluna 'access_token', já filtra as válidas)
         const { data } = await supabase
           .from("company_integrations")
           .select("provider, access_token")
@@ -69,7 +66,6 @@ export function GenerateBoletoButtons({
           .filter((r) => !!r.access_token)
           .map((r) => r.provider as string);
 
-        // prioridade: Asaas > MP
         if (providers.includes("asaas")) setProvider("asaas");
         else if (providers.includes("mercado_pago"))
           setProvider("mercado_pago");
@@ -92,7 +88,6 @@ export function GenerateBoletoButtons({
       />
     );
   }
-  // fallback: MP
   return (
     <GenerateBoletoMPButton
       orderId={orderId}
@@ -231,12 +226,6 @@ function GenerateBoletoAsaasButton({
         openBoleto(order.boleto_url);
         return;
       }
-
-      // const cliente = order.customers;
-      // const days =
-      //   typeof order.days_ticket === "number" ? order.days_ticket : 0;
-      // const dueDate = formatYMD(addDays(new Date(), days));
-      // const value = Number(order.total || 0);
 
       const appt = order.appointment_date
         ? String(order.appointment_date).slice(0, 10)

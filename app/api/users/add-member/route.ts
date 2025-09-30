@@ -34,6 +34,11 @@ export async function POST(req: Request) {
       );
     }
 
+    const validRoles = ["admin", "normal", "motorista"];
+    if (!validRoles.includes(role)) {
+      return NextResponse.json({ error: "Role inválida" }, { status: 400 });
+    }
+
     // opcional: só admin pode convidar admin
     if (role === "admin" && cu.role !== "admin") {
       return NextResponse.json(

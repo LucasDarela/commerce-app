@@ -571,7 +571,7 @@ export default function EditFinancialRecord() {
                       className="p-2 cursor-pointer"
                       onClick={() => {
                         setSelectedSupplier(entity.name);
-                        setShowEntityDropdown(false); // 🔥 Fecha o dropdown ao selecionar
+                        setShowEntityDropdown(false);
                       }}
                     >
                       {entity.name}

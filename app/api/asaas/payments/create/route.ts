@@ -37,8 +37,6 @@ export async function POST(req: Request) {
       orderId,
     } = bodySchema.parse(await req.json());
 
-    // ✅ dueDate = appointmentDate + 12 dias (retroativo)
-    // cuidado com timezone; concateno "T00:00:00" para não pular dia
     const base = new Date(`${appointmentDate}T00:00:00`);
     const plus12 = new Date(base);
     plus12.setDate(plus12.getDate() + 12);

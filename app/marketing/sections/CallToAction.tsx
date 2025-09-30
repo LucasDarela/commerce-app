@@ -60,7 +60,8 @@ export default function CallToAction() {
           Teste Grátis
         </h2>
         <p className="section-description text-center mt-5 text-muted-foreground">
-          Realize seu teste 3 dias antes de começar a pagar
+          Realize seu teste <span className="font-bold">10 dias</span> antes de
+          começar a pagar
         </p>
         <div className="flex gap-2 mt-10 justify-center">
           <Button

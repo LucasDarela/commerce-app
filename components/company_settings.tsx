@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import Image from "next/image";
+import { PasswordInput } from "./ui/password-input";
 
 export default function CompanySettingsForm() {
   const { companyId } = useAuthenticatedCompany();
@@ -276,6 +277,10 @@ export default function CompanySettingsForm() {
             value={formData.state_registration}
             onChange={handleChange}
           />
+        </div>
+        <div>
+          <Label className="mb-2">ID da Sua Empresa</Label>
+          <PasswordInput value={companyId ?? ""} readOnly />
         </div>
       </div>
       <Button onClick={handleSubmit} disabled={loading} className="mt-4">

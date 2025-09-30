@@ -14,6 +14,7 @@ export const orderSchema = z.object({
   appointment_hour: z.string().nullable(),
   appointment_local: z.string().nullable(),
   customer: z.string(),
+  fantasy_name: z.string().optional(),
   customer_id: z.string().nullable(),
   customer_signature: z.string().nullable().optional(),
   phone: z.string(),

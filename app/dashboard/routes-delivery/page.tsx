@@ -102,7 +102,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import type { SupabaseClient } from "@supabase/supabase-js";
-// import { supabase } from "@/lib/supabase";
 import { PaymentModal } from "@/components/payment-modal";
 import { LoanEquipmentModal } from "@/components/equipment-loan/LoanEquipmentModal";
 import { fetchEquipmentsForOrderProducts } from "@/lib/fetch-equipments-for-products";
@@ -113,13 +112,13 @@ import "react-datepicker/dist/react-datepicker.css";
 import CustomDateInput from "@/components/ui/CustomDateInput";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import { parseOrderProducts } from "@/lib/orders/parseOrderProducts";
-import { ReturnProductModal } from "./products/ReturnProductModal";
 import type { Equipment } from "@/components/types/equipments";
 import type { ProductItem } from "@/components/types/products";
-import { TableSkeleton } from "./ui/TableSkeleton";
+import { TableSkeleton } from "@/components/ui/TableSkeleton";
 import { orderSchema, type Order } from "@/components/types/orderSchema";
-import EmitNfeMenuItem from "./nf/EmitNfeMenuItem";
 import { DeleteOrderButton } from "@/components/orders/DeleteOrderButton";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import DriverSelect from "@/components/routes/SelectMotorista";
 
 type Sale = z.infer<typeof orderSchema>;
 
@@ -147,6 +146,14 @@ export type ReturnEquipmentItem = {
   loanId: string;
   equipmentName: string;
   quantity: number;
+};
+
+type Delivery = {
+  id: string;
+  name: string;
+  address: string;
+  order: string;
+  selected?: boolean;
 };
 
 function DragHandle({ id }: { id: string }) {
@@ -261,7 +268,7 @@ async function parseProductsWithIds(
     .filter((p) => p.id !== 0);
 }
 
-export function DataTable({
+export default function RoutesTable({
   data: initialData,
   companyId,
   onRowClick,
@@ -278,6 +285,7 @@ export function DataTable({
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [dateInput, setDateInput] = useState("");
+  const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [returnedProducts, setReturnedProducts] = useState<
     { name: string; quantity: number }[]
   >([]);
@@ -311,6 +319,9 @@ export function DataTable({
     return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
   });
 
+  const [selectedDriver, setSelectedDriver] = useState<string | undefined>();
+  const [drivers, setDrivers] = useState<{ id: string; name: string }[]>([]);
+
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(
     () => {
       if (typeof window !== "undefined") {
@@ -320,6 +331,16 @@ export function DataTable({
       return {};
     },
   );
+
+  const handleGenerateRoute = () => {
+    const selectedDeliveries = deliveries.filter((d) => d.selected);
+    if (selectedDeliveries.length === 0) {
+      toast.warning("Selecione pelo menos uma entrega para gerar a rota!");
+      return;
+    }
+
+    // lógica de geração de rota aqui
+  };
 
   function handleDateInput(e: React.ChangeEvent<HTMLInputElement>) {
     let value = e.target.value.replace(/\D/g, "");
@@ -385,7 +406,6 @@ export function DataTable({
       return;
     }
 
-    // processa fantasy_name
     const ordersWithFantasy = (data ?? []).map((r) => {
       const cr = (r as any).customer_rel;
       const fantasyName = Array.isArray(cr)
@@ -397,6 +417,8 @@ export function DataTable({
         fantasy_name: fantasyName || "",
       };
     });
+
+    console.log("🔹 ordersWithFantasy", ordersWithFantasy);
 
     const parsedOrders = orderSchema.array().safeParse(ordersWithFantasy);
     if (parsedOrders.success) {
@@ -418,6 +440,8 @@ export function DataTable({
         };
       }),
     );
+
+    console.log("orders payload", JSON.parse(JSON.stringify(data)));
 
     const parsed = orderSchema.array().safeParse(data);
     if (parsed.success) {
@@ -499,11 +523,23 @@ export function DataTable({
 
   const columns: CustomColumnDef<Order>[] = [
     {
-      id: "drag",
-      header: () => null,
+      id: "select",
+      header: ({ table }) => (
+        <input
+          type="checkbox"
+          checked={table.getIsAllRowsSelected()}
+          onChange={table.getToggleAllRowsSelectedHandler()}
+        />
+      ),
+      cell: ({ row }) => (
+        <input
+          type="checkbox"
+          checked={row.getIsSelected()}
+          onChange={row.getToggleSelectedHandler()}
+        />
+      ),
       size: 25,
       meta: { className: "w-[25px]" },
-      cell: () => null,
       enableSorting: false,
       enableHiding: false,
     },
@@ -518,12 +554,10 @@ export function DataTable({
 
         const rowTime = new Date(rowDate).getTime();
 
-        // Caso seja filtro por uma data exata
         if (typeof filterValue === "string") {
           return rowDate === filterValue;
         }
 
-        // Caso seja intervalo de datas
         if (filterValue?.from && filterValue?.to) {
           const fromTime = new Date(filterValue.from).getTime();
           const toTime = new Date(filterValue.to).getTime();
@@ -554,6 +588,9 @@ export function DataTable({
       cell: ({ row }) => {
         const saleId = row.original.id;
         const orderWithFantasy = orders.find((o) => o.id === saleId);
+
+        console.log("🔹 row.original", row.original); // log do que a tabela tem
+        console.log("🔹 orderWithFantasy", orderWithFantasy); // log do objeto atualizado com fantasy_name
 
         return (
           <Button
@@ -648,8 +685,8 @@ export function DataTable({
     {
       accessorKey: "appointment_local",
       header: "Localização",
-      size: 250,
-      meta: { className: "w-[250px]" },
+      size: 350,
+      meta: { className: "w-[350px]" },
       cell: ({ row }) => (
         <div className="whitespace-pre-wrap lowercase text-muted-foreground">
           {row.original.appointment_local || ""}
@@ -662,26 +699,6 @@ export function DataTable({
       size: 100,
       meta: { className: "w-[100px] uppercase" },
       cell: ({ row }) => row.original.delivery_status,
-    },
-    {
-      accessorKey: "issue_date",
-      header: "Emissão",
-      size: 110,
-      meta: { className: "w-[110px]" },
-      cell: ({ row }) =>
-        row.original.issue_date
-          ? format(parseISO(row.original.issue_date), "dd/MM/yyyy")
-          : "—",
-    },
-    {
-      accessorKey: "due_date",
-      header: "Vencimento",
-      size: 110,
-      meta: { className: "w-[110px]" },
-      cell: ({ row }) =>
-        row.original.due_date
-          ? format(parseISO(row.original.due_date), "dd/MM/yyyy")
-          : "—",
     },
     {
       accessorKey: "payment_method",
@@ -713,102 +730,11 @@ export function DataTable({
       },
     },
     {
-      accessorKey: "total",
-      header: "Total",
-      size: 100,
-      meta: { className: "w-[100px] text-right uppercase" },
-      cell: ({ row }) => {
-        const value = row.original.total;
-        return `R$ ${value.toFixed(2).replace(".", ",")}`;
-      },
-    },
-    {
       id: "actions",
       header: "",
       size: 50,
       meta: { className: "w-[50px]" },
-      cell: ({ row }) => {
-        return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-muted-foreground"
-              >
-                <IconDotsVertical size={16} />
-              </Button>
-            </DropdownMenuTrigger>
-
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem asChild>
-                <a
-                  href={`/dashboard/orders/${row.original.id}/view`}
-                  rel="noopener noreferrer"
-                  className="w-full text-left"
-                >
-                  Ver Espelho
-                </a>
-              </DropdownMenuItem>
-
-              <DropdownMenuItem
-                onClick={() => {
-                  setSelectedOrder(row.original);
-                  setIsPaymentOpen(true);
-                }}
-              >
-                Pagar
-              </DropdownMenuItem>
-              <EmitNfeMenuItem
-                orderId={row.original.id}
-                customerId={row.original.customer_id}
-                emitNfFromOrder={(row.original as any)?.emit_nf}
-                emitNfFromCustomer={
-                  (row.original as any)?.customer_rel?.emit_nf
-                }
-                showDebug={false}
-              />
-
-              <DropdownMenuSeparator />
-
-              {!row.original.customer_signature ? (
-                <DropdownMenuItem asChild>
-                  <Link href={`/dashboard/orders/${row.original.id}/edit`}>
-                    Editar
-                  </Link>
-                </DropdownMenuItem>
-              ) : (
-                <DropdownMenuItem
-                  disabled
-                  className="text-foreground text-sm tracking-tighter"
-                >
-                  Edição bloqueada
-                </DropdownMenuItem>
-              )}
-
-              <DropdownMenuItem
-                onClick={() => {
-                  fetchOrderProductsForReturnModal(row.original.id);
-                  setSelectedCustomer(row.original);
-                }}
-              >
-                Retornar Produto
-              </DropdownMenuItem>
-
-              <DeleteOrderButton
-                orderId={row.original.id}
-                asDropdownItem
-                onDeleted={() => {
-                  // ATENÇÃO: use o mesmo setter de estado que povoa a tabela
-                  setData((prev) =>
-                    prev.filter((o) => o.id !== row.original.id),
-                  );
-                }}
-              />
-            </DropdownMenuContent>
-          </DropdownMenu>
-        );
-      },
+      cell: ({ row }) => {},
     },
   ];
 
@@ -863,36 +789,6 @@ export function DataTable({
     getFacetedRowModel: getFacetedRowModel(),
     getFacetedUniqueValues: getFacetedUniqueValues(),
   });
-
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
-
-    if (!active || !over || active.id === over.id) return;
-
-    const oldIndex = orders.findIndex((item) => item.id === active.id);
-    const newIndex = orders.findIndex((item) => item.id === over.id);
-
-    const newData = arrayMove(orders, oldIndex, newIndex);
-
-    setOrders(newData);
-    setIsSavingOrder(true);
-
-    Promise.all(
-      newData.map((item, index) =>
-        supabase
-          .from("orders")
-          .update({ order_index: index })
-          .eq("id", item.id),
-      ),
-    )
-      .then(() => {
-        setIsSavingOrder(false);
-      })
-      .catch((err) => {
-        console.error("Erro ao atualizar ordem:", err);
-        setIsSavingOrder(false);
-      });
-  }
 
   const futureReservations = React.useMemo(() => {
     return orders.filter((order) => {
@@ -1023,7 +919,6 @@ export function DataTable({
           setOrders((prev) => {
             const next = Array.isArray(prev) ? [...prev] : [];
 
-            // 🔧 pegue o id de forma segura
             const newRow = (payload.new ?? {}) as { id?: string };
             const oldRow = (payload.old ?? {}) as { id?: string };
             const rowId = newRow.id ?? oldRow.id;
@@ -1060,11 +955,8 @@ export function DataTable({
 
   useEffect(() => {
     if (!companyId) return;
-
-    // garante que a tabela tenha Realtime habilitado no Supabase Dashboard
     const channel = supabase
       .channel("orders-realtime")
-      // DELETE
       .on(
         "postgres_changes",
         { event: "DELETE", schema: "public", table: "orders" },
@@ -1074,7 +966,6 @@ export function DataTable({
           setData((prev) => prev.filter((o) => o.id !== oldRow.id));
         },
       )
-      // INSERT
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "orders" },
@@ -1082,13 +973,11 @@ export function DataTable({
           const newRow = payload.new as any;
           if (newRow?.company_id && newRow.company_id !== companyId) return;
           setData((prev) => {
-            // evita duplicar se já estiver na lista
             if (prev.some((o) => o.id === newRow.id)) return prev;
             return [newRow, ...prev];
           });
         },
       )
-      // UPDATE
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "orders" },
@@ -1111,31 +1000,6 @@ export function DataTable({
     !selectedCustomer?.customer_signature ||
     selectedCustomer?.delivery_status === "Coletado";
 
-  const emitirNota = async (nota: Order) => {
-    try {
-      const response = await fetch("/api/nfe/create", {
-        method: "POST",
-        body: JSON.stringify({
-          companyId,
-          invoiceData: nota,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        console.error("Erro da API:", data);
-        toast.error(`Erro ao emitir NF: ${data.error || "Erro desconhecido"}`);
-      } else {
-        toast.success("NF-e emitida com sucesso!");
-      }
-    } catch (err) {
-      console.error("Erro inesperado:", err);
-      toast.error("Erro inesperado ao emitir NF.");
-    }
-  };
-
-  // DateRangeFilter
   const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([
     null,
     null,
@@ -1190,54 +1054,11 @@ export function DataTable({
         </div>
       )}
       <div className="w-full flex justify-between items-center px-4 lg:px-6 my-2">
-        <h2 className="text-xl font-bold">Vendas</h2>
-        {/* Botão Adicionar */}
-        <div className="flex gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="min-w-[100px]">
-                <IconLayoutColumns />
-                <span className="hidden sm:inline">Colunas</span>
-                <IconChevronDown />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              {table
-                .getAllColumns()
-                .filter(
-                  (col) =>
-                    typeof col.accessorFn !== "undefined" && col.getCanHide(),
-                )
-                .map((column) => (
-                  <DropdownMenuCheckboxItem
-                    key={column.id}
-                    className="capitalize"
-                    checked={column.getIsVisible()}
-                    onCheckedChange={(value) =>
-                      column.toggleVisibility(!!value)
-                    }
-                  >
-                    {column.id}
-                  </DropdownMenuCheckboxItem>
-                ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <Link href="/dashboard/orders/add">
-            <Button
-              variant="default"
-              size="sm"
-              className="min-w-[100px] bg-primary text-primary-foreground hover:bg-primary/90"
-            >
-              <IconPlus className="mr-1" />
-              <span className="hidden sm:inline">Venda</span>
-            </Button>
-          </Link>
-        </div>
+        <h2 className="text-xl font-bold">Todas as Rotas</h2>
       </div>
-      <div className="grid gap-2 px-4 lg:px-6 py-2 grid-cols-2 md:grid-cols-3 lg:grid-cols-6 items-center">
+      <div className="grid gap-2 px-4 lg:px-6 py-2 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 items-center">
         {/* Filtro por data */}
-        <div className="relative w-full sm:w-full md:max-w-[300px] z-50">
+        <div className="relative w-full">
           <DatePicker
             selectsRange
             startDate={startDate}
@@ -1256,37 +1077,9 @@ export function DataTable({
           {(startDate || endDate) && (
             <button
               type="button"
-              onClick={clearFilter}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-red-600"
-            >
-              <IconTrash className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-
-        <div className="relative w-full sm:w-full md:max-w-[250px] z-50">
-          <DatePicker
-            selected={issueDateFilter}
-            onChange={(date: Date | null) => {
-              setissueDateFilter(date);
-              const isoDate = date?.toISOString().split("T")[0];
-              table
-                .getColumn("issue_date")
-                ?.setFilterValue(isoDate ?? undefined);
-            }}
-            placeholderText="Filtrar por Emissão"
-            dateFormat="dd/MM/yyyy"
-            customInput={<CustomDateInput />}
-            popperPlacement="bottom-start"
-            popperClassName="z-[9999]"
-          />
-
-          {issueDateFilter && (
-            <button
-              type="button"
               onClick={() => {
-                setissueDateFilter(null);
-                table.getColumn("issue_date")?.setFilterValue(undefined);
+                setDateRange([null, null]);
+                table.getColumn("appointment_date")?.setFilterValue(undefined);
               }}
               className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-red-600"
             >
@@ -1295,19 +1088,8 @@ export function DataTable({
           )}
         </div>
 
-        {/* Nome do cliente */}
-        <Input
-          placeholder="Buscar cliente..."
-          value={
-            (table.getColumn("customer")?.getFilterValue() as string) ?? ""
-          }
-          onChange={(e) =>
-            table.getColumn("customer")?.setFilterValue(e.target.value)
-          }
-          className="min-w-[100px] w-full"
-        />
+        <DriverSelect />
 
-        {/* Status de entrega */}
         <Select
           value={
             (table.getColumn("delivery_status")?.getFilterValue() as string) ??
@@ -1329,525 +1111,27 @@ export function DataTable({
             <SelectItem value="Coletado">Coletado</SelectItem>
           </SelectContent>
         </Select>
-
-        {/* Tipo de pagamento */}
-        <Select
-          value={
-            (table.getColumn("payment_method")?.getFilterValue() as string) ??
-            ""
-          }
-          onValueChange={(value) =>
-            table
-              .getColumn("payment_method")
-              ?.setFilterValue(value === "all" ? undefined : value)
-          }
-        >
-          <SelectTrigger className="min-w-[90px] w-full">
-            <SelectValue placeholder="Tipo" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="Pix">Pix</SelectItem>
-            <SelectItem value="Dinheiro">Dinheiro</SelectItem>
-            <SelectItem value="Boleto">Boleto</SelectItem>
-            <SelectItem value="Cartao">Cartão</SelectItem>
-          </SelectContent>
-        </Select>
-
-        {/* Status de pagamento */}
-        <Select
-          value={
-            (table.getColumn("payment_status")?.getFilterValue() as string) ??
-            ""
-          }
-          onValueChange={(value) =>
-            table
-              .getColumn("payment_status")
-              ?.setFilterValue(value === "all" ? undefined : value)
-          }
-        >
-          <SelectTrigger className="min-w-[90px] w-full">
-            <SelectValue placeholder="Pagamento" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="Unpaid">Pendente</SelectItem>
-            <SelectItem value="Paid">Pago</SelectItem>
-          </SelectContent>
-        </Select>
+        <Link href="/dashboard/routes-delivery/create">
+          <Button
+            variant="default"
+            size="sm"
+            className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+          >
+            <IconPlus className="mr-1" />
+            <span>Criar Nova Rota</span>
+          </Button>
+        </Link>
       </div>
 
-      <Tabs
-        value={selectedMonth}
-        onValueChange={setSelectedMonth}
-        className="overflow-hidden rounded-lg "
-      >
-        <div className="overflow-x-auto scrollbar-hide">
-          <TabsList className="mb-4 mx-4 lg:mx-6">
-            {monthsAvailable
-              .filter(
-                (month) => typeof month === "string" && month.includes("-"),
-              )
-              .map((month) => {
-                const [year, monthNum] = month.split("-");
-                const monthParsed = parseInt(monthNum, 10);
+      {/* Cards  */}
 
-                if (isNaN(monthParsed)) return null;
-
-                return (
-                  <TabsTrigger key={month} value={month} className="capitalize">
-                    {`${monthParsed.toString().padStart(2, "0")}/${year}`}
-                  </TabsTrigger>
-                );
-              })
-              .filter(Boolean)}
-          </TabsList>
-        </div>
-        <TabsContent
-          value={selectedMonth}
-          className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6"
-        >
-          <div className="overflow-hidden rounded-lg border">
-            <DndContext
-              collisionDetection={closestCenter}
-              modifiers={[restrictToVerticalAxis]}
-              onDragEnd={handleDragEnd}
-              sensors={sensors}
-              id={sortableId}
-            >
-              <Table className="table-fixed w-full uppercase">
-                <TableHeader className="bg-muted sticky top-0 z-10">
-                  {table.getHeaderGroups().map((headerGroup) => (
-                    <TableRow key={headerGroup.id}>
-                      {headerGroup.headers.map((header) => {
-                        return (
-                          <TableHead
-                            key={header.id}
-                            colSpan={header.colSpan}
-                            className={
-                              (
-                                header.column
-                                  .columnDef as CustomColumnDef<Order>
-                              )?.meta?.className
-                            }
-                          >
-                            {header.isPlaceholder
-                              ? null
-                              : flexRender(
-                                  header.column.columnDef.header,
-                                  header.getContext(),
-                                )}
-                          </TableHead>
-                        );
-                      })}
-                    </TableRow>
-                  ))}
-                </TableHeader>
-                <TableBody className="**:data-[slot=table-cell]:first:w-8">
-                  {table.getRowModel().rows?.length ? (
-                    <SortableContext
-                      items={table
-                        .getRowModel()
-                        .rows.map((row) => row.original.id)}
-                      strategy={verticalListSortingStrategy}
-                    >
-                      {table.getRowModel().rows.map((row) => (
-                        <DraggableRow key={row.id} row={row} />
-                      ))}
-                    </SortableContext>
-                  ) : (
-                    <TableRow>
-                      <TableCell
-                        colSpan={columns.length}
-                        className="h-30 text-center normal-case"
-                      >
-                        Crie sua primeira venda...
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-              <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-                <SheetContent side="right">
-                  <SheetHeader>
-                    <SheetTitle>Detalhes do Pedido</SheetTitle>
-                    <SheetDescription>
-                      Detalhes sobre:{" "}
-                      <strong>{selectedCustomer?.customer}</strong>
-                      <br />
-                      Nota: <strong>{selectedCustomer?.note_number}</strong>
-                      <br />
-                      Tipo: <strong>{selectedCustomer?.document_type}</strong>
-                      <br />
-                      Emissão: <strong>{selectedCustomer?.issue_date}</strong>
-                      <br />
-                      Vencimento: <strong>{selectedCustomer?.due_date}</strong>
-                      <br />
-                    </SheetDescription>
-                  </SheetHeader>
-                  <div className="max-h-[80vh] overflow-y-auto pr-4">
-                    {selectedCustomer && (
-                      <div className="ml-4 flex flex-col gap-2 text-sm">
-                        <div>
-                          <strong>Data de Agendamento:</strong>{" "}
-                          {selectedCustomer?.appointment_date
-                            ? format(
-                                parseISO(selectedCustomer.appointment_date),
-                                "dd/MM/yyyy",
-                              )
-                            : "—"}
-                        </div>
-                        <div>
-                          <strong>Hora:</strong>{" "}
-                          {selectedCustomer.appointment_hour}
-                        </div>
-                        <div>
-                          <strong>Nome:</strong> {selectedCustomer.customer}
-                        </div>
-                        <div>
-                          <strong>Fantasia:</strong>{" "}
-                          {selectedCustomer.fantasy_name ?? ""}
-                        </div>
-                        {selectedCustomer?.phone && (
-                          <div>
-                            <strong>Telefone:</strong>{" "}
-                            <a
-                              href={`https://wa.me/55${selectedCustomer.phone.replace(/\D/g, "")}?text=${encodeURIComponent("Olá, tudo bem? Sua entrega de chopp está a caminho.")}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-primary hover:underline"
-                            >
-                              {selectedCustomer.phone}
-                            </a>
-                          </div>
-                        )}
-                        <div>
-                          <strong>Produtos:</strong>
-                          <br /> {selectedCustomer.products}
-                        </div>
-                        <div>
-                          <strong>Quantidade:</strong> {selectedCustomer.amount}
-                        </div>
-                        {selectedCustomer && returnedProducts.length > 0 && (
-                          <div>
-                            <strong>Produtos Devolvidos:</strong>
-                            <ul className="list-disc pl-4">
-                              {returnedProducts.map((product, index) => (
-                                <li key={index}>
-                                  {product.name} – {product.quantity}x
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                        <div>
-                          <strong>Localização:</strong>{" "}
-                          {selectedCustomer.appointment_local}
-                        </div>
-                        <div>
-                          <strong>Observação:</strong>
-                          <br />
-                          <span className="whitespace-pre-wrap">
-                            {selectedCustomer.text_note}
-                          </span>
-                        </div>
-                        <div>
-                          <strong>Frete:</strong> {selectedCustomer.freight}
-                        </div>
-                        <div>
-                          <strong>Total:</strong> {selectedCustomer.total}
-                        </div>
-                        <div>
-                          <strong>Forma de Pagamento:</strong>{" "}
-                          {selectedCustomer.payment_method}
-                        </div>
-                        <div>
-                          <strong>Delivery:</strong>{" "}
-                          {selectedCustomer.delivery_status}
-                        </div>
-                        <div>
-                          <strong>Pagamento:</strong>{" "}
-                          {selectedCustomer
-                            ? getTranslatedStatus({
-                                source: "order",
-                                payment_status: selectedCustomer.payment_status,
-                              })
-                            : "—"}
-                        </div>
-
-                        <Button
-                          className="mt-6"
-                          onClick={() => {
-                            if (selectedCustomer?.id) {
-                              router.push(
-                                `/dashboard/orders/${selectedCustomer.id}/view`,
-                              );
-                            }
-                          }}
-                        >
-                          Ver Espelho
-                        </Button>
-
-                        <Button
-                          className={clsx({
-                            "bg-muted text-muted-foreground cursor-not-allowed opacity-60":
-                              isDisabled,
-                          })}
-                          disabled={isDisabled}
-                          onClick={async () => {
-                            if (!selectedCustomer?.customer_signature) {
-                              toast.warning(
-                                "⚠️ O cliente precisa assinar antes de marcar como entregue.",
-                              );
-                              return;
-                            }
-
-                            if (
-                              selectedCustomer?.delivery_status === "Coletado"
-                            ) {
-                              return;
-                            }
-
-                            if (
-                              selectedCustomer.delivery_status === "Entregar"
-                            ) {
-                              const equipmentItems =
-                                await fetchEquipmentsForOrderProducts(
-                                  selectedCustomer.products,
-                                );
-                              const {
-                                data: matchingCustomer,
-                                error: customerError,
-                              } = await supabase
-                                .from("customers")
-                                .select("id, name")
-                                .eq("name", selectedCustomer.customer)
-                                .maybeSingle();
-
-                              if (!matchingCustomer || customerError) {
-                                toast.error(
-                                  "Cliente não encontrado na tabela de clientes.",
-                                );
-                                return;
-                              }
-
-                              setInitialLoanCustomer({
-                                id: matchingCustomer.id,
-                                name: matchingCustomer.name,
-                              });
-                              setInitialLoanItems(equipmentItems);
-                              setIsLoanModalOpen(true);
-                            } else if (
-                              selectedCustomer.delivery_status === "Coletar"
-                            ) {
-                              const {
-                                data: matchingCustomer,
-                                error: customerError,
-                              } = await supabase
-                                .from("customers")
-                                .select("id, name")
-                                .eq("name", selectedCustomer.customer)
-                                .maybeSingle();
-
-                              if (!matchingCustomer || customerError) {
-                                toast.error(
-                                  "Cliente não encontrado na tabela de clientes.",
-                                );
-                                return;
-                              }
-
-                              const { data: loans, error } = await supabase
-                                .from("equipment_loans")
-                                .select(
-                                  "id, quantity, equipment:equipment_id(name)",
-                                )
-                                .eq("customer_id", matchingCustomer.id)
-                                .eq("status", "active");
-
-                              if (error || !loans) {
-                                toast.error(
-                                  "Erro ao buscar itens para retorno",
-                                );
-                                return;
-                              }
-
-                              const formatted = loans.map((loan) => ({
-                                loanId: loan.id,
-                                equipmentName:
-                                  (loan as any).equipment.name || "Equipamento",
-                                quantity: loan.quantity,
-                              }));
-
-                              if (formatted.length === 0) {
-                                toast.warning(
-                                  "Nenhum item de empréstimo encontrado para retornar.",
-                                );
-                                return;
-                              }
-
-                              setReturnEquipmentItems(formatted);
-                              setReturnModalCustomerId(matchingCustomer.id);
-                              setIsReturnModalOpen(true);
-                            } else {
-                              handleDeliveryStatusUpdate();
-                            }
-                          }}
-                        >
-                          {selectedCustomer?.delivery_status === "Entregar" &&
-                            "Marcar como Entregue"}
-                          {selectedCustomer?.delivery_status === "Coletar" &&
-                            "Coletar Itens"}
-                          {selectedCustomer?.delivery_status === "Coletado" &&
-                            "Chopp já Coletado ✅"}
-                          {!selectedCustomer?.delivery_status &&
-                            "Atualizar Status"}
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </SheetContent>
-              </Sheet>
-            </DndContext>
-          </div>
-          <div className="flex items-center justify-between px-4">
-            <div className="text-muted-foreground hidden flex-1 text-sm lg:flex">
-              {table.getFilteredSelectedRowModel().rows.length} of{" "}
-              {table.getFilteredRowModel().rows.length} row(s) selected.
-            </div>
-            <div className="flex w-full items-center gap-8 lg:w-fit">
-              <div className="hidden items-center gap-2 lg:flex">
-                <Label htmlFor="rows-per-page" className="text-sm font-medium">
-                  Rows per page
-                </Label>
-                <Select
-                  value={`${table.getState().pagination.pageSize}`}
-                  onValueChange={(value) => {
-                    table.setPageSize(Number(value));
-                  }}
-                >
-                  <SelectTrigger size="sm" className="w-20" id="rows-per-page">
-                    <SelectValue
-                      placeholder={table.getState().pagination.pageSize}
-                    />
-                  </SelectTrigger>
-                  <SelectContent side="top">
-                    {[10, 20, 30, 40, 50].map((pageSize) => (
-                      <SelectItem key={pageSize} value={`${pageSize}`}>
-                        {pageSize}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex w-fit items-center justify-center text-sm font-medium">
-                Page {table.getState().pagination.pageIndex + 1} of{" "}
-                {table.getPageCount()}
-              </div>
-              <div className="ml-auto flex items-center gap-2 lg:ml-0">
-                <Button
-                  variant="outline"
-                  className="hidden h-8 w-8 p-0 lg:flex"
-                  onClick={() => table.setPageIndex(0)}
-                  disabled={!table.getCanPreviousPage()}
-                >
-                  <span className="sr-only">Go to first page</span>
-                  <IconChevronsLeft />
-                </Button>
-                <Button
-                  variant="outline"
-                  className="size-8"
-                  size="icon"
-                  onClick={() => table.previousPage()}
-                  disabled={!table.getCanPreviousPage()}
-                >
-                  <span className="sr-only">Go to previous page</span>
-                  <IconChevronLeft />
-                </Button>
-                <Button
-                  variant="outline"
-                  className="size-8"
-                  size="icon"
-                  onClick={() => table.nextPage()}
-                  disabled={!table.getCanNextPage()}
-                >
-                  <span className="sr-only">Go to next page</span>
-                  <IconChevronRight />
-                </Button>
-                <Button
-                  variant="outline"
-                  className="hidden size-8 lg:flex"
-                  size="icon"
-                  onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-                  disabled={!table.getCanNextPage()}
-                >
-                  <span className="sr-only">Go to last page</span>
-                  <IconChevronsRight />
-                </Button>
-              </div>
-            </div>
-          </div>
-        </TabsContent>
-      </Tabs>
-      {selectedOrder && (
-        <PaymentModal
-          order={{
-            ...selectedOrder,
-            total_payed: selectedOrder.total_payed ?? 0,
-          }}
-          open={isPaymentOpen}
-          onClose={() => setIsPaymentOpen(false)}
-          onSuccess={async () => {
-            await refreshOrders();
-            setIsPaymentOpen(false);
-          }}
-        />
-      )}
-      <LoanEquipmentModal
-        open={isLoanModalOpen}
-        onOpenChange={setIsLoanModalOpen}
-        onLoanSaved={() => {
-          setIsLoanModalOpen(false);
-          handleDeliveryStatusUpdate();
-          refreshOrders();
-        }}
-        initialCustomer={initialLoanCustomer}
-        initialItems={initialLoanItems}
-      />
-
-      {isReturnModalOpen && returnEquipmentItems.length > 0 && (
-        <ReturnEquipmentModal
-          open={isReturnModalOpen}
-          onOpenChange={setIsReturnModalOpen}
-          customerId={returnModalCustomerId}
-          items={returnEquipmentItems}
-          order={selectedCustomer}
-          user={user}
-          onReturnSuccess={() => {
-            setIsReturnModalOpen(false);
-            handleDeliveryStatusUpdate();
-            refreshOrders();
-          }}
-          onOpenProductReturnModal={() => {
-            if (selectedCustomer?.id) {
-              fetchOrderProductsForReturnModal(selectedCustomer.id);
-            }
-          }}
-        />
-      )}
-      {isProductReturnModalOpen && selectedCustomer && (
-        <ReturnProductModal
-          open={isProductReturnModalOpen}
-          onClose={() => setIsProductReturnModalOpen(false)}
-          items={returnProductItems}
-          orderId={selectedCustomer?.id ?? ""}
-          companyId={companyId}
-          createdBy={user.id}
-          onSuccess={() => {
-            refreshOrders();
-            setIsProductReturnModalOpen(false);
-          }}
-        />
-      )}
+      <Card className="m-4 w-auto">
+        <CardContent className="flex items-center justify-between">
+          <h2>Motorista 01</h2>
+          <p>Rota 1</p>
+          <Button>Ver Rota</Button>
+        </CardContent>
+      </Card>
     </>
   );
 }

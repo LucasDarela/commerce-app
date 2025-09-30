@@ -102,7 +102,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import type { SupabaseClient } from "@supabase/supabase-js";
-// import { supabase } from "@/lib/supabase";
 import { PaymentModal } from "@/components/payment-modal";
 import { LoanEquipmentModal } from "@/components/equipment-loan/LoanEquipmentModal";
 import { fetchEquipmentsForOrderProducts } from "@/lib/fetch-equipments-for-products";
@@ -113,12 +112,10 @@ import "react-datepicker/dist/react-datepicker.css";
 import CustomDateInput from "@/components/ui/CustomDateInput";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import { parseOrderProducts } from "@/lib/orders/parseOrderProducts";
-import { ReturnProductModal } from "./products/ReturnProductModal";
 import type { Equipment } from "@/components/types/equipments";
 import type { ProductItem } from "@/components/types/products";
-import { TableSkeleton } from "./ui/TableSkeleton";
+import { TableSkeleton } from "@/components/ui/TableSkeleton";
 import { orderSchema, type Order } from "@/components/types/orderSchema";
-import EmitNfeMenuItem from "./nf/EmitNfeMenuItem";
 import { DeleteOrderButton } from "@/components/orders/DeleteOrderButton";
 
 type Sale = z.infer<typeof orderSchema>;
@@ -261,7 +258,7 @@ async function parseProductsWithIds(
     .filter((p) => p.id !== 0);
 }
 
-export function DataTable({
+export default function RoutesTable({
   data: initialData,
   companyId,
   onRowClick,
@@ -398,6 +395,8 @@ export function DataTable({
       };
     });
 
+    console.log("🔹 ordersWithFantasy", ordersWithFantasy);
+
     const parsedOrders = orderSchema.array().safeParse(ordersWithFantasy);
     if (parsedOrders.success) {
       setOrders(parsedOrders.data);
@@ -418,6 +417,8 @@ export function DataTable({
         };
       }),
     );
+
+    console.log("orders payload", JSON.parse(JSON.stringify(data)));
 
     const parsed = orderSchema.array().safeParse(data);
     if (parsed.success) {
@@ -499,11 +500,23 @@ export function DataTable({
 
   const columns: CustomColumnDef<Order>[] = [
     {
-      id: "drag",
-      header: () => null,
+      id: "select",
+      header: ({ table }) => (
+        <input
+          type="checkbox"
+          checked={table.getIsAllRowsSelected()}
+          onChange={table.getToggleAllRowsSelectedHandler()}
+        />
+      ),
+      cell: ({ row }) => (
+        <input
+          type="checkbox"
+          checked={row.getIsSelected()}
+          onChange={row.getToggleSelectedHandler()}
+        />
+      ),
       size: 25,
       meta: { className: "w-[25px]" },
-      cell: () => null,
       enableSorting: false,
       enableHiding: false,
     },
@@ -554,6 +567,9 @@ export function DataTable({
       cell: ({ row }) => {
         const saleId = row.original.id;
         const orderWithFantasy = orders.find((o) => o.id === saleId);
+
+        console.log("🔹 row.original", row.original); // log do que a tabela tem
+        console.log("🔹 orderWithFantasy", orderWithFantasy); // log do objeto atualizado com fantasy_name
 
         return (
           <Button
@@ -648,8 +664,8 @@ export function DataTable({
     {
       accessorKey: "appointment_local",
       header: "Localização",
-      size: 250,
-      meta: { className: "w-[250px]" },
+      size: 350,
+      meta: { className: "w-[350px]" },
       cell: ({ row }) => (
         <div className="whitespace-pre-wrap lowercase text-muted-foreground">
           {row.original.appointment_local || ""}
@@ -662,26 +678,6 @@ export function DataTable({
       size: 100,
       meta: { className: "w-[100px] uppercase" },
       cell: ({ row }) => row.original.delivery_status,
-    },
-    {
-      accessorKey: "issue_date",
-      header: "Emissão",
-      size: 110,
-      meta: { className: "w-[110px]" },
-      cell: ({ row }) =>
-        row.original.issue_date
-          ? format(parseISO(row.original.issue_date), "dd/MM/yyyy")
-          : "—",
-    },
-    {
-      accessorKey: "due_date",
-      header: "Vencimento",
-      size: 110,
-      meta: { className: "w-[110px]" },
-      cell: ({ row }) =>
-        row.original.due_date
-          ? format(parseISO(row.original.due_date), "dd/MM/yyyy")
-          : "—",
     },
     {
       accessorKey: "payment_method",
@@ -713,101 +709,85 @@ export function DataTable({
       },
     },
     {
-      accessorKey: "total",
-      header: "Total",
-      size: 100,
-      meta: { className: "w-[100px] text-right uppercase" },
-      cell: ({ row }) => {
-        const value = row.original.total;
-        return `R$ ${value.toFixed(2).replace(".", ",")}`;
-      },
-    },
-    {
       id: "actions",
       header: "",
       size: 50,
       meta: { className: "w-[50px]" },
       cell: ({ row }) => {
-        return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-muted-foreground"
-              >
-                <IconDotsVertical size={16} />
-              </Button>
-            </DropdownMenuTrigger>
-
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem asChild>
-                <a
-                  href={`/dashboard/orders/${row.original.id}/view`}
-                  rel="noopener noreferrer"
-                  className="w-full text-left"
-                >
-                  Ver Espelho
-                </a>
-              </DropdownMenuItem>
-
-              <DropdownMenuItem
-                onClick={() => {
-                  setSelectedOrder(row.original);
-                  setIsPaymentOpen(true);
-                }}
-              >
-                Pagar
-              </DropdownMenuItem>
-              <EmitNfeMenuItem
-                orderId={row.original.id}
-                customerId={row.original.customer_id}
-                emitNfFromOrder={(row.original as any)?.emit_nf}
-                emitNfFromCustomer={
-                  (row.original as any)?.customer_rel?.emit_nf
-                }
-                showDebug={false}
-              />
-
-              <DropdownMenuSeparator />
-
-              {!row.original.customer_signature ? (
-                <DropdownMenuItem asChild>
-                  <Link href={`/dashboard/orders/${row.original.id}/edit`}>
-                    Editar
-                  </Link>
-                </DropdownMenuItem>
-              ) : (
-                <DropdownMenuItem
-                  disabled
-                  className="text-foreground text-sm tracking-tighter"
-                >
-                  Edição bloqueada
-                </DropdownMenuItem>
-              )}
-
-              <DropdownMenuItem
-                onClick={() => {
-                  fetchOrderProductsForReturnModal(row.original.id);
-                  setSelectedCustomer(row.original);
-                }}
-              >
-                Retornar Produto
-              </DropdownMenuItem>
-
-              <DeleteOrderButton
-                orderId={row.original.id}
-                asDropdownItem
-                onDeleted={() => {
-                  // ATENÇÃO: use o mesmo setter de estado que povoa a tabela
-                  setData((prev) =>
-                    prev.filter((o) => o.id !== row.original.id),
-                  );
-                }}
-              />
-            </DropdownMenuContent>
-          </DropdownMenu>
-        );
+        // return (
+        //   <DropdownMenu>
+        //     <DropdownMenuTrigger asChild>
+        //       <Button
+        //         variant="ghost"
+        //         size="icon"
+        //         className="text-muted-foreground"
+        //       >
+        //         <IconDotsVertical size={16} />
+        //       </Button>
+        //     </DropdownMenuTrigger>
+        //     <DropdownMenuContent align="end">
+        //       <DropdownMenuItem asChild>
+        //         <a
+        //           href={`/dashboard/orders/${row.original.id}/view`}
+        //           rel="noopener noreferrer"
+        //           className="w-full text-left"
+        //         >
+        //           Ver Espelho
+        //         </a>
+        //       </DropdownMenuItem>
+        //       <DropdownMenuItem
+        //         onClick={() => {
+        //           setSelectedOrder(row.original);
+        //           setIsPaymentOpen(true);
+        //         }}
+        //       >
+        //         Pagar
+        //       </DropdownMenuItem>
+        //       {/* <EmitNfeMenuItem
+        //         orderId={row.original.id}
+        //         customerId={row.original.customer_id}
+        //         emitNfFromOrder={(row.original as any)?.emit_nf}
+        //         emitNfFromCustomer={
+        //           (row.original as any)?.customer_rel?.emit_nf
+        //         }
+        //         showDebug={false}
+        //       /> */}
+        //       <DropdownMenuSeparator />
+        //       {!row.original.customer_signature ? (
+        //         <DropdownMenuItem asChild>
+        //           <Link href={`/dashboard/orders/${row.original.id}/edit`}>
+        //             Editar
+        //           </Link>
+        //         </DropdownMenuItem>
+        //       ) : (
+        //         <DropdownMenuItem
+        //           disabled
+        //           className="text-foreground text-sm tracking-tighter"
+        //         >
+        //           Edição bloqueada
+        //         </DropdownMenuItem>
+        //       )}
+        //       <DropdownMenuItem
+        //         onClick={() => {
+        //           fetchOrderProductsForReturnModal(row.original.id);
+        //           setSelectedCustomer(row.original);
+        //         }}
+        //       >
+        //         Retornar Produto
+        //       </DropdownMenuItem>
+        //       <DeleteOrderButton
+        //         orderId={row.original.id}
+        //         asDropdownItem
+        //         onDeleted={() => {
+        //           // ATENÇÃO: use o mesmo setter de estado que povoa a tabela
+        //           setData((prev) =>
+        //             prev.filter((o) => o.id !== row.original.id),
+        //           );
+        //         }}
+        //       />
+        //     </DropdownMenuContent>
+        //   </DropdownMenu>
+        // );
       },
     },
   ];
@@ -864,35 +844,35 @@ export function DataTable({
     getFacetedUniqueValues: getFacetedUniqueValues(),
   });
 
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
+  // function handleDragEnd(event: DragEndEvent) {
+  //   const { active, over } = event;
 
-    if (!active || !over || active.id === over.id) return;
+  //   if (!active || !over || active.id === over.id) return;
 
-    const oldIndex = orders.findIndex((item) => item.id === active.id);
-    const newIndex = orders.findIndex((item) => item.id === over.id);
+  //   const oldIndex = orders.findIndex((item) => item.id === active.id);
+  //   const newIndex = orders.findIndex((item) => item.id === over.id);
 
-    const newData = arrayMove(orders, oldIndex, newIndex);
+  //   const newData = arrayMove(orders, oldIndex, newIndex);
 
-    setOrders(newData);
-    setIsSavingOrder(true);
+  //   setOrders(newData);
+  //   setIsSavingOrder(true);
 
-    Promise.all(
-      newData.map((item, index) =>
-        supabase
-          .from("orders")
-          .update({ order_index: index })
-          .eq("id", item.id),
-      ),
-    )
-      .then(() => {
-        setIsSavingOrder(false);
-      })
-      .catch((err) => {
-        console.error("Erro ao atualizar ordem:", err);
-        setIsSavingOrder(false);
-      });
-  }
+  //   Promise.all(
+  //     newData.map((item, index) =>
+  //       supabase
+  //         .from("orders")
+  //         .update({ order_index: index })
+  //         .eq("id", item.id),
+  //     ),
+  //   )
+  //     .then(() => {
+  //       setIsSavingOrder(false);
+  //     })
+  //     .catch((err) => {
+  //       console.error("Erro ao atualizar ordem:", err);
+  //       setIsSavingOrder(false);
+  //     });
+  // }
 
   const futureReservations = React.useMemo(() => {
     return orders.filter((order) => {
@@ -1111,30 +1091,6 @@ export function DataTable({
     !selectedCustomer?.customer_signature ||
     selectedCustomer?.delivery_status === "Coletado";
 
-  const emitirNota = async (nota: Order) => {
-    try {
-      const response = await fetch("/api/nfe/create", {
-        method: "POST",
-        body: JSON.stringify({
-          companyId,
-          invoiceData: nota,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        console.error("Erro da API:", data);
-        toast.error(`Erro ao emitir NF: ${data.error || "Erro desconhecido"}`);
-      } else {
-        toast.success("NF-e emitida com sucesso!");
-      }
-    } catch (err) {
-      console.error("Erro inesperado:", err);
-      toast.error("Erro inesperado ao emitir NF.");
-    }
-  };
-
   // DateRangeFilter
   const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([
     null,
@@ -1190,7 +1146,7 @@ export function DataTable({
         </div>
       )}
       <div className="w-full flex justify-between items-center px-4 lg:px-6 my-2">
-        <h2 className="text-xl font-bold">Vendas</h2>
+        <h2 className="text-xl font-bold">Rotas</h2>
         {/* Botão Adicionar */}
         <div className="flex gap-2">
           <DropdownMenu>
@@ -1223,14 +1179,14 @@ export function DataTable({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Link href="/dashboard/orders/add">
+          <Link href="/api/routes/generate">
             <Button
               variant="default"
               size="sm"
               className="min-w-[100px] bg-primary text-primary-foreground hover:bg-primary/90"
             >
               <IconPlus className="mr-1" />
-              <span className="hidden sm:inline">Venda</span>
+              <span className="hidden sm:inline">Gerar Rota</span>
             </Button>
           </Link>
         </div>
@@ -1265,22 +1221,6 @@ export function DataTable({
         </div>
 
         <div className="relative w-full sm:w-full md:max-w-[250px] z-50">
-          <DatePicker
-            selected={issueDateFilter}
-            onChange={(date: Date | null) => {
-              setissueDateFilter(date);
-              const isoDate = date?.toISOString().split("T")[0];
-              table
-                .getColumn("issue_date")
-                ?.setFilterValue(isoDate ?? undefined);
-            }}
-            placeholderText="Filtrar por Emissão"
-            dateFormat="dd/MM/yyyy"
-            customInput={<CustomDateInput />}
-            popperPlacement="bottom-start"
-            popperClassName="z-[9999]"
-          />
-
           {issueDateFilter && (
             <button
               type="button"
@@ -1294,18 +1234,6 @@ export function DataTable({
             </button>
           )}
         </div>
-
-        {/* Nome do cliente */}
-        <Input
-          placeholder="Buscar cliente..."
-          value={
-            (table.getColumn("customer")?.getFilterValue() as string) ?? ""
-          }
-          onChange={(e) =>
-            table.getColumn("customer")?.setFilterValue(e.target.value)
-          }
-          className="min-w-[100px] w-full"
-        />
 
         {/* Status de entrega */}
         <Select
@@ -1327,52 +1255,6 @@ export function DataTable({
             <SelectItem value="Entregar">Entregar</SelectItem>
             <SelectItem value="Coletar">Coletar</SelectItem>
             <SelectItem value="Coletado">Coletado</SelectItem>
-          </SelectContent>
-        </Select>
-
-        {/* Tipo de pagamento */}
-        <Select
-          value={
-            (table.getColumn("payment_method")?.getFilterValue() as string) ??
-            ""
-          }
-          onValueChange={(value) =>
-            table
-              .getColumn("payment_method")
-              ?.setFilterValue(value === "all" ? undefined : value)
-          }
-        >
-          <SelectTrigger className="min-w-[90px] w-full">
-            <SelectValue placeholder="Tipo" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="Pix">Pix</SelectItem>
-            <SelectItem value="Dinheiro">Dinheiro</SelectItem>
-            <SelectItem value="Boleto">Boleto</SelectItem>
-            <SelectItem value="Cartao">Cartão</SelectItem>
-          </SelectContent>
-        </Select>
-
-        {/* Status de pagamento */}
-        <Select
-          value={
-            (table.getColumn("payment_status")?.getFilterValue() as string) ??
-            ""
-          }
-          onValueChange={(value) =>
-            table
-              .getColumn("payment_status")
-              ?.setFilterValue(value === "all" ? undefined : value)
-          }
-        >
-          <SelectTrigger className="min-w-[90px] w-full">
-            <SelectValue placeholder="Pagamento" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="Unpaid">Pendente</SelectItem>
-            <SelectItem value="Paid">Pago</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -1411,7 +1293,7 @@ export function DataTable({
             <DndContext
               collisionDetection={closestCenter}
               modifiers={[restrictToVerticalAxis]}
-              onDragEnd={handleDragEnd}
+              // onDragEnd={handleDragEnd}
               sensors={sensors}
               id={sortableId}
             >
@@ -1788,20 +1670,6 @@ export function DataTable({
           </div>
         </TabsContent>
       </Tabs>
-      {selectedOrder && (
-        <PaymentModal
-          order={{
-            ...selectedOrder,
-            total_payed: selectedOrder.total_payed ?? 0,
-          }}
-          open={isPaymentOpen}
-          onClose={() => setIsPaymentOpen(false)}
-          onSuccess={async () => {
-            await refreshOrders();
-            setIsPaymentOpen(false);
-          }}
-        />
-      )}
       <LoanEquipmentModal
         open={isLoanModalOpen}
         onOpenChange={setIsLoanModalOpen}
@@ -1831,20 +1699,6 @@ export function DataTable({
             if (selectedCustomer?.id) {
               fetchOrderProductsForReturnModal(selectedCustomer.id);
             }
-          }}
-        />
-      )}
-      {isProductReturnModalOpen && selectedCustomer && (
-        <ReturnProductModal
-          open={isProductReturnModalOpen}
-          onClose={() => setIsProductReturnModalOpen(false)}
-          items={returnProductItems}
-          orderId={selectedCustomer?.id ?? ""}
-          companyId={companyId}
-          createdBy={user.id}
-          onSuccess={() => {
-            refreshOrders();
-            setIsProductReturnModalOpen(false);
           }}
         />
       )}

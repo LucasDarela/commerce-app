@@ -337,7 +337,7 @@ export default function AddOrder() {
         payment_status: "Unpaid",
         days_ticket:
           capitalize(order?.payment_method || "") === "Boleto"
-            ? order?.days_ticket || "12"
+            ? order?.days_ticket || "10"
             : "1",
         total,
         freight,
@@ -549,7 +549,7 @@ export default function AddOrder() {
               value={order?.payment_method || ""}
               onValueChange={(value) => {
                 let days = "0";
-                if (value.toLowerCase() === "boleto") days = "12";
+                if (value.toLowerCase() === "boleto") days = "10";
 
                 if (!["Pix", "Dinheiro", "Cartao", "Boleto"].includes(value))
                   return;
@@ -798,13 +798,9 @@ export default function AddOrder() {
                   return (
                     <TableRow key={index}>
                       <TableCell>
-                        {/* 2) Produto fixo (não editável) */}
                         <div className="w-[300px] truncate rounded-md border bg-muted/40 px-3 py-2 text-sm select-none">
                           {label}
                         </div>
-                        {/* Se preferir aparência de input:
-          <Input value={label} readOnly className="w-[300px] cursor-default select-none bg-muted/40" />
-          */}
                       </TableCell>
 
                       <TableCell className="w-[100px]">

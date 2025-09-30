@@ -59,6 +59,13 @@ interface Customer {
   price_table_id?: string;
 }
 
+type LineItem = {
+  id: number | string;
+  name: string;
+  quantity: number;
+  standard_price: number;
+};
+
 type PaymentMethod = "Pix" | "Dinheiro" | "Cartao" | "Boleto";
 
 interface Product {
@@ -82,6 +89,7 @@ export default function EditOrderPage() {
   const params = useParams();
   const { id } = useParams<{ id: string }>();
   const { companyId, user } = useAuthenticatedCompany();
+  const orderId = id as string;
 
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -92,7 +100,6 @@ export default function EditOrderPage() {
   const [searchCustomer, setSearchCustomer] = useState("");
   const [showCustomers, setShowCustomers] = useState(false);
   const [order, setOrder] = useState<EditableOrder | null>(null);
-  const [items, setItems] = useState<any[]>([]);
   const [quantity, setQuantity] = useState<number>(1);
   const [standardPrice, setStandardPrice] = useState<number | "">("");
   const [freight, setFreight] = useState<number>(0);
@@ -107,6 +114,8 @@ export default function EditOrderPage() {
   const [reservedStock, setReservedStock] = useState<number>(0);
   const [originalDueDate, setOriginalDueDate] = useState<Date | null>(null);
   const [calculatedDueDate, setCalculatedDueDate] = useState<Date | null>(null);
+
+  const [orderItems, setOrderItems] = useState<LineItem[]>([]);
 
   const [priceTableItems, setPriceTableItems] = useState<
     { product_id: string; price: number }[]
@@ -209,7 +218,7 @@ export default function EditOrderPage() {
         };
       });
 
-      setItems(parsedItems);
+      setOrderItems(parsedItems);
     };
 
     fetchData();
@@ -277,8 +286,8 @@ export default function EditOrderPage() {
 
   const addItem = () => {
     if (selectedProduct && standardPrice !== "") {
-      setItems([
-        ...items,
+      setOrderItems([
+        ...orderItems,
         {
           id: selectedProduct.id,
           name: selectedProduct.name,
@@ -293,12 +302,14 @@ export default function EditOrderPage() {
   };
 
   const removeItem = (index: number) => {
-    setItems(items.filter((_, i) => i !== index));
+    setOrderItems(orderItems.filter((_, i) => i !== index));
   };
 
   const getTotal = () =>
-    items.reduce((acc, item) => acc + item.standard_price * item.quantity, 0) +
-    freight;
+    orderItems.reduce(
+      (acc, item) => acc + item.standard_price * item.quantity,
+      0,
+    ) + freight;
 
   const handleUpdate = async () => {
     if (!order || !id) return;
@@ -319,8 +330,8 @@ export default function EditOrderPage() {
           freight: freight,
           total: total,
           text_note: text_note,
-          amount: items.reduce((sum, item) => sum + item.quantity, 0),
-          products: formatProductsForOrder(items),
+          amount: orderItems.reduce((sum, item) => sum + item.quantity, 0),
+          products: formatProductsForOrder(orderItems),
           appointment_date: appointment.date
             ? appointment.date.toISOString().split("T")[0]
             : null,
@@ -340,7 +351,7 @@ export default function EditOrderPage() {
       await supabase.from("order_items").delete().eq("order_id", id);
 
       // Insere os novos itens
-      const newItems = items.map((item) => ({
+      const newItems = orderItems.map((item) => ({
         order_id: id,
         product_id: item.id,
         quantity: item.quantity,
@@ -371,7 +382,7 @@ export default function EditOrderPage() {
     const product = products.find((p) => p.id.toString() === productId);
     if (!product) return;
 
-    setItems((prevItems) => {
+    setOrderItems((prevItems) => {
       const updatedItems = [...prevItems];
       updatedItems[index] = {
         ...updatedItems[index],
@@ -400,7 +411,7 @@ export default function EditOrderPage() {
     const product = products.find((p) => p.id.toString() === productId);
     if (!product) return;
 
-    setItems((prevItems) => {
+    setOrderItems((prevItems) => {
       const updatedItems = [...prevItems];
       updatedItems[index] = {
         ...updatedItems[index],
@@ -412,23 +423,23 @@ export default function EditOrderPage() {
     });
   };
 
-  const handleChangeQuantity = (index: number, quantity: string) => {
-    setItems((prevItems) => {
+  const handleEditQuantity = (index: number, value: string) => {
+    setOrderItems((prevItems) => {
       const updatedItems = [...prevItems];
       updatedItems[index] = {
         ...updatedItems[index],
-        quantity: Number(quantity) || 0,
+        quantity: Number(value) || 0,
       };
       return updatedItems;
     });
   };
 
-  const handleChangePrice = (index: number, price: string) => {
-    setItems((prevItems) => {
+  const handleEditPrice = (index: number, value: string) => {
+    setOrderItems((prevItems) => {
       const updatedItems = [...prevItems];
       updatedItems[index] = {
         ...updatedItems[index],
-        standard_price: Number(price) || 0,
+        standard_price: Number(value) || 0,
       };
       return updatedItems;
     });
@@ -452,6 +463,8 @@ export default function EditOrderPage() {
   const dueDate = calculatedDueDate
     ? format(calculatedDueDate, "dd/MM/yyyy")
     : "";
+
+  const productById = new Map(products.map((p) => [String(p.id), p]));
 
   return (
     <div className="w-full max-w-4xl mx-auto p-6 rounded-lg shadow-md">
@@ -515,7 +528,7 @@ export default function EditOrderPage() {
               value={order?.payment_method || ""}
               onValueChange={(value) => {
                 let days = "0";
-                if (value.toLowerCase() === "boleto") days = "12";
+                if (value.toLowerCase() === "boleto") days = "10";
 
                 if (!["Pix", "Dinheiro", "Cartao", "Boleto"].includes(value))
                   return;
@@ -710,61 +723,51 @@ export default function EditOrderPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {items.map((item, index) => (
-                  <TableRow key={index}>
-                    <TableCell>
-                      <Select
-                        value={item.id}
-                        onValueChange={(value) =>
-                          handleChangeProduct(index, value)
-                        }
-                      >
-                        <SelectTrigger className="w-[300px] truncate border rounded-md shadow-sm">
-                          <SelectValue
-                            placeholder="Produto"
-                            defaultValue={item.name}
-                          />
-                        </SelectTrigger>
-                        <SelectContent className="shadow-md rounded-md">
-                          {products.map((product) => (
-                            <SelectItem
-                              key={product.id}
-                              value={product.id.toString()}
-                            >
-                              {product.code} - {product.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell className="w-[100px]">
-                      <Input
-                        className="w-full text-left"
-                        type="number"
-                        value={item.quantity}
-                        onChange={(e) =>
-                          handleChangeQuantity(index, e.target.value)
-                        }
-                      />
-                    </TableCell>
-                    <TableCell className="w-[120px]">
-                      <Input
-                        className="w-full text-left"
-                        type="number"
-                        value={item.standard_price}
-                        onChange={(e) =>
-                          handleChangePrice(index, e.target.value)
-                        }
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Trash
-                        className="cursor-pointer text-red-500"
-                        onClick={() => removeItem(index)}
-                      />
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {orderItems.map((item, index) => {
+                  const p = productById.get(String(item.id));
+                  const label = p
+                    ? `${p.code} - ${p.name}`
+                    : "Produto indisponível";
+
+                  return (
+                    <TableRow key={index}>
+                      <TableCell>
+                        <div className="w-[300px] truncate rounded-md border bg-muted/40 px-3 py-2 text-sm select-none">
+                          {label}
+                        </div>
+                      </TableCell>
+
+                      <TableCell className="w-[100px]">
+                        <Input
+                          className="w-full text-left"
+                          type="number"
+                          value={item.quantity}
+                          onChange={(e) =>
+                            handleEditQuantity(index, e.target.value)
+                          }
+                        />
+                      </TableCell>
+
+                      <TableCell className="w-[120px]">
+                        <Input
+                          className="w-full text-left"
+                          type="number"
+                          value={item.standard_price}
+                          onChange={(e) =>
+                            handleEditPrice(index, e.target.value)
+                          }
+                        />
+                      </TableCell>
+
+                      <TableCell>
+                        <Trash
+                          className="cursor-pointer text-red-500"
+                          onClick={() => removeItem(index)}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>

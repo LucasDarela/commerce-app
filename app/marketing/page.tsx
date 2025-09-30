@@ -1,13 +1,19 @@
-import { redirect } from "next/navigation";
+"use client";
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import LandingLayout from "./LandingLayout";
-import { getServerUser } from "@/lib/getServerUser";
 
-export default async function LandingPage() {
-  const session = await getServerUser();
+export default function LandingPage() {
+  const supabase = createClientComponentClient();
+  const router = useRouter();
 
-  if (session?.user) {
-    redirect("/dashboard");
-  }
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) router.replace("/dashboard");
+    });
+  }, [router, supabase]);
 
   return <LandingLayout />;
 }

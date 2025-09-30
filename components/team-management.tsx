@@ -37,10 +37,10 @@ export default function TeamManagementPage() {
   const router = useRouter();
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [currentUserRole, setCurrentUserRole] = useState<
-    "admin" | "normal" | null
+    "admin" | "normal" | "motorista" | null
   >(null);
   const [isAdding, setIsAdding] = useState(false);
-  const [newMember, setNewMember] = useState({ email: "", role: "normal" });
+  const [newMember, setNewMember] = useState({ email: "", role: "motorista" });
 
   async function fetchTeam() {
     try {
@@ -199,7 +199,10 @@ export default function TeamManagementPage() {
         <Select
           value={newMember.role}
           onValueChange={(value) =>
-            setNewMember({ ...newMember, role: value as "admin" | "normal" })
+            setNewMember({
+              ...newMember,
+              role: value as "admin" | "normal" | "motorista",
+            })
           }
         >
           <SelectTrigger className="w-full">
@@ -208,6 +211,7 @@ export default function TeamManagementPage() {
           <SelectContent>
             <SelectItem value="admin">Admin</SelectItem>
             <SelectItem value="normal">Normal</SelectItem>
+            <SelectItem value="motorista">Motorista</SelectItem>
           </SelectContent>
         </Select>
         <Button onClick={handleAddMember} disabled={isAdding}>
@@ -233,7 +237,11 @@ export default function TeamManagementPage() {
               <TableRow key={member.id}>
                 <TableCell className="py-2">{member.email}</TableCell>
                 <TableCell className="py-2">
-                  {member.role === "admin" ? "👑" : "👤"}
+                  {member.role === "admin"
+                    ? "👑"
+                    : member.role === "motorista"
+                      ? "🛻"
+                      : "👤"}
                 </TableCell>
                 <TableCell className="py-2">
                   {member.pending

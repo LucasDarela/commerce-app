@@ -61,6 +61,9 @@ export default function NfePage() {
     valorTotal: "",
   });
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   useEffect(() => {
     if (!companyId) return;
     const fetchInvoices = async () => {
@@ -68,7 +71,7 @@ export default function NfePage() {
         .from("invoices")
         .select("*")
         .eq("company_id", companyId)
-        .order("data_emissao", { ascending: false });
+        .order("numero", { ascending: false });
 
       if (error) {
         console.error("Erro ao buscar notas fiscais:", error);
@@ -118,6 +121,17 @@ export default function NfePage() {
       matchesValor
     );
   });
+
+  const sortedInvoices = filtered.sort(
+    (a, b) => Number(b.numero) - Number(a.numero),
+  );
+
+  const paginatedInvoices = filtered.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage,
+  );
+
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
   // helpers
   const isAuthorized = (s?: string) =>
     (s || "").toLowerCase().includes("autorizad");
@@ -161,16 +175,19 @@ export default function NfePage() {
         {invoices.length === 0 && (
           <p className="text-muted-foreground text-sm">Nenhuma nota emitida.</p>
         )}
-
-        {filtered.map((invoice) => (
+        {paginatedInvoices.slice().map((invoice) => (
           <Card key={invoice.id} className="my-2">
             <CardHeader>
-              <CardTitle className="flex gap-4 items-center">
+              {/* Nome do cliente */}
+              <CardTitle className="flex items-center gap-2 w-full">
                 <InvoiceStatusIndicator status={invoice.status} />
-                {invoice.customer_name || "Destinatário"}
+                <span className="font-bold text-lg break-words w-full">
+                  {invoice.customer_name || "Destinatário"}
+                </span>
               </CardTitle>
 
-              <CardDescription className="flex gap-4 flex-wrap">
+              {/* Informações */}
+              <CardDescription className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
                 <div>Nº NFe: {invoice.numero ?? "--"}</div>
                 <div>Nº Pedido: {invoice.note_number ?? "--"}</div>
                 <div>Natureza: {invoice.natureza_operacao || "Venda"}</div>
@@ -187,70 +204,98 @@ export default function NfePage() {
                     : "R$ 0,00"}
                 </div>
               </CardDescription>
-              <CardAction className="flex gap-4">
-                <Button asChild variant="secondary">
-                  <Link
-                    href={`/dashboard/orders/${invoice.order_id}/view`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Ver Espelho
-                  </Link>
-                </Button>
-                {isProcessing(invoice.status) && (
-                  <RefreshButton
+            </CardHeader>
+
+            {/* Botões no rodapé */}
+            <CardFooter className="flex flex-wrap gap-2 mt-2">
+              <Button asChild variant="secondary">
+                <Link
+                  href={`/dashboard/orders/${invoice.order_id}/view`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Ver Espelho
+                </Link>
+              </Button>
+
+              {isProcessing(invoice.status) && (
+                <RefreshButton
+                  refId={invoice.ref}
+                  companyId={invoice.company_id}
+                  setInvoices={setInvoices}
+                />
+              )}
+
+              {shouldShowReason(invoice.status, invoice.danfe_url) && (
+                <InvoiceStatusButton
+                  refId={invoice.ref}
+                  companyId={companyId!}
+                />
+              )}
+
+              {canShowDanfe(invoice.status, invoice.danfe_url) && (
+                <ViewDanfeButton
+                  url={invoice.danfe_url}
+                  ref={invoice.ref}
+                  invoiceId={invoice.id}
+                />
+              )}
+
+              {isAuthorized(invoice.status) &&
+                (!invoice.danfe_url || !invoice.xml_url) && (
+                  <FetchLinksButton
                     refId={invoice.ref}
                     companyId={invoice.company_id}
+                    invoiceId={invoice.id}
                     setInvoices={setInvoices}
                   />
                 )}
 
-                {shouldShowReason(invoice.status, invoice.danfe_url) && (
-                  <InvoiceStatusButton
-                    refId={invoice.ref}
-                    companyId={companyId!}
-                  />
-                )}
-
-                {canShowDanfe(invoice.status, invoice.danfe_url) && (
-                  <ViewDanfeButton
-                    url={invoice.danfe_url}
-                    ref={invoice.ref}
-                    invoiceId={invoice.id}
-                  />
-                )}
-                {/* se autorizada e sem danfe/xml, exibe o botão */}
-                {isAuthorized(invoice.status) &&
-                  (!invoice.danfe_url || !invoice.xml_url) && (
-                    <FetchLinksButton
-                      refId={invoice.ref}
-                      companyId={invoice.company_id}
-                      invoiceId={invoice.id}
-                      setInvoices={setInvoices}
-                    />
-                  )}
-
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-muted-foreground"
-                    >
-                      <IconDotsVertical size={16} />
-                    </Button>
-                  </DropdownMenuTrigger>
-
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem>Cancelar</DropdownMenuItem>
-                    <DropdownMenuItem>Inutilizar</DropdownMenuItem>
-                    <DropdownMenuItem>Carta de Correção</DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </CardAction>
-            </CardHeader>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-muted-foreground"
+                  >
+                    <IconDotsVertical size={16} />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem>Cancelar</DropdownMenuItem>
+                  <DropdownMenuItem>Inutilizar</DropdownMenuItem>
+                  <DropdownMenuItem>Carta de Correção</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </CardFooter>
           </Card>
         ))}
+        {/* Paginação */}
+        <div className="flex items-center justify-between mt-4">
+          <span className="text-sm">
+            Página {currentPage} de {totalPages || 1}
+          </span>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+            >
+              <IconChevronsLeft />
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() =>
+                setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+              }
+              disabled={currentPage === totalPages}
+            >
+              <IconChevronsRight />
+            </Button>
+          </div>
+        </div>
       </TabsContent>
 
       <TabsContent value="cadastro">

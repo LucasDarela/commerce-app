@@ -68,6 +68,7 @@ export default function AccountPage() {
 
     if (profileError || companyError) toast.error("Failed to update profile.");
     else toast.success("Profile updated!");
+    window.location.reload();
   };
 
   const handleChangeAvatar = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -177,7 +178,7 @@ export default function AccountPage() {
           />
           <IconSelector />
 
-          <Button onClick={handleUpdateProfile}>Save Changes</Button>
+          <Button onClick={handleUpdateProfile}>Salvar Alterações</Button>
         </CardContent>
       </Card>
     </div>

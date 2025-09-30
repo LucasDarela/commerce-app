@@ -562,7 +562,7 @@ export function DataEquipments({
                     <TableRow>
                       <TableCell
                         colSpan={columns.length}
-                        className="h-24 text-center"
+                        className="h-24 text-center normal-case"
                       >
                         Nada por aqui...
                       </TableCell>

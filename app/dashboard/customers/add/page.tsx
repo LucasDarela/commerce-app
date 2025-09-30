@@ -16,6 +16,7 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
+import Link from "next/link";
 const initialCliente = {
   type: "CPF",
   document: "",
@@ -246,7 +247,17 @@ export default function CreateClient() {
       const clienteIdRecemCriado = insertedCustomer?.id;
 
       if (error) {
-        toast.error("Erro ao cadastrar cliente: " + error.message);
+        toast.error(
+          <div>
+            Erro ao cadastrar cliente: Os campos Cpf/Cnpj, Nome/Razão Social,
+            Telefone e Catálogo são Obrigatórios.{" "}
+            <Link href="/dashboard/help" className="underline font-medium">
+              Acesse aqui
+            </Link>{" "}
+            para obter ajuda.
+          </div>,
+          { duration: 6000 },
+        );
       } else {
         toast.success("Cliente cadastrado com sucesso!");
         setCliente({

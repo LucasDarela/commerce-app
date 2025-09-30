@@ -57,7 +57,6 @@ export async function POST(req: Request) {
     auth: { persistSession: false },
   });
 
-  // resolve empresa pelo token do webhook
   const { data: integ, error: integErr } = await supabase
     .from("company_integrations")
     .select("company_id")
@@ -69,7 +68,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const companyId = integ.company_id;
-  // ...
   const status = mapAsaasToFRStatus(payment.status);
   const isPaid = status === "Paid";
   const totalPayed =
@@ -79,7 +77,6 @@ export async function POST(req: Request) {
         ? payment.value
         : null;
 
-  // Atualiza pedido (se houver match)
   const updateOrder: Record<string, any> = { payment_status: status };
 
   if (isPaid) {
@@ -112,15 +109,13 @@ export async function POST(req: Request) {
     console.error("webhook asaas: erro ao atualizar orders:", updErr);
   }
 
-  // 1) tenta achar o pedido pela cobrança (boleto_id)
   const { data: order } = await supabase
     .from("orders")
-    .select("id, number, customer_id")
+    .select("id, number, customer_id, customers(name)")
     .eq("company_id", companyId)
     .eq("boleto_id", payment.id)
     .maybeSingle();
 
-  // 2) se achou o pedido, busca o nome do cliente
   let customerName: string | null = null;
   if (order?.customer_id) {
     const { data: customer } = await supabase
@@ -134,7 +129,6 @@ export async function POST(req: Request) {
 
   const orderNumber = order?.number ?? order?.id ?? null;
 
-  // 🔔 montar texto rico (sem alterar schema/colunas)
   const title = "Pagamento recebido";
   const header =
     `Cobrança ` +
@@ -146,7 +140,7 @@ export async function POST(req: Request) {
 
   const notifPayload: any = {
     title,
-    description, // sua UI já mostra em múltiplas linhas; \n quebra a linha
+    description,
     company_id: companyId,
     date: new Date().toISOString(),
     read: false,
