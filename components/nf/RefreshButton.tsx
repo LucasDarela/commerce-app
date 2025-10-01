@@ -20,7 +20,6 @@ export default function RefreshButton({
   const [loading, setLoading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
-  // aborta request pendente no unmount
   useEffect(() => {
     return () => abortRef.current?.abort();
   }, []);

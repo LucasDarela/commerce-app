@@ -1,7 +1,7 @@
 export type OrderDetails = {
   id: string;
   payment_method: string;
-  payment_status?: "Paid" | "Unpaid";
+  payment_status?: "Paid" | "Unpaid" | "Partial";
   days_ticket?: number | string;
   freight?: number | string | null;
   note_number?: string;

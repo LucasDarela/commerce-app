@@ -18,7 +18,7 @@ export const financialSchema = z.object({
   description: z.string().optional(),
   category: z.string(),
   amount: z.preprocess((val) => Number(val), z.number()),
-  status: z.enum(["Paid", "Unpaid"]),
+  status: z.enum(["Paid", "Unpaid", "Partial"]),
   payment_method: paymentMethodEnum,
   invoice_number: z.string().optional(),
   type: z.enum(["input", "output"]),

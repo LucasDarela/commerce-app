@@ -9,7 +9,7 @@ export type Order = {
   amount: number;
   products: string;
   delivery_status: "Entregar" | "Coletar" | "Coletado";
-  payment_status: "Unpaid" | "Paid";
+  payment_status: "Unpaid" | "Paid" | "Partial";
   payment_method: "Dinheiro" | "Cartao" | "Boleto" | "Pix";
   days_ticket: string;
   freight: number;

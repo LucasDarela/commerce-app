@@ -1,20 +1,22 @@
 type SourceRecord = {
   source: "order" | "financial";
-  payment_status?: "Paid" | "Unpaid" | string;
-  status?: "Paid" | "Unpaid" | string;
+  payment_status?: "Paid" | "Unpaid" | "Partial" | string;
+  status?: "Paid" | "Unpaid" | "Partial" | string;
 };
 
 export function getTranslatedStatus(record: {
   source: "order" | "financial";
-  payment_status?: "Paid" | "Unpaid";
-  status?: "Paid" | "Unpaid";
+  payment_status?: "Paid" | "Unpaid" | "Partial";
+  status?: "Paid" | "Unpaid" | "Partial";
 }): string {
   if (record.source === "order") {
     return record.payment_status === "Paid"
       ? "Pago"
       : record.payment_status === "Unpaid"
         ? "Pendente"
-        : "—";
+        : record.payment_status === "Partial"
+          ? "Parcial"
+          : "—";
   }
 
   if (record.source === "financial") {
@@ -22,7 +24,9 @@ export function getTranslatedStatus(record: {
       ? "Pago"
       : record.status === "Unpaid"
         ? "Pendente"
-        : "—";
+        : record.status === "Partial"
+          ? "Parcial"
+          : "—";
   }
 
   return "—";

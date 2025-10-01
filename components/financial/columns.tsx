@@ -169,8 +169,12 @@ export function financialColumns({
       id: "payment_status",
       header: "Pagamento",
       accessorFn: (row) => {
-        if (isFinancial(row)) return row.status === "Paid" ? "Paid" : "Unpaid";
-        return row.payment_status === "Paid" ? "Paid" : "Unpaid";
+        const status = isFinancial(row) ? row.status : row.payment_status;
+        return status === "Paid"
+          ? "Paid"
+          : status === "Partial"
+            ? "Partial"
+            : "Unpaid";
       },
       filterFn: (row, columnId, filterValue) => {
         const value = row.getValue(columnId);
@@ -181,7 +185,11 @@ export function financialColumns({
           ? row.original.status
           : row.original.payment_status;
 
-        return status === "Paid" ? "Pago" : "Pendente";
+        return status === "Paid"
+          ? "Pago"
+          : status === "Partial"
+            ? "Parcial"
+            : "Pendente";
       },
     },
     {

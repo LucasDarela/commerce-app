@@ -22,7 +22,7 @@ export const orderSchema = z.object({
   products: z.string(),
   delivery_status: z.enum(["Entregar", "Coletar", "Coletado"]),
   payment_method: paymentMethodEnum,
-  payment_status: z.enum(["Unpaid", "Paid"]),
+  payment_status: z.enum(["Unpaid", "Paid", "Partial"]),
   days_ticket: z.union([z.string(), z.number()]).optional(),
   freight: z.union([z.string(), z.number(), z.null()]).optional(),
   note_number: z.string().optional(),

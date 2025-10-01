@@ -1373,6 +1373,7 @@ export function DataTable({
             <SelectItem value="all">Todos</SelectItem>
             <SelectItem value="Unpaid">Pendente</SelectItem>
             <SelectItem value="Paid">Pago</SelectItem>
+            <SelectItem value="Partial">Parcial</SelectItem>
           </SelectContent>
         </Select>
       </div>

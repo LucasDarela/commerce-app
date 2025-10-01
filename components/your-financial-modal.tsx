@@ -30,7 +30,7 @@ interface PaymentModalProps {
 interface FinancialRecord {
   id: string;
   amount: number;
-  status: "Unpaid" | "Paid";
+  status: "Unpaid" | "Paid" | "Partial";
   payment_method: "Pix" | "Cartao" | "Dinheiro" | "Boleto";
 }
 

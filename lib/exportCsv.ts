@@ -4,6 +4,7 @@ import { format, parseISO } from "date-fns";
 const translateMap: Record<string, string> = {
   Paid: "Pago",
   Unpaid: "Pendente",
+  Partial: "Parcial",
   financial: "Nota Financeira",
   Pix: "Pix",
   Boleto: "Boleto",

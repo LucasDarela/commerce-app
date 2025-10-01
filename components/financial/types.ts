@@ -9,7 +9,7 @@ export type FinancialRecord = {
   description?: string;
   category: string;
   amount: number;
-  status: "Paid" | "Unpaid";
+  status: "Paid" | "Unpaid" | "Partial";
   payment_method: "Pix" | "Dinheiro" | "Cartao" | "Boleto";
   invoice_number?: string;
   type: "input" | "output";
