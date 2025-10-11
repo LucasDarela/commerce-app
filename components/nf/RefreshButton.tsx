@@ -66,11 +66,11 @@ export default function RefreshButton({
         toast.success(payload.mensagem_sefaz);
       } else {
         toast.success("Status atualizado!");
+        window.location.reload();
       }
-      router.refresh();
     } finally {
       clearTimeout(timeoutId);
-      abortRef.current = null; // <- limpa
+      abortRef.current = null;
     }
   }, [companyId, refId, router, errorFromPayload]);
 

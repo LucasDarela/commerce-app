@@ -122,11 +122,20 @@ export default function NfePage() {
     );
   });
 
-  const sortedInvoices = filtered.sort(
-    (a, b) => Number(b.numero) - Number(a.numero),
-  );
+  const sortedInvoices = filtered.sort((a, b) => {
+    // Se 'a' não tem número e 'b' tem, 'a' vem primeiro
+    if (!a.numero && b.numero) return -1;
+    // Se 'b' não tem número e 'a' tem, 'b' vem primeiro
+    if (a.numero && !b.numero) return 1;
 
-  const paginatedInvoices = filtered.slice(
+    // Ambos têm número → ordenar do maior para o menor
+    const numA = Number(a.numero);
+    const numB = Number(b.numero);
+
+    return numB - numA;
+  });
+
+  const paginatedInvoices = sortedInvoices.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage,
   );

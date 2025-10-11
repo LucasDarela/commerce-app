@@ -25,9 +25,17 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Chopp Hub - Desenvolvido para sua distribuidora",
+  title: "Chopp Hub",
   description:
-    "Gerencia sua distribuidora de Chopp com muito mais segurança e agilidade.",
+    "Gerencie sua distribuidora de Chopp com muito mais segurança e agilidade.",
+  icons: {
+    icon: [
+      { url: "/favicon-16x16.png", type: "image/png", sizes: "16x16" },
+      { url: "/favicon-32x32.png", type: "image/png", sizes: "32x32" },
+    ],
+    apple: "/apple-touch-icon.png",
+    shortcut: "/favicon.ico",
+  },
 };
 
 export const dynamic = "force-dynamic";
