@@ -47,6 +47,7 @@ import {
   IconPlus,
   IconTrash,
 } from "@tabler/icons-react";
+import { NfeActionsDropdown } from "@/components/nf/NfeActionsDropdown";
 
 const supabase = createClientComponentClient<Database>();
 
@@ -260,7 +261,7 @@ export default function NfePage() {
                   />
                 )}
 
-              <DropdownMenu>
+              {/* <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
@@ -275,7 +276,12 @@ export default function NfePage() {
                   <DropdownMenuItem>Inutilizar</DropdownMenuItem>
                   <DropdownMenuItem>Carta de Correção</DropdownMenuItem>
                 </DropdownMenuContent>
-              </DropdownMenu>
+              </DropdownMenu> */}
+              <NfeActionsDropdown
+                refId={invoice.ref}
+                companyId={companyId}
+                status={invoice.status}
+              />
             </CardFooter>
           </Card>
         ))}

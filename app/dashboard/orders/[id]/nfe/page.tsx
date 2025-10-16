@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { format } from "date-fns";
 import Link from "next/link";
+import { Loader2 } from "lucide-react";
 
 export default function EmitNfePage() {
   const { id } = useParams();
@@ -29,6 +30,7 @@ export default function EmitNfePage() {
   const [emissor, setEmissor] = useState<any>(null);
   const [operations, setOperations] = useState<any[]>([]);
   const [selectedOperation, setSelectedOperation] = useState<string>("");
+  const [loading, setLoading] = useState(false);
 
   const mapPaymentMethod = (method: string): string => {
     switch (method) {
@@ -98,6 +100,8 @@ export default function EmitNfePage() {
   }, [id, companyId]);
 
   const handleEmit = async () => {
+    if (loading) return; // evita cliques duplos
+
     const operacaoFiscal = operations.find((o) => o.id === selectedOperation);
     if (!operacaoFiscal)
       return toast.error("Selecione um tipo de operação fiscal");
@@ -105,121 +109,117 @@ export default function EmitNfePage() {
     if (!emissor) return toast.error("Emissor não definido");
     if (products.length === 0) return toast.error("Nenhum produto na venda");
 
-    const hoje = format(new Date(), "yyyy-MM-dd");
-    const totalProdutos = products.reduce(
-      (acc, p) => acc + Number(p.price) * p.quantity,
-      0,
-    );
-
-    const icmsCode = String(
-      operacaoFiscal.icms_situacao_tributaria ?? "",
-    ).trim(); // <- digitável pelo usuário: "102", "500", "60", etc.
-
-    // se o usuário digitar "60", valide se ST veio completo
-    if (icmsCode === "60") {
-      const faltaST =
-        operacaoFiscal.vbc_st_ret == null ||
-        operacaoFiscal.pst == null ||
-        operacaoFiscal.vicms_substituto == null ||
-        operacaoFiscal.vicms_st_ret == null;
-
-      if (faltaST) {
-        toast.error(
-          "Para ICMS 60 (ST) é obrigatório informar vbc_st_ret, pst, vicms_substituto e vicms_st_ret.",
-        );
-        return; // não envia a nota
-      }
-    }
-
-    const items = products.map((p, index) => ({
-      numero_item: index + 1,
-      codigo_produto: String(p.code ?? ""),
-      descricao: p.name ?? "",
-      cfop: String(operacaoFiscal.cfop).padStart(4, "0"),
-      unidade_comercial: p.unit ?? "UN",
-      quantidade_comercial: Number(p.quantity),
-      valor_unitario_comercial: Number(p.price),
-      valor_unitario_tributavel: Number(p.price),
-      unidade_tributavel: p.unit ?? "UN",
-      codigo_ncm: String(operacaoFiscal.ncm).padStart(8, "0"),
-      quantidade_tributavel: Number(p.quantity),
-      valor_bruto: Number(p.price) * Number(p.quantity),
-      icms_origem: String(operacaoFiscal.icms_origem ?? "0"),
-      icms_situacao_tributaria: icmsCode,
-      pis_situacao_tributaria: String(operacaoFiscal.pis ?? "").padStart(
-        2,
-        "0",
-      ),
-      cofins_situacao_tributaria: String(operacaoFiscal.cofins ?? "").padStart(
-        2,
-        "0",
-      ),
-      // Só envie os campos de ST se for 60
-      ...(icmsCode === "60"
-        ? {
-            vbc_st_ret: Number(operacaoFiscal.vbc_st_ret),
-            pst: Number(operacaoFiscal.pst),
-            vicms_substituto: Number(operacaoFiscal.vicms_substituto),
-            vicms_st_ret: Number(operacaoFiscal.vicms_st_ret),
-          }
-        : {}),
-    }));
-
-    const invoiceData = {
-      ambiente: "1",
-      note_number: order.note_number,
-      order_id: id,
-      data_emissao: hoje,
-      data_entrada_saida: hoje,
-      natureza_operacao: operacaoFiscal.natureza_operacao,
-      tipo_documento: Number(operacaoFiscal.tipo_documento),
-      finalidade_emissao: Number(operacaoFiscal.finalidade_emissao),
-      modalidade_frete: 0,
-      valor_frete: order.freight ? Number(order.freight) : 0,
-      valor_seguro: 0,
-      valor_produtos: totalProdutos,
-      valor_total: totalProdutos,
-      // Emitente
-      nome_emitente: emissor.corporate_name,
-      nome_fantasia_emitente: emissor.trade_name,
-      cnpj_emitente: emissor.document?.replace(/\D/g, "") ?? "",
-      inscricao_estadual_emitente: emissor.state_registration,
-      logradouro_emitente: emissor.address,
-      numero_emitente: String(emissor.number ?? "S/N"),
-      bairro_emitente: emissor.neighborhood,
-      municipio_emitente: emissor.city,
-      uf_emitente: emissor.state,
-      cep_emitente: emissor.zip_code?.replace(/\D/g, "") ?? "",
-      // Destinatário
-      // Documento dinâmico
-      ...(customer.document?.replace(/\D/g, "").length === 14
-        ? { cnpj_destinatario: customer.document.replace(/\D/g, "") }
-        : { cpf_destinatario: customer.document.replace(/\D/g, "") }),
-      nome_destinatario: customer.name,
-      telefone_destinatario: String(customer.phone ?? "")
-        .replace(/\D/g, "")
-        .replace(/^55/, ""),
-      inscricao_estadual_destinatario:
-        customer.state_registration?.trim() || "ISENTO",
-      logradouro_destinatario: customer.address,
-      numero_destinatario: String(customer.number ?? "S/N"),
-      bairro_destinatario: customer.neighborhood ?? "",
-      municipio_destinatario: customer.city,
-      uf_destinatario: customer.state,
-      cep_destinatario: customer.zip_code?.replace(/\D/g, "") ?? "",
-      pais_destinatario: "Brasil",
-      presenca_comprador: operacaoFiscal.presenca_comprador || "1",
-      items,
-    };
+    setLoading(true); // ✅ inicia loading
 
     try {
+      const hoje = format(new Date(), "yyyy-MM-dd");
+      const totalProdutos = products.reduce(
+        (acc, p) => acc + Number(p.price) * p.quantity,
+        0,
+      );
+
+      const icmsCode = String(
+        operacaoFiscal.icms_situacao_tributaria ?? "",
+      ).trim();
+
+      if (icmsCode === "60") {
+        const faltaST =
+          operacaoFiscal.vbc_st_ret == null ||
+          operacaoFiscal.pst == null ||
+          operacaoFiscal.vicms_substituto == null ||
+          operacaoFiscal.vicms_st_ret == null;
+
+        if (faltaST) {
+          toast.error(
+            "Para ICMS 60 (ST) é obrigatório informar vbc_st_ret, pst, vicms_substituto e vicms_st_ret.",
+          );
+          setLoading(false);
+          return;
+        }
+      }
+
+      const items = products.map((p, index) => ({
+        numero_item: index + 1,
+        codigo_produto: String(p.code ?? ""),
+        descricao: p.name ?? "",
+        cfop: String(operacaoFiscal.cfop).padStart(4, "0"),
+        unidade_comercial: p.unit ?? "UN",
+        quantidade_comercial: Number(p.quantity),
+        valor_unitario_comercial: Number(p.price),
+        valor_unitario_tributavel: Number(p.price),
+        unidade_tributavel: p.unit ?? "UN",
+        codigo_ncm: String(operacaoFiscal.ncm).padStart(8, "0"),
+        quantidade_tributavel: Number(p.quantity),
+        valor_bruto: Number(p.price) * Number(p.quantity),
+        icms_origem: String(operacaoFiscal.icms_origem ?? "0"),
+        icms_situacao_tributaria: icmsCode,
+        pis_situacao_tributaria: String(operacaoFiscal.pis ?? "").padStart(
+          2,
+          "0",
+        ),
+        cofins_situacao_tributaria: String(
+          operacaoFiscal.cofins ?? "",
+        ).padStart(2, "0"),
+        ...(icmsCode === "60"
+          ? {
+              vbc_st_ret: Number(operacaoFiscal.vbc_st_ret),
+              pst: Number(operacaoFiscal.pst),
+              vicms_substituto: Number(operacaoFiscal.vicms_substituto),
+              vicms_st_ret: Number(operacaoFiscal.vicms_st_ret),
+            }
+          : {}),
+      }));
+
+      const invoiceData = {
+        ambiente: "1",
+        note_number: order.note_number,
+        order_id: id,
+        data_emissao: hoje,
+        data_entrada_saida: hoje,
+        natureza_operacao: operacaoFiscal.natureza_operacao,
+        tipo_documento: Number(operacaoFiscal.tipo_documento),
+        finalidade_emissao: Number(operacaoFiscal.finalidade_emissao),
+        modalidade_frete: 0,
+        valor_frete: order.freight ? Number(order.freight) : 0,
+        valor_seguro: 0,
+        valor_produtos: totalProdutos,
+        valor_total: totalProdutos,
+        nome_emitente: emissor.corporate_name,
+        nome_fantasia_emitente: emissor.trade_name,
+        cnpj_emitente: emissor.document?.replace(/\D/g, "") ?? "",
+        inscricao_estadual_emitente: emissor.state_registration,
+        logradouro_emitente: emissor.address,
+        numero_emitente: String(emissor.number ?? "S/N"),
+        bairro_emitente: emissor.neighborhood,
+        municipio_emitente: emissor.city,
+        uf_emitente: emissor.state,
+        cep_emitente: emissor.zip_code?.replace(/\D/g, "") ?? "",
+        ...(customer.document?.replace(/\D/g, "").length === 14
+          ? { cnpj_destinatario: customer.document.replace(/\D/g, "") }
+          : { cpf_destinatario: customer.document.replace(/\D/g, "") }),
+        nome_destinatario: customer.name,
+        telefone_destinatario: String(customer.phone ?? "")
+          .replace(/\D/g, "")
+          .replace(/^55/, ""),
+        inscricao_estadual_destinatario:
+          customer.state_registration?.trim() || "ISENTO",
+        logradouro_destinatario: customer.address,
+        numero_destinatario: String(customer.number ?? "S/N"),
+        bairro_destinatario: customer.neighborhood ?? "",
+        municipio_destinatario: customer.city,
+        uf_destinatario: customer.state,
+        cep_destinatario: customer.zip_code?.replace(/\D/g, "") ?? "",
+        pais_destinatario: "Brasil",
+        presenca_comprador: operacaoFiscal.presenca_comprador || "1",
+        items,
+      };
+
       const r = await fetch("/api/nfe/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ companyId, invoiceData }),
       });
 
-      // leia como texto e tente parsear
       const raw = await r.text();
       let body: any = null;
       try {
@@ -237,10 +237,10 @@ export default function EmitNfePage() {
 
         console.error("Erro Focus (response):", { status: r.status, body });
         toast.error(msg);
+        setLoading(false);
         return;
       }
 
-      // sucesso garantido pelo backend
       toast.success(
         <div>
           NF-e enviada para autorização!{" "}
@@ -252,9 +252,10 @@ export default function EmitNfePage() {
         { duration: 6000 },
       );
     } catch (err: any) {
-      // erros de rede/JS
       console.error("Erro de rede/JS ao emitir NF-e:", err);
       toast.error("Erro de rede ao emitir NF-e. Tente novamente.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -294,11 +295,12 @@ export default function EmitNfePage() {
       </div>
 
       <Button
-        className="mt-4"
+        className="mt-4 flex items-center gap-2"
         onClick={handleEmit}
-        disabled={!selectedOperation}
+        disabled={loading || !selectedOperation}
       >
-        Emitir NF-e
+        {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+        {loading ? "Emitindo NF-e..." : "Emitir NF-e"}
       </Button>
     </div>
   );
