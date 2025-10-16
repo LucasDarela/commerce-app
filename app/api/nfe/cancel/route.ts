@@ -50,8 +50,6 @@ export async function POST(req: Request) {
 
     const { focus_token, environment } = credentials;
 
-    console.log("Token Focus da empresa:", credentials.focus_token);
-
     // Define a URL com base no ambiente
     const baseUrl =
       environment === "homologacao"
@@ -77,6 +75,17 @@ export async function POST(req: Request) {
         { error: "Erro ao cancelar NFe", details: data },
         { status: response.status },
       );
+    }
+
+    // ✅ Atualiza o status no Supabase
+    const { error: updateError } = await supabase
+      .from("invoices")
+      .update({ status: "cancelado" })
+      .eq("ref", ref)
+      .eq("company_id", companyId);
+
+    if (updateError) {
+      console.error("Erro ao atualizar status no Supabase:", updateError);
     }
 
     return Response.json({ success: true, data });
