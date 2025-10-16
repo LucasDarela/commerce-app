@@ -64,6 +64,9 @@ export default function RefreshButton({
       // sucesso
       if (payload?.mensagem_sefaz) {
         toast.success(payload.mensagem_sefaz);
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
       } else {
         toast.success("Status atualizado!");
         window.location.reload();
