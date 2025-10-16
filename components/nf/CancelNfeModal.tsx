@@ -63,6 +63,7 @@ export function CancelNfeModal({
       toast.success(
         data?.message || data?.mensagem || "NF-e cancelada com sucesso!",
       );
+      window.location.reload();
       onOpenChange(false);
     } catch (err: any) {
       toast.error(err.message || "Erro ao cancelar NF-e.");

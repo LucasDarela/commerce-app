@@ -1,5 +1,5 @@
 {
-  "name": "darela-chopp-app",
+  "name": "chopp-hub-app",
   "version": "0.1.0",
   "private": true,
   "engines": {
@@ -40,6 +40,7 @@
     "@radix-ui/react-toggle-group": "^1.1.2",
     "@radix-ui/react-tooltip": "^1.1.8",
     "@react-pdf/renderer": "^4.3.0",
+    "@sendgrid/mail": "^8.1.6",
     "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.49.3",

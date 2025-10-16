@@ -63,10 +63,24 @@ export default function RefreshButton({
 
       // sucesso
       if (payload?.mensagem_sefaz) {
-        toast.success(payload.mensagem_sefaz);
-        setTimeout(() => {
+        try {
+          await fetch("/api/nfe/send-email", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              refId,
+              toEmail: clienteEmail,
+              subject: `NF-e ${refId} cancelada`,
+              body: `<p>Sua NF-e ${refId} foi cancelada com sucesso.</p>`,
+            }),
+          });
+
+          toast.success(payload.mensagem_sefaz);
+          setTimeout(() => window.location.reload(), 1500);
+        } catch (err) {
+          toast.error("Erro ao enviar e-mail da NF-e.");
           window.location.reload();
-        }, 1500);
+        }
       } else {
         toast.success("Status atualizado!");
         window.location.reload();

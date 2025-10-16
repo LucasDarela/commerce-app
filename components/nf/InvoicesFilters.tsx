@@ -55,9 +55,11 @@ export function InvoicesFilters({ filters, setFilters }: InvoicesFiltersProps) {
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">Todas</SelectItem>
-          <SelectItem value="autorizada">Autorizada</SelectItem>
-          <SelectItem value="erro">Erro</SelectItem>
+          <SelectItem value="autorizado">Autorizada</SelectItem>
           <SelectItem value="processando_autorizacao">Processando</SelectItem>
+          <SelectItem value="cancelado">Cancelado</SelectItem>
+          <SelectItem value="inutilizacao">Inutilizado</SelectItem>
+          <SelectItem value="erro">Erro</SelectItem>
         </SelectContent>
       </Select>
     </div>

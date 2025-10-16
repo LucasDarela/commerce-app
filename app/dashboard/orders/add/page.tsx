@@ -497,6 +497,7 @@ export default function AddOrder() {
           <div className="flex gap-4 w-full">
             <Select
               value={order.document_type}
+              disabled
               onValueChange={async (value) => {
                 let generatedNoteNumber = order.note_number;
                 if (value === "internal" && companyId) {

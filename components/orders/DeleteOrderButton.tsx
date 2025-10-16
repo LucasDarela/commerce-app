@@ -46,6 +46,7 @@ export function DeleteOrderButton({
         .eq("id", orderId);
       if (error) throw error;
       toast.success("Pedido deletado com sucesso.");
+      window.location.reload();
       onDeleted?.();
       router.refresh();
       setOpen(false);

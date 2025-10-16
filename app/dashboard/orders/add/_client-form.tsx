@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useOverdueCheck } from "@/components/billing/useOverdueCheck";
 import { OverdueModal } from "@/components/billing/OverdueModal";
-// import type { OverdueItem } from "@/components/billing/types"; // (opcional, não usado aqui)
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import type { Database } from "@/components/types/supabase";
 
