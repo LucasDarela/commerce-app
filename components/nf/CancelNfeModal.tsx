@@ -31,41 +31,25 @@ export function CancelNfeModal({
 
   const handleCancelNfe = async () => {
     try {
-      if (!reason.trim()) {
-        toast.error("Informe o motivo do cancelamento.");
-        return;
-      }
+      if (!reason.trim())
+        return toast.error("Informe o motivo do cancelamento.");
 
       setLoading(true);
 
-      // 🔹 1. Cancelar na Focus NFe
-      const response = await fetch(
-        `https://api.focusnfe.com.br/v2/nfe/${refId}/cancelar`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${process.env.NEXT_PUBLIC_FOCUS_API_KEY}`,
-          },
-          body: JSON.stringify({ justificativa: reason }),
-        },
-      );
+      // ✅ Chamar sua API interna, não a Focus diretamente
+      const res = await fetch("/api/nfe/cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ref: refId, motivo: reason, companyId }),
+      });
 
-      const data = await response.json();
+      const data = await res.json();
 
-      if (!response.ok) {
-        console.error(data);
-        throw new Error(data.mensagem || "Erro ao cancelar NF-e na Focus.");
+      if (!res.ok) {
+        const errorMessage =
+          data?.mensagem || data?.message || "Erro ao cancelar NF-e.";
+        throw new Error(errorMessage);
       }
-
-      // 🔹 2. Atualizar status no Supabase
-      const { error } = await supabase
-        .from("invoices")
-        .update({ status: "cancelada" })
-        .eq("ref", refId)
-        .eq("company_id", companyId);
-
-      if (error) throw error;
 
       toast.success("NF-e cancelada com sucesso!");
       onOpenChange(false);

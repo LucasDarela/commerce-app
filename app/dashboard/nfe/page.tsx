@@ -260,23 +260,6 @@ export default function NfePage() {
                     setInvoices={setInvoices}
                   />
                 )}
-
-              {/* <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-muted-foreground"
-                  >
-                    <IconDotsVertical size={16} />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem>Cancelar</DropdownMenuItem>
-                  <DropdownMenuItem>Inutilizar</DropdownMenuItem>
-                  <DropdownMenuItem>Carta de Correção</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu> */}
               <NfeActionsDropdown
                 refId={invoice.ref}
                 companyId={companyId}
