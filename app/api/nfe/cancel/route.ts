@@ -37,7 +37,7 @@ export async function POST(req: Request) {
     // 🔍 Busca o token na tabela nfe_credentials
     const { data: credentials, error: credentialsError } = await supabase
       .from("nfe_credentials")
-      .select("focus_token, ambiente")
+      .select("focus_token, environment")
       .eq("company_id", companyId)
       .maybeSingle();
 
@@ -48,11 +48,13 @@ export async function POST(req: Request) {
       );
     }
 
-    const { focus_token, ambiente } = credentials;
+    const { focus_token, environment } = credentials;
+
+    console.log("Token Focus da empresa:", credentials.focus_token);
 
     // Define a URL com base no ambiente
     const baseUrl =
-      ambiente === "homologacao"
+      environment === "homologacao"
         ? "https://homologacao.focusnfe.com.br"
         : "https://api.focusnfe.com.br";
 
