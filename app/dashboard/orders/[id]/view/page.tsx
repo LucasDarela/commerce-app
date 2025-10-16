@@ -20,6 +20,8 @@ import { LoanEquipmentModal } from "@/components/equipment-loan/LoanEquipmentMod
 import { ReturnEquipmentModal } from "@/components/equipment-loan/ReturnEquipmentModal";
 import clsx from "clsx";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
+import EmitNfeButton from "@/components/nf/EmitirNfeViewPage";
+import { useCanEmitNfe } from "@/hooks/useCanEmitNfe";
 
 // --------- helpers de estoque ----------
 async function parseProductsWithIds(
@@ -193,6 +195,23 @@ export default function ViewOrderPage() {
         if (!data || !data.customer) return;
         setOrder(data);
 
+        const { data: customerEmit, error: emitError } = await supabase
+          .from("customers")
+          .select("emit_nf")
+          .eq("id", data.customer.id)
+          .single();
+
+        if (!emitError && customerEmit) {
+          setOrder((prev: any) =>
+            prev
+              ? {
+                  ...prev,
+                  customer: { ...prev.customer, emit_nf: customerEmit.emit_nf },
+                }
+              : prev,
+          );
+        }
+
         if (data?.customer_signature) {
           setSignatureData(data.customer_signature);
         }
@@ -215,6 +234,17 @@ export default function ViewOrderPage() {
 
     if (id) fetch();
   }, [id]);
+
+  // chama o hook sempre — passa nulls enquanto order não existe
+  const {
+    canEmit,
+    loading: canEmitLoading,
+    error: canEmitError,
+  } = useCanEmitNfe({
+    customerId: order?.customer?.id ?? null,
+    emitNfFromOrder: order?.emit_nf ?? null,
+    emitNfFromCustomer: order?.customer?.emit_nf ?? null,
+  });
 
   if (loading || !order) {
     return <TableSkeleton />;
@@ -254,26 +284,29 @@ export default function ViewOrderPage() {
   const handleSaveSignature = async (dataUrl: string) => {
     if (!dataUrl) return;
 
-    if (order?.stock_updated) {
-      toast.info("✔️ Estoque já foi atualizado para este pedido.");
-      return;
+    if (signatureData) {
+      const confirmReplace = confirm(
+        "Deseja substituir a assinatura existente?",
+      );
+      if (!confirmReplace) return;
     }
 
     const { error: saveError } = await supabase
       .from("orders")
       .update({ customer_signature: dataUrl })
-      .eq("id", id); // pode usar id do useParams
+      .eq("id", id);
 
     if (saveError) {
       toast.error("Erro ao salvar assinatura no banco.");
       console.error("Erro ao atualizar assinatura:", saveError);
       return;
     }
-
+    toast.success("Assinatura salva com sucesso!");
     setOrder((prev: any) =>
       prev ? { ...prev, customer_signature: dataUrl } : prev,
     );
     setSignatureData(dataUrl);
+    setOpenSignature(false);
 
     const { data: items, error: itemsError } = await supabase
       .from("order_items")
@@ -549,7 +582,7 @@ export default function ViewOrderPage() {
         {/* Botão Assinar */}
         <div className="w-full mt-6">
           <Button className="w-full" onClick={() => setOpenSignature(true)}>
-            Assinar
+            {signatureData ? "Refazer Assinatura" : "Assinar"}
           </Button>
         </div>
 
@@ -575,7 +608,7 @@ export default function ViewOrderPage() {
 
       {/* Ações pós-assinatura */}
       {signatureData && (
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4 mb-4">
           {logoUrl && (
             <PDFDownloadLink
               key={JSON.stringify({ signatureData, returnedProducts, items })}
@@ -622,6 +655,14 @@ export default function ViewOrderPage() {
           >
             {deliveryLabel}
           </Button>
+
+          {/* Botao nfe */}
+          <EmitNfeButton
+            orderId={order?.id ?? ""}
+            customerId={order?.customer?.id ?? ""}
+            emitNfFromOrder={order?.emit_nf ?? null}
+            emitNfFromCustomer={order?.customer?.emit_nf ?? null}
+          />
         </div>
       )}
 

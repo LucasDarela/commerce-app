@@ -8,6 +8,7 @@ export type OrderDetails = {
   customer_signature?: string | null;
   document_type: string | null;
   company_id?: string;
+  emit_nf?: boolean | null;
   // usado no PDF/logo:
   company: {
     id: string;
@@ -37,6 +38,7 @@ export type OrderDetails = {
     city?: string | null;
     state?: string | null;
     zip_code?: string | null;
+    emit_nf?: boolean | null;
   };
 
   // itens já resolvidos (não o order_items cru):
