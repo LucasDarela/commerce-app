@@ -3,82 +3,86 @@ import { cookies } from "next/headers";
 
 export async function POST(req: Request) {
   try {
+    const { ref, motivo } = await req.json();
     const supabase = createRouteHandlerClient({ cookies });
-    const { ref, motivo, companyId } = await req.json();
 
-    if (!ref || !motivo || !companyId) {
-      return Response.json({ error: "Dados incompletos" }, { status: 400 });
+    // 🔒 Pega o usuário autenticado
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return Response.json(
+        { error: "Usuário não autenticado" },
+        { status: 401 },
+      );
     }
 
-    const { data: company, error: companyError } = await supabase
-      .from("companies")
-      .select("focus_token")
-      .eq("id", companyId)
+    // 🔗 Busca o company_id vinculado ao usuário
+    const { data: companyUser, error: companyError } = await supabase
+      .from("company_users")
+      .select("company_id")
+      .eq("user_id", user.id)
       .maybeSingle();
 
-    if (companyError || !company?.focus_token) {
+    if (companyError || !companyUser?.company_id) {
+      return Response.json(
+        { error: "Empresa não encontrada para este usuário" },
+        { status: 401 },
+      );
+    }
+
+    const companyId = companyUser.company_id;
+
+    // 🔍 Busca o token na tabela nfe_credentials
+    const { data: credentials, error: credentialsError } = await supabase
+      .from("nfe_credentials")
+      .select("focus_token, ambiente")
+      .eq("company_id", companyId)
+      .maybeSingle();
+
+    if (credentialsError || !credentials?.focus_token) {
       return Response.json(
         { error: "Token Focus NFe não encontrado" },
         { status: 401 },
       );
     }
 
-    // Requisição para Focus (confirme método/endpoint com a doc da Focus)
-    const res = await fetch(`https://api.focusnfe.com.br/v2/nfe/${ref}`, {
+    const { focus_token, ambiente } = credentials;
+
+    // Define a URL com base no ambiente
+    const baseUrl =
+      ambiente === "homologacao"
+        ? "https://homologacao.focusnfe.com.br"
+        : "https://api.focusnfe.com.br";
+
+    const url = `${baseUrl}/v2/nfe/${ref}`;
+
+    // Faz o cancelamento (HTTP DELETE com justificativa)
+    const response = await fetch(url, {
       method: "DELETE",
       headers: {
-        Authorization: `Basic ${btoa(`${company.focus_token}:`)}`,
+        Authorization: `Basic ${Buffer.from(`${focus_token}:`).toString("base64")}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ motivo }),
+      body: JSON.stringify({ justificativa: motivo }),
     });
 
-    // tente parsear JSON, mas proteja caso não seja JSON
-    let payload: any = {};
-    try {
-      payload = await res.json();
-    } catch {
-      const text = await res.text().catch(() => "");
-      payload = { message: text || null };
-    }
+    const data = await response.json();
 
-    if (!res.ok) {
-      console.error("Erro Focus NFe:", payload);
-      // devolve o payload da Focus (ou uma mensagem padronizada) como JSON
+    if (!response.ok) {
       return Response.json(
-        {
-          error: payload?.mensagem ?? payload?.message ?? "Erro na Focus NFe",
-          payload,
-        },
-        { status: res.status },
+        { error: "Erro ao cancelar NFe", details: data },
+        { status: response.status },
       );
     }
 
-    // Atualiza status no Supabase
-    const { error: updateError } = await supabase
-      .from("invoices")
-      .update({ status: "cancelada" })
-      .eq("ref", ref)
-      .eq("company_id", companyId);
-
-    if (updateError) {
-      console.error("Erro ao atualizar status no Supabase:", updateError);
-      // não interrompe o fluxo, mas retorna aviso
-      return Response.json(
-        {
-          warning: "Cancelado na Focus, mas falha ao atualizar Supabase",
-          details: updateError,
-        },
-        { status: 200 },
-      );
-    }
-
-    return Response.json({
-      message: payload?.mensagem ?? "NF-e cancelada com sucesso!",
-      payload,
-    });
-  } catch (err: any) {
-    console.error("Erro geral cancelamento:", err);
-    return Response.json({ error: "Erro interno" }, { status: 500 });
+    return Response.json({ success: true, data });
+  } catch (error) {
+    console.error("Erro ao cancelar NFe:", error);
+    return Response.json(
+      { error: "Erro interno no servidor" },
+      { status: 500 },
+    );
   }
 }
