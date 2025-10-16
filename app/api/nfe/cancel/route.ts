@@ -6,20 +6,24 @@ export async function POST(req: Request) {
     const supabase = createRouteHandlerClient({ cookies });
     const { ref, motivo, companyId } = await req.json();
 
-    if (!ref || !motivo || !companyId)
-      return new Response("Dados incompletos", { status: 400 });
+    if (!ref || !motivo || !companyId) {
+      return Response.json({ error: "Dados incompletos" }, { status: 400 });
+    }
 
-    // 🔑 Pegue o token Focus NFe da empresa
     const { data: company, error: companyError } = await supabase
       .from("companies")
       .select("focus_token")
       .eq("id", companyId)
       .maybeSingle();
 
-    if (companyError || !company?.focus_token)
-      return new Response("Token Focus NFe não encontrado", { status: 401 });
+    if (companyError || !company?.focus_token) {
+      return Response.json(
+        { error: "Token Focus NFe não encontrado" },
+        { status: 401 },
+      );
+    }
 
-    // 🚀 Requisição para cancelar NF-e
+    // Requisição para Focus (confirme método/endpoint com a doc da Focus)
     const res = await fetch(`https://api.focusnfe.com.br/v2/nfe/${ref}`, {
       method: "DELETE",
       headers: {
@@ -29,14 +33,28 @@ export async function POST(req: Request) {
       body: JSON.stringify({ motivo }),
     });
 
-    const payload = await res.json().catch(() => ({}));
+    // tente parsear JSON, mas proteja caso não seja JSON
+    let payload: any = {};
+    try {
+      payload = await res.json();
+    } catch {
+      const text = await res.text().catch(() => "");
+      payload = { message: text || null };
+    }
 
     if (!res.ok) {
       console.error("Erro Focus NFe:", payload);
-      return new Response(JSON.stringify(payload), { status: res.status });
+      // devolve o payload da Focus (ou uma mensagem padronizada) como JSON
+      return Response.json(
+        {
+          error: payload?.mensagem ?? payload?.message ?? "Erro na Focus NFe",
+          payload,
+        },
+        { status: res.status },
+      );
     }
 
-    // ✅ Atualiza status no Supabase
+    // Atualiza status no Supabase
     const { error: updateError } = await supabase
       .from("invoices")
       .update({ status: "cancelada" })
@@ -45,13 +63,22 @@ export async function POST(req: Request) {
 
     if (updateError) {
       console.error("Erro ao atualizar status no Supabase:", updateError);
+      // não interrompe o fluxo, mas retorna aviso
+      return Response.json(
+        {
+          warning: "Cancelado na Focus, mas falha ao atualizar Supabase",
+          details: updateError,
+        },
+        { status: 200 },
+      );
     }
 
     return Response.json({
-      message: payload.mensagem ?? "NF-e cancelada com sucesso!",
+      message: payload?.mensagem ?? "NF-e cancelada com sucesso!",
+      payload,
     });
   } catch (err: any) {
     console.error("Erro geral cancelamento:", err);
-    return new Response("Erro interno", { status: 500 });
+    return Response.json({ error: "Erro interno" }, { status: 500 });
   }
 }

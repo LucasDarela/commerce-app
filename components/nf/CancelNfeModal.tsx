@@ -43,15 +43,26 @@ export function CancelNfeModal({
         body: JSON.stringify({ ref: refId, motivo: reason, companyId }),
       });
 
-      const data = await res.json();
+      let data: any;
+      try {
+        data = await res.json();
+      } catch {
+        const text = await res.text().catch(() => "");
+        data = { mensagem: text || "Resposta inválida do servidor" };
+      }
 
       if (!res.ok) {
         const errorMessage =
-          data?.mensagem || data?.message || "Erro ao cancelar NF-e.";
+          data?.mensagem ||
+          data?.error ||
+          data?.message ||
+          "Erro ao cancelar NF-e.";
         throw new Error(errorMessage);
       }
 
-      toast.success("NF-e cancelada com sucesso!");
+      toast.success(
+        data?.message || data?.mensagem || "NF-e cancelada com sucesso!",
+      );
       onOpenChange(false);
     } catch (err: any) {
       toast.error(err.message || "Erro ao cancelar NF-e.");

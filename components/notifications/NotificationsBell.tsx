@@ -17,7 +17,7 @@ type Notification = {
   id: string;
   title: string;
   description: string;
-  date: string; // timestamp/ISO
+  date: string;
   read: boolean;
 };
 
