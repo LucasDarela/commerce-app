@@ -232,6 +232,7 @@ export default function NfePage() {
                 <RefreshButton
                   refId={invoice.ref}
                   companyId={invoice.company_id}
+                  customerId={invoice.customer_id}
                   setInvoices={setInvoices}
                 />
               )}
