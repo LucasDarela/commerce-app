@@ -219,10 +219,20 @@ export function FinancialFilters<T>({
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">Todas</SelectItem>
-          <SelectItem value="compra_produto">Compra Produto</SelectItem>
-          <SelectItem value="compra_equipamento">Compra Equipamento</SelectItem>
+          <SelectItem value="compra_produto">Compra de Produto</SelectItem>
+          <SelectItem value="compra_equipamento">
+            Compra de Equipamento
+          </SelectItem>
+          <SelectItem value="pgto_funcionario">
+            Pagamento Funcionário
+          </SelectItem>
           <SelectItem value="vale_funcionario">Vale Funcionário</SelectItem>
-          <SelectItem value="outros">Outros</SelectItem>
+          <SelectItem value="combustivel">Combustível</SelectItem>
+          <SelectItem value="veiculo">Gastos com Veículos</SelectItem>
+          <SelectItem value="aluguel">Aluguel</SelectItem>
+          <SelectItem value="contabilidade">Contabilidade</SelectItem>
+          <SelectItem value="utilidades">Utilidades</SelectItem>
+          <SelectItem value="others">+ Outros</SelectItem>
         </SelectContent>
       </Select>
 

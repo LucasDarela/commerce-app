@@ -104,7 +104,7 @@ export default function AddFinancialRecord() {
   const router = useRouter();
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurrenceType, setRecurrenceType] = useState<
-    "daily" | "weekly" | "monthly"
+    "daily" | "weekly" | "monthly" | "biweekly"
   >("monthly");
   const [recurrenceCount, setRecurrenceCount] = useState<number>(1);
 
@@ -176,15 +176,17 @@ export default function AddFinancialRecord() {
       return;
     }
 
-    if (!isValidBrazilianDate(issueDate)) {
-      toast.error("Data de emissão inválida. Verifique o formato e o valor.");
+    if (
+      isRecurring &&
+      (selectedCategory === "compra_produto" ||
+        selectedCategory === "compra_equipamento")
+    ) {
+      toast.error("Recorrência não é permitida para este tipo de nota.");
       return;
     }
 
-    if (!isValidBrazilianDate(dueDate)) {
-      toast.error(
-        "Data de vencimento inválida. Verifique o formato e o valor.",
-      );
+    if (!isValidBrazilianDate(issueDate) || !isValidBrazilianDate(dueDate)) {
+      toast.error("Preencha as datas corretamente (dd/mm/aaaa).");
       return;
     }
 
@@ -212,7 +214,7 @@ export default function AddFinancialRecord() {
       supplier: selectedSupplier,
       description,
       category: selectedCategory || customCategory || "others",
-      amount: calculatedAmount,
+      amount: Number(calculatedAmount || 0),
       notes,
       status: "Unpaid",
       created_at: new Date().toISOString(),
@@ -229,6 +231,13 @@ export default function AddFinancialRecord() {
       .select()
       .maybeSingle();
 
+    if (error) {
+      console.error("Erro ao salvar nota principal:", error);
+      toast.error("Erro ao salvar nota. Verifique os dados e tente novamente.");
+      setLoading(false);
+      return;
+    }
+
     if (isRecurring && recurrenceCount > 1) {
       const entriesToInsert = [];
 
@@ -243,6 +252,8 @@ export default function AddFinancialRecord() {
           newDate.setMonth(baseDate.getMonth() + i);
         } else if (recurrenceType === "weekly") {
           newDate.setDate(baseDate.getDate() + i * 7);
+        } else if (recurrenceType === "biweekly") {
+          newDate.setDate(baseDate.getDate() + i * 14);
         } else if (recurrenceType === "daily") {
           newDate.setDate(baseDate.getDate() + i);
         }
@@ -251,7 +262,7 @@ export default function AddFinancialRecord() {
           ...record,
           due_date: newDate.toISOString().split("T")[0],
           created_at: new Date().toISOString(),
-          invoice_number: invoiceNumber ? `${invoiceNumber}-${i + 1}` : null,
+          invoice_number: `${invoiceNumber || "rec"}-${i + 1}`,
         });
       }
 
@@ -379,7 +390,7 @@ export default function AddFinancialRecord() {
 
   useEffect(() => {
     const fetchItems = async () => {
-      if (!companyId) return;
+      if (!companyId || !selectedCategory) return;
 
       if (selectedCategory === "compra_produto") {
         const { data, error } = await supabase
@@ -501,10 +512,12 @@ export default function AddFinancialRecord() {
               Pagamento Funcionário
             </SelectItem>
             <SelectItem value="vale_funcionario">Vale Funcionário</SelectItem>
-            <SelectItem value="utilidades">Utilidades</SelectItem>
-            <SelectItem value="aluguel">Aluguel</SelectItem>
+            <SelectItem value="combustivel">Combustível</SelectItem>
             <SelectItem value="veiculo">Gastos com Veículos</SelectItem>
-            <SelectItem value="outros">+ Outros</SelectItem>
+            <SelectItem value="aluguel">Aluguel</SelectItem>
+            <SelectItem value="contabilidade">Contabilidade</SelectItem>
+            <SelectItem value="utilidades">Utilidades</SelectItem>
+            <SelectItem value="others">+ Outros</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -627,7 +640,7 @@ export default function AddFinancialRecord() {
           {productEntries.map((entry, index) => (
             <div
               key={index}
-              className="flex flex-cols-4 gap-4 my-2 items-center justify-evenly"
+              className="grid grid-cols-4 gap-4 my-2 items-center"
             >
               <Select
                 value={entry.productId}
@@ -747,6 +760,7 @@ export default function AddFinancialRecord() {
               <SelectContent>
                 <SelectItem value="daily">Diária</SelectItem>
                 <SelectItem value="weekly">Semanal</SelectItem>
+                <SelectItem value="biweekly">Quinzenal</SelectItem>
                 <SelectItem value="monthly">Mensal</SelectItem>
               </SelectContent>
             </Select>

@@ -491,7 +491,11 @@ export default function EditFinancialRecord() {
           </SelectContent>
         </Select>
 
-        <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+        <Select
+          disabled
+          value={selectedCategory}
+          onValueChange={setSelectedCategory}
+        >
           <SelectTrigger className="w-full">
             <SelectValue placeholder="Selecione a categoria" />
           </SelectTrigger>
@@ -504,10 +508,12 @@ export default function EditFinancialRecord() {
               Pagamento Funcionário
             </SelectItem>
             <SelectItem value="vale_funcionario">Vale Funcionário</SelectItem>
-            <SelectItem value="utilidades">Utilidades</SelectItem>
-            <SelectItem value="aluguel">Aluguel</SelectItem>
+            <SelectItem value="combustivel">Combustível</SelectItem>
             <SelectItem value="veiculo">Gastos com Veículos</SelectItem>
-            <SelectItem value="outros">+ Outros</SelectItem>
+            <SelectItem value="aluguel">Aluguel</SelectItem>
+            <SelectItem value="contabilidade">Contabilidade</SelectItem>
+            <SelectItem value="utilidades">Utilidades</SelectItem>
+            <SelectItem value="others">+ Outros</SelectItem>
           </SelectContent>
         </Select>
       </div>

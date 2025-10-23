@@ -20,7 +20,7 @@ export function InvoiceStatusIndicator({
   if (status === "autorizado") {
     color = "text-green-600";
     Icon = CheckCircle;
-  } else if (status === "processando") {
+  } else if (status === "processando_autorizacao") {
     color = "text-yellow-500";
     Icon = Clock;
   } else if (status === "cancelado" || status === "inutilizado") {

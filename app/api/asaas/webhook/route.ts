@@ -109,21 +109,26 @@ export async function POST(req: Request) {
     console.error("webhook asaas: erro ao atualizar orders:", updErr);
   }
 
-  const { data: order } = await supabase
+  const { data: order, error: orderErr } = await supabase
     .from("orders")
-    .select("id, number, customer_id, customers(name)")
+    .select("id, number, customer_id")
     .eq("company_id", companyId)
     .eq("boleto_id", payment.id)
     .maybeSingle();
 
+  if (orderErr) {
+    console.error("Erro ao buscar pedido:", orderErr);
+  }
+
   let customerName: string | null = null;
   if (order?.customer_id) {
-    const { data: customer } = await supabase
+    const { data: customer, error: custErr } = await supabase
       .from("customers")
       .select("name")
       .eq("company_id", companyId)
       .eq("id", order.customer_id)
       .maybeSingle();
+    if (custErr) console.error("Erro ao buscar cliente:", custErr);
     customerName = customer?.name ?? null;
   }
 
