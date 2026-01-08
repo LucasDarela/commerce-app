@@ -15,6 +15,30 @@ const to8Digits = (v?: string) => {
   return only.length === 8 ? only : "";
 };
 
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+function distributeFreight(totalFreight: number, items: any[]) {
+  const freight = Number(totalFreight || 0);
+  if (!freight || !items?.length) return items.map(() => 0);
+
+  const bases = items.map((it) =>
+    Number(it.valor_bruto ?? it.valor_bruto_produto ?? 0),
+  );
+  const sum = bases.reduce((a, b) => a + b, 0);
+  if (!sum) return items.map(() => 0);
+
+  let allocated = 0;
+
+  return bases.map((base, idx) => {
+    if (idx === bases.length - 1) {
+      return round2(freight - allocated);
+    }
+    const part = round2((base / sum) * freight);
+    allocated = round2(allocated + part);
+    return part;
+  });
+}
+
 export async function emitInvoice({
   companyId,
   invoiceData,
@@ -74,65 +98,10 @@ export async function emitInvoice({
       invoiceData.destinatario.endereco.cep,
     );
 
-  // 4) Montagem dos itens no formato Focus
-  // const payloadItems = (invoiceData.items || invoiceData.itens || []).map(
-  //   (it: any) => {
-  //     // CSOSN (SN/MEI) x CST (Regime normal)
-  //     const csosn = (it.csosn_icms ?? "").toString();
-  //     const cst = pad2(it.cst_icms ?? "60");
+  const items: any[] = (invoiceData as any).items ?? [];
 
-  //     const icmsCode = isSN
-  //       ? csosn || "500" // SN/MEI => CSOSN (fallback 500 = ST cobrado anteriormente)
-  //       : cst || "60"; // Normal => CST (fallback 60 = ST cobrado anteriormente)
-
-  //     return {
-  //       numero_item: it.numero_item,
-  //       codigo_produto: it.codigo_produto,
-  //       descricao: it.descricao,
-  //       cfop: it.cfop,
-
-  //       // NCM deve ter 8 dígitos
-  //       codigo_ncm: to8Digits(it.codigo_ncm ?? it.ncm),
-
-  //       // Quantidades/valores
-  //       unidade_comercial: it.unidade_comercial,
-  //       quantidade_comercial: it.quantidade_comercial,
-  //       valor_unitario_comercial: it.valor_unitario_comercial,
-
-  //       unidade_tributavel: it.unidade_tributavel,
-  //       quantidade_tributavel: it.quantidade_tributavel,
-  //       valor_unitario_tributavel: it.valor_unitario_tributavel,
-
-  //       // Nome esperado pela Focus
-  //       valor_bruto_produto: it.valor_bruto,
-
-  //       // ICMS
-  //       icms_origem: it.icms_origem,
-  //       icms_situacao_tributaria: String(
-  //         it.icms_situacao_tributaria ?? "",
-  //       ).trim(),
-
-  //       // PIS/COFINS sempre como strings de 2 dígitos quando aplicável
-  //       ...buildPisFields({
-  //         ...it,
-  //         // garantir que o builder receba base/aliquota/valor se for o caso de 01/99
-  //         valor_base_calculo_pis: it.valor_base_calculo_pis,
-  //         aliquota_pis: it.aliquota_pis,
-  //         valor_pis: it.valor_pis,
-  //         valor_bruto: it.valor_bruto,
-  //       }),
-  //       ...buildCofinsFields({
-  //         ...it,
-  //         valor_base_calculo_cofins: it.valor_base_calculo_cofins,
-  //         aliquota_cofins: it.aliquota_cofins,
-  //         valor_cofins: it.valor_cofins,
-  //         valor_bruto: it.valor_bruto,
-  //       }),
-  //     };
-  //   },
-  // );
-  const items: any[] =
-    (invoiceData as any).itens ?? (invoiceData as any).items ?? [];
+  const totalFreight = Number(invoiceData.valor_frete || 0);
+  const freightParts = distributeFreight(totalFreight, items);
 
   const payload = {
     // envie apenas os campos aceitos pela Focus (opcional, mas limpo)
@@ -180,7 +149,7 @@ export async function emitInvoice({
     serie: invoiceData.serie ?? "1",
 
     // 👈 AQUI: envie o ARRAY completo
-    itens: items.map((it) => ({
+    itens: items.map((it, idx) => ({
       numero_item: it.numero_item,
       codigo_produto: it.codigo_produto,
       descricao: it.descricao,
@@ -192,10 +161,8 @@ export async function emitInvoice({
       unidade_tributavel: it.unidade_tributavel,
       quantidade_tributavel: it.quantidade_tributavel,
       valor_unitario_tributavel: it.valor_unitario_tributavel,
-
-      // A Focus aceita "valor_bruto_produto". Se você usava "valor_bruto", normalize:
       valor_bruto_produto: it.valor_bruto ?? it.valor_bruto_produto,
-
+      valor_frete: freightParts[idx] ?? 0,
       icms_origem: String(it.icms_origem ?? "0"),
       icms_situacao_tributaria: String(it.icms_situacao_tributaria ?? ""),
 
@@ -248,6 +215,16 @@ export async function emitInvoice({
     "[FOCUS PAYLOAD]",
     JSON.stringify({ ref, ...finalPayload }, null, 2),
   );
+
+  const sumFreightItems = payload.itens.reduce(
+    (s: number, it: any) => s + Number(it.valor_frete || 0),
+    0,
+  );
+
+  console.log("[FRETE CHECK]", {
+    total: Number(invoiceData.valor_frete || 0),
+    soma_itens: sumFreightItems,
+  });
 
   // 7) Chamada Focus
   const url = `${baseURL}/nfe?ref=${encodeURIComponent(ref)}`;
