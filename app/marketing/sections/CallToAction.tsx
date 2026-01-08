@@ -5,13 +5,7 @@ import { motion, useScroll, useTransform } from "framer-motion";
 import lupulo1Image from "@/app/assets/lupulo7.webp";
 import lupulo2Image from "@/app/assets/lupulo8.webp";
 import { Button } from "@/components/ui/button";
-import type { ImgHTMLAttributes } from "react";
-import type { MotionProps } from "framer-motion";
 import Link from "next/link";
-
-const MotionImage = motion<ImgHTMLAttributes<HTMLImageElement> & MotionProps>(
-  "img",
-);
 
 export default function CallToAction() {
   const scrollToRegion = () => {
@@ -76,7 +70,7 @@ export default function CallToAction() {
 
         {/* Imagens com efeito Parallax */}
         <div className="relative w-full max-w-[850px] mx-auto">
-          <MotionImage
+          <motion.img
             src={lupulo1Image.src}
             alt="Lúpulo imagem 1"
             height={300}
@@ -84,7 +78,7 @@ export default function CallToAction() {
             className="hidden md:block absolute -right-28 bottom-16 opacity-70 will-change-transform"
             style={{ y: translateY }}
           />
-          <MotionImage
+          <motion.img
             src={lupulo2Image.src}
             alt="Lúpulo imagem 2"
             height={263}

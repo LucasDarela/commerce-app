@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
-import { Database } from "@/components/types/supabase";
+import { supabase } from "@/lib/supabase/client";
 
 interface Notification {
   id: string;
@@ -18,7 +18,7 @@ interface Notification {
 }
 
 export default function NotificationsPage() {
-  const supabase = createClientComponentClient<Database>();
+  const supabase = createClientComponentClient<any>();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -64,7 +64,10 @@ export default function NotificationsPage() {
   }, [supabase]);
 
   const markAsRead = async (id: string) => {
-    await supabase.from("notifications").update({ read: true }).eq("id", id);
+    await (supabase as any)
+      .from("notifications")
+      .update({ read: true })
+      .eq("id", id);
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
     );

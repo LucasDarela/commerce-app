@@ -6,6 +6,8 @@ export type OrderDetails = {
   freight?: number | string | null;
   note_number?: string;
   appointment_date?: string | null;
+  appointment_local?: string | null;
+  text_note?: string | null;
   customer_signature?: string | null;
   document_type: string | null;
   company_id?: string;

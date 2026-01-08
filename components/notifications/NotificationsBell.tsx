@@ -3,8 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { Bell, Check, Trash2 } from "lucide-react";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
-import { Database } from "@/components/types/supabase";
+import { supabase } from "@/lib/supabase/client";
 import {
   Popover,
   PopoverContent,
@@ -22,7 +21,6 @@ type Notification = {
 };
 
 export default function NotificationBell() {
-  const supabase = createClientComponentClient<Database>();
   const [open, setOpen] = React.useState(false);
   const [items, setItems] = React.useState<Notification[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -59,13 +57,16 @@ export default function NotificationBell() {
       mounted = false;
       supabase.removeChannel(ch);
     };
-  }, [supabase]);
+  }, []);
 
   async function markAsRead(id: string) {
     setItems((prev) =>
       prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
     );
-    await supabase.from("notifications").update({ read: true }).eq("id", id);
+    await (supabase as any)
+      .from("notifications")
+      .update({ read: true })
+      .eq("id", id);
   }
 
   async function deleteOne(id: string) {
@@ -77,7 +78,11 @@ export default function NotificationBell() {
     const ids = items.filter((i) => !i.read).map((i) => i.id);
     if (ids.length === 0) return;
     setItems((prev) => prev.map((n) => ({ ...n, read: true })));
-    await supabase.from("notifications").update({ read: true }).in("id", ids);
+
+    await (supabase as any)
+      .from("notifications")
+      .update({ read: true })
+      .in("id", ids);
   }
 
   return (

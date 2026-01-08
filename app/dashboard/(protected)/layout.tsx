@@ -2,18 +2,21 @@
 export const runtime = "nodejs";
 
 import { redirect } from "next/navigation";
-import { supabaseServer } from "@/lib/supabaseServer";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export default async function AdminGateLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = supabaseServer();
+  const supabase = createServerSupabaseClient();
+
   const {
     data: { user },
+    error: userError,
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login-signin");
+
+  if (userError || !user) redirect("/login-signin");
 
   const { data: cu, error } = await supabase
     .from("company_users")
@@ -21,7 +24,9 @@ export default async function AdminGateLayout({
     .eq("user_id", user.id)
     .maybeSingle();
 
-  if (error || cu?.role !== "admin") redirect("/dashboard/forbidden");
+  const role = (cu as any)?.role;
+
+  if (error || role !== "admin") redirect("/dashboard/forbidden");
 
   return <>{children}</>;
 }

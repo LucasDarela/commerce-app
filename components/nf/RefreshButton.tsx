@@ -4,8 +4,6 @@ import { Button } from "../ui/button";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
-import { Database } from "@/components/types/supabase";
 
 type Props = {
   refId: string;
@@ -23,7 +21,6 @@ export default function RefreshButton({
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
-  const supabase = createClientComponentClient<Database>();
 
   useEffect(() => {
     return () => abortRef.current?.abort();
@@ -66,40 +63,10 @@ export default function RefreshButton({
         throw new Error(errorFromPayload(payload));
       }
 
-      // 🔍 Buscar e-mail do cliente
-      const { data: customer, error: customerError } = await supabase
-        .from("customers")
-        .select("email")
-        .eq("id", customerId)
-        .maybeSingle();
-
-      if (customerError || !customer?.email) {
-        toast.error("Não foi possível recuperar o e-mail do cliente.");
-        return;
-      }
-
-      const clienteEmail = customer.email;
-
       // sucesso
       if (payload?.mensagem_sefaz) {
-        try {
-          await fetch("/api/nfe/send-email", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              refId,
-              toEmail: clienteEmail,
-              subject: `NF-e ${refId} emitida`,
-              body: `<p>Sua NF-e ${refId} foi emitida com sucesso.</p>`,
-            }),
-          });
-
-          toast.success(payload.mensagem_sefaz);
-          setTimeout(() => window.location.reload(), 1500);
-        } catch (err) {
-          toast.error("Erro ao enviar e-mail da NF-e.");
-          window.location.reload();
-        }
+        toast.success(payload.mensagem_sefaz);
+        setTimeout(() => window.location.reload(), 1500);
       } else {
         toast.success("Status atualizado!");
         window.location.reload();
@@ -108,7 +75,7 @@ export default function RefreshButton({
       clearTimeout(timeoutId);
       abortRef.current = null;
     }
-  }, [companyId, refId, customerId, router, errorFromPayload, supabase]);
+  }, [companyId, refId, router, errorFromPayload]);
 
   const handleRefresh = useCallback(async () => {
     if (loading) return;

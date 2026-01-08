@@ -1,12 +1,13 @@
 // app/api/customers/[id]/overdue/route.ts
 import { NextResponse } from "next/server";
-import { supabaseServer } from "@/lib/supabaseServer"; // sua helper que usa service role ou usa RLS + company_id do JWT
+// import { supabaseServer } from "@/lib/supabaseServer"; // sua helper que usa service role ou usa RLS + company_id do JWT
+import { createRouteSupabaseClient } from "@/lib/supabase/server";
 
 export async function GET(
   _req: Request,
   { params }: { params: { id: string } },
 ) {
-  const supabase = supabaseServer();
+  const supabase = createRouteSupabaseClient();
 
   // Descobre company_id do usuário atual (do JWT/claims, sua função atual)
   const { data: comp } = await supabase

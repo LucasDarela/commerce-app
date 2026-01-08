@@ -8,14 +8,14 @@ import { Input } from "@/components/ui/input";
 import { useOverdueCheck } from "@/components/billing/useOverdueCheck";
 import { OverdueModal } from "@/components/billing/OverdueModal";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
-import type { Database } from "@/components/types/supabase";
+import { supabase } from "@/lib/supabase/client";
 
 type Props = {
   defaultCustomerId?: string | null;
 };
 
 export default function NewOrderForm({ defaultCustomerId = null }: Props) {
-  const supabase = createClientComponentClient<Database>();
+  const supabase = createClientComponentClient<any>();
   const [customerId, setCustomerId] = useState(defaultCustomerId ?? "");
   const [total, setTotal] = useState<number>(150);
   const [saving, setSaving] = useState(false);
@@ -38,7 +38,7 @@ export default function NewOrderForm({ defaultCustomerId = null }: Props) {
         .select("role")
         .eq("user_id", user.id)
         .maybeSingle();
-      setRole((row?.role as "admin" | "member" | null) ?? "member");
+      setRole(((row as any)?.role as "admin" | "member" | null) ?? "member");
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

@@ -11,8 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
-import { Database } from "@/components/types/supabase";
+import { supabase } from "@/lib/supabase/client";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import { format } from "date-fns";
 
@@ -26,7 +25,6 @@ export function SectionCards() {
   useEffect(() => {
     const fetchData = async () => {
       if (!companyId) return;
-      const supabase = createClientComponentClient<Database>();
 
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -67,11 +65,22 @@ export function SectionCards() {
       ]);
 
       const totalReceber =
-        ordersCurrent.data?.reduce((sum, o) => sum + Number(o.total), 0) || 0;
+        (ordersCurrent.data as any[])?.reduce(
+          (sum, o) => sum + Number(o.total),
+          0,
+        ) || 0;
+
       const totalReceberLast =
-        ordersLast.data?.reduce((sum, o) => sum + Number(o.total), 0) || 0;
+        (ordersLast.data as any[])?.reduce(
+          (sum, o) => sum + Number(o.total),
+          0,
+        ) || 0;
+
       const totalPagar =
-        inputsCurrent.data?.reduce((sum, i) => sum + Number(i.amount), 0) || 0;
+        (inputsCurrent.data as any[])?.reduce(
+          (sum, i) => sum + Number(i.amount),
+          0,
+        ) || 0;
       const receitaAtual = totalReceber - totalPagar;
       const receitaAnterior = totalReceberLast;
 

@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { createServerComponentClient } from "@supabase/auth-helpers-nextjs";
-import { Database } from "@/components/types/supabase";
+import { createRouteSupabaseClient } from "@/lib/supabase/server";
 
 export async function POST(req: Request) {
   try {
@@ -24,9 +24,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const supabase = createServerComponentClient<Database>({
-      cookies,
-    });
+    const supabase = createRouteSupabaseClient();
 
     const { data: order, error: orderError } = await supabase
       .from("orders")
