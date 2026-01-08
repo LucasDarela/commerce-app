@@ -66,7 +66,6 @@ export async function emitInvoice({
     .replace(/\r?\n|\r/g, "");
   const auth = `Basic ${Buffer.from(`${token}:`).toString("base64")}`;
 
-  // 2) Busca regime tributário da empresa (CRT)
   // 1 = Simples; 4 = MEI; 3 = Regime normal
   const { data: comp } = await supabaseClient
     .from("companies")
@@ -98,7 +97,8 @@ export async function emitInvoice({
       invoiceData.destinatario.endereco.cep,
     );
 
-  const items: any[] = (invoiceData as any).items ?? [];
+  const items: any[] =
+    (invoiceData as any).itens ?? (invoiceData as any).items ?? [];
 
   const totalFreight = Number(invoiceData.valor_frete || 0);
   const freightParts = distributeFreight(totalFreight, items);
@@ -107,8 +107,8 @@ export async function emitInvoice({
     // envie apenas os campos aceitos pela Focus (opcional, mas limpo)
     ref: invoiceData.ref,
     ambiente: invoiceData.ambiente,
-    note_number: invoiceData.note_number,
-    order_id: invoiceData.order_id,
+    // note_number: invoiceData.note_number,
+    // order_id: invoiceData.order_id,
     data_emissao: invoiceData.data_emissao,
     data_entrada_saida: invoiceData.data_entrada_saida,
     natureza_operacao: invoiceData.natureza_operacao,
@@ -185,8 +185,6 @@ export async function emitInvoice({
     })),
   };
 
-  console.log("[FOCUS PAYLOAD] itens:", payload.itens?.length);
-
   // 5) Referência que vai na query (?ref=)
   const ref =
     invoiceData?.ref ||
@@ -226,6 +224,15 @@ export async function emitInvoice({
     soma_itens: sumFreightItems,
   });
 
+  // antes do fetch
+  console.log("[FOCUS REQUEST]", {
+    url: `${baseURL}/nfe?ref=${encodeURIComponent(ref)}`,
+    payload: finalPayload,
+  });
+
+  // opcional: log “flat” pra ficar mais fácil de ler
+  console.log("[FOCUS REQUEST JSON]", JSON.stringify(finalPayload, null, 2));
+
   // 7) Chamada Focus
   const url = `${baseURL}/nfe?ref=${encodeURIComponent(ref)}`;
   const resp = await fetch(url, {
@@ -247,6 +254,15 @@ export async function emitInvoice({
   }
 
   if (!resp.ok) {
+    await supabaseClient.from("nfe_debug").insert({
+      company_id: companyId,
+      ref,
+      order_id: invoiceData.order_id,
+      payload: finalPayload,
+      response: body,
+      status: resp.status,
+    });
+
     const erros = Array.isArray(body?.erros) ? body.erros : [];
     const detalhePrimario =
       body?.mensagem ||
