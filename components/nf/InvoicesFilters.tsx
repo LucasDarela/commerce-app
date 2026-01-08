@@ -59,7 +59,7 @@ export function InvoicesFilters({ filters, setFilters }: InvoicesFiltersProps) {
           <SelectItem value="processando_autorizacao">Processando</SelectItem>
           <SelectItem value="cancelado">Cancelado</SelectItem>
           <SelectItem value="inutilizacao">Inutilizado</SelectItem>
-          <SelectItem value="erro">Erro</SelectItem>
+          <SelectItem value="erro_autorizacao">Erro</SelectItem>
         </SelectContent>
       </Select>
     </div>
