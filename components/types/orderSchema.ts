@@ -34,6 +34,7 @@ export const orderSchema = z.object({
   text_note: z.string().nullable().optional(),
   boleto_id: z.string().nullable().optional(),
   source: z.enum(["order", "financial"]).optional(),
+  driver_id: z.string().uuid().nullable().optional(),
   order_items: z
     .array(
       z.object({

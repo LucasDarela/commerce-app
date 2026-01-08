@@ -74,6 +74,9 @@ export async function fetchOrderDetails(
     // cliente completo (já contém phone, address, etc)
     customer: data.customers,
     note_number: data.note_number ?? undefined,
+    appointment_date: data.appointment_date ?? null,
+    appointment_local: data.appointment_local ?? null,
+    text_note: data.text_note ?? null,
     document_type: data.document_type ?? null,
     customer_signature: data.customer_signature ?? null,
     freight: data.freight ?? null,

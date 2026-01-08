@@ -145,7 +145,7 @@ export function financialColumns({
     {
       id: "category",
       header: "Categoria",
-      accessorFn: (row) => (isFinancial(row) ? row.category : "pedido"),
+      accessorFn: (row) => (isFinancial(row) ? row.category : "order"),
       cell: ({ row }) =>
         isFinancial(row.original) ? row.original.category : "Pedido",
     },
@@ -153,16 +153,37 @@ export function financialColumns({
       id: "payment_method",
       header: "Método",
       meta: { className: "uppercase truncate" },
-      accessorFn: (row) => row.payment_method,
-      cell: ({ row }) => {
-        const method = row.original.payment_method;
-        const methodMap: Record<string, string> = {
+
+      // ✅ o filtro SEMPRE trabalha com valores canônicos
+      accessorFn: (row) => {
+        const raw = row.payment_method;
+
+        const normalize: Record<
+          string,
+          "Pix" | "Dinheiro" | "Boleto" | "Cartao"
+        > = {
           Pix: "Pix",
           Cash: "Dinheiro",
+          Dinheiro: "Dinheiro",
           Ticket: "Boleto",
-          Card: "Cartão",
+          Boleto: "Boleto",
+          Card: "Cartao",
+          Cartao: "Cartao",
+          Cartão: "Cartao",
         };
-        return methodMap[method] || method;
+
+        return normalize[String(raw)] ?? String(raw);
+      },
+
+      cell: ({ row }) => {
+        const value = row.getValue("payment_method") as string;
+        const labelMap: Record<string, string> = {
+          Pix: "Pix",
+          Dinheiro: "Dinheiro",
+          Boleto: "Boleto",
+          Cartao: "Cartão",
+        };
+        return labelMap[value] ?? value;
       },
     },
     {

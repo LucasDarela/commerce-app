@@ -7,8 +7,6 @@ import {
   Image,
 } from "@react-pdf/renderer";
 import dayjs from "dayjs";
-// import logo from "@/app/assets/logo-bk.png";
-// import { getCompanyLogoAsDataUrl } from "./CompanyLogoAsDataUrl";
 
 const styles = StyleSheet.create({
   page: {
@@ -94,9 +92,12 @@ const styles = StyleSheet.create({
 
 interface ItemRelationPDFProps {
   company: any;
-  note: any;
   customer: any;
   items: any[];
+  note: {
+    note_number?: string | number | null;
+    appointment_date?: string | null;
+  };
   signature?: string | null;
   freight?: number;
   returnedProducts?: any[];
@@ -127,6 +128,11 @@ const RelationSection = ({
 
   const totalFinal = totalItems + Number(freight) - totalDevolucao;
 
+  const appointment = note?.appointment_date; // "YYYY-MM-DD"
+  const formattedDate = appointment
+    ? dayjs(appointment).format("DD/MM/YYYY")
+    : "—";
+
   return (
     <View>
       {/* Cabeçalho */}
@@ -138,9 +144,10 @@ const RelationSection = ({
         )}
         <View>
           <Text>
-            Nota: <Text style={styles.bold}>{note ?? "000000"}</Text>
+            Nota:{" "}
+            <Text style={styles.bold}>{note?.note_number ?? "000000"}</Text>
           </Text>
-          <Text>Data: {dayjs().format("DD/MM/YYYY HH:mm")}</Text>
+          <Text>Data: {formattedDate}</Text>
         </View>
       </View>
 

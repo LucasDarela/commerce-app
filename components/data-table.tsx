@@ -143,6 +143,15 @@ type Item = {
   quantity: number;
 };
 
+type InvoiceStatus =
+  | "autorizado"
+  | "processando_autorizacao"
+  | "cancelado"
+  | "inutilizado"
+  | string;
+
+type Driver = { id: string; name: string };
+
 export type ReturnEquipmentItem = {
   loanId: string;
   equipmentName: string;
@@ -287,6 +296,117 @@ export function DataTable({
     error: integrationError,
   } = useCompanyIntegration("mercado_pago");
   const router = useRouter();
+
+  // filtros salvos em cache
+
+  // dentro do DataTable(...)
+
+  const FILTERS_KEY = React.useMemo(() => {
+    // por empresa (evita misturar filtros entre tenants)
+    return `orders_filters_v1:${companyId}`;
+  }, [companyId]);
+
+  type PersistedOrdersFilters = {
+    selectedMonth: string;
+    columnFilters: ColumnFiltersState;
+    dateRange: [string | null, string | null]; // ISO yyyy-mm-dd
+    issueDate: string | null; // ISO yyyy-mm-dd
+  };
+
+  function safeParseJSON<T>(value: string | null): T | null {
+    if (!value) return null;
+    try {
+      return JSON.parse(value) as T;
+    } catch {
+      return null;
+    }
+  }
+
+  // ✅ selectedMonth persistido
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const today = new Date();
+    const defaultMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
+
+    if (typeof window === "undefined") return defaultMonth;
+
+    const saved = safeParseJSON<PersistedOrdersFilters>(
+      localStorage.getItem(FILTERS_KEY),
+    );
+
+    return saved?.selectedMonth ?? defaultMonth;
+  });
+
+  // ✅ columnFilters persistido (faz Input/Select voltarem com valor)
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
+    () => {
+      if (typeof window === "undefined") return [];
+
+      const saved = safeParseJSON<PersistedOrdersFilters>(
+        localStorage.getItem(FILTERS_KEY),
+      );
+
+      return saved?.columnFilters ?? [];
+    },
+  );
+
+  // ✅ DateRange persistido (para o DatePicker de período)
+  const [dateRange, setDateRange] = useState<[Date | null, Date | null]>(() => {
+    if (typeof window === "undefined") return [null, null];
+
+    const saved = safeParseJSON<PersistedOrdersFilters>(
+      localStorage.getItem(FILTERS_KEY),
+    );
+
+    const [startISO, endISO] = saved?.dateRange ?? [null, null];
+
+    return [
+      startISO ? new Date(startISO) : null,
+      endISO ? new Date(endISO) : null,
+    ];
+  });
+
+  const [startDate, endDate] = dateRange;
+
+  // ✅ issueDateFilter persistido (para o DatePicker de emissão)
+  const [issueDateFilter, setissueDateFilter] = useState<Date | null>(() => {
+    if (typeof window === "undefined") return null;
+
+    const saved = safeParseJSON<PersistedOrdersFilters>(
+      localStorage.getItem(FILTERS_KEY),
+    );
+
+    return saved?.issueDate ? new Date(saved.issueDate) : null;
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!companyId) return;
+
+    const payload: PersistedOrdersFilters = {
+      selectedMonth,
+      columnFilters,
+      dateRange: [
+        startDate ? startDate.toISOString().split("T")[0] : null,
+        endDate ? endDate.toISOString().split("T")[0] : null,
+      ],
+      issueDate: issueDateFilter
+        ? issueDateFilter.toISOString().split("T")[0]
+        : null,
+    };
+
+    localStorage.setItem(FILTERS_KEY, JSON.stringify(payload));
+  }, [
+    FILTERS_KEY,
+    companyId,
+    selectedMonth,
+    columnFilters,
+    startDate,
+    endDate,
+    issueDateFilter,
+  ]);
+
+  // filtros salvos em cache no localStorage
+
   const [isLoanModalOpen, setIsLoanModalOpen] = useState(false);
   const [initialLoanCustomer, setInitialLoanCustomer] = useState<
     { id: string; name: string } | undefined
@@ -305,11 +425,11 @@ export function DataTable({
   );
   const [isProductReturnModalOpen, setIsProductReturnModalOpen] =
     useState(false);
-  const [issueDateFilter, setissueDateFilter] = useState<Date | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState(() => {
-    const today = new Date();
-    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
-  });
+  // const [issueDateFilter, setissueDateFilter] = useState<Date | null>(null);
+  // const [selectedMonth, setSelectedMonth] = useState(() => {
+  //   const today = new Date();
+  //   return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
+  // });
 
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(
     () => {
@@ -320,6 +440,142 @@ export function DataTable({
       return {};
     },
   );
+
+  // driver select
+
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  useEffect(() => {
+    async function fetchDrivers() {
+      if (!companyId) return;
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, username, email")
+        .eq("company_id", companyId)
+        .order("username", { ascending: true });
+
+      if (error) {
+        console.error("Erro ao buscar motoristas (profiles):", error);
+        return;
+      }
+
+      setDrivers(
+        (data ?? []).map((p: any) => ({
+          id: p.id,
+          name: p.username || p.email || "Sem nome",
+        })),
+      );
+    }
+
+    fetchDrivers();
+  }, [companyId]);
+
+  async function setOrderDriver(orderId: string, driverId: string | null) {
+    const { data, error } = await supabase
+      .from("orders")
+      .update({ driver_id: driverId })
+      .eq("id", orderId)
+      .select("id, driver_id")
+      .single();
+
+    if (error) {
+      console.error("❌ Falha ao salvar motorista:", error);
+      toast.error(error.message || "Sem permissão para salvar (RLS).");
+      return;
+    }
+
+    console.log("✅ Motorista salvo no banco:", data);
+    toast.success("Motorista salvo.");
+
+    // ✅ atualiza a tabela imediatamente (sem depender do realtime)
+    setOrders((prev) =>
+      prev.map((o) =>
+        o.id === orderId ? ({ ...o, driver_id: data.driver_id } as any) : o,
+      ),
+    );
+  }
+
+  // driver select
+
+  // nfe status by order id
+
+  const [nfeStatusByOrderId, setNfeStatusByOrderId] = useState<
+    Record<string, InvoiceStatus | null>
+  >({});
+
+  async function fetchNfeStatuses(orderIds: string[]) {
+    if (!companyId) return;
+
+    if (!orderIds.length) {
+      setNfeStatusByOrderId({});
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("invoices")
+      .select("order_id, status")
+      .eq("company_id", companyId)
+      .in("order_id", orderIds);
+
+    if (error) {
+      console.error("Erro ao buscar invoices:", error);
+      return;
+    }
+
+    const map: Record<string, InvoiceStatus | null> = {};
+    // default: sem invoice = null (vai virar bolinha cinza/vermelha como você preferir)
+    for (const id of orderIds) map[id] = null;
+
+    for (const inv of data ?? []) {
+      map[String((inv as any).order_id)] = (inv as any).status ?? null;
+    }
+
+    setNfeStatusByOrderId(map);
+  }
+
+  useEffect(() => {
+    const visibleOrderIds = orders
+      .filter((o) => o.appointment_date?.startsWith(selectedMonth))
+      .map((o) => String(o.id));
+
+    fetchNfeStatuses(visibleOrderIds);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orders, selectedMonth, companyId]);
+
+  function NfeDot({ status }: { status: InvoiceStatus | null }) {
+    let dotClass = "bg-red-500";
+    let label = "Erro";
+
+    if (status === "autorizado") {
+      dotClass = "bg-emerald-500";
+      label = "Autorizado";
+    } else if (status === "processando_autorizacao") {
+      dotClass = "bg-amber-500";
+      label = "Em análise";
+    } else if (status === "cancelado" || status === "inutilizado") {
+      dotClass = "bg-red-500";
+      label = status === "cancelado" ? "Cancelado" : "Inutilizado";
+    } else if (status == null) {
+      // sem registro em invoices
+      dotClass = "bg-muted-foreground/30";
+      label = "Sem NF-e";
+    }
+
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="flex justify-center">
+              <span className={`h-2.5 w-2.5 rounded-full ${dotClass}`} />
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>{label}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+
+  // nfe status by order id
 
   function handleDateInput(e: React.ChangeEvent<HTMLInputElement>) {
     let value = e.target.value.replace(/\D/g, "");
@@ -370,6 +626,7 @@ export function DataTable({
         customer_signature,
         text_note,
         boleto_id,
+        driver_id,
         customer_rel:customers!sales_customer_id_fkey (
           id,
           name,
@@ -502,11 +759,12 @@ export function DataTable({
       id: "drag",
       header: () => null,
       size: 25,
-      meta: { className: "w-[25px]" },
+      meta: { className: "w-[30px]" },
       cell: () => null,
       enableSorting: false,
       enableHiding: false,
     },
+
     {
       accessorKey: "appointment_date",
       header: "Data",
@@ -547,10 +805,20 @@ export function DataTable({
       cell: ({ row }) => row.original.appointment_hour,
     },
     {
+      id: "nfe",
+      header: "",
+      size: 55,
+      meta: { className: "w-[25px]" },
+      cell: ({ row }) => {
+        const status = nfeStatusByOrderId[String(row.original.id)] ?? null;
+        return <NfeDot status={status} />;
+      },
+    },
+    {
       accessorKey: "customer",
       header: "Cliente",
       size: 200,
-      meta: { className: "w-[200px] truncate uppercase" },
+      meta: { className: "w-[220px] truncate uppercase" },
       cell: ({ row }) => {
         const saleId = row.original.id;
         const orderWithFantasy = orders.find((o) => o.id === saleId);
@@ -568,6 +836,51 @@ export function DataTable({
           >
             {orderWithFantasy?.customer}
           </Button>
+        );
+      },
+    },
+    {
+      id: "driver",
+      header: "Motorista",
+      size: 160,
+      meta: { className: "w-[150px] truncate" },
+      cell: ({ row }) => {
+        const currentDriverId =
+          (row.original as any).driver_id === null ||
+          (row.original as any).driver_id === undefined
+            ? "none"
+            : String((row.original as any).driver_id);
+
+        return (
+          <div onClick={(e) => e.stopPropagation()}>
+            <Select
+              value={
+                row.original.driver_id == null
+                  ? "none"
+                  : String(row.original.driver_id)
+              }
+              onValueChange={(value) => {
+                const driverId = value === "none" ? null : value;
+                setOrderDriver(String(row.original.id), driverId);
+              }}
+            >
+              <SelectTrigger className="h-8">
+                <SelectValue placeholder="" />
+              </SelectTrigger>
+
+              <SelectContent>
+                <SelectItem value="none">
+                  <span className="h-5 text-muted-foreground"></span>
+                </SelectItem>
+
+                {drivers.map((d) => (
+                  <SelectItem key={d.id} value={String(d.id)}>
+                    {d.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         );
       },
     },
@@ -623,6 +936,7 @@ export function DataTable({
         );
       },
     },
+
     {
       accessorKey: "products",
       header: "Produtos",
@@ -634,6 +948,7 @@ export function DataTable({
         </div>
       ),
     },
+
     {
       accessorKey: "text_note",
       header: "Observação",
@@ -814,9 +1129,9 @@ export function DataTable({
 
   const [data, setData] = React.useState(() => initialData);
   const [rowSelection, setRowSelection] = React.useState({});
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-    [],
-  );
+  // const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
+  //   [],
+  // );
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [pagination, setPagination] = React.useState({
     pageIndex: 0,
@@ -1134,13 +1449,6 @@ export function DataTable({
       toast.error("Erro inesperado ao emitir NF.");
     }
   };
-
-  // DateRangeFilter
-  const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([
-    null,
-    null,
-  ]);
-  const [startDate, endDate] = dateRange;
 
   const handleFilter = (range: [Date | null, Date | null]) => {
     setDateRange(range);

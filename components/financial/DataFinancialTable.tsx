@@ -1,12 +1,12 @@
 import * as React from "react";
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { useCompanyIntegration } from "@/hooks/use-company-integration";
 import { toast } from "sonner";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
-import { supabase } from "@/lib/supabase";
+// import { supabase } from "@/lib/supabase";
 import { PaymentModal } from "@/components/payment-modal";
 import { YourFinancialRecords } from "@/components/your-financial-modal";
 import { DataTableConfig } from "./DataTableConfig";
@@ -36,6 +36,35 @@ import { MonthlyFinancialTable } from "./MonthlyFinancialTable";
 import { orderSchema, type Order } from "@/components/types/orderSchema";
 import { FinancialRecord as FinancialRecordType } from "@/components/types/financial";
 import { financialSchema, type FinancialRecord } from "./schema";
+
+type PersistedState = {
+  selectedMonth?: string;
+  columnFilters?: ColumnFiltersState;
+  dateRange?: [string | null, string | null];
+};
+
+function safeParse<T>(raw: string | null): T | null {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+}
+
+function readPersistedState<T>(key: string): T | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : null;
+  } catch {
+    return null;
+  }
+}
+
+function toISO(d: Date | null) {
+  return d ? d.toISOString().split("T")[0] : null;
+}
 
 export type CombinedRecord = Order | FinancialRecord;
 
@@ -228,19 +257,78 @@ export default function DataFinancialTable() {
     });
   }, [groupedByMonth]);
 
+  // const [selectedMonth, setSelectedMonth] = useState(() => {
+  //   const now = new Date();
+  //   const month = String(now.getMonth() + 1).padStart(2, "0");
+  //   const year = String(now.getFullYear());
+  //   return `${month}/${year}`;
+  // });
+
+  // const [sorting, setSorting] = React.useState<SortingState>([]);
+  // const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
+  //   [],
+  // );
+  // const [rowSelection, setRowSelection] = React.useState({});
+
+  // // ✅ Range do filtro due_date (controlado no pai)
+  // const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([
+  //   null,
+  //   null,
+  // ]);
+  // const STORAGE_KEY = "financial_table_state_v3:global";
+  const STORAGE_KEY = "financial_table_state_v3:global";
+
+  const [sorting, setSorting] = React.useState<SortingState>([]);
+  const [rowSelection, setRowSelection] = React.useState({});
+
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
     const month = String(now.getMonth() + 1).padStart(2, "0");
     const year = String(now.getFullYear());
-    return `${month}/${year}`;
+    const fallback = `${month}/${year}`;
+
+    const saved = readPersistedState<PersistedState>(STORAGE_KEY);
+    return saved?.selectedMonth ?? fallback;
   });
 
-  const [sorting, setSorting] = React.useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-    [],
-  );
-  const [rowSelection, setRowSelection] = React.useState({});
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>(() => {
+    const saved = readPersistedState<PersistedState>(STORAGE_KEY);
+    return saved?.columnFilters ?? [];
+  });
 
+  const [dateRange, setDateRange] = useState<[Date | null, Date | null]>(() => {
+    const saved = readPersistedState<PersistedState>(STORAGE_KEY);
+    const [startISO, endISO] = saved?.dateRange ?? [null, null];
+
+    return [
+      startISO ? new Date(`${startISO}T00:00:00`) : null,
+      endISO ? new Date(`${endISO}T00:00:00`) : null,
+    ];
+  });
+
+  useEffect(() => {
+    const [start, end] = dateRange;
+    const from = start ? start.toISOString().split("T")[0] : undefined;
+    const to = end ? end.toISOString().split("T")[0] : undefined;
+
+    setColumnFilters((prev) => {
+      const withoutDue = prev.filter((f) => f.id !== "due_date");
+      if (!from && !to) return withoutDue;
+      return [...withoutDue, { id: "due_date", value: { from, to } }];
+    });
+  }, [dateRange]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const payload: PersistedState = {
+      selectedMonth,
+      columnFilters,
+      dateRange: [toISO(dateRange[0]), toISO(dateRange[1])],
+    };
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  }, [selectedMonth, columnFilters, dateRange]);
   const table = useReactTable<CombinedRecord>({
     data: combinedData,
     columns,
@@ -327,6 +415,18 @@ export default function DataFinancialTable() {
     };
   }, [currentMonthRows]);
 
+  // useEffect(() => {
+  //   const [start, end] = dateRange;
+  //   const from = start ? start.toISOString().split("T")[0] : undefined;
+  //   const to = end ? end.toISOString().split("T")[0] : undefined;
+
+  //   setColumnFilters((prev) => {
+  //     const withoutDue = prev.filter((f) => f.id !== "due_date");
+  //     if (!from && !to) return withoutDue;
+  //     return [...withoutDue, { id: "due_date", value: { from, to } }];
+  //   });
+  // }, [dateRange]);
+
   return (
     <>
       <HeaderActions table={table} />
@@ -336,6 +436,8 @@ export default function DataFinancialTable() {
         setIssueDateInput={setIssueDateInput}
         dueDateInput={dueDateInput}
         setDueDateInput={setDueDateInput}
+        dateRange={dateRange}
+        setDateRange={setDateRange}
       />
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 px-6 text-sm font-medium text-muted-foreground">
         <div>

@@ -14,7 +14,6 @@ import type { OrderItem } from "@/components/types/orders";
 import { getCompanyLogoAsDataUrl } from "@/components/pdf/CompanyLogoAsDataUrl";
 import { fetchEquipmentsForOrderProducts } from "@/lib/fetch-equipments-for-products";
 import type { SupabaseClient } from "@supabase/supabase-js";
-// import type { Order } from "@/components/types/orderSchema";
 import type { OrderDetails } from "@/components/types/orderDetails";
 import { LoanEquipmentModal } from "@/components/equipment-loan/LoanEquipmentModal";
 import { ReturnEquipmentModal } from "@/components/equipment-loan/ReturnEquipmentModal";
@@ -22,6 +21,7 @@ import clsx from "clsx";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
 import EmitNfeButton from "@/components/nf/EmitirNfeViewPage";
 import { useCanEmitNfe } from "@/hooks/useCanEmitNfe";
+import dayjs from "dayjs";
 
 // --------- helpers de estoque ----------
 async function parseProductsWithIds(
@@ -476,127 +476,283 @@ export default function ViewOrderPage() {
       </div>
 
       {/* Cliente */}
-      <section>
-        <h2 className="font-semibold">Cliente</h2>
-        <p>
-          <strong>{customer.name}</strong> - {customer.document}
-        </p>
-        <p>
-          {customer.address}, {customer.number} - {customer.neighborhood}
-        </p>
-        <p>
-          {customer.city} - {customer.state}, {customer.zip_code}
-        </p>
-        <p>
-          📞 {customer.phone} | ✉️{" "}
-          {customer.email?.trim() ? customer.email : "N/A"}
-        </p>
-      </section>
+      <section className=" p-4 space-y-4 text-sm">
+        {/* Linha 1: Pedido */}
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+          <p>
+            <span className="font-semibold">Nota:</span>{" "}
+            {order.note_number ?? "—"}
+          </p>
 
-      {/* Forma de Pagamento */}
-      <section>
-        <h2 className="font-semibold">
-          Forma de Pagamento:{" "}
-          <span>{order.payment_method ? order.payment_method : "N/A"}</span>
-        </h2>
-      </section>
+          <p>
+            <span className="font-semibold">Data agendada:</span>{" "}
+            {order.appointment_date
+              ? dayjs(order.appointment_date).format("DD/MM/YYYY")
+              : "—"}
+          </p>
 
-      {/* Itens */}
-      <section>
-        <h2 className="font-semibold">Itens da Venda</h2>
+          <p>
+            <span className="font-semibold">Local:</span>{" "}
+            {order.appointment_local?.trim() ? order.appointment_local : "—"}
+          </p>
 
-        <table className="w-full text-sm border">
-          <thead>
-            <tr className="text-left">
-              <th className="p-2">Produto</th>
-              <th className="p-2">Qtd</th>
-              <th className="p-2">Un</th>
-              <th className="p-2">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((item: any, index: number) => (
-              <tr key={item.id ?? `fallback-${index}`} className="border-t">
-                <td className="p-2">{item.product?.name}</td>
-                <td className="p-2">{item.quantity}</td>
-                <td className="p-2">R$ {(item.price ?? 0).toFixed(2)}</td>
-                <td className="p-2 font-semibold">
-                  R$ {(item.quantity * (item.price ?? 0)).toFixed(2)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+          <p>
+            <span className="font-semibold">Pagamento:</span>{" "}
+            {order.payment_method ? order.payment_method : "N/A"}
+          </p>
+        </div>
 
-        {/* Produtos devolvidos */}
-        {returnedProducts.length > 0 && (
-          <>
-            <h3 className="mt-6 font-semibold">Produtos Devolvidos</h3>
-            <table className="w-full text-sm border mt-2">
-              <thead>
+        {/* Linha 2: Cliente (grid) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <p className="font-semibold">Cliente</p>
+            <p>
+              <span className="font-semibold">{customer.name}</span>{" "}
+              <span className="text-muted-foreground">
+                • {customer.document}
+              </span>
+            </p>
+            <p className="text-muted-foreground">
+              {customer.address}, {customer.number} - {customer.neighborhood}
+            </p>
+            <p className="text-muted-foreground">
+              {customer.city} - {customer.state}, {customer.zip_code}
+            </p>
+          </div>
+
+          <div className="space-y-1">
+            <p className="font-semibold">Contato</p>
+            <p className="text-muted-foreground">📞 {customer.phone}</p>
+            <p className="text-muted-foreground">
+              ✉️ {customer.email?.trim() ? customer.email : "N/A"}
+            </p>
+          </div>
+        </div>
+
+        {/* Observações */}
+        <div className="pt-1">
+          <p className="font-semibold">Observações:</p>
+          <p className="text-muted-foreground">
+            {order.text_note?.trim() ? order.text_note : "—"}
+          </p>
+        </div>
+
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="font-semibold">Itens da Venda</h2>
+          <p className="text-muted-foreground">
+            {items.length} {items.length === 1 ? "item" : "itens"}
+          </p>
+        </div>
+
+        {/* Tabela Itens */}
+        <div className="rounded-md border overflow-hidden">
+          <div className="w-full overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-muted/40">
                 <tr className="text-left">
-                  <th className="p-2">Produto</th>
-                  <th className="p-2">Qtd Devolvida</th>
-                  <th className="p-2">Un</th>
-                  <th className="p-2">Total</th>
+                  <th className="p-2 font-semibold">Produto</th>
+                  <th className="p-2 font-semibold w-[80px] hidden sm:table-cell">
+                    Qtd
+                  </th>
+                  <th className="p-2 font-semibold w-[120px] text-right hidden sm:table-cell">
+                    Un
+                  </th>
+                  <th className="p-2 font-semibold w-[140px] text-right hidden sm:table-cell">
+                    Total
+                  </th>
                 </tr>
               </thead>
+
               <tbody>
-                {returnedProducts.map((item, index) => {
-                  const productName = item.product?.name || "Produto";
-                  const unitPrice = item.unitPrice ?? 0;
-                  const total = item.quantity * unitPrice;
+                {items.map((item: any, index: number) => {
+                  const qty = Number(item.quantity ?? 0);
+                  const unit = Number(item.price ?? 0);
+                  const lineTotal = qty * unit;
+
                   return (
-                    <tr key={index} className="border-t text-red-700">
-                      <td className="p-2">{productName}</td>
-                      <td className="p-2">{item.quantity}</td>
-                      <td className="p-2">R$ {unitPrice.toFixed(2)}</td>
-                      <td className="p-2 font-semibold">
-                        R$ {total.toFixed(2)}
+                    <tr
+                      key={item.id ?? `fallback-${index}`}
+                      className="border-t hover:bg-muted/30"
+                    >
+                      {/* Produto */}
+                      <td className="p-2 align-top">
+                        <p className="font-medium leading-snug break-words">
+                          {item.product?.name}
+                        </p>
+
+                        {/* MOBILE: layout legível (2 colunas + total em linha inteira) */}
+                        <div className="mt-2 sm:hidden">
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                            <span>Qtd: {qty}</span>
+                            <span className="text-right">
+                              Un: R$ {unit.toFixed(2)}
+                            </span>
+
+                            <span className="col-span-2 flex items-center justify-between pt-1 border-t">
+                              <span>Total</span>
+                              <span className="font-semibold text-foreground">
+                                R$ {lineTotal.toFixed(2)}
+                              </span>
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* DESKTOP */}
+                      <td className="p-2 hidden sm:table-cell">{qty}</td>
+
+                      <td className="p-2 text-right hidden sm:table-cell">
+                        R$ {unit.toFixed(2)}
+                      </td>
+
+                      <td className="p-2 text-right font-semibold hidden sm:table-cell">
+                        R$ {lineTotal.toFixed(2)}
                       </td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
-          </>
+          </div>
+        </div>
+
+        {/* Produtos devolvidos */}
+        {returnedProducts.length > 0 && (
+          <div className="pt-2 space-y-2">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold">Produtos Devolvidos</h3>
+              <p className="text-muted-foreground">
+                {returnedProducts.length}{" "}
+                {returnedProducts.length === 1 ? "registro" : "registros"}
+              </p>
+            </div>
+
+            <div className="rounded-md border overflow-hidden">
+              <div className="w-full overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-destructive/5">
+                    <tr className="text-left">
+                      <th className="p-2 font-semibold">Produto</th>
+                      <th className="p-2 font-semibold w-[120px] hidden sm:table-cell">
+                        Qtd Devolvida
+                      </th>
+                      <th className="p-2 font-semibold w-[120px] text-right hidden sm:table-cell">
+                        Un
+                      </th>
+                      <th className="p-2 font-semibold w-[140px] text-right hidden sm:table-cell">
+                        Total
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {returnedProducts.map((item: any, index: number) => {
+                      const productName = item.product?.name || "Produto";
+                      const qty = Number(item.quantity ?? 0);
+                      const unit = Number(item.unitPrice ?? 0);
+                      const lineTotal = qty * unit;
+
+                      return (
+                        <tr
+                          key={index}
+                          className="border-t text-destructive hover:bg-destructive/5"
+                        >
+                          {/* Produto */}
+                          <td className="p-2 align-top">
+                            <p className="font-medium leading-snug break-words">
+                              {productName}
+                            </p>
+
+                            {/* MOBILE: mesmo padrão do bloco de itens */}
+                            <div className="mt-2 sm:hidden">
+                              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                                <span>Qtd: {qty}</span>
+                                <span className="text-right">
+                                  Un: R$ {unit.toFixed(2)}
+                                </span>
+
+                                <span className="col-span-2 flex items-center justify-between pt-1 border-t border-destructive/20">
+                                  <span>Total</span>
+                                  <span className="font-semibold">
+                                    R$ {lineTotal.toFixed(2)}
+                                  </span>
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* DESKTOP */}
+                          <td className="p-2 hidden sm:table-cell">{qty}</td>
+
+                          <td className="p-2 text-right hidden sm:table-cell">
+                            R$ {unit.toFixed(2)}
+                          </td>
+
+                          <td className="p-2 text-right font-semibold hidden sm:table-cell">
+                            R$ {lineTotal.toFixed(2)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Totais */}
-        <div className="mt-6 border-t pt-4 text-sm text-right space-y-1">
-          <p>
-            <strong>Frete:</strong> R$ {freight.toFixed(2)}
-          </p>
-          <p className="text-lg font-bold">
-            <strong>Total Final:</strong> R{"$ "}
-            {(
-              totalFinal -
-              returnedProducts.reduce(
-                (sum, item) => sum + item.unitPrice * item.quantity,
-                0,
-              )
-            ).toFixed(2)}
-          </p>
+        <div className="border-t pt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="text-muted-foreground space-y-1">
+            <p>
+              <span className="font-semibold text-foreground">Frete:</span> R${" "}
+              {freight.toFixed(2)}
+            </p>
+          </div>
+
+          <div className="text-right space-y-1">
+            <p className="text-lg font-bold">
+              Total Final:{" "}
+              <span>
+                R${" "}
+                {(
+                  totalFinal -
+                  returnedProducts.reduce(
+                    (sum: number, item: any) =>
+                      sum + item.unitPrice * item.quantity,
+                    0,
+                  )
+                ).toFixed(2)}
+              </span>
+            </p>
+            {returnedProducts.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                (Total já com devoluções descontadas)
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Botão Assinar */}
-        <div className="w-full mt-6">
+        <div className="pt-2">
           <Button className="w-full" onClick={() => setOpenSignature(true)}>
             {signatureData ? "Refazer Assinatura" : "Assinar"}
           </Button>
-        </div>
 
-        {/* Imagem da Assinatura */}
-        {signatureData && (
-          <div className="flex flex-col items-center mt-4 bg-white">
-            <p className="text-sm text-gray-600 mb-2">Assinatura capturada:</p>
-            <img
-              src={signatureData}
-              alt="Assinatura do cliente"
-              className="border rounded w-64 h-auto"
-            />
-          </div>
-        )}
+          {/* Imagem da Assinatura */}
+          {signatureData && (
+            <div className="mt-4 rounded-md border p-3 flex flex-col items-center gap-2">
+              <p className="text-xs text-muted-foreground">
+                Assinatura capturada:
+              </p>
+              <img
+                src={signatureData}
+                alt="Assinatura do cliente"
+                className="border rounded w-64 h-auto bg-white"
+              />
+            </div>
+          )}
+        </div>
       </section>
 
       {/* Modal de Assinatura */}
@@ -617,7 +773,10 @@ export default function ViewOrderPage() {
                   company={order.company}
                   customer={order.customer}
                   items={itemsForPdf}
-                  note={order.note_number}
+                  note={{
+                    note_number: order.note_number,
+                    appointment_date: order.appointment_date, // ✅ aqui
+                  }}
                   logoUrl={logoUrl}
                   signature={order.customer_signature}
                   freight={Number(order.freight ?? 0)}
