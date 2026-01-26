@@ -356,27 +356,24 @@ export function DataTable({
     const saved = safeParseJSON<PersistedOrdersFilters>(
       localStorage.getItem(FILTERS_KEY),
     );
-
     const [startISO, endISO] = saved?.dateRange ?? [null, null];
 
     return [
-      startISO ? new Date(startISO) : null,
-      endISO ? new Date(endISO) : null,
+      startISO ? fromLocalISODate(startISO) : null,
+      endISO ? fromLocalISODate(endISO) : null,
     ];
   });
 
-  const [startDate, endDate] = dateRange;
-
-  // ✅ issueDateFilter persistido (para o DatePicker de emissão)
   const [issueDateFilter, setissueDateFilter] = useState<Date | null>(() => {
     if (typeof window === "undefined") return null;
 
     const saved = safeParseJSON<PersistedOrdersFilters>(
       localStorage.getItem(FILTERS_KEY),
     );
-
-    return saved?.issueDate ? new Date(saved.issueDate) : null;
+    return saved?.issueDate ? fromLocalISODate(saved.issueDate) : null;
   });
+
+  const [startDate, endDate] = dateRange;
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -386,12 +383,10 @@ export function DataTable({
       selectedMonth,
       columnFilters,
       dateRange: [
-        startDate ? startDate.toISOString().split("T")[0] : null,
-        endDate ? endDate.toISOString().split("T")[0] : null,
+        startDate ? toLocalISODate(startDate) : null,
+        endDate ? toLocalISODate(endDate) : null,
       ],
-      issueDate: issueDateFilter
-        ? issueDateFilter.toISOString().split("T")[0]
-        : null,
+      issueDate: issueDateFilter ? toLocalISODate(issueDateFilter) : null,
     };
 
     localStorage.setItem(FILTERS_KEY, JSON.stringify(payload));
@@ -425,11 +420,6 @@ export function DataTable({
   );
   const [isProductReturnModalOpen, setIsProductReturnModalOpen] =
     useState(false);
-  // const [issueDateFilter, setissueDateFilter] = useState<Date | null>(null);
-  // const [selectedMonth, setSelectedMonth] = useState(() => {
-  //   const today = new Date();
-  //   return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
-  // });
 
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(
     () => {
@@ -1179,6 +1169,16 @@ export function DataTable({
     getFacetedUniqueValues: getFacetedUniqueValues(),
   });
 
+  function toLocalISODate(d: Date) {
+    return format(d, "yyyy-MM-dd"); // sem UTC, sem shift
+  }
+
+  function fromLocalISODate(s: string) {
+    const [y, m, d] = s.split("-").map(Number);
+    // meio-dia evita bugs de DST/horário de verão
+    return new Date(y, m - 1, d, 12, 0, 0);
+  }
+
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
 
@@ -1453,13 +1453,12 @@ export function DataTable({
   const handleFilter = (range: [Date | null, Date | null]) => {
     setDateRange(range);
 
-    const isoStart = range[0]?.toISOString().split("T")[0];
-    const isoEnd = range[1]?.toISOString().split("T")[0];
+    const from = range[0] ? toLocalISODate(range[0]) : undefined;
+    const to = range[1] ? toLocalISODate(range[1]) : undefined;
 
-    table.getColumn("appointment_date")?.setFilterValue({
-      from: isoStart,
-      to: isoEnd,
-    });
+    table
+      .getColumn("appointment_date")
+      ?.setFilterValue(from && to ? { from, to } : undefined);
   };
 
   const clearFilter = () => {
@@ -1575,12 +1574,11 @@ export function DataTable({
         <div className="relative w-full sm:w-full md:max-w-[250px] z-50">
           <DatePicker
             selected={issueDateFilter}
-            onChange={(date: Date | null) => {
+            onChange={(date) => {
               setissueDateFilter(date);
-              const isoDate = date?.toISOString().split("T")[0];
               table
                 .getColumn("issue_date")
-                ?.setFilterValue(isoDate ?? undefined);
+                ?.setFilterValue(date ? toLocalISODate(date) : undefined);
             }}
             placeholderText="Filtrar por Emissão"
             dateFormat="dd/MM/yyyy"
