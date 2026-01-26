@@ -7,7 +7,9 @@ import { createClient } from "@supabase/supabase-js";
 export async function GET() {
   try {
     // Sessão do admin que está chamando
-    const supa = createRouteHandlerClient({ cookies });
+    const supa = createRouteHandlerClient({
+      cookies: async () => await cookies(),
+    });
     const {
       data: { user: inviter },
       error: sessErr,

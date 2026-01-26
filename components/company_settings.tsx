@@ -47,12 +47,21 @@ export default function CompanySettingsForm() {
         return;
       }
 
-      setFormData((prev) => ({
-        ...prev,
-        ...Object.fromEntries(
-          Object.entries(data).map(([key, value]) => [key, value ?? ""]),
-        ),
-      }));
+      setFormData({
+        document: data.document ?? "",
+        corporate_name: data.corporate_name ?? "",
+        trade_name: data.trade_name ?? "",
+        zip_code: data.zip_code ?? "",
+        address: data.address ?? "",
+        neighborhood: data.neighborhood ?? "",
+        city: data.city ?? "",
+        state: data.state ?? "",
+        number: data.number != null ? String(data.number) : "",
+        complement: data.complement ?? "",
+        phone: data.phone ?? "",
+        email: data.email ?? "",
+        state_registration: data.state_registration ?? "",
+      });
       if (data.logo_url) {
         setLogoUrl(data.logo_url);
       }
@@ -136,12 +145,33 @@ export default function CompanySettingsForm() {
       const url = await handleLogoUpload();
       if (url) uploadedLogoUrl = url;
     }
+    const toIntOrNull = (v: string) => {
+      const s = v.trim();
+      if (!s) return null;
+      const n = Number(s);
+      return Number.isFinite(n) ? Math.trunc(n) : null;
+    };
+
+    const payload = {
+      document: formData.document.trim() || null,
+      corporate_name: formData.corporate_name.trim() || null,
+      trade_name: formData.trade_name.trim() || null,
+      zip_code: formData.zip_code.trim() || null,
+      address: formData.address.trim() || null,
+      neighborhood: formData.neighborhood.trim() || null,
+      city: formData.city.trim() || null,
+      state: formData.state.trim() || null,
+      number: toIntOrNull(formData.number), // ✅ evita "" em integer
+      complement: formData.complement.trim() || null,
+      phone: formData.phone.trim() || null,
+      email: formData.email.trim() || null,
+      state_registration: formData.state_registration.trim() || null,
+      logo_url: uploadedLogoUrl,
+    };
+
     const { error } = await supabase
       .from("companies")
-      .update({
-        ...formData,
-        logo_url: uploadedLogoUrl,
-      })
+      .update(payload)
       .eq("id", companyId);
 
     if (error) {
