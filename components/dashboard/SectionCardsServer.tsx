@@ -54,7 +54,7 @@ export function SectionCards() {
           .eq("company_id", companyId),
       ]);
 
-      const [inputsCurrent] = await Promise.all([
+      const [inputsCurrent, inputsLast] = await Promise.all([
         supabase
           .from("financial_records")
           .select("amount")
@@ -62,6 +62,14 @@ export function SectionCards() {
           .eq("type", "input")
           .gte("issue_date", formatDate(startOfMonth))
           .lte("issue_date", formatDate(endOfMonth)),
+
+        supabase
+          .from("financial_records")
+          .select("amount")
+          .eq("company_id", companyId)
+          .eq("type", "input")
+          .gte("issue_date", formatDate(startOfLastMonth))
+          .lte("issue_date", formatDate(endOfLastMonth)),
       ]);
 
       const totalReceber =
@@ -81,17 +89,23 @@ export function SectionCards() {
           (sum, i) => sum + Number(i.amount),
           0,
         ) || 0;
+      const totalPagarLast =
+        (inputsLast.data as any[])?.reduce(
+          (sum, i) => sum + Number(i.amount),
+          0,
+        ) || 0;
+
       const receitaAtual = totalReceber - totalPagar;
-      const receitaAnterior = totalReceberLast;
+      const receitaAnterior = totalReceberLast - totalPagarLast;
 
       setReceitaLiquida(receitaAtual);
       setAReceber(totalReceber);
       setAPagar(totalPagar);
 
       const crescimento =
-        receitaAnterior > 0
-          ? ((receitaAtual - receitaAnterior) / receitaAnterior) * 100
-          : 100;
+        receitaAnterior !== 0
+          ? ((receitaAtual - receitaAnterior) / Math.abs(receitaAnterior)) * 100
+          : 0;
       setCrescimento(crescimento);
     };
     fetchData();
