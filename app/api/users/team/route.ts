@@ -6,30 +6,33 @@ import { createClient } from "@supabase/supabase-js";
 
 export async function GET() {
   try {
-    // Sessão do admin que está chamando
-    const supa = createRouteHandlerClient({
-      cookies: async () => await cookies(),
-    });
+    const supa = createRouteHandlerClient({ cookies });
+
     const {
       data: { user: inviter },
       error: sessErr,
     } = await supa.auth.getUser();
+
     if (sessErr || !inviter) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    // Client com SRK para consultas privilegiadas
-    const admin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    );
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    // Descobre a company do admin
+    if (!url || !serviceKey) {
+      console.error("[team] Missing env", { hasUrl: !!url, hasServiceKey: !!serviceKey });
+      return NextResponse.json({ error: "Missing server env" }, { status: 500 });
+    }
+
+    const admin = createClient(url, serviceKey);
+
     const { data: cu, error: cuErr } = await admin
       .from("company_users")
       .select("company_id")
       .eq("user_id", inviter.id)
       .maybeSingle();
+
     if (cuErr || !cu?.company_id) {
       return NextResponse.json(
         { error: "Company not found for inviter" },
@@ -37,31 +40,41 @@ export async function GET() {
       );
     }
 
-    // Junta APENAS com profiles (join entre tabelas públicas)
     const { data: rows, error: listErr } = await admin
       .from("company_users")
-      .select(
-        `
-        user_id,
-        role,
-        profiles:profiles!inner(id,email,is_blocked)
-      `,
-      )
+      .select("user_id, role")
       .eq("company_id", cu.company_id);
+
     if (listErr) {
       return NextResponse.json({ error: listErr.message }, { status: 400 });
     }
 
-    // Busca dados do auth para cada user_id (confirmed_at, last_sign_in_at)
+    const userIds = (rows ?? []).map((r) => r.user_id).filter(Boolean);
+
+    const { data: profiles, error: профErr } = await admin
+      .from("profiles")
+      .select("id, email, is_blocked")
+      .in("id", userIds);
+
+    if (профErr) {
+      return NextResponse.json({ error: профErr.message }, { status: 400 });
+    }
+
+    const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]));
+
     const members = await Promise.all(
       (rows ?? []).map(async (row: any) => {
-        const { data: ures } = await admin.auth.admin.getUserById(row.user_id);
+        const { data: ures, error: uErr } = await admin.auth.admin.getUserById(row.user_id);
+        if (uErr) console.warn("[team] getUserById error:", uErr.message);
+
         const u = ures?.user;
+        const p: any = profileMap.get(row.user_id);
+
         return {
           id: row.user_id,
-          email: row?.profiles?.email ?? u?.email ?? "",
+          email: p?.email ?? u?.email ?? "",
           role: row.role,
-          isBlocked: !!row?.profiles?.is_blocked,
+          isBlocked: !!p?.is_blocked,
           emailConfirmed: !!u?.confirmed_at,
           lastSignInAt: u?.last_sign_in_at ?? null,
           pending: !u?.confirmed_at,
@@ -71,9 +84,9 @@ export async function GET() {
 
     return NextResponse.json({ members }, { status: 200 });
   } catch (e: any) {
-    console.error("[team] GET error:", e?.message || e);
+    console.error("[team] GET error:", e);
     return NextResponse.json(
-      { error: "Internal error listing team" },
+      { error: e?.message || "Internal error listing team" },
       { status: 500 },
     );
   }
