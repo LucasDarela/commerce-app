@@ -993,7 +993,31 @@ export function DataTable({
       header: "Tipo",
       size: 80,
       meta: { className: "w-[80px] uppercase" },
-      cell: ({ row }) => row.original.payment_method,
+      cell: ({ row }) => {
+        const method = row.original.payment_method;
+
+        // ✅ critério: boleto gerado quando tem boleto_id
+        const boletoGenerated = Boolean((row.original as any).boleto_id);
+
+        // só mostra tooltip pra boleto
+        if (method !== "Boleto") return method;
+
+        return (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="cursor-help">{method}</span>
+              </TooltipTrigger>
+
+              <TooltipContent>
+                {boletoGenerated
+                  ? "Boleto já gerado ✅"
+                  : "Boleto não gerado ⚠️"}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        );
+      },
     },
     {
       accessorKey: "payment_status",

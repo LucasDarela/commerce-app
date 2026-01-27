@@ -640,51 +640,59 @@ export default function AddFinancialRecord() {
           {productEntries.map((entry, index) => (
             <div
               key={index}
-              className="grid grid-cols-4 gap-4 my-2 items-center"
+              className="grid grid-cols-12 gap-3 my-2 items-center"
             >
-              <Select
-                value={entry.productId}
-                onValueChange={(val) =>
-                  handleProductChange(index, "productId", val)
-                }
-              >
-                <SelectTrigger className="w-[350px]">
-                  <SelectValue placeholder="Produto ou Equipamento" />
-                </SelectTrigger>
-                <SelectContent>
-                  {products.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="col-span-6">
+                <Select
+                  value={entry.productId}
+                  onValueChange={(val) =>
+                    handleProductChange(index, "productId", val)
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Produto ou Equipamento" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {products.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-              <Input
-                type="number"
-                placeholder="Quantidade"
-                value={entry.quantity}
-                onChange={(e) =>
-                  handleProductChange(index, "quantity", e.target.value)
-                }
-              />
-              <Input
-                type="number"
-                placeholder="Valor Unitário"
-                value={entry.unitPrice}
-                onChange={(e) =>
-                  handleProductChange(index, "unitPrice", e.target.value)
-                }
-              />
+              <div className="col-span-2">
+                <Input
+                  type="number"
+                  placeholder="Quantidade"
+                  value={entry.quantity}
+                  onChange={(e) =>
+                    handleProductChange(index, "quantity", e.target.value)
+                  }
+                />
+              </div>
 
-              {/* Botão de remover */}
-              <Button
-                variant="destructive"
-                size="icon"
-                onClick={() => handleRemoveProduct(index)}
-              >
-                <Trash className="h-4 w-4" />
-              </Button>
+              <div className="col-span-3">
+                <Input
+                  type="number"
+                  placeholder="Valor Unitário"
+                  value={entry.unitPrice}
+                  onChange={(e) =>
+                    handleProductChange(index, "unitPrice", e.target.value)
+                  }
+                />
+              </div>
+
+              <div className="col-span-1 flex justify-end">
+                <Button
+                  variant="destructive"
+                  size="icon"
+                  onClick={() => handleRemoveProduct(index)}
+                >
+                  <Trash className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           ))}
           <Button variant="outline" onClick={handleAddProduct} className="mt-2">

@@ -118,6 +118,15 @@ export function PriceTableManager() {
         return;
       }
 
+      const hasValidPrice = catalog.products.some((p) => Number(p.price) > 0);
+
+      if (!hasValidPrice) {
+        toast.error(
+          `O catálogo "${catalog.name}" precisa ter pelo menos 1 preço.`,
+        );
+        continue;
+      }
+
       // 1. Cria o catálogo
       const { data: priceTable, error: tableError } = await supabase
         .from("price_tables")
@@ -148,6 +157,8 @@ export function PriceTableManager() {
       }));
 
       if (productsData.length === 0) {
+        await supabase.from("price_tables").delete().eq("id", priceTable.id);
+
         toast.error(`Catálogo ${catalog.name} não possui preços válidos.`);
         continue;
       }
@@ -157,6 +168,8 @@ export function PriceTableManager() {
         .insert(productsData);
 
       if (productsError) {
+        await supabase.from("price_tables").delete().eq("id", priceTable.id);
+
         toast.error(`Erro ao salvar produtos para ${catalog.name}`);
         console.error("Erro ao salvar produtos:", productsError);
         continue;
@@ -310,38 +323,44 @@ export function PriceTableManager() {
                   step="0.01"
                   value={selectedProduct?.price ?? ""}
                   onChange={(e) => {
-                    const price = parseFloat(e.target.value);
+                    const raw = e.target.value; // mantém o valor digitado
+                    const price = parseFloat(raw);
 
-                    if (editingCatalogIndex === null) return; // Não precisa retornar null, só sair
-
-                    const catalog = savedCatalogs[editingCatalogIndex];
-
-                    const updatedProducts = [...catalog.products];
+                    const currentCatalog = catalogs[index];
+                    const updatedProducts = [...currentCatalog.products];
 
                     const existingProductIndex = updatedProducts.findIndex(
                       (p) => p.product_id === product.id,
                     );
 
+                    // se apagar o input, remove o produto da lista (ou zera)
+                    if (raw === "") {
+                      const cleaned = updatedProducts.filter(
+                        (p) => p.product_id !== product.id,
+                      );
+                      updateCatalog(index, {
+                        ...currentCatalog,
+                        products: cleaned,
+                      });
+                      return;
+                    }
+
                     if (existingProductIndex >= 0) {
                       updatedProducts[existingProductIndex] = {
                         ...updatedProducts[existingProductIndex],
-                        price,
+                        price: isNaN(price) ? 0 : price,
                       };
-                    } else if (!isNaN(price) && price > 0) {
+                    } else {
                       updatedProducts.push({
                         product_id: product.id,
-                        price,
+                        price: isNaN(price) ? 0 : price,
                       });
                     }
 
-                    const updatedCatalog = {
-                      ...catalog,
+                    updateCatalog(index, {
+                      ...currentCatalog,
                       products: updatedProducts,
-                    };
-
-                    const updatedSaved = [...savedCatalogs];
-                    updatedSaved[editingCatalogIndex] = updatedCatalog;
-                    setSavedCatalogs(updatedSaved);
+                    });
                   }}
                 />
               </div>
