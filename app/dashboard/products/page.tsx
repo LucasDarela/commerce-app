@@ -43,8 +43,8 @@ type Equipment = {
 // 🔹 Product Type
 type Product = {
   id: number;
-  code: string;
-  name: string;
+  code: string | number | null; 
+  name: string | null;
   manufacturer: string;
   standard_price: string;
   material_class: string;
@@ -119,11 +119,14 @@ export default function ListProduct() {
   }, [companyId, loading]);
 
   const filteredProducts = products.filter((product) => {
-    const searchTerm = search.toLowerCase().trim();
-    return (
-      product.name.toLowerCase().includes(searchTerm) ||
-      product.code.toLowerCase().includes(searchTerm)
-    );
+    const term = search.trim().toLowerCase();
+  
+    const name = String(product.name ?? "").toLowerCase();
+    const code = String(product.code ?? "").toLowerCase();
+  
+    if (!term) return true;
+  
+    return name.includes(term) || code.includes(term);
   });
 
   const equipmentMap = equipments.reduce(
