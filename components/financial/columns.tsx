@@ -154,7 +154,7 @@ export function financialColumns({
       header: "Método",
       meta: { className: "uppercase truncate" },
 
-      // ✅ o filtro SEMPRE trabalha com valores canônicos
+      // 🔹 filtro sempre trabalha com valores canônicos
       accessorFn: (row) => {
         const raw = row.payment_method;
 
@@ -177,13 +177,45 @@ export function financialColumns({
 
       cell: ({ row }) => {
         const value = row.getValue("payment_method") as string;
+
         const labelMap: Record<string, string> = {
           Pix: "Pix",
           Dinheiro: "Dinheiro",
           Boleto: "Boleto",
           Cartao: "Cartão",
         };
-        return labelMap[value] ?? value;
+
+        const label = labelMap[value] ?? value;
+        const record = row.original;
+
+        // ❌ nunca mostra tooltip se não for boleto
+        if (value !== "Boleto") return label;
+
+        // ❌ se for nota financeira de ENTRADA, não mostra nada
+        if (isFinancial(record) && record.type === "input") {
+          return label;
+        }
+
+        // ✅ regra de boleto gerado
+        const boletoGenerated = isOrder(record)
+          ? Boolean((record as any).boleto_id)
+          : false;
+
+        return (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="cursor-help">{label}</span>
+              </TooltipTrigger>
+
+              <TooltipContent>
+                {boletoGenerated
+                  ? "Boleto já gerado ✅"
+                  : "Boleto não gerado ⚠️"}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        );
       },
     },
     {

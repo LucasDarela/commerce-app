@@ -415,18 +415,6 @@ export default function DataFinancialTable() {
     };
   }, [currentMonthRows]);
 
-  // useEffect(() => {
-  //   const [start, end] = dateRange;
-  //   const from = start ? start.toISOString().split("T")[0] : undefined;
-  //   const to = end ? end.toISOString().split("T")[0] : undefined;
-
-  //   setColumnFilters((prev) => {
-  //     const withoutDue = prev.filter((f) => f.id !== "due_date");
-  //     if (!from && !to) return withoutDue;
-  //     return [...withoutDue, { id: "due_date", value: { from, to } }];
-  //   });
-  // }, [dateRange]);
-
   return (
     <>
       <HeaderActions table={table} />
