@@ -28,29 +28,30 @@ export function SectionCards() {
 
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
       const startOfLastMonth = new Date(
         now.getFullYear(),
         now.getMonth() - 1,
         1,
       );
-      const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
 
       const formatDate = (d: Date) => format(d, "yyyy-MM-dd");
+
+      const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
       const [ordersCurrent, ordersLast] = await Promise.all([
         supabase
           .from("orders")
-          .select("total")
+          .select("total,total_payed,payment_status")
           .gte("issue_date", formatDate(startOfMonth))
-          .lte("issue_date", formatDate(endOfMonth))
+          .lt("issue_date", formatDate(startOfNextMonth))
           .eq("company_id", companyId),
-
+      
         supabase
           .from("orders")
-          .select("total")
+          .select("total,total_payed,payment_status")
           .gte("issue_date", formatDate(startOfLastMonth))
-          .lte("issue_date", formatDate(endOfLastMonth))
+          .lt("issue_date", formatDate(startOfMonth))
           .eq("company_id", companyId),
       ]);
 
@@ -61,15 +62,15 @@ export function SectionCards() {
           .eq("company_id", companyId)
           .eq("type", "input")
           .gte("issue_date", formatDate(startOfMonth))
-          .lte("issue_date", formatDate(endOfMonth)),
-
+          .lt("issue_date", formatDate(startOfNextMonth)),
+      
         supabase
           .from("financial_records")
           .select("amount")
           .eq("company_id", companyId)
           .eq("type", "input")
           .gte("issue_date", formatDate(startOfLastMonth))
-          .lte("issue_date", formatDate(endOfLastMonth)),
+          .lt("issue_date", formatDate(startOfMonth)),
       ]);
 
       const totalReceber =
@@ -103,9 +104,9 @@ export function SectionCards() {
       setAPagar(totalPagar);
 
       const crescimento =
-        receitaAnterior !== 0
-          ? ((receitaAtual - receitaAnterior) / Math.abs(receitaAnterior)) * 100
-          : 0;
+      receitaAnterior === 0
+        ? (receitaAtual === 0 ? 0 : 100)
+        : ((receitaAtual - receitaAnterior) / Math.abs(receitaAnterior)) * 100;
       setCrescimento(crescimento);
     };
     fetchData();
@@ -121,7 +122,7 @@ export function SectionCards() {
   const formatPercent = (value: number) => `${value.toFixed(1)}%`;
 
   return (
-    <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
+    <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-3">
       <Card className="@container/card">
         <CardHeader>
           <CardDescription>Receita Líquida</CardDescription>
@@ -165,7 +166,7 @@ export function SectionCards() {
           <div className="text-muted-foreground">Contas a pagar do mês</div>
         </CardFooter>
       </Card>
-      <Card className="@container/card">
+      {/* <Card className="@container/card">
         <CardHeader>
           <CardDescription>Crescimento</CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
@@ -181,7 +182,7 @@ export function SectionCards() {
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
           <div className="text-muted-foreground">Comparado ao mês anterior</div>
         </CardFooter>
-      </Card>
+      </Card> */}
     </div>
   );
 }
