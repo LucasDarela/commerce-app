@@ -1,21 +1,22 @@
 // middleware.ts
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { createMiddlewareClient } from "@supabase/auth-helpers-nextjs";
+
+function isStatic(pathname: string) {
+  return (
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/favicon.ico") ||
+    pathname.match(/\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map|txt)$/)
+  );
+}
 
 export async function middleware(req: NextRequest) {
   const { pathname, hostname, search } = req.nextUrl;
 
-  // 1) IGNORAR API, assets e estáticos sempre
-  if (
-    pathname.startsWith("/api") ||
-    pathname.startsWith("/_next") ||
-    pathname.match(/\.[a-zA-Z0-9]+$/)
-  ) {
-    return NextResponse.next();
-  }
+  // 1) Ignorar assets
+  if (isStatic(pathname)) return NextResponse.next();
 
-  // 2) Forçar www SOMENTE para páginas (não-API)
+  // 2) Forçar www no domínio raiz (somente páginas)
   if (hostname === "chopphub.com") {
     return NextResponse.redirect(
       new URL(`https://www.chopphub.com${pathname}${search}`),
@@ -23,34 +24,18 @@ export async function middleware(req: NextRequest) {
     );
   }
 
-  // 3) Gate de auth só para áreas protegidas
+  // 3) Proteger dashboard (somente aqui roda Supabase)
   if (pathname.startsWith("/dashboard")) {
     const res = NextResponse.next();
     const supabase = createMiddlewareClient({ req, res });
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    // getUser pode fazer chamada externa → mantenha o middleware leve
+    const { data, error } = await supabase.auth.getUser();
 
-    if (!user) {
+    if (error || !data?.user) {
       return NextResponse.redirect(new URL("/login-signin", req.url));
     }
 
-    // rotas admin
-    if (
-      pathname.startsWith("/dashboard/team") ||
-      pathname.startsWith("/api/users/add-member")
-    ) {
-      const { data: cu } = await supabase
-        .from("company_users")
-        .select("role")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (cu?.role !== "admin") {
-        return NextResponse.redirect(new URL("/unauthorized", req.url));
-      }
-    }
     return res;
   }
 
@@ -58,5 +43,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/api/users/add-member"],
+  matcher: ["/dashboard/:path*"],
 };

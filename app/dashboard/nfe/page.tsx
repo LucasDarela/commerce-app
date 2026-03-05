@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
 import { InvoiceStatusIndicator } from "@/components/nf/InvoiceStatusIndicator";
 import FetchLinksButton from "@/components/nf/FetchLinksButton";
+import ViewXmlButton from "@/components/nf/ViewXmlButton";
 import {
   Card,
   CardAction,
@@ -244,13 +245,33 @@ export default function NfePage() {
                 />
               )}
 
+
               {canShowDanfe(invoice.status, invoice.danfe_url) && (
-                <ViewDanfeButton
-                  url={invoice.danfe_url}
-                  ref={invoice.ref}
-                  invoiceId={invoice.id}
-                />
+                <>
+                  <ViewDanfeButton
+                    url={invoice.danfe_url}
+                    ref={invoice.ref}
+                    invoiceId={invoice.id}
+                  />
+
+                  <ViewXmlButton
+                    xmlUrl={invoice.xml_url}
+                    refId={invoice.ref}
+                    companyId={companyId}
+                    invoiceId={invoice.id}
+                    onUpdated={async () => {
+                      const { data } = await supabase
+                        .from("invoices")
+                        .select("*")
+                        .eq("company_id", companyId)
+                        .order("numero", { ascending: false });
+
+                      if (data) setInvoices(data);
+                    }}
+                  />
+                </>
               )}
+              
 
               {isAuthorized(invoice.status) &&
                 (!invoice.danfe_url || !invoice.xml_url) && (
