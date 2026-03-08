@@ -3,7 +3,6 @@
 import * as React from "react";
 import { format, parseISO } from "date-fns";
 import { useEffect, useState } from "react";
-import { useCompanyIntegration } from "@/hooks/use-company-integration";
 import {
   DndContext,
   KeyboardSensor,
@@ -32,7 +31,6 @@ import {
   IconDotsVertical,
   IconGripVertical,
   IconLayoutColumns,
-  IconLoader,
   IconPlus,
   IconTrash,
 } from "@tabler/icons-react";
@@ -56,7 +54,6 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -102,7 +99,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import type { SupabaseClient } from "@supabase/supabase-js";
-// import { supabase } from "@/lib/supabase";
 import { PaymentModal } from "@/components/payment-modal";
 import { LoanEquipmentModal } from "@/components/equipment-loan/LoanEquipmentModal";
 import { fetchEquipmentsForOrderProducts } from "@/lib/fetch-equipments-for-products";
@@ -252,6 +248,7 @@ async function parseProductsWithIds(
   });
 
   const names = parsed.map((p) => p.name);
+
   const { data, error } = await supabaseClient
     .from("products")
     .select("id, name")
@@ -271,16 +268,14 @@ async function parseProductsWithIds(
 }
 
 export function DataTable({
-  data: initialData,
   companyId,
-  onRowClick,
 }: DataTableProps) {
   const [selectedCustomer, setSelectedCustomer] = React.useState<Sale | null>(
     null,
   );
   const { user } = useAuthenticatedCompany();
   const [sheetOpen, setSheetOpen] = React.useState(false);
-  const supabase = createClientComponentClient();
+const supabase = React.useMemo(() => createClientComponentClient(), []);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSavingOrder, setIsSavingOrder] = useState(false);
@@ -290,28 +285,19 @@ export function DataTable({
   const [returnedProducts, setReturnedProducts] = useState<
     { name: string; quantity: number }[]
   >([]);
-  const {
-    accessToken,
-    loading: loadingIntegration,
-    error: integrationError,
-  } = useCompanyIntegration("mercado_pago");
   const router = useRouter();
 
-  // filtros salvos em cache
-
-  // dentro do DataTable(...)
-
   const FILTERS_KEY = React.useMemo(() => {
-    // por empresa (evita misturar filtros entre tenants)
     return `orders_filters_v1:${companyId}`;
   }, [companyId]);
 
-  type PersistedOrdersFilters = {
-    selectedMonth: string;
-    columnFilters: ColumnFiltersState;
-    dateRange: [string | null, string | null]; // ISO yyyy-mm-dd
-    issueDate: string | null; // ISO yyyy-mm-dd
-  };
+type PersistedOrdersFilters = {
+  selectedMonth: string;
+  columnFilters: ColumnFiltersState;
+  dateRange: [string | null, string | null];
+  issueDate: string | null;
+  sorting: SortingState;
+};
 
   function safeParseJSON<T>(value: string | null): T | null {
     if (!value) return null;
@@ -375,6 +361,20 @@ export function DataTable({
 
   const [startDate, endDate] = dateRange;
 
+    const defaultSorting: SortingState = [
+  { id: "appointment_date", desc: true },
+];
+
+const [sorting, setSorting] = React.useState<SortingState>(() => {
+  if (typeof window === "undefined") return defaultSorting;
+
+  const saved = safeParseJSON<PersistedOrdersFilters>(
+    localStorage.getItem(FILTERS_KEY),
+  );
+
+  return saved?.sorting?.length ? saved.sorting : defaultSorting;
+});
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!companyId) return;
@@ -387,10 +387,11 @@ export function DataTable({
         endDate ? toLocalISODate(endDate) : null,
       ],
       issueDate: issueDateFilter ? toLocalISODate(issueDateFilter) : null,
+      sorting,
     };
 
     localStorage.setItem(FILTERS_KEY, JSON.stringify(payload));
-  }, [
+  }, [  
     FILTERS_KEY,
     companyId,
     selectedMonth,
@@ -398,6 +399,7 @@ export function DataTable({
     startDate,
     endDate,
     issueDateFilter,
+    sorting,  
   ]);
 
   // filtros salvos em cache no localStorage
@@ -723,7 +725,32 @@ export function DataTable({
     async function fetchOrders() {
       const { data, error } = await supabase
         .from("orders")
-        .select("*")
+        .select(`
+  id,
+  customer_id,
+  note_number,
+  document_type,
+  appointment_date,
+  appointment_hour,
+  appointment_local,
+  customer,
+  phone,
+  products,
+  freight,
+  amount,
+  total,
+  total_payed,
+  delivery_status,
+  payment_status,
+  payment_method,
+  order_index,
+  issue_date,
+  due_date,
+  customer_signature,
+  text_note,
+  boleto_id,
+  driver_id
+`)
         .order("order_index", { ascending: true });
 
       if (error) {
@@ -744,7 +771,7 @@ export function DataTable({
     fetchOrders();
   }, []);
 
-  const columns: CustomColumnDef<Order>[] = [
+const columns = React.useMemo<CustomColumnDef<Order>[]>(() => [
     {
       id: "drag",
       header: () => null,
@@ -755,38 +782,48 @@ export function DataTable({
       enableHiding: false,
     },
 
-    {
-      accessorKey: "appointment_date",
-      header: "Data",
-      size: 90,
-      meta: { className: "w-[90px]" },
-      filterFn: (row, columnId, filterValue) => {
-        const rowDate = row.getValue<string>(columnId);
-        if (!rowDate || typeof rowDate !== "string") return false;
+{
+  accessorKey: "appointment_date",
+  header: "Data",
+  size: 90,
+  meta: { className: "w-[90px]" },
+  sortingFn: (rowA, rowB) => {
+    const dateA = rowA.original.appointment_date ?? "";
+    const hourA = rowA.original.appointment_hour ?? "00:00";
 
-        const rowTime = new Date(rowDate).getTime();
+    const dateB = rowB.original.appointment_date ?? "";
+    const hourB = rowB.original.appointment_hour ?? "00:00";
 
-        // Caso seja filtro por uma data exata
-        if (typeof filterValue === "string") {
-          return rowDate === filterValue;
-        }
+    const dateTimeA = new Date(`${dateA}T${hourA}:00`).getTime();
+    const dateTimeB = new Date(`${dateB}T${hourB}:00`).getTime();
 
-        // Caso seja intervalo de datas
-        if (filterValue?.from && filterValue?.to) {
-          const fromTime = new Date(filterValue.from).getTime();
-          const toTime = new Date(filterValue.to).getTime();
-          return rowTime >= fromTime && rowTime <= toTime;
-        }
+    return dateTimeA - dateTimeB;
+  },
+  filterFn: (row, columnId, filterValue) => {
+    const rowDate = row.getValue<string>(columnId);
+    if (!rowDate || typeof rowDate !== "string") return false;
 
-        return true;
-      },
-      cell: ({ row }) => {
-        const rawDate = row.original.appointment_date;
-        if (!rawDate) return "—";
-        const [year, month, day] = rawDate.split("-");
-        return `${day}/${month}/${year}`;
-      },
-    },
+    const rowTime = new Date(rowDate).getTime();
+
+    if (typeof filterValue === "string") {
+      return rowDate === filterValue;
+    }
+
+    if (filterValue?.from && filterValue?.to) {
+      const fromTime = new Date(filterValue.from).getTime();
+      const toTime = new Date(filterValue.to).getTime();
+      return rowTime >= fromTime && rowTime <= toTime;
+    }
+
+    return true;
+  },
+  cell: ({ row }) => {
+    const rawDate = row.original.appointment_date;
+    if (!rawDate) return "—";
+    const [year, month, day] = rawDate.split("-");
+    return `${day}/${month}/${year}`;
+  },
+},
     {
       accessorKey: "appointment_hour",
       header: "Hora",
@@ -809,25 +846,22 @@ export function DataTable({
       header: "Cliente",
       size: 200,
       meta: { className: "w-[220px] truncate uppercase" },
-      cell: ({ row }) => {
-        const saleId = row.original.id;
-        const orderWithFantasy = orders.find((o) => o.id === saleId);
+cell: ({ row }) => {
+  const order = row.original;
 
-        return (
-          <Button
-            variant="link"
-            className="p-0 text-left text-primary hover:underline"
-            onClick={() => {
-              if (orderWithFantasy) {
-                setSelectedCustomer(orderWithFantasy);
-                setSheetOpen(true);
-              }
-            }}
-          >
-            {orderWithFantasy?.customer}
-          </Button>
-        );
-      },
+  return (
+    <Button
+      variant="link"
+      className="p-0 text-left text-primary hover:underline"
+      onClick={() => {
+        setSelectedCustomer(order);
+        setSheetOpen(true);
+      }}
+    >
+      {order.customer}
+    </Button>
+  );
+}, 
     },
     {
       id: "driver",
@@ -1128,25 +1162,20 @@ export function DataTable({
                 orderId={row.original.id}
                 asDropdownItem
                 onDeleted={() => {
-                  // ATENÇÃO: use o mesmo setter de estado que povoa a tabela
-                  setData((prev) =>
+                  setOrders((prev) =>
                     prev.filter((o) => o.id !== row.original.id),
                   );
-                }}
+                }}  
               />
             </DropdownMenuContent>
           </DropdownMenu>
         );
       },
     },
-  ];
+     ], [orders, drivers, nfeStatusByOrderId]);
 
-  const [data, setData] = React.useState(() => initialData);
   const [rowSelection, setRowSelection] = React.useState({});
-  // const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-  //   [],
-  // );
-  const [sorting, setSorting] = React.useState<SortingState>([]);
+
   const [pagination, setPagination] = React.useState({
     pageIndex: 0,
     pageSize: 20,
@@ -1158,17 +1187,12 @@ export function DataTable({
     useSensor(KeyboardSensor, {}),
   );
 
-  const dataIds = React.useMemo<UniqueIdentifier[]>(
-    () => data?.map(({ id }) => id) || [],
-    [data],
-  );
-
   const table = useReactTable<Order>({
     data: React.useMemo(() => {
-      return orders.filter((order) => {
-        if (!order.appointment_date) return false;
-        return order.appointment_date.startsWith(selectedMonth);
-      });
+return orders.filter((order) => {
+  if (!order.appointment_date) return false;
+  return order.appointment_date.startsWith(selectedMonth);
+});
     }, [orders, selectedMonth]),
     columns,
     state: {
@@ -1192,6 +1216,35 @@ export function DataTable({
     getFacetedRowModel: getFacetedRowModel(),
     getFacetedUniqueValues: getFacetedUniqueValues(),
   });
+
+  const filteredRows = table.getFilteredRowModel().rows;
+
+  const filteredSalesTotal = React.useMemo(() => {
+    return filteredRows.reduce((sum, row) => {
+      const total = Number(row.original.total ?? 0);
+      return sum + total;
+    }, 0);
+  }, [filteredRows]);
+
+  const formattedFilteredSalesTotal = React.useMemo(() => {
+    return filteredSalesTotal.toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    });
+  }, [filteredSalesTotal]);
+
+function handleDateSortChange(value: string) {
+  switch (value) {
+    case "date_asc":
+      setSorting([{ id: "appointment_date", desc: false }]);
+      break;
+
+    case "default":
+    default:
+      setSorting([{ id: "appointment_date", desc: true }]);
+      break;
+  }
+}
 
   function toLocalISODate(d: Date) {
     return format(d, "yyyy-MM-dd"); // sem UTC, sem shift
@@ -1232,6 +1285,16 @@ export function DataTable({
         setIsSavingOrder(false);
       });
   }
+
+function clearAllFilters() {
+  table.resetColumnFilters();
+  setSorting([{ id: "appointment_date", desc: true }]);
+  setDateRange([null, null]);
+  setissueDateFilter(null);
+  setSelectedDate(undefined);
+  setDateInput("");
+  table.setPageIndex(0);
+}
 
   const futureReservations = React.useMemo(() => {
     return orders.filter((order) => {
@@ -1353,51 +1416,6 @@ export function DataTable({
   }, [selectedCustomer]);
 
   useEffect(() => {
-    const channel = supabase
-      .channel("orders-realtime")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "orders" },
-        (payload: any) => {
-          setOrders((prev) => {
-            const next = Array.isArray(prev) ? [...prev] : [];
-
-            // 🔧 pegue o id de forma segura
-            const newRow = (payload.new ?? {}) as { id?: string };
-            const oldRow = (payload.old ?? {}) as { id?: string };
-            const rowId = newRow.id ?? oldRow.id;
-
-            const idx =
-              rowId != null ? next.findIndex((o) => o.id === rowId) : -1;
-
-            switch (payload.eventType) {
-              case "INSERT": {
-                if (idx === -1) next.unshift(payload.new as any); // tipar se tiver seu tipo Order
-                return next;
-              }
-              case "UPDATE": {
-                if (idx !== -1)
-                  next[idx] = { ...next[idx], ...(payload.new as any) };
-                return next;
-              }
-              case "DELETE": {
-                if (idx !== -1) next.splice(idx, 1);
-                return next;
-              }
-              default:
-                return prev;
-            }
-          });
-        },
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
-  useEffect(() => {
     if (!companyId) return;
 
     // garante que a tabela tenha Realtime habilitado no Supabase Dashboard
@@ -1410,7 +1428,7 @@ export function DataTable({
         (payload) => {
           const oldRow = payload.old as { id: string; company_id?: string };
           if (oldRow?.company_id && oldRow.company_id !== companyId) return;
-          setData((prev) => prev.filter((o) => o.id !== oldRow.id));
+          setOrders((prev) => prev.filter((o) => o.id !== oldRow.id));
         },
       )
       // INSERT
@@ -1420,7 +1438,7 @@ export function DataTable({
         (payload) => {
           const newRow = payload.new as any;
           if (newRow?.company_id && newRow.company_id !== companyId) return;
-          setData((prev) => {
+          setOrders((prev) => {
             // evita duplicar se já estiver na lista
             if (prev.some((o) => o.id === newRow.id)) return prev;
             return [newRow, ...prev];
@@ -1434,7 +1452,7 @@ export function DataTable({
         (payload) => {
           const newRow = payload.new as any;
           if (newRow?.company_id && newRow.company_id !== companyId) return;
-          setData((prev) =>
+          setOrders((prev) =>
             prev.map((o) => (o.id === newRow.id ? { ...o, ...newRow } : o)),
           );
         },
@@ -1444,7 +1462,7 @@ export function DataTable({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [companyId, setData]);
+  }, [companyId, setOrders]);
 
   const isDisabled =
     !selectedCustomer?.customer_signature ||
@@ -1521,7 +1539,12 @@ export function DataTable({
         </div>
       )}
       <div className="w-full flex justify-between items-center px-4 lg:px-6 my-2">
-        <h2 className="text-xl font-bold">Vendas</h2>
+  <div className="flex items-center gap-3">
+    <h2 className="text-xl font-bold">Vendas</h2>
+    <Badge variant="secondary" className="text-sm">
+      Total: {formattedFilteredSalesTotal}
+    </Badge>
+  </div>
         {/* Botão Adicionar */}
         <div className="flex gap-2">
           <DropdownMenu>
@@ -1566,7 +1589,7 @@ export function DataTable({
           </Link>
         </div>
       </div>
-      <div className="grid gap-2 px-4 lg:px-6 py-2 grid-cols-2 md:grid-cols-3 lg:grid-cols-6 items-center">
+      <div className="grid gap-2 px-4 lg:px-6 py-2 grid-cols-2 md:grid-cols-3 lg:grid-cols-7 items-center">
         {/* Filtro por data */}
         <div className="relative w-full sm:w-full md:max-w-[300px] z-50">
           <DatePicker
@@ -1595,7 +1618,7 @@ export function DataTable({
           )}
         </div>
 
-        <div className="relative w-full sm:w-full md:max-w-[250px] z-50">
+        {/* <div className="relative w-full sm:w-full md:max-w-[250px] z-50">
           <DatePicker
             selected={issueDateFilter}
             onChange={(date) => {
@@ -1623,7 +1646,7 @@ export function DataTable({
               <IconTrash className="w-4 h-4" />
             </button>
           )}
-        </div>
+        </div> */}
 
         {/* Nome do cliente */}
         <Input
@@ -1706,6 +1729,32 @@ export function DataTable({
             <SelectItem value="Partial">Parcial</SelectItem>
           </SelectContent>
         </Select>
+        <Select
+  value={
+    sorting.length && sorting[0]?.id === "appointment_date"
+      ? sorting[0].desc
+        ? "default"
+        : "date_asc"
+      : "default"
+  }
+  onValueChange={handleDateSortChange}
+>
+  <SelectTrigger className="min-w-[120px] w-full">
+    <SelectValue placeholder="Ordenar" />
+  </SelectTrigger>
+  <SelectContent>
+    <SelectItem value="default">Data decrescente</SelectItem>
+    <SelectItem value="date_asc">Data crescente</SelectItem>
+  </SelectContent>
+</Select>
+<Button
+  variant="outline"
+  className="min-w-[120px]"
+  onClick={clearAllFilters}
+>
+  <IconTrash className="mr-2 h-4 w-4" />
+  Limpar filtros
+</Button>
       </div>
 
       <Tabs
