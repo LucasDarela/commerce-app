@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { toast } from "sonner";
-
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -259,235 +259,342 @@ export function ProductForm({
     );
   }
 
-  return (
-    <div className="max-w-3xl mx-auto p-6 rounded-lg shadow-md">
-      <h1 className="text-2xl font-bold mb-4">
-        {mode === "create" ? "Adicionar Produto" : "Editar Produto"}
-      </h1>
+return (
+  <div className="mx-auto w-full max-w-5xl p-4 md:p-6">
+    <Card className="border-border/60 shadow-sm">
+      <CardContent className="p-4 md:p-6 space-y-8">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold tracking-tight">
+            {mode === "create" ? "Adicionar Produto" : "Editar Produto"}
+          </h1>
+        </div>
 
-      <Card>
-        <CardContent className="p-6 space-y-4">
-          <div className="grid grid-cols-3 gap-4">
-            <Input
-              type="text"
-              name="code"
-              value={formData.code}
+        {/* DADOS GERAIS */}
+        <div className="space-y-4">
+          <div>
+            <h2 className="text-base font-semibold">Dados do Produto</h2>
+            <p className="text-sm text-muted-foreground">
+              Informações principais do produto.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="code">Código</Label>
+              <Input
+                id="code"
+                type="text"
+                name="code"
+                value={formData.code}
+                onChange={handleChange}
+                required
+              />
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="name">Nome do Produto</Label>
+              <Input
+                id="name"
+                type="text"
+                name="name"
+                value={formData.name}
+                onChange={handleChange}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="standard_price">Preço (R$)</Label>
+              <Input
+                id="standard_price"
+                type="text"
+                name="standard_price"
+                value={formData.standard_price}
+                onChange={handleChange}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="manufacturer">Fabricante</Label>
+              <Input
+                id="manufacturer"
+                type="text"
+                name="manufacturer"
+                value={formData.manufacturer}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Unidade</Label>
+              <Select
+                value={formData.unit}
+                onValueChange={(value) => handleSelectChange("unit", value)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="un">Un - Unidade</SelectItem>
+                  <SelectItem value="kg">Kg - Kilograma</SelectItem>
+                  <SelectItem value="m">M - Metro</SelectItem>
+                  <SelectItem value="l">L - Litro</SelectItem>
+                  <SelectItem value="m2">M2 - Metro quadrado</SelectItem>
+                  <SelectItem value="m3">M3 - Metro cúbico</SelectItem>
+                  <SelectItem value="kw">Kw - Kilowatt</SelectItem>
+                  <SelectItem value="h">H - Hora</SelectItem>
+                  <SelectItem value="par">P - Par</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="space-y-2">
+              <Label>Classe do Material</Label>
+              <Select
+                value={formData.material_class}
+                onValueChange={(value) =>
+                  handleSelectChange("material_class", value)
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="CHOPP">CHOPP</SelectItem>
+                  <SelectItem value="EQUIPAMENTO">EQUIPAMENTO</SelectItem>
+                  <SelectItem value="ACESSORIO">ACESSÓRIO</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="submaterial_class">Sub Classe</Label>
+              <Input
+                id="submaterial_class"
+                type="text"
+                name="submaterial_class"
+                value={formData.submaterial_class}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Origem do Produto</Label>
+              <Select
+                value={formData.material_origin}
+                onValueChange={(value) =>
+                  handleSelectChange("material_origin", value)
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="National">Nacional</SelectItem>
+                  <SelectItem value="Foreign">Estrangeira</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="percentage_taxes">Tributos (%)</Label>
+              <Input
+                id="percentage_taxes"
+                name="percentage_taxes"
+                value={formData.percentage_taxes}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <Label>Aplicação do Material</Label>
+              <Select
+                value={formData.aplication}
+                onValueChange={(value) =>
+                  handleSelectChange("aplication", value)
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sale-product">
+                    Mercadoria para Revenda
+                  </SelectItem>
+                  <SelectItem value="materail-use-consumption">
+                    Material de Uso e Consumo
+                  </SelectItem>
+                  <SelectItem value="service">Serviço</SelectItem>
+                  <SelectItem value="fixed-asset">Ativo Imobilizado</SelectItem>
+                  <SelectItem value="raw-material">Matéria prima</SelectItem>
+                  <SelectItem value="sub-product">Subproduto</SelectItem>
+                  <SelectItem value="packaging">Embalagem</SelectItem>
+                  <SelectItem value="others">Outros</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+
+        {/* DADOS FISCAIS */}
+        <div className="space-y-4">
+          <div>
+            <h2 className="text-base font-semibold">Dados Fiscais</h2>
+            <p className="text-sm text-muted-foreground">
+              Informações utilizadas para emissão de nota fiscal.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="ncm">NCM</Label>
+              <Input
+                id="ncm"
+                name="ncm"
+                value={formData.ncm}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="cest">CEST</Label>
+              <Input
+                id="cest"
+                name="cest"
+                value={formData.cest}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="cfop">CFOP</Label>
+              <Input
+                id="cfop"
+                name="cfop"
+                value={formData.cfop}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="icms_origem">Origem ICMS</Label>
+              <Input
+                id="icms_origem"
+                name="icms_origem"
+                value={formData.icms_origem}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="cst_icms">CST ICMS</Label>
+              <Input
+                id="cst_icms"
+                name="cst_icms"
+                value={formData.cst_icms}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="csosn_icms">CSOSN</Label>
+              <Input
+                id="csosn_icms"
+                name="csosn_icms"
+                value={formData.csosn_icms}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="icms_situacao_tributaria">
+                Situação Tributária ICMS
+              </Label>
+              <Input
+                id="icms_situacao_tributaria"
+                name="icms_situacao_tributaria"
+                value={formData.icms_situacao_tributaria}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="pis">PIS</Label>
+              <Input
+                id="pis"
+                name="pis"
+                value={formData.pis}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="cofins">COFINS</Label>
+              <Input
+                id="cofins"
+                name="cofins"
+                value={formData.cofins}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="ipi">IPI</Label>
+              <Input
+                id="ipi"
+                name="ipi"
+                value={formData.ipi}
+                onChange={handleChange}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* DESCRIÇÃO E VÍNCULO */}
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="description">Descrição</Label>
+            <Textarea
+              id="description"
+              name="description"
+              value={formData.description}
               onChange={handleChange}
-              placeholder="Código do Produto"
-              required
-            />
-            <Input
-              type="text"
-              name="name"
-              value={formData.name}
-              onChange={handleChange}
-              placeholder="Nome do Produto"
-              className="col-span-2"
-              required
+              className="min-h-[110px]"
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
-            <Input
-              type="text"
-              name="standard_price"
-              value={formData.standard_price}
-              onChange={handleChange}
-              placeholder="Custo (R$)"
-              required
-            />
-            <Input
-              type="text"
-              name="manufacturer"
-              value={formData.manufacturer}
-              onChange={handleChange}
-              placeholder="Fabricante"
-            />
-
+          <div className="space-y-2">
+            <Label>Equipamento Vinculado</Label>
             <Select
-              value={formData.unit}
-              onValueChange={(value) => handleSelectChange("unit", value)}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Unidade" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="un">Un - Unidade</SelectItem>
-                <SelectItem value="kg">Kg - Kilograma</SelectItem>
-                <SelectItem value="m">M - Metro</SelectItem>
-                <SelectItem value="l">L - Litro</SelectItem>
-                <SelectItem value="m2">M2 - Metro quadrado</SelectItem>
-                <SelectItem value="m3">M3 - Metro cúbico</SelectItem>
-                <SelectItem value="kw">Kw - Kilowatt</SelectItem>
-                <SelectItem value="h">H - Hora</SelectItem>
-                <SelectItem value="par">P - Par</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid grid-cols-3 gap-4">
-            <Select
-              value={formData.material_class}
+              value={formData.loan_product_code}
               onValueChange={(value) =>
-                handleSelectChange("material_class", value)
+                handleSelectChange("loan_product_code", value)
               }
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Classe do Material" />
+                <SelectValue placeholder="Selecione um equipamento" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="CHOPP">CHOPP</SelectItem>
-                <SelectItem value="EQUIPAMENTO">EQUIPAMENTO</SelectItem>
-                <SelectItem value="ACESSORIO">ACESSÓRIO</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Input
-              type="text"
-              name="submaterial_class"
-              value={formData.submaterial_class}
-              onChange={handleChange}
-              placeholder="Sub Classe"
-            />
-
-            <Select
-              value={formData.material_origin}
-              onValueChange={(value) =>
-                handleSelectChange("material_origin", value)
-              }
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Origem do Produto" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="National">Nacional</SelectItem>
-                <SelectItem value="Foreign">Estrangeira</SelectItem>
+                {equipments.map((eq) => (
+                  <SelectItem key={eq.id} value={eq.id}>
+                    {eq.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
+        </div>
 
-          <div className="grid grid-cols-3 gap-4">
-            <Input
-              name="percentage_taxes"
-              value={formData.percentage_taxes}
-              onChange={handleChange}
-              placeholder="Tributos %"
-            />
-
-            <Select
-              value={formData.aplication}
-              onValueChange={(value) => handleSelectChange("aplication", value)}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Aplicação do Material" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="sale-product">
-                  Mercadoria para Revenda
-                </SelectItem>
-                <SelectItem value="materail-use-consumption">
-                  Material de Uso e Consumo
-                </SelectItem>
-                <SelectItem value="service">Serviço</SelectItem>
-                <SelectItem value="fixed-asset">Ativo Imobilizado</SelectItem>
-                <SelectItem value="raw-material">Matéria prima</SelectItem>
-                <SelectItem value="sub-product">Subproduto</SelectItem>
-                <SelectItem value="packaging">Embalagem</SelectItem>
-                <SelectItem value="others">Outros</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input
-              placeholder="NCM"
-              name="ncm"
-              value={formData.ncm}
-              onChange={handleChange}
-            />
-            <Input
-              placeholder="CEST"
-              name="cest"
-              value={formData.cest}
-              onChange={handleChange}
-            />
-            <Input
-              placeholder="CFOP"
-              name="cfop"
-              value={formData.cfop}
-              onChange={handleChange}
-            />
-            <Input
-              placeholder="ICMS Origin"
-              name="icms_origem"
-              value={formData.icms_origem}
-              onChange={handleChange}
-            />
-            <Input
-              placeholder="CST ICMS"
-              name="cst_icms"
-              value={formData.cst_icms}
-              onChange={handleChange}
-            />
-            <Input
-              placeholder="CSOSN ICMS"
-              name="csosn_icms"
-              value={formData.csosn_icms}
-              onChange={handleChange}
-            />
-            <Input
-              placeholder="ICMS Tax Situation"
-              name="icms_situacao_tributaria"
-              value={formData.icms_situacao_tributaria}
-              onChange={handleChange}
-            />
-            <Input
-              placeholder="PIS"
-              name="pis"
-              value={formData.pis}
-              onChange={handleChange}
-            />
-            <Input
-              placeholder="COFINS"
-              name="cofins"
-              value={formData.cofins}
-              onChange={handleChange}
-            />
-            <Input
-              placeholder="IPI"
-              name="ipi"
-              value={formData.ipi}
-              onChange={handleChange}
-            />
-          </div>
-
-          <Textarea
-            name="description"
-            value={formData.description}
-            onChange={handleChange}
-            placeholder="Descrição do Produto"
-          />
-
-          <Select
-            value={formData.loan_product_code}
-            onValueChange={(value) =>
-              handleSelectChange("loan_product_code", value)
-            }
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Produto Vinculado (Opcional)" />
-            </SelectTrigger>
-            <SelectContent>
-              {equipments.map((eq) => (
-                <SelectItem key={eq.id} value={eq.id}>
-                  {eq.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
+        <div className="flex justify-end pt-2">
           <Button
-            className="w-full"
+            className="w-full md:w-auto min-w-[180px]"
             onClick={handleSubmit}
             disabled={submitting}
           >
@@ -497,8 +604,9 @@ export function ProductForm({
                 ? "Salvar Produto"
                 : "Atualizar Produto"}
           </Button>
-        </CardContent>
-      </Card>
-    </div>
-  );
+        </div>
+      </CardContent>
+    </Card>
+  </div>
+);
 }

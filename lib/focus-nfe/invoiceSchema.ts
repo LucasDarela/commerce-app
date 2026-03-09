@@ -19,17 +19,9 @@ const itemSchema = z
 
     icms_origem: z.enum(["0", "1", "2", "3", "4", "5", "6", "7", "8"]),
 
-    // Regime normal
     icms_situacao_tributaria: z
       .string()
-      .regex(/^\d{2,3}$/)
-      .optional(),
-
-    // Simples Nacional
-    csosn_icms: z
-      .string()
-      .regex(/^\d{3}$/)
-      .optional(),
+      .regex(/^\d{2,3}$/),  
 
     pis_situacao_tributaria: z
       .string()
@@ -46,28 +38,6 @@ const itemSchema = z
     vicms_st_ret: z.number().optional(),
   })
   .superRefine((it, ctx) => {
-    const hasCst = !!it.icms_situacao_tributaria;
-    const hasCsosn = !!it.csosn_icms;
-
-    // precisa ter um dos dois
-    if (!hasCst && !hasCsosn) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message:
-          "Informe icms_situacao_tributaria ou csosn_icms no item.",
-        path: ["icms_situacao_tributaria"],
-      });
-    }
-
-    // não pode ter os dois ao mesmo tempo
-    if (hasCst && hasCsosn) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message:
-          "Informe apenas um entre icms_situacao_tributaria e csosn_icms.",
-        path: ["icms_situacao_tributaria"],
-      });
-    }
 
     // validação de ST somente para CST 60
     if (it.icms_situacao_tributaria === "60") {

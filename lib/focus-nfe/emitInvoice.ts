@@ -165,13 +165,11 @@ const isSN = crt === 1 || crt === 2 || crt === 4;
       valor_frete: freightParts[idx] ?? 0,
       icms_origem: String(it.icms_origem ?? "0"),
 
-      ...(isSN
-        ? {
-            csosn_icms: String(it.csosn_icms ?? "102"),
-          }
-        : {
-            icms_situacao_tributaria: String(it.icms_situacao_tributaria ?? "00"),
-          }),
+      icms_situacao_tributaria: String(
+        isSN
+          ? (it.icms_situacao_tributaria ?? "102")
+          : (it.icms_situacao_tributaria ?? "00")
+      ),  
 
       pis_situacao_tributaria: String(
         it.pis_situacao_tributaria ?? "",
