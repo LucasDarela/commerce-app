@@ -13,31 +13,70 @@ const itemSchema = z
     valor_unitario_tributavel: z.number(),
     unidade_tributavel: z.string(),
     codigo_ncm: z.string().length(8),
+    codigo_cest: z.string().optional(),
     quantidade_tributavel: z.number(),
     valor_bruto: z.number(),
 
-    icms_situacao_tributaria: z.string().regex(/^\d{2,3}$/), // "60", "102", "500", "900", etc.
-    icms_origem: z.string(),
+    icms_origem: z.enum(["0", "1", "2", "3", "4", "5", "6", "7", "8"]),
+
+    // Regime normal
+    icms_situacao_tributaria: z
+      .string()
+      .regex(/^\d{2,3}$/)
+      .optional(),
+
+    // Simples Nacional
+    csosn_icms: z
+      .string()
+      .regex(/^\d{3}$/)
+      .optional(),
 
     pis_situacao_tributaria: z
       .string()
       .regex(/^\d{2}$/, "PIS deve ter 2 dígitos"),
+
     cofins_situacao_tributaria: z
       .string()
       .regex(/^\d{2}$/, "COFINS deve ter 2 dígitos"),
-    // ST – opcionais (validados condicionalmente)
+
+    // ST – opcionais
     vbc_st_ret: z.number().optional(),
     pst: z.number().optional(),
     vicms_substituto: z.number().optional(),
     vicms_st_ret: z.number().optional(),
   })
   .superRefine((it, ctx) => {
+    const hasCst = !!it.icms_situacao_tributaria;
+    const hasCsosn = !!it.csosn_icms;
+
+    // precisa ter um dos dois
+    if (!hasCst && !hasCsosn) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "Informe icms_situacao_tributaria ou csosn_icms no item.",
+        path: ["icms_situacao_tributaria"],
+      });
+    }
+
+    // não pode ter os dois ao mesmo tempo
+    if (hasCst && hasCsosn) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "Informe apenas um entre icms_situacao_tributaria e csosn_icms.",
+        path: ["icms_situacao_tributaria"],
+      });
+    }
+
+    // validação de ST somente para CST 60
     if (it.icms_situacao_tributaria === "60") {
       const falta =
         it.vbc_st_ret == null ||
         it.pst == null ||
         it.vicms_substituto == null ||
         it.vicms_st_ret == null;
+
       if (falta) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -49,62 +88,72 @@ const itemSchema = z
     }
   });
 
-export const invoiceSchema = z.object({
-  ref: z.string().optional(),
-  ambiente: z.enum(["1", "2"]),
-  order_id: z.string().uuid(),
-  numero: z.number().int().positive().optional(),
-  serie: z.string().optional(),
-  natureza_operacao: z.string().min(1, "Obrigatório"),
-  data_emissao: z.string(),
-  data_entrada_saida: z.string(),
-  tipo_documento: z.union([z.literal(0), z.literal(1)]),
-  finalidade_emissao: z.union([
-    z.literal(1),
-    z.literal(2),
-    z.literal(3),
-    z.literal(4),
-  ]),
+export const invoiceSchema = z
+  .object({
+    ref: z.string().optional(),
+    ambiente: z.enum(["1", "2"]),
+    order_id: z.string().uuid(),
+    numero: z.number().int().positive().optional(),
+    serie: z.string().optional(),
+    natureza_operacao: z.string().min(1, "Obrigatório"),
+    data_emissao: z.string(),
+    data_entrada_saida: z.string(),
+    tipo_documento: z.union([z.literal(0), z.literal(1)]),
+    finalidade_emissao: z.union([
+      z.literal(1),
+      z.literal(2),
+      z.literal(3),
+      z.literal(4),
+    ]),
 
-  cnpj_emitente: z.string(),
-  cpf_emitente: z.string().optional(),
-  nome_emitente: z.string(),
-  nome_fantasia_emitente: z.string(),
-  logradouro_emitente: z.string(),
-  numero_emitente: z.string(),
-  bairro_emitente: z.string(),
-  municipio_emitente: z.string(),
-  uf_emitente: z.string(),
-  cep_emitente: z.string(),
-  inscricao_estadual_emitente: z.string(),
+    cnpj_emitente: z.string(),
+    cpf_emitente: z.string().optional(),
+    nome_emitente: z.string(),
+    nome_fantasia_emitente: z.string(),
+    logradouro_emitente: z.string(),
+    numero_emitente: z.string(),
+    bairro_emitente: z.string(),
+    municipio_emitente: z.string(),
+    uf_emitente: z.string(),
+    cep_emitente: z.string(),
+    inscricao_estadual_emitente: z.string(),
 
-  nome_destinatario: z.string(),
-  // aceitar CPF **ou** CNPJ; aqui você pode ter dois campos (um deles vazio)
-  cpf_destinatario: z.string().optional(),
-  cnpj_destinatario: z.string().optional(),
-  inscricao_estadual_destinatario: z.string().nullable().optional(),
-  logradouro_destinatario: z.string(),
-  numero_destinatario: z.string(),
-  bairro_destinatario: z.string(),
-  municipio_destinatario: z.string(),
-  uf_destinatario: z.string(),
-  pais_destinatario: z.string(),
-  cep_destinatario: z.string(),
+    nome_destinatario: z.string(),
+    telefone_destinatario: z.string().optional(),
+    cpf_destinatario: z.string().optional(),
+    cnpj_destinatario: z.string().optional(),
+    inscricao_estadual_destinatario: z.string().nullable().optional(),
+    logradouro_destinatario: z.string(),
+    numero_destinatario: z.string(),
+    bairro_destinatario: z.string(),
+    municipio_destinatario: z.string(),
+    uf_destinatario: z.string(),
+    pais_destinatario: z.string(),
+    cep_destinatario: z.string(),
 
-  presenca_comprador: z.enum(["0", "1", "2", "3", "4", "9"]),
+    presenca_comprador: z.enum(["0", "1", "2", "3", "4", "9"]),
 
-  valor_frete: z.number(),
-  valor_seguro: z.number(),
-  valor_total: z.number(),
-  valor_produtos: z.number(),
-  modalidade_frete: z.union([
-    z.literal(0),
-    z.literal(1),
-    z.literal(2),
-    z.literal(3),
-    z.literal(4),
-    z.literal(9),
-  ]),
+    valor_frete: z.number(),
+    valor_seguro: z.number(),
+    valor_total: z.number(),
+    valor_produtos: z.number(),
+    modalidade_frete: z.union([
+      z.literal(0),
+      z.literal(1),
+      z.literal(2),
+      z.literal(3),
+      z.literal(4),
+      z.literal(9),
+    ]),
 
-  items: z.array(itemSchema),
-});
+    items: z.array(itemSchema).min(1, "A nota precisa ter pelo menos 1 item"),
+  })
+  .superRefine((data, ctx) => {
+    if (!data.cpf_destinatario && !data.cnpj_destinatario) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Informe cpf_destinatario ou cnpj_destinatario.",
+        path: ["cpf_destinatario"],
+      });
+    }
+  });

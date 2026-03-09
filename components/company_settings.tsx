@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -9,9 +10,17 @@ import { supabase } from "@/lib/supabase";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import Image from "next/image";
 import { PasswordInput } from "./ui/password-input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function CompanySettingsForm() {
   const { companyId } = useAuthenticatedCompany();
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [logoUrl, setLogoUrl] = useState("/default-logo.png");
@@ -31,6 +40,7 @@ export default function CompanySettingsForm() {
     phone: "",
     email: "",
     state_registration: "",
+    regime_tributario: "",
   });
 
   useEffect(() => {
@@ -61,6 +71,7 @@ export default function CompanySettingsForm() {
         phone: data.phone ?? "",
         email: data.email ?? "",
         state_registration: data.state_registration ?? "",
+        regime_tributario: data.regime_tributario ?? "",
       });
       if (data.logo_url) {
         setLogoUrl(data.logo_url);
@@ -138,13 +149,20 @@ export default function CompanySettingsForm() {
   };
 
   const handleSubmit = async () => {
-    setLoading(true);
-    let uploadedLogoUrl = logoUrl;
+    if (!companyId) {
+      toast.error("Empresa não identificada.");
+      return;
+    }
+    try {
+      setLoading(true);
+
+      let uploadedLogoUrl = logoUrl;
 
     if (logoFile) {
       const url = await handleLogoUpload();
       if (url) uploadedLogoUrl = url;
     }
+
     const toIntOrNull = (v: string) => {
       const s = v.trim();
       if (!s) return null;
@@ -161,12 +179,13 @@ export default function CompanySettingsForm() {
       neighborhood: formData.neighborhood.trim() || null,
       city: formData.city.trim() || null,
       state: formData.state.trim() || null,
-      number: toIntOrNull(formData.number), // ✅ evita "" em integer
+      number: toIntOrNull(formData.number),
       complement: formData.complement.trim() || null,
       phone: formData.phone.trim() || null,
       email: formData.email.trim() || null,
       state_registration: formData.state_registration.trim() || null,
       logo_url: uploadedLogoUrl,
+      regime_tributario: String(formData.regime_tributario) || null,
     };
 
     const { error } = await supabase
@@ -177,12 +196,18 @@ export default function CompanySettingsForm() {
     if (error) {
       toast.error("Erro ao salvar empresa.");
       console.error(error);
-      setLoading(false);
       return;
     }
 
     toast.success("Dados da empresa atualizados com sucesso");
-  };
+    router.refresh();
+  } catch (err) {
+    console.error("Erro inesperado ao salvar empresa:", err);
+    toast.error("Erro inesperado ao salvar empresa.");
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="space-y-4 py-8">
@@ -312,6 +337,31 @@ export default function CompanySettingsForm() {
           <Label className="mb-2">ID da Sua Empresa</Label>
           <PasswordInput value={companyId ?? ""} readOnly />
         </div>
+       
+       <div>
+  <Label className="mb-2">Regime Tributário</Label>
+
+  <Select
+    value={formData.regime_tributario ?? ""}
+    onValueChange={(value) =>
+      setFormData((prev) => ({ ...prev, regime_tributario: value }))
+    }
+  >
+    <SelectTrigger className="w-full">
+      <SelectValue placeholder="Regime tributário" />
+    </SelectTrigger>
+    <SelectContent>
+      <SelectItem value="1">Simples Nacional</SelectItem>
+      <SelectItem value="2">
+        Simples Nacional — excesso de sublimite
+      </SelectItem>
+      <SelectItem value="3">
+        Regime Normal (Lucro Presumido / Lucro Real)
+      </SelectItem>
+    </SelectContent>
+  </Select>
+</div>
+
       </div>
       <Button onClick={handleSubmit} disabled={loading} className="mt-4">
         {loading ? "Salvando..." : "Salvar Empresa"}

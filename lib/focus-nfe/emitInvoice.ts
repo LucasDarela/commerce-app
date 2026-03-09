@@ -1,6 +1,5 @@
 // lib/focus-nfe/emitInvoice.ts
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { buildPisFields, buildCofinsFields } from "./buildTaxes";
 
 type EmitParams = {
   companyId: string;
@@ -74,7 +73,7 @@ export async function emitInvoice({
     .maybeSingle();
 
   const crt = Number(comp?.regime_tributario);
-  const isSN = crt === 1 || crt === 4;
+const isSN = crt === 1 || crt === 2 || crt === 4;
 
   // 3) Normalizações de emitente/destinatário
   if (invoiceData?.emitente?.cpf_cnpj)
@@ -155,6 +154,7 @@ export async function emitInvoice({
       descricao: it.descricao,
       cfop: it.cfop,
       codigo_ncm: it.codigo_ncm,
+      codigo_cest: it.codigo_cest,
       unidade_comercial: it.unidade_comercial,
       quantidade_comercial: it.quantidade_comercial,
       valor_unitario_comercial: it.valor_unitario_comercial,
@@ -164,24 +164,31 @@ export async function emitInvoice({
       valor_bruto_produto: it.valor_bruto ?? it.valor_bruto_produto,
       valor_frete: freightParts[idx] ?? 0,
       icms_origem: String(it.icms_origem ?? "0"),
-      icms_situacao_tributaria: String(it.icms_situacao_tributaria ?? ""),
+
+      ...(isSN
+        ? {
+            csosn_icms: String(it.csosn_icms ?? "102"),
+          }
+        : {
+            icms_situacao_tributaria: String(it.icms_situacao_tributaria ?? "00"),
+          }),
 
       pis_situacao_tributaria: String(
         it.pis_situacao_tributaria ?? "",
       ).padStart(2, "0"),
       cofins_situacao_tributaria: String(
-        it.cofins_situicao_tributaria ?? it.cofins_situacao_tributaria ?? "",
+        it.cofins_situacao_tributaria ?? "",
       ).padStart(2, "0"),
 
       // Campos ST (somente se houver)
-      ...(String(it.icms_situacao_tributaria) === "60"
-        ? {
-            vbc_st_ret: Number(it.vbc_st_ret),
-            pst: Number(it.pst),
-            vicms_substituto: Number(it.vicms_substituto),
-            vicms_st_ret: Number(it.vicms_st_ret),
-          }
-        : {}),
+    ...((!isSN && String(it.icms_situacao_tributaria) === "60")
+      ? {
+          vbc_st_ret: Number(it.vbc_st_ret),
+          pst: Number(it.pst),
+          vicms_substituto: Number(it.vicms_substituto),
+          vicms_st_ret: Number(it.vicms_st_ret),
+        }
+      : {}),
     })),
   };
 
@@ -193,20 +200,21 @@ export async function emitInvoice({
   // 6) Sanitize: remove undefined/null
   const finalPayload = JSON.parse(JSON.stringify({ ...payload }));
 
-  for (const it of payload.itens) {
-    if (String(it.icms_situacao_tributaria) === "60") {
-      const falta =
-        it.vbc_st_ret == null ||
-        it.pst == null ||
-        it.vicms_substituto == null ||
-        it.vicms_st_ret == null;
-      if (falta) {
-        throw new Error(
-          "ICMS 60 (ST) sem os campos obrigatórios: vbc_st_ret, pst, vicms_substituto, vicms_st_ret.",
-        );
-      }
+for (const it of payload.itens) {
+if (!isSN && String((it as any).icms_situacao_tributaria) === "60") {
+    const falta =
+      it.vbc_st_ret == null ||
+      it.pst == null ||
+      it.vicms_substituto == null ||
+      it.vicms_st_ret == null;
+
+    if (falta) {
+      throw new Error(
+        "ICMS 60 (ST) sem os campos obrigatórios: vbc_st_ret, pst, vicms_substituto, vicms_st_ret.",
+      );
     }
   }
+}
 
   // (debug opcional)
   console.log(

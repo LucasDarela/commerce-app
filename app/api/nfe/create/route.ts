@@ -81,66 +81,64 @@ export async function POST(req: Request) {
       );
     }
 
-    // 2) MESMO note_number + série (bloqueio forte)
-    const { data: dup } = await supabase
-      .from("invoices")
-      .select("id, status, ref, numero")
-      .eq("company_id", companyId)
-      .eq("serie", invoiceData.serie)
-      .eq("note_number", invoiceData.note_number)
-      .in("status", ATIVOS)
-      .maybeSingle();
+const { data: previous } = await supabase
+  .from("invoices")
+  .select("id, numero, serie, ref, status, created_at")
+  .eq("company_id", companyId)
+  .eq("order_id", invoiceData.order_id)
+  .order("created_at", { ascending: false })
+  .limit(1);
 
-    if (dup) {
-      return NextResponse.json(
-        { error: "NF-e já emitida para este número/série.", ref: dup.ref },
-        { status: 409 },
-      );
-    }
+const prev = previous?.[0];
+const isRetry =
+  prev?.status === "nota_rejeitada" || prev?.status === "erro_autorizacao";
 
-    const { data: previous } = await supabase
-      .from("invoices")
-      .select("id, numero, serie, ref, status, created_at")
-      .eq("company_id", companyId)
-      .eq("order_id", invoiceData.order_id)
-      .order("created_at", { ascending: false })
-      .limit(1);
+// garanta série antes de validar duplicidade por série
+invoiceData.serie = invoiceData.serie || prev?.serie || "1";
 
-    const prev = previous?.[0];
-    const isRetry =
-      prev?.status === "nota_rejeitada" || prev?.status === "erro_autorizacao";
+// garanta note_number antes de validar duplicidade
+if (!invoiceData.note_number && invoiceData.order_id) {
+  const { data: o } = await supabase
+    .from("orders")
+    .select("note_number")
+    .eq("id", invoiceData.order_id)
+    .maybeSingle();
 
-    // garanta serie
-    invoiceData.serie = prev?.serie || "1";
+  if (o?.note_number) {
+    invoiceData.note_number = o.note_number;
+  }
+}
 
-    // garanta note_number (buscando pela order, se precisar)
-    if (!invoiceData.note_number && invoiceData.order_id) {
-      const { data: o } = await supabase
-        .from("orders")
-        .select("note_number")
-        .eq("id", invoiceData.order_id)
-        .maybeSingle();
-      if (o?.note_number) {
-        invoiceData.note_number = o.note_number;
-      }
-    }
+if (!invoiceData.note_number) {
+  return NextResponse.json(
+    { error: "note_number é obrigatório para emissão idempotente" },
+    { status: 400 },
+  );
+}
 
-    // garanta que temos note_number antes (já feito acima)
-    if (!invoiceData.note_number) {
-      return NextResponse.json(
-        { error: "note_number é obrigatório para emissão idempotente" },
-        { status: 400 },
-      );
-    }
+// 2) MESMO note_number + série
+const { data: dup } = await supabase
+  .from("invoices")
+  .select("id, status, ref, numero")
+  .eq("company_id", companyId)
+  .eq("serie", invoiceData.serie)
+  .eq("note_number", invoiceData.note_number)
+  .in("status", ATIVOS)
+  .maybeSingle();
 
-    // baseRef determinística por note_number ou order_id
-    const baseRef = invoiceData.note_number
-      ? `${invoiceData.note_number}`
-      : `${invoiceData.order_id}`;
+if (dup) {
+  return NextResponse.json(
+    { error: "NF-e já emitida para este número/série.", ref: dup.ref },
+    { status: 409 },
+  );
+}
 
-    // ref: se for retry, reutiliza a anterior; senão, gera fixa por base + série
-    invoiceData.ref =
-      isRetry && prev?.ref ? prev.ref : `${baseRef}_s${invoiceData.serie}`;
+// baseRef determinística por note_number ou order_id
+const baseRef = `${invoiceData.note_number}`;
+
+// ref: se for retry, reutiliza a anterior; senão, gera fixa por base + série
+invoiceData.ref =
+  isRetry && prev?.ref ? prev.ref : `${baseRef}_s${invoiceData.serie}`;
 
     console.log("[NFe create] ref gerada:", invoiceData.ref, {
       isRetry,

@@ -28,12 +28,24 @@ type UiProduct = {
   returnedQty: number;
   netQty: number;
   price: number;
+
+  ncm?: string | null;
+  cest?: string | null;
+  cfop?: string | null;
+  icms_origem?: string | null;
+  cst_icms?: string | null;
+  csosn_icms?: string | null;
+  icms_situacao_tributaria?: string | null;
+  pis?: string | null;
+  cofins?: string | null;
+  ipi?: string | null;
 };
 
 export default function EmitNfePage() {
-  const { id } = useParams();
+  const params = useParams();
+const id = Array.isArray(params.id) ? params.id[0] : params.id;
   const { companyId } = useAuthenticatedCompany();
-  const supabase = createClientComponentClient();
+  const supabase = useMemo(() => createClientComponentClient(), []);
 
   const [order, setOrder] = useState<any>(null);
   const [products, setProducts] = useState<UiProduct[]>([]);
@@ -61,12 +73,32 @@ export default function EmitNfePage() {
       }
 
       // 2) Itens do pedido
-      const { data: items, error: itemsErr } = await supabase
-        .from("order_items")
-        .select(
-          "id, order_id, product_id, quantity, price, products(id, name, code, unit)",
-        )
-        .eq("order_id", id);
+const { data: items, error: itemsErr } = await supabase
+  .from("order_items")
+  .select(`
+    id,
+    order_id,
+    product_id,
+    quantity,
+    price,
+    products (
+      id,
+      name,
+      code,
+      unit,
+      ncm,
+      cest,
+      cfop,
+      icms_origem,
+      cst_icms,
+      csosn_icms,
+      icms_situacao_tributaria,
+      pis,
+      cofins,
+      ipi
+    )
+  `)
+  .eq("order_id", id);
 
       if (itemsErr) {
         console.error(itemsErr);
@@ -131,24 +163,35 @@ export default function EmitNfePage() {
         returnedByProduct.set(pid, (returnedByProduct.get(pid) ?? 0) + qty);
       }
 
-      const uiProducts: UiProduct[] = (items ?? []).map((i: any) => {
-        const pid = String(i.product_id);
-        const soldQty = Number(i.quantity ?? 0);
-        const returnedQty = Number(returnedByProduct.get(pid) ?? 0);
-        const netQty = Math.max(soldQty - returnedQty, 0);
+const uiProducts: UiProduct[] = (items ?? []).map((i: any) => {
+  const pid = String(i.product_id);
+  const soldQty = Number(i.quantity ?? 0);
+  const returnedQty = Number(returnedByProduct.get(pid) ?? 0);
+  const netQty = Math.max(soldQty - returnedQty, 0);
 
-        return {
-          item_id: String(i.id),
-          product_id: pid,
-          code: String(i.products?.code ?? pid),
-          name: String(i.products?.name ?? "Produto"),
-          unit: String(i.products?.unit ?? "UN"),
-          soldQty,
-          returnedQty,
-          netQty,
-          price: Number(i.price ?? 0),
-        };
-      });
+  return {
+    item_id: String(i.id),
+    product_id: pid,
+    code: String(i.products?.code ?? pid),
+    name: String(i.products?.name ?? "Produto"),
+    unit: String(i.products?.unit ?? "UN"),
+    soldQty,
+    returnedQty,
+    netQty,
+    price: Number(i.price ?? 0),
+
+    ncm: i.products?.ncm ?? null,
+    cest: i.products?.cest ?? null,
+    cfop: i.products?.cfop ?? null,
+    icms_origem: i.products?.icms_origem ?? null,
+    cst_icms: i.products?.cst_icms ?? null,
+    csosn_icms: i.products?.csosn_icms ?? null,
+    icms_situacao_tributaria: i.products?.icms_situacao_tributaria ?? null,
+    pis: i.products?.pis ?? null,
+    cofins: i.products?.cofins ?? null,
+    ipi: i.products?.ipi ?? null,
+  };
+});
 
       setProducts(uiProducts);
     };
@@ -186,66 +229,171 @@ export default function EmitNfePage() {
       );
     }
 
+    // 🔴 valida NCM
+const invalidProductNcm = produtosParaNfe.find((p) => {
+  const ncm = String(p.ncm ?? "").replace(/\D/g, "");
+  return ncm.length !== 8;
+});
+
+if (invalidProductNcm) {
+  toast.error(`O produto ${invalidProductNcm.name} está sem NCM cadastrado.`);
+  return;
+}
+
+// 🔴 valida CFOP
+const invalidProductCfop = produtosParaNfe.find((p) => {
+  const cfop = String(p.cfop || operacaoFiscal.cfop || "").replace(/\D/g, "");
+  return cfop.length !== 4;
+});
+
+if (invalidProductCfop) {
+  toast.error(`O produto ${invalidProductCfop.name} está com CFOP inválido.`);
+  return;
+}
+
+// 🔴 valida PIS
+const invalidProductPis = produtosParaNfe.find((p) => {
+  const pis = String(p.pis ?? "").replace(/\D/g, "");
+  return pis.length !== 2;
+});
+
+if (invalidProductPis) {
+  toast.error(`O produto ${invalidProductPis.name} está com PIS inválido.`);
+  return;
+}
+
+// 🔴 valida COFINS
+const invalidProductCofins = produtosParaNfe.find((p) => {
+  const cofins = String(p.cofins ?? "").replace(/\D/g, "");
+  return cofins.length !== 2;
+});
+
+if (invalidProductCofins) {
+  toast.error(`O produto ${invalidProductCofins.name} está com COFINS inválido.`);
+  return;
+}
+
+const regime = String(emissor.regime_tributario ?? "");
+
+if (regime === "1" || regime === "2" || regime === "4") {
+  const invalidProductCsosn = produtosParaNfe.find((p) => {
+    const csosn = String(p.csosn_icms ?? "").replace(/\D/g, "");
+    return csosn.length !== 3;
+  });
+
+  if (invalidProductCsosn) {
+    toast.error(`O produto ${invalidProductCsosn.name} está sem CSOSN cadastrado.`);
+    return;
+  }
+} else {
+const invalidProductCst = produtosParaNfe.find((p) => {
+  const cst = String(p.icms_situacao_tributaria ?? p.cst_icms ?? "").replace(/\D/g, "");
+  return cst.length < 2 || cst.length > 3;
+});
+
+  if (invalidProductCst) {
+    toast.error(`O produto ${invalidProductCst.name} está sem CST ICMS cadastrado.`);
+    return;
+  }
+}
+const invalidProductOrigem = produtosParaNfe.find((p) => {
+  const origem = String(p.icms_origem ?? "").trim();
+  return !["0", "1", "2", "3", "4", "5", "6", "7", "8"].includes(origem);
+});
+
+if (invalidProductOrigem) {
+  toast.error(`O produto ${invalidProductOrigem.name} está com origem do ICMS inválida.`);
+  return;
+}
+
     setLoading(true);
 
     try {
       const hoje = format(new Date(), "yyyy-MM-dd");
 
-      const icmsCode = String(
-        operacaoFiscal.icms_situacao_tributaria ?? "",
-      ).trim();
+      const isSimples = regime === "1" || regime === "2" || regime === "4";
 
-      if (icmsCode === "60") {
-        const faltaST =
-          operacaoFiscal.vbc_st_ret == null ||
-          operacaoFiscal.pst == null ||
-          operacaoFiscal.vicms_substituto == null ||
-          operacaoFiscal.vicms_st_ret == null;
+const hasIcms60 = !isSimples && produtosParaNfe.some((p) => {
+  const code = String(
+    p.icms_situacao_tributaria ?? p.cst_icms ?? "",
+  ).trim();
+  return code === "60";
+});
 
-        if (faltaST) {
-          toast.error(
-            "Para ICMS 60 (ST) é obrigatório informar vbc_st_ret, pst, vicms_substituto e vicms_st_ret.",
-          );
-          setLoading(false);
-          return;
+if (hasIcms60) {
+  const faltaST =
+    operacaoFiscal.vbc_st_ret == null ||
+    operacaoFiscal.pst == null ||
+    operacaoFiscal.vicms_substituto == null ||
+    operacaoFiscal.vicms_st_ret == null;
+
+  if (faltaST) {
+    toast.error(
+      "Existe produto com ICMS 60. Preencha na operação fiscal: vbc_st_ret, pst, vicms_substituto e vicms_st_ret.",
+    );
+    return;
+  }
+}
+
+const customerDocumentDigits = String(customer.document ?? "").replace(/\D/g, "");
+
+const isCpf = customerDocumentDigits.length === 11;
+const isCnpj = customerDocumentDigits.length === 14;
+
+if (!isCpf && !isCnpj) {
+  toast.error("Cliente inválido: CPF/CNPJ inválido.");
+  return;
+} 
+
+const items = produtosParaNfe.map((p, index) => {
+  const cfop = String(p.cfop || operacaoFiscal.cfop || "").replace(/\D/g, "");
+const ncm = String(p.ncm || "").replace(/\D/g, "");
+const cest = String(p.cest || "").replace(/\D/g, "");
+const pis = String(p.pis ?? "").replace(/\D/g, "");
+const cofins = String(p.cofins ?? "").replace(/\D/g, "");
+  const icmsItem = String(
+    p.icms_situacao_tributaria ?? p.cst_icms ?? "",
+  ).trim();
+
+  const csosnItem = String(p.csosn_icms ?? "").trim();
+
+  return {
+    numero_item: index + 1,
+    codigo_produto: String(p.code ?? ""),
+    descricao: p.name ?? "",
+cfop: cfop,
+    unidade_comercial: p.unit ?? "UN",
+    quantidade_comercial: Number(p.netQty),
+    valor_unitario_comercial: Number(p.price),
+    valor_unitario_tributavel: Number(p.price),
+    unidade_tributavel: p.unit ?? "UN",
+codigo_ncm: ncm,
+codigo_cest: cest || undefined, 
+    quantidade_tributavel: Number(p.netQty),
+    valor_bruto: Number(p.price) * Number(p.netQty),
+    icms_origem: String(p.icms_origem ?? "0"),
+
+    ...(regime === "1" || regime === "2" || regime === "4"
+      ? {
+          csosn_icms: csosnItem || "102",
         }
-      }
+      : {
+          icms_situacao_tributaria: icmsItem || "00",
+        }),
 
-      // Itens para Focus: use netQty e valor bruto líquido
-      const items = produtosParaNfe.map((p, index) => ({
-        numero_item: index + 1,
-        codigo_produto: String(p.code ?? ""),
-        descricao: p.name ?? "",
-        cfop: String(operacaoFiscal.cfop).padStart(4, "0"),
-        unidade_comercial: p.unit ?? "UN",
-        quantidade_comercial: Number(p.netQty),
-        valor_unitario_comercial: Number(p.price),
-        valor_unitario_tributavel: Number(p.price),
-        unidade_tributavel: p.unit ?? "UN",
-        codigo_ncm: String(operacaoFiscal.ncm).padStart(8, "0"),
-        quantidade_tributavel: Number(p.netQty),
-        valor_bruto: Number(p.price) * Number(p.netQty),
+pis_situacao_tributaria: pis.padStart(2, "0"),
+cofins_situacao_tributaria: cofins.padStart(2, "0"),
 
-        icms_origem: String(operacaoFiscal.icms_origem ?? "0"),
-        icms_situacao_tributaria: icmsCode,
-
-        pis_situacao_tributaria: String(operacaoFiscal.pis ?? "").padStart(
-          2,
-          "0",
-        ),
-        cofins_situacao_tributaria: String(
-          operacaoFiscal.cofins ?? "",
-        ).padStart(2, "0"),
-
-        ...(icmsCode === "60"
-          ? {
-              vbc_st_ret: Number(operacaoFiscal.vbc_st_ret),
-              pst: Number(operacaoFiscal.pst),
-              vicms_substituto: Number(operacaoFiscal.vicms_substituto),
-              vicms_st_ret: Number(operacaoFiscal.vicms_st_ret),
-            }
-          : {}),
-      }));
+...(!isSimples && icmsItem === "60"
+  ? {
+      vbc_st_ret: Number(operacaoFiscal.vbc_st_ret),
+      pst: Number(operacaoFiscal.pst),
+      vicms_substituto: Number(operacaoFiscal.vicms_substituto),
+      vicms_st_ret: Number(operacaoFiscal.vicms_st_ret),
+    }
+  : {}),
+  };
+});
 
       const invoiceData = {
         ambiente: "1",
@@ -278,9 +426,9 @@ export default function EmitNfePage() {
         uf_emitente: emissor.state,
         cep_emitente: emissor.zip_code?.replace(/\D/g, "") ?? "",
 
-        ...(customer.document?.replace(/\D/g, "").length === 14
-          ? { cnpj_destinatario: customer.document.replace(/\D/g, "") }
-          : { cpf_destinatario: customer.document.replace(/\D/g, "") }),
+...(isCnpj
+  ? { cnpj_destinatario: customerDocumentDigits }
+  : { cpf_destinatario: customerDocumentDigits }),
 
         nome_destinatario: customer.name,
         telefone_destinatario: String(customer.phone ?? "")
@@ -355,7 +503,7 @@ export default function EmitNfePage() {
       <p>Revise os dados antes de emitir a nota</p>
 
       <Label>Tipo de Operação Fiscal</Label>
-      <Select onValueChange={setSelectedOperation}>
+      <Select value={selectedOperation} onValueChange={setSelectedOperation}>
         <SelectTrigger>
           <SelectValue placeholder="Selecione uma operação fiscal" />
         </SelectTrigger>
