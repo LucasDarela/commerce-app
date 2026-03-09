@@ -1538,13 +1538,13 @@ function clearAllFilters() {
           </svg>
         </div>
       )}
-      <div className="w-full flex justify-between items-center px-4 lg:px-6 my-2">
-  <div className="flex items-center gap-3">
-    <h2 className="text-xl font-bold">Vendas</h2>
-    <Badge variant="secondary" className="text-sm">
-      Total: {formattedFilteredSalesTotal}
-    </Badge>
-  </div>
+      <div className="w-full flex justify-between items-start px-4 lg:px-6 my-2">
+        <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3">
+          <h2 className="text-xl font-bold">Vendas</h2>
+          <Badge variant="secondary" className="text-sm w-fit">
+            Total:{formattedFilteredSalesTotal}
+          </Badge>
+        </div>
         {/* Botão Adicionar */}
         <div className="flex gap-2">
           <DropdownMenu>
