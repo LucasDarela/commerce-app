@@ -215,10 +215,10 @@ if (!isSN && String((it as any).icms_situacao_tributaria) === "60") {
 }
 
   // (debug opcional)
-  console.log(
-    "[FOCUS PAYLOAD]",
-    JSON.stringify({ ref, ...finalPayload }, null, 2),
-  );
+  // console.log(
+  //   "[FOCUS PAYLOAD]",
+  //   JSON.stringify({ ref, ...finalPayload }, null, 2),
+  // );
 
   const sumFreightItems = payload.itens.reduce(
     (s: number, it: any) => s + Number(it.valor_frete || 0),
