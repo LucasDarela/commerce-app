@@ -19,7 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
-import { supabase } from "@/lib/supabase";
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { toast } from "sonner";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -79,8 +79,14 @@ type LineItem = {
   standard_price: number;
 };
 
+type Driver = {
+  id: string;
+  name: string;
+};
+
 export default function AddOrder() {
   const router = useRouter();
+  const supabase = React.useMemo(() => createClientComponentClient(), []);
   const { companyId } = useAuthenticatedCompany();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
@@ -125,6 +131,10 @@ export default function AddOrder() {
   const dueDate = order?.due_date
     ? format(parseISO(order.due_date), "dd/MM/yyyy")
     : "";
+
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
+  const driverValue = selectedDriverId ?? "none";
 
   useEffect(() => {
     if (!appointment.date) return;
@@ -185,6 +195,33 @@ export default function AddOrder() {
 
     prepareNote();
   }, [companyId, order?.document_type]);
+
+useEffect(() => {
+  const fetchDrivers = async () => {
+    if (!companyId) return;
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, username, email")
+      .eq("company_id", companyId)
+      .order("username", { ascending: true });
+
+    if (error) {
+      console.error("Erro ao buscar motoristas:", error);
+      toast.error("Erro ao carregar motoristas.");
+      return;
+    }
+
+    const mappedDrivers: Driver[] = (data ?? []).map((p: any) => ({
+      id: p.id,
+      name: p.username || p.email || "Sem nome",
+    }));
+
+    setDrivers(mappedDrivers);
+  };
+
+  fetchDrivers();
+}, [companyId, supabase]);
 
   const filteredCustomers = searchCustomer.trim()
     ? customers.filter(
@@ -341,6 +378,7 @@ export default function AddOrder() {
             : "1",
         total,
         freight,
+        driver_id: selectedDriverId,
         delivery_status: "Entregar",
         appointment_date: appointment.date
           ? format(appointment.date, "yyyy-MM-dd")
@@ -897,25 +935,50 @@ export default function AddOrder() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 items-center mt-4">
-            <Input
-              type="text"
-              placeholder="Local da Entrega"
-              value={appointment.location}
-              onChange={(e) =>
-                setAppointment({ ...appointment, location: e.target.value })
-              }
-            />
-            <Input
-              type="number"
-              placeholder="Frete"
-              value={freight === 0 ? "" : freight}
-              onChange={(e) => {
-                const value = e.target.value;
-                setFreight(value === "" ? 0 : Number(value));
-              }}
-            />
-          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center mt-4">
+  <Input
+    type="text"
+    placeholder="Local da Entrega"
+    value={appointment.location}
+    onChange={(e) =>
+      setAppointment({ ...appointment, location: e.target.value })
+    }
+  />
+
+  <Input
+    type="number"
+    placeholder="Frete"
+    value={freight === 0 ? "" : freight}
+    onChange={(e) => {
+      const value = e.target.value;
+      setFreight(value === "" ? 0 : Number(value));
+    }}
+  />
+
+<Select
+  value={driverValue}
+  onValueChange={(value) =>
+    setSelectedDriverId(value === "none" ? null : value)
+  }
+>
+  <SelectTrigger
+    className={`w-full ${driverValue === "none" ? "text-muted-foreground" : ""}`}
+  >
+    <SelectValue />
+  </SelectTrigger>
+
+  <SelectContent>
+    <SelectItem value="none">Selecione o Motorista</SelectItem>
+
+    {drivers.map((driver) => (
+      <SelectItem key={driver.id} value={driver.id}>
+        {driver.name}
+      </SelectItem>
+    ))}
+  </SelectContent>
+</Select>
+</div>
 
           <div className="flex mt-4">
             <Textarea

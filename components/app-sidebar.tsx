@@ -4,6 +4,7 @@ import * as React from "react";
 import NavUserWrapper from "@/components/nav-user-wrapper";
 import Link from "next/link";
 import { CompanyBrand } from "@/components/company-brand";
+import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import {
   IconChartBar,
   IconDashboard,
@@ -123,6 +124,24 @@ const data = {
 };
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { role } = useAuthenticatedCompany();
+
+  const navMainTop =
+  role === "motorista"
+    ? data.navMainTop.filter(
+        (item) =>
+          item.url !== "/dashboard" &&
+          item.url !== "/dashboard/financial"
+      )
+    : data.navMainTop;
+
+const navSecondary =
+  role === "motorista"
+    ? data.navSecondary.filter(
+        (item) => item.url !== "/dashboard/settings"
+      )
+    : data.navSecondary;
+
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
@@ -153,12 +172,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             </Link>
           </SidebarMenuItem>
         </SidebarMenu>
-        <NavMain items={data.navMainTop} />
+        <NavMain items={navMainTop} />
         <div className="my-2 h-px bg-border shrink-0" />
         <NavMain items={data.navMainBottom} />
 
         <NavDocumentsSidebar />
-        <NavSecondary items={data.navSecondary} className="mt-auto" />
+        <NavSecondary items={navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
         <NavUserWrapper />

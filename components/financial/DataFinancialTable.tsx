@@ -257,25 +257,6 @@ export default function DataFinancialTable() {
     });
   }, [groupedByMonth]);
 
-  // const [selectedMonth, setSelectedMonth] = useState(() => {
-  //   const now = new Date();
-  //   const month = String(now.getMonth() + 1).padStart(2, "0");
-  //   const year = String(now.getFullYear());
-  //   return `${month}/${year}`;
-  // });
-
-  // const [sorting, setSorting] = React.useState<SortingState>([]);
-  // const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-  //   [],
-  // );
-  // const [rowSelection, setRowSelection] = React.useState({});
-
-  // // ✅ Range do filtro due_date (controlado no pai)
-  // const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([
-  //   null,
-  //   null,
-  // ]);
-  // const STORAGE_KEY = "financial_table_state_v3:global";
   const STORAGE_KEY = "financial_table_state_v3:global";
 
   const [sorting, setSorting] = React.useState<SortingState>([]);

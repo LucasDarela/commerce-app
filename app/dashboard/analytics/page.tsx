@@ -1,4 +1,4 @@
-import ReportsPage from "@/components/analytics/reportsPage";
+import ReportsPage from "@/components/analytics/ReportsPage";
 
 export default function Analytics() {
   return (

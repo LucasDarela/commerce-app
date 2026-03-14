@@ -116,6 +116,15 @@ import { TableSkeleton } from "./ui/TableSkeleton";
 import { orderSchema, type Order } from "@/components/types/orderSchema";
 import EmitNfeMenuItem from "./nf/EmitNfeMenuItem";
 import { DeleteOrderButton } from "@/components/orders/DeleteOrderButton";
+import {
+  canCreateOrder,
+  canAssignDriver,
+  canHandlePayment,
+  canEmitNfe,
+  canEditOrder,
+  canDeleteOrder,
+  canViewFinancial,
+} from "@/lib/permissions";
 
 type Sale = z.infer<typeof orderSchema>;
 
@@ -273,7 +282,7 @@ export function DataTable({
   const [selectedCustomer, setSelectedCustomer] = React.useState<Sale | null>(
     null,
   );
-  const { user } = useAuthenticatedCompany();
+  const { user, role } = useAuthenticatedCompany();
   const [sheetOpen, setSheetOpen] = React.useState(false);
 const supabase = React.useMemo(() => createClientComponentClient(), []);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -297,6 +306,7 @@ type PersistedOrdersFilters = {
   dateRange: [string | null, string | null];
   issueDate: string | null;
   sorting: SortingState;
+  selectedDriverId: string | null;
 };
 
   function safeParseJSON<T>(value: string | null): T | null {
@@ -361,6 +371,16 @@ type PersistedOrdersFilters = {
 
   const [startDate, endDate] = dateRange;
 
+  const [selectedDriverId, setSelectedDriverId] = useState<string | null>(() => {
+  if (typeof window === "undefined") return null;
+
+  const saved = safeParseJSON<PersistedOrdersFilters>(
+    localStorage.getItem(FILTERS_KEY),
+  );
+
+  return saved?.selectedDriverId ?? null;
+});
+
     const defaultSorting: SortingState = [
   { id: "appointment_date", desc: true },
 ];
@@ -388,6 +408,7 @@ const [sorting, setSorting] = React.useState<SortingState>(() => {
       ],
       issueDate: issueDateFilter ? toLocalISODate(issueDateFilter) : null,
       sorting,
+      selectedDriverId, 
     };
 
     localStorage.setItem(FILTERS_KEY, JSON.stringify(payload));
@@ -400,6 +421,7 @@ const [sorting, setSorting] = React.useState<SortingState>(() => {
     endDate,
     issueDateFilter,
     sorting,  
+    selectedDriverId,
   ]);
 
   // filtros salvos em cache no localStorage
@@ -436,31 +458,34 @@ const [sorting, setSorting] = React.useState<SortingState>(() => {
   // driver select
 
   const [drivers, setDrivers] = useState<Driver[]>([]);
-  useEffect(() => {
-    async function fetchDrivers() {
-      if (!companyId) return;
+useEffect(() => {
+  async function fetchDrivers() {
+    if (!companyId) return;
 
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, username, email")
-        .eq("company_id", companyId)
-        .order("username", { ascending: true });
+    // motorista não precisa carregar lista de motoristas
+    if (role === "motorista") return;
 
-      if (error) {
-        console.error("Erro ao buscar motoristas (profiles):", error);
-        return;
-      }
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, username, email")
+      .eq("company_id", companyId)
+      .order("username", { ascending: true });
 
-      setDrivers(
-        (data ?? []).map((p: any) => ({
-          id: p.id,
-          name: p.username || p.email || "Sem nome",
-        })),
-      );
+    if (error) {
+      console.error("Erro ao buscar motoristas:", error);
+      return;
     }
 
-    fetchDrivers();
-  }, [companyId]);
+    setDrivers(
+      (data ?? []).map((p: any) => ({
+        id: p.id,
+        name: p.username || p.email || "Sem nome",
+      }))
+    );
+  }
+
+  fetchDrivers();
+}, [companyId, role]);
 
   async function setOrderDriver(orderId: string, driverId: string | null) {
     const { data, error } = await supabase
@@ -841,73 +866,83 @@ const columns = React.useMemo<CustomColumnDef<Order>[]>(() => [
         return <NfeDot status={status} />;
       },
     },
+
     {
-      accessorKey: "customer",
-      header: "Cliente",
-      size: 200,
-      meta: { className: "w-[220px] truncate uppercase" },
-cell: ({ row }) => {
-  const order = row.original;
+  accessorKey: "customer",
+  header: "Cliente",
+  size: 200,
+  meta: { className: "w-[220px] truncate uppercase" },
+  filterFn: (row, columnId, filterValue) => {
+    const search = String(filterValue ?? "").trim().toLowerCase();
 
-  return (
-    <Button
-      variant="link"
-      className="p-0 text-left text-primary hover:underline"
-      onClick={() => {
-        setSelectedCustomer(order);
-        setSheetOpen(true);
-      }}
-    >
-      {order.customer}
-    </Button>
-  );
-}, 
-    },
+    if (!search) return true;
+
+    const customer = String(row.original.customer ?? "").toLowerCase();
+    const noteNumber = String(row.original.note_number ?? "").toLowerCase();
+
+    return customer.includes(search) || noteNumber.includes(search);
+  },
+  cell: ({ row }) => {
+    const order = row.original;
+
+    return (
+      <Button
+        variant="link"
+        className="p-0 text-left text-primary hover:underline"
+        onClick={() => {
+          setSelectedCustomer(order);
+          setSheetOpen(true);
+        }}
+      >
+        {order.customer}
+      </Button>
+    );
+  },
+},
     {
-      id: "driver",
-      header: "Motorista",
-      size: 160,
-      meta: { className: "w-[150px] truncate" },
-      cell: ({ row }) => {
-        const currentDriverId =
-          (row.original as any).driver_id === null ||
-          (row.original as any).driver_id === undefined
-            ? "none"
-            : String((row.original as any).driver_id);
+  id: "driver",
+  header: "Motorista",
+  size: 160,
+  meta: { className: "w-[150px] truncate" },
+  cell: ({ row }) => {
+    const canAssign = canAssignDriver(role);
 
-        return (
-          <div onClick={(e) => e.stopPropagation()}>
-            <Select
-              value={
-                row.original.driver_id == null
-                  ? "none"
-                  : String(row.original.driver_id)
-              }
-              onValueChange={(value) => {
-                const driverId = value === "none" ? null : value;
-                setOrderDriver(String(row.original.id), driverId);
-              }}
-            >
-              <SelectTrigger className="h-8">
-                <SelectValue placeholder="" />
-              </SelectTrigger>
+    return (
+      <div onClick={(e) => e.stopPropagation()}>
+        <Select
+          value={
+            row.original.driver_id == null
+              ? "none"
+              : String(row.original.driver_id)
+          }
+          onValueChange={(value) => {
+            if (!canAssign) return;
 
-              <SelectContent>
-                <SelectItem value="none">
-                  <span className="h-5 text-muted-foreground"></span>
-                </SelectItem>
+            const driverId = value === "none" ? null : value;
+            setOrderDriver(String(row.original.id), driverId);
+          }}
+          disabled={!canAssign}
+        >
+          <SelectTrigger className="h-8">
+            <SelectValue placeholder="" />
+          </SelectTrigger>
 
-                {drivers.map((d) => (
-                  <SelectItem key={d.id} value={String(d.id)}>
-                    {d.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        );
-      },
-    },
+          <SelectContent>
+            <SelectItem value="none">
+              <span className="h-5 text-muted-foreground"></span>
+            </SelectItem>
+
+            {drivers.map((d) => (
+              <SelectItem key={d.id} value={String(d.id)}>
+                {d.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    );
+  },
+},
     {
       accessorKey: "phone",
       header: "Tel",
@@ -1188,12 +1223,23 @@ cell: ({ row }) => {
   );
 
   const table = useReactTable<Order>({
-    data: React.useMemo(() => {
-return orders.filter((order) => {
-  if (!order.appointment_date) return false;
-  return order.appointment_date.startsWith(selectedMonth);
-});
-    }, [orders, selectedMonth]),
+data: React.useMemo(() => {
+  return orders.filter((order) => {
+    if (!order.appointment_date) return false;
+
+    // motorista logado só vê pedidos dele
+    if (role === "motorista" && order.driver_id !== user?.id) {
+      return false;
+    }
+
+    // filtro manual por motorista (admin)
+    if (selectedDriverId && order.driver_id !== selectedDriverId) {
+      return false;
+    }
+
+    return order.appointment_date.startsWith(selectedMonth);
+  });
+}, [orders, selectedMonth, role, user, selectedDriverId]),
     columns,
     state: {
       sorting,
@@ -1293,6 +1339,7 @@ function clearAllFilters() {
   setissueDateFilter(null);
   setSelectedDate(undefined);
   setDateInput("");
+  setSelectedDriverId(null);
   table.setPageIndex(0);
 }
 
@@ -1416,6 +1463,31 @@ function clearAllFilters() {
   }, [selectedCustomer]);
 
   useEffect(() => {
+  const [start, end] = dateRange;
+
+  if (start && end) {
+    table.getColumn("appointment_date")?.setFilterValue({
+      from: toLocalISODate(start),
+      to: toLocalISODate(end),
+    });
+  } else {
+    table.getColumn("appointment_date")?.setFilterValue(undefined);
+  }
+}, [dateRange, table]);
+
+  const sortValue =
+  sorting.length && sorting[0]?.id === "appointment_date"
+    ? sorting[0].desc
+      ? "default"
+      : "date_asc"
+    : "default";
+
+    const driverFilterValue =
+  role === "motorista"
+    ? (user?.id ?? "all")
+    : (selectedDriverId ?? "all");
+
+  useEffect(() => {
     if (!companyId) return;
 
     // garante que a tabela tenha Realtime habilitado no Supabase Dashboard
@@ -1492,21 +1564,13 @@ function clearAllFilters() {
     }
   };
 
-  const handleFilter = (range: [Date | null, Date | null]) => {
-    setDateRange(range);
+const handleFilter = (range: [Date | null, Date | null]) => {
+  setDateRange(range);
+};
 
-    const from = range[0] ? toLocalISODate(range[0]) : undefined;
-    const to = range[1] ? toLocalISODate(range[1]) : undefined;
-
-    table
-      .getColumn("appointment_date")
-      ?.setFilterValue(from && to ? { from, to } : undefined);
-  };
-
-  const clearFilter = () => {
-    setDateRange([null, null]);
-    table.getColumn("appointment_date")?.setFilterValue(undefined);
-  };
+const clearFilter = () => {
+  setDateRange([null, null]);
+};
 
   if (loading) {
     return <TableSkeleton />;
@@ -1541,9 +1605,11 @@ function clearAllFilters() {
       <div className="w-full flex justify-between items-start px-4 lg:px-6 my-2">
         <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3">
           <h2 className="text-xl font-bold">Vendas</h2>
-          <Badge variant="secondary" className="text-sm w-fit">
-            Total:{formattedFilteredSalesTotal}
-          </Badge>
+          {canViewFinancial(role) &&  (
+            <Badge variant="secondary" className="text-sm w-fit">
+              Total:{formattedFilteredSalesTotal}
+            </Badge>
+          )}
         </div>
         {/* Botão Adicionar */}
         <div className="flex gap-2">
@@ -1577,21 +1643,44 @@ function clearAllFilters() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Link href="/dashboard/orders/add">
-            <Button
-              variant="default"
-              size="sm"
-              className="min-w-[100px] bg-primary text-primary-foreground hover:bg-primary/90"
-            >
-              <IconPlus className="mr-1" />
-              <span className="hidden sm:inline">Venda</span>
-            </Button>
-          </Link>
+{canCreateOrder(role) ? (
+  <Link href="/dashboard/orders/add">
+    <Button
+      variant="default"
+      size="sm"
+      className="min-w-[100px] bg-primary text-primary-foreground hover:bg-primary/90"
+    >
+      <IconPlus className="mr-1" />
+      <span className="hidden sm:inline">Venda</span>
+    </Button>
+  </Link>
+) : (
+  <TooltipProvider>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span>
+          <Button
+            variant="default"
+            size="sm"
+            disabled
+            className="min-w-[100px] bg-primary text-primary-foreground opacity-50 cursor-not-allowed"
+          >
+            <IconPlus className="mr-1" />
+            <span className="hidden sm:inline">Venda</span>
+          </Button>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>
+        Apenas administradores podem criar vendas
+      </TooltipContent>
+    </Tooltip>
+  </TooltipProvider>
+)}
         </div>
       </div>
-      <div className="grid gap-2 px-4 lg:px-6 py-2 grid-cols-2 md:grid-cols-3 lg:grid-cols-7 items-center">
+  <div className="grid gap-2 px-4 lg:px-6 py-2 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 items-center">
         {/* Filtro por data */}
-        <div className="relative w-full sm:w-full md:max-w-[300px] z-50">
+<div className="relative w-full min-w-0 z-50">
           <DatePicker
             selectsRange
             startDate={startDate}
@@ -1605,6 +1694,7 @@ function clearAllFilters() {
             customInput={<CustomDateInput />}
             popperPlacement="bottom-start"
             popperClassName="z-[9999]"
+            wrapperClassName="w-full"
           />
 
           {(startDate || endDate) && (
@@ -1617,40 +1707,9 @@ function clearAllFilters() {
             </button>
           )}
         </div>
-
-        {/* <div className="relative w-full sm:w-full md:max-w-[250px] z-50">
-          <DatePicker
-            selected={issueDateFilter}
-            onChange={(date) => {
-              setissueDateFilter(date);
-              table
-                .getColumn("issue_date")
-                ?.setFilterValue(date ? toLocalISODate(date) : undefined);
-            }}
-            placeholderText="Filtrar por Emissão"
-            dateFormat="dd/MM/yyyy"
-            customInput={<CustomDateInput />}
-            popperPlacement="bottom-start"
-            popperClassName="z-[9999]"
-          />
-
-          {issueDateFilter && (
-            <button
-              type="button"
-              onClick={() => {
-                setissueDateFilter(null);
-                table.getColumn("issue_date")?.setFilterValue(undefined);
-              }}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-red-600"
-            >
-              <IconTrash className="w-4 h-4" />
-            </button>
-          )}
-        </div> */}
-
         {/* Nome do cliente */}
         <Input
-          placeholder="Buscar cliente..."
+          placeholder="Buscar cliente ou nota..."
           value={
             (table.getColumn("customer")?.getFilterValue() as string) ?? ""
           }
@@ -1682,6 +1741,34 @@ function clearAllFilters() {
             <SelectItem value="Coletado">Coletado</SelectItem>
           </SelectContent>
         </Select>
+
+        {/* Filtro motorista */}
+<Select
+  value={driverFilterValue}
+  onValueChange={(value) => {
+    if (role === "motorista") return;
+    setSelectedDriverId(value === "all" ? null : value);
+  }}
+  disabled={role === "motorista"}
+>
+  <SelectTrigger
+    className={`w-full ${
+      driverFilterValue === "all" ? "text-muted-foreground" : ""
+    }`}
+  >
+    <SelectValue placeholder="Motorista" />
+  </SelectTrigger>
+
+  <SelectContent>
+    <SelectItem value="all">Todos motoristas</SelectItem>
+
+    {drivers.map((driver) => (
+      <SelectItem key={driver.id} value={driver.id}>
+        {driver.name}
+      </SelectItem>
+    ))}
+  </SelectContent>
+</Select>
 
         {/* Tipo de pagamento */}
         <Select
@@ -1730,18 +1817,17 @@ function clearAllFilters() {
           </SelectContent>
         </Select>
         <Select
-  value={
-    sorting.length && sorting[0]?.id === "appointment_date"
-      ? sorting[0].desc
-        ? "default"
-        : "date_asc"
-      : "default"
-  }
+  value={sortValue}
   onValueChange={handleDateSortChange}
 >
-  <SelectTrigger className="min-w-[120px] w-full">
+  <SelectTrigger
+    className={`min-w-[120px] w-full ${
+      sortValue === "default" ? "text-muted-foreground" : ""
+    }`}
+  >
     <SelectValue placeholder="Ordenar" />
   </SelectTrigger>
+
   <SelectContent>
     <SelectItem value="default">Data decrescente</SelectItem>
     <SelectItem value="date_asc">Data crescente</SelectItem>
