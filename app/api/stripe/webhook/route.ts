@@ -93,6 +93,49 @@ if (object.id && String(object.id).startsWith("cus_")) {
   };
 }
 
+function getSubscriptionPeriodStart(
+  subscription: Stripe.Subscription | Stripe.Response<Stripe.Subscription>,
+) {
+  const item = subscription.items.data[0] as
+    | (Stripe.SubscriptionItem & {
+        current_period_start?: number | null;
+      })
+    | undefined;
+
+  return item?.current_period_start ?? null;
+}
+
+function getSubscriptionPeriodEnd(
+  subscription: Stripe.Subscription | Stripe.Response<Stripe.Subscription>,
+) {
+  const item = subscription.items.data[0] as
+    | (Stripe.SubscriptionItem & {
+        current_period_end?: number | null;
+      })
+    | undefined;
+
+  return item?.current_period_end ?? null;
+}
+
+function getInvoiceSubscriptionId(invoice: Stripe.Invoice) {
+  const rawSubscription =
+    (invoice as Stripe.Invoice & {
+      subscription?: string | { id?: string } | null;
+    }).subscription ??
+    (invoice as Stripe.Invoice & {
+      parent?: {
+        subscription_details?: {
+          subscription?: string | { id?: string } | null;
+        };
+      };
+    }).parent?.subscription_details?.subscription ??
+    null;
+
+  return typeof rawSubscription === "string"
+    ? rawSubscription
+    : rawSubscription?.id ?? null;
+}
+
 export async function POST(req: Request) {
   const body = await req.text();
   const signature = req.headers.get("stripe-signature");
@@ -193,15 +236,8 @@ if (subscriptionId) {
   status = subscription.status;
   cancelAtPeriodEnd = subscription.cancel_at_period_end;
 
-  const rawCurrentPeriodStart =
-    subscription.current_period_start ??
-    subscription.items.data[0]?.current_period_start ??
-    null;
-
-  const rawCurrentPeriodEnd =
-    subscription.current_period_end ??
-    subscription.items.data[0]?.current_period_end ??
-    null;
+const rawCurrentPeriodStart = getSubscriptionPeriodStart(subscription);
+const rawCurrentPeriodEnd = getSubscriptionPeriodEnd(subscription);
 
   currentPeriodStart = rawCurrentPeriodStart
     ? new Date(rawCurrentPeriodStart * 1000).toISOString()
@@ -263,15 +299,8 @@ if (subscriptionId) {
 case "customer.subscription.created": {
   const subscription = event.data.object as Stripe.Subscription;
 
-const rawCurrentPeriodStart =
-  subscription.current_period_start ??
-  subscription.items.data[0]?.current_period_start ??
-  null;
-
-const rawCurrentPeriodEnd =
-  subscription.current_period_end ??
-  subscription.items.data[0]?.current_period_end ??
-  null;
+const rawCurrentPeriodStart = getSubscriptionPeriodStart(subscription);
+const rawCurrentPeriodEnd = getSubscriptionPeriodEnd(subscription);
 
 const currentPeriodStart = rawCurrentPeriodStart
   ? new Date(rawCurrentPeriodStart * 1000).toISOString()
@@ -360,15 +389,8 @@ case "customer.subscription.deleted": {
     expand: ["latest_invoice"],
   });
 
-const rawCurrentPeriodStart =
-  subscription.current_period_start ??
-  subscription.items.data[0]?.current_period_start ??
-  null;
-
-const rawCurrentPeriodEnd =
-  subscription.current_period_end ??
-  subscription.items.data[0]?.current_period_end ??
-  null;
+const rawCurrentPeriodStart = getSubscriptionPeriodStart(subscription);
+const rawCurrentPeriodEnd = getSubscriptionPeriodEnd(subscription);
 
 const currentPeriodStart = rawCurrentPeriodStart
   ? new Date(rawCurrentPeriodStart * 1000).toISOString()
@@ -424,10 +446,7 @@ trial_end: subscription.trial_end
       case "invoice.payment_succeeded": {
         const invoice = event.data.object as Stripe.Invoice;
 
-        const subscriptionId =
-          typeof invoice.subscription === "string"
-            ? invoice.subscription
-            : invoice.subscription?.id ?? null;
+const subscriptionId = getInvoiceSubscriptionId(invoice);
 
         const customerId =
           typeof invoice.customer === "string"
@@ -461,10 +480,7 @@ trial_end: subscription.trial_end
       case "invoice.payment_failed": {
         const invoice = event.data.object as Stripe.Invoice;
 
-        const subscriptionId =
-          typeof invoice.subscription === "string"
-            ? invoice.subscription
-            : invoice.subscription?.id ?? null;
+const subscriptionId = getInvoiceSubscriptionId(invoice);
 
         const customerId =
           typeof invoice.customer === "string"

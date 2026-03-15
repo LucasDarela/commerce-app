@@ -25,6 +25,18 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY,
 );
 
+function getSubscriptionPeriodEnd(
+  subscription: Stripe.Subscription | Stripe.Response<Stripe.Subscription>,
+) {
+  const item = subscription.items.data[0] as
+    | (Stripe.SubscriptionItem & {
+        current_period_end?: number | null;
+      })
+    | undefined;
+
+  return item?.current_period_end ?? null;
+}
+
 export async function POST(req: Request) {
   try {
     const { subscriptionIdLocal, companyId } = await req.json();
@@ -80,10 +92,11 @@ export async function POST(req: Request) {
       },
     );
 
-    const currentPeriodEnd =
-      updatedStripeSubscription.current_period_end
-        ? new Date(updatedStripeSubscription.current_period_end * 1000).toISOString()
-        : null;
+const rawCurrentPeriodEnd = getSubscriptionPeriodEnd(updatedStripeSubscription);
+
+const currentPeriodEnd = rawCurrentPeriodEnd
+  ? new Date(rawCurrentPeriodEnd * 1000).toISOString()
+  : null;
 
     const { error: updateError } = await supabase
       .from("subscriptions")
