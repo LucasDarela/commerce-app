@@ -615,91 +615,67 @@ useEffect(() => {
     }
   }
 
-  const refreshOrders = async () => {
-    const { data, error } = await supabase
-      .from("orders")
-      .select(
-        `
+const refreshOrders = async () => {
+  const { data, error } = await supabase
+    .from("orders")
+    .select(`
+      id,
+      customer_id,
+      note_number,
+      document_type,
+      appointment_date,
+      appointment_hour,
+      appointment_local,
+      customer,
+      phone,
+      products,
+      freight,
+      amount,
+      total,
+      total_payed,
+      delivery_status,
+      payment_status,
+      payment_method,
+      order_index,
+      issue_date,
+      due_date,
+      customer_signature,
+      text_note,
+      boleto_id,
+      driver_id,
+      customer_rel:customers!sales_customer_id_fkey (
         id,
-        customer_id,
-        note_number,
-        document_type,
-        appointment_date,
-        appointment_hour,
-        appointment_local,
-        customer,
-        phone,
-        products,
-        freight,
-        amount,
-        total,
-        total_payed,
-        delivery_status,
-        payment_status,
-        payment_method,
-        order_index,
-        issue_date,
-        due_date,
-        customer_signature,
-        text_note,
-        boleto_id,
-        driver_id,
-        customer_rel:customers!sales_customer_id_fkey (
-          id,
-          name,
-          fantasy_name,
-          emit_nf
-        )
-      `,
+        name,
+        fantasy_name,
+        emit_nf
       )
-      .order("order_index", { ascending: true });
+    `)
+    .order("order_index", { ascending: true });
 
-    if (error) {
-      console.error("Erro ao buscar pedidos:", error);
-      return;
-    }
+  if (error) {
+    console.error("Erro ao buscar pedidos:", error);
+    return;
+  }
 
-    // processa fantasy_name
-    const ordersWithFantasy = (data ?? []).map((r) => {
-      const cr = (r as any).customer_rel;
-      const fantasyName = Array.isArray(cr)
-        ? cr[0]?.fantasy_name
-        : cr?.fantasy_name;
+  const ordersWithFantasy = (data ?? []).map((r) => {
+    const cr = (r as any).customer_rel;
+    const fantasyName = Array.isArray(cr)
+      ? cr[0]?.fantasy_name
+      : cr?.fantasy_name;
 
-      return {
-        ...r,
-        fantasy_name: fantasyName || "",
-      };
-    });
+    return {
+      ...r,
+      fantasy_name: fantasyName || "",
+    };
+  });
 
-    const parsedOrders = orderSchema.array().safeParse(ordersWithFantasy);
-    if (parsedOrders.success) {
-      setOrders(parsedOrders.data);
-    } else {
-      console.error("Erro ao validar schema Zod:", parsedOrders.error);
-    }
-
-    console.table(
-      (data ?? []).map((r) => {
-        const cr = (r as any).customer_rel;
-        const crEmit = Array.isArray(cr) ? cr[0]?.emit_nf : cr?.emit_nf; // 👈 cobre os 2 casos
-        return {
-          id: r.id,
-          order_emit_nf: (r as any).emit_nf,
-          customer_emit_nf: crEmit,
-          typeof_order_emit_nf: typeof (r as any).emit_nf,
-          typeof_customer_emit_nf: typeof crEmit,
-        };
-      }),
-    );
-
-    const parsed = orderSchema.array().safeParse(data);
-    if (parsed.success) {
-      setOrders(parsed.data);
-    } else {
-      console.error("Erro ao validar schema Zod:", parsed.error);
-    }
-  };
+  const parsed = orderSchema.array().safeParse(ordersWithFantasy);
+  if (parsed.success) {
+    setOrders(parsed.data);
+  } else {
+    console.error("Erro ao validar schema Zod:", parsed.error);
+  }
+};
 
   const restoreStockBeforeDelete = async (orderId: string) => {
     const { data: items, error: fetchError } = await supabase
@@ -746,55 +722,73 @@ useEffect(() => {
     }
   }, [columnVisibility]);
 
-  useEffect(() => {
-    async function fetchOrders() {
-      const { data, error } = await supabase
-        .from("orders")
-        .select(`
-  id,
-  customer_id,
-  note_number,
-  document_type,
-  appointment_date,
-  appointment_hour,
-  appointment_local,
-  customer,
-  phone,
-  products,
-  freight,
-  amount,
-  total,
-  total_payed,
-  delivery_status,
-  payment_status,
-  payment_method,
-  order_index,
-  issue_date,
-  due_date,
-  customer_signature,
-  text_note,
-  boleto_id,
-  driver_id
-`)
-        .order("order_index", { ascending: true });
+useEffect(() => {
+  async function fetchOrders() {
+    const { data, error } = await supabase
+      .from("orders")
+      .select(`
+        id,
+        customer_id,
+        note_number,
+        document_type,
+        appointment_date,
+        appointment_hour,
+        appointment_local,
+        customer,
+        phone,
+        products,
+        freight,
+        amount,
+        total,
+        total_payed,
+        delivery_status,
+        payment_status,
+        payment_method,
+        order_index,
+        issue_date,
+        due_date,
+        customer_signature,
+        text_note,
+        boleto_id,
+        driver_id,
+        customer_rel:customers!sales_customer_id_fkey (
+          id,
+          name,
+          fantasy_name,
+          emit_nf
+        )
+      `)
+      .order("order_index", { ascending: true });
 
-      if (error) {
-        console.error("Erro ao buscar pedidos:", error);
-        return;
-      }
-
-      const parsed = orderSchema.array().safeParse(data);
-      if (parsed.success) {
-        setOrders(parsed.data);
-      } else {
-        console.error("Erro ao validar schema Zod:", parsed.error);
-      }
-
-      setLoading(false);
+    if (error) {
+      console.error("Erro ao buscar pedidos:", error);
+      return;
     }
 
-    fetchOrders();
-  }, []);
+    const ordersWithFantasy = (data ?? []).map((r) => {
+      const cr = (r as any).customer_rel;
+      const fantasyName = Array.isArray(cr)
+        ? cr[0]?.fantasy_name
+        : cr?.fantasy_name;
+
+      return {
+        ...r,
+        fantasy_name: fantasyName || "",
+      };
+    });
+
+    const parsed = orderSchema.array().safeParse(ordersWithFantasy);
+    if (parsed.success) {
+      setOrders(parsed.data);
+    } else {
+      console.error("Erro ao validar schema Zod:", parsed.error);
+    }
+
+    setLoading(false);
+  }
+
+  fetchOrders();
+}, [supabase]);
 
 const columns = React.useMemo<CustomColumnDef<Order>[]>(() => [
     {

@@ -462,7 +462,7 @@ export default function ViewOrderPage() {
       setOrder((prev: any) =>
         prev ? { ...prev, delivery_status: next } : prev,
       );
-      toast.success(`Status atualizado para ${next}.`);
+      // toast.success(`Status atualizado para ${next}.`);
     } catch (err) {
       console.error(err);
       toast.error("Erro ao processar ação.");

@@ -52,7 +52,6 @@ export function SignatureModal({ open, onSave, onClose }: SignatureModalProps) {
     const dataUrl = sigPadRef.current?.getCanvas().toDataURL("image/png");
     onSave(dataUrl);
     onClose();
-    toast.success("🖊️ Assinatura salva com sucesso!");
   };
   useEffect(() => {
     const isMobileDevice = window.innerWidth <= 768;
