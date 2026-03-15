@@ -34,13 +34,13 @@ export default async function LogInSignIn() {
           </TabsContent>
           {/* Create account */}
           <TabsContent value="create-account">
-            <CreateAccountForm />
-            {/* <div className="flex flex-col justify-center items-center h-[250px]">
-              <h2>🚧 Site em desenvolvimento... 🚧</h2>
+            {/* <CreateAccountForm /> */}
+            <div className="flex flex-col justify-center items-center h-[250px]">
+              <h2>🚧 Sistema em desenvolvimento... 🚧</h2>
               <p className="text-muted-foreground text-sm italic">
                 Não é possível criar uma conta no momento.
               </p>
-            </div> */}
+            </div>
           </TabsContent>
         </Tabs>
         <Link href="/" className="mt-4 text-muted-foreground text-sm">
