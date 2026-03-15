@@ -111,28 +111,31 @@ export async function POST(req: Request) {
 
   const { data: order, error: orderErr } = await supabase
     .from("orders")
-    .select("id, number, customer_id")
+    .select("id, note_number, customer_id, customer")
     .eq("company_id", companyId)
     .eq("boleto_id", payment.id)
-    .maybeSingle();
+    .maybeSingle(); 
 
   if (orderErr) {
     console.error("Erro ao buscar pedido:", orderErr);
   }
 
-  let customerName: string | null = null;
-  if (order?.customer_id) {
-    const { data: customer, error: custErr } = await supabase
-      .from("customers")
-      .select("name")
-      .eq("company_id", companyId)
-      .eq("id", order.customer_id)
-      .maybeSingle();
-    if (custErr) console.error("Erro ao buscar cliente:", custErr);
-    customerName = customer?.name ?? null;
-  }
+let customerName: string | null = order?.customer ?? null;
 
-  const orderNumber = order?.number ?? order?.id ?? null;
+if (!customerName && order?.customer_id) {
+  const { data: customer, error: custErr } = await supabase
+    .from("customers")
+    .select("name, fantasy_name")
+    .eq("company_id", companyId)
+    .eq("id", order.customer_id)
+    .maybeSingle();
+
+  if (custErr) console.error("Erro ao buscar cliente:", custErr);
+
+  customerName = customer?.fantasy_name || customer?.name || null;
+}
+
+const orderNumber = order?.note_number ?? order?.id ?? null;
 
   const title = "Pagamento recebido";
   const header =

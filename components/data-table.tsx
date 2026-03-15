@@ -501,7 +501,6 @@ useEffect(() => {
       return;
     }
 
-    console.log("✅ Motorista salvo no banco:", data);
     toast.success("Motorista salvo.");
 
     // ✅ atualiza a tabela imediatamente (sem depender do realtime)
@@ -511,8 +510,6 @@ useEffect(() => {
       ),
     );
   }
-
-  // driver select
 
   // nfe status by order id
 

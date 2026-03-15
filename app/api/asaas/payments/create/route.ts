@@ -101,8 +101,6 @@ export async function POST(req: Request) {
         dueDateLimitDays: discountDueDateLimitDays ?? 0,
       };
 
-    console.log("➡️ Criando boleto no Asaas com payload:", payload);
-
     const created = await asaasFetch<any>("/payments", {
       method: "POST",
       body: JSON.stringify(payload),
@@ -160,7 +158,6 @@ export async function POST(req: Request) {
       payment: created,
     };
 
-    console.log("📦 Resposta enviada pro front (boleto criado):", response);
     return NextResponse.json(response);
   } catch (e: any) {
     console.error("❌ Create boleto - erro:", e?.message || e);
