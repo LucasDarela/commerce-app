@@ -14,7 +14,7 @@ export default async function LogInSignIn() {
       <div className="flex flex-col h-screen w-full justify-center items-center">
         {/* Account Tabs and Password */}
         <Tabs
-          defaultValue="login"
+          defaultValue="create-account"
           className="w-[400px] border rounded-lg pb-4 shadow-2xl"
         >
           <TabsList className="flex justify-around items-center w-full rounded-b-none h-14">
@@ -34,13 +34,13 @@ export default async function LogInSignIn() {
           </TabsContent>
           {/* Create account */}
           <TabsContent value="create-account">
-            {/* <CreateAccountForm /> */}
-            <div className="flex flex-col justify-center items-center h-[250px]">
+            <CreateAccountForm />
+            {/* <div className="flex flex-col justify-center items-center h-[250px]">
               <h2>🚧 Sistema em desenvolvimento... 🚧</h2>
               <p className="text-muted-foreground text-sm italic">
                 Não é possível criar uma conta no momento.
               </p>
-            </div>
+            </div> */}
           </TabsContent>
         </Tabs>
         <Link href="/" className="mt-4 text-muted-foreground text-sm">

@@ -1,22 +1,34 @@
-// app/api/stripe/cancel/route.ts
 export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import Stripe from "stripe";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+if (!process.env.STRIPE_SECRET_KEY) {
+  throw new Error("STRIPE_SECRET_KEY não definida");
+}
+
+if (!process.env.SUPABASE_URL) {
+  throw new Error("SUPABASE_URL não definida");
+}
+
+if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  throw new Error("SUPABASE_SERVICE_ROLE_KEY não definida");
+}
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: "2025-08-27.basil",
 });
 
 const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
 );
 
 export async function POST(req: Request) {
   try {
-    const { subscriptionIdLocal } = await req.json();
+    const { subscriptionIdLocal, companyId } = await req.json();
+
     if (!subscriptionIdLocal) {
       return NextResponse.json(
         { error: "subscriptionIdLocal é obrigatório" },
@@ -24,11 +36,18 @@ export async function POST(req: Request) {
       );
     }
 
-    // Busca a assinatura no Supabase
+    if (!companyId) {
+      return NextResponse.json(
+        { error: "companyId é obrigatório" },
+        { status: 400 },
+      );
+    }
+
     const { data: subscription, error: fetchError } = await supabase
       .from("subscriptions")
       .select("*")
       .eq("id", subscriptionIdLocal)
+      .eq("company_id", companyId)
       .single();
 
     if (fetchError || !subscription) {
@@ -38,26 +57,64 @@ export async function POST(req: Request) {
       );
     }
 
-    const stripeSubscriptionId = subscription.stripe_subscription_id;
-    if (stripeSubscriptionId) {
-      // Cancela a assinatura no Stripe
-      await stripe.subscriptions.cancel(stripeSubscriptionId);
+    if (!subscription.stripe_subscription_id) {
+      return NextResponse.json(
+        { error: "Assinatura Stripe não encontrada" },
+        { status: 400 },
+      );
     }
 
-    // Atualiza o status no Supabase
+    if (subscription.cancel_at_period_end) {
+      return NextResponse.json({
+        message: "A assinatura já está configurada para cancelamento ao final do período.",
+        cancelAtPeriodEnd: true,
+        currentPeriodEnd: subscription.current_period_end,
+        status: subscription.status,
+      });
+    }
+
+    const updatedStripeSubscription = await stripe.subscriptions.update(
+      subscription.stripe_subscription_id,
+      {
+        cancel_at_period_end: true,
+      },
+    );
+
+    const currentPeriodEnd =
+      updatedStripeSubscription.current_period_end
+        ? new Date(updatedStripeSubscription.current_period_end * 1000).toISOString()
+        : null;
+
     const { error: updateError } = await supabase
       .from("subscriptions")
-      .update({ status: "canceled" })
-      .eq("id", subscriptionIdLocal);
+      .update({
+        status: updatedStripeSubscription.status,
+        cancel_at_period_end: updatedStripeSubscription.cancel_at_period_end,
+        canceled_at: null,
+        current_period_end: currentPeriodEnd,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", subscriptionIdLocal)
+      .eq("company_id", companyId);
 
     if (updateError) {
       return NextResponse.json({ error: updateError.message }, { status: 500 });
     }
 
-    return NextResponse.json({ message: "Assinatura cancelada com sucesso." });
-  } catch (err: any) {
+    return NextResponse.json({
+      message: "Assinatura configurada para cancelamento ao final do período.",
+      cancelAtPeriodEnd: updatedStripeSubscription.cancel_at_period_end,
+      currentPeriodEnd,
+      status: updatedStripeSubscription.status,
+    });
+  } catch (err: unknown) {
     return NextResponse.json(
-      { error: err.message || "Erro desconhecido" },
+      {
+        error:
+          err instanceof Error
+            ? err.message
+            : "Erro desconhecido",
+      },
       { status: 500 },
     );
   }

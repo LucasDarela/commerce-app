@@ -1,5 +1,5 @@
-// app/api/stripe/create-checkout-session/route.ts
 export const runtime = "nodejs";
+
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 
@@ -12,25 +12,55 @@ export async function POST(req: Request) {
     const { priceId, companyId, subscriptionIdLocal } = await req.json();
 
     if (!priceId) {
+      return NextResponse.json({ error: "priceId obrigatório" }, { status: 400 });
+    }
+
+    if (!companyId) {
+      return NextResponse.json({ error: "companyId obrigatório" }, { status: 400 });
+    }
+
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+
+    if (!siteUrl) {
       return NextResponse.json(
-        { error: "priceId obrigatório" },
-        { status: 400 },
+        { error: "NEXT_PUBLIC_SITE_URL não está definida no servidor." },
+        { status: 500 },
       );
     }
 
-    const session = await stripe.checkout.sessions.create({
-      mode: "subscription",
-      line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard/billing?success=true`,
-      cancel_url: `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard/billing?canceled=true`,
-      metadata: {
-        companyId,
-        subscriptionIdLocal: subscriptionIdLocal || "",
-      },
-    });
+    const successUrl = `${siteUrl}/dashboard/billing?success=true`;
+    const cancelUrl = `${siteUrl}/dashboard/billing?canceled=true`;
+
+    console.log("NEXT_PUBLIC_SITE_URL:", siteUrl);
+    console.log("SUCCESS URL:", successUrl);
+    console.log("CANCEL URL:", cancelUrl);
+    console.log("priceId:", priceId);
+    console.log("companyId:", companyId);
+
+const session = await stripe.checkout.sessions.create({
+  mode: "subscription",
+  line_items: [{ price: priceId, quantity: 1 }],
+  success_url: successUrl,
+  cancel_url: cancelUrl,
+  metadata: {
+    companyId,
+    subscriptionIdLocal: subscriptionIdLocal || "",
+  },
+  subscription_data: {
+    trial_period_days: 30,
+    metadata: {
+      companyId,
+      subscriptionIdLocal: subscriptionIdLocal || "",
+    },
+  },
+});
 
     return NextResponse.json({ url: session.url });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error("Erro ao criar checkout session:", err);
+    return NextResponse.json(
+      { error: err.message || "Erro ao criar checkout session" },
+      { status: 500 },
+    );
   }
 }

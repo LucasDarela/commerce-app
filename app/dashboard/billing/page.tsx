@@ -3,49 +3,103 @@
 import { useEffect, useState } from "react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import SubscriptionManager from "@/components/subscription/SubscriptionManager";
+import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
+
+type PlanRow = {
+  id: string;
+  name: string;
+  stripe_price_id: string;
+  price: number;
+  currency: string;
+  interval: string;
+};
+
+  type SubscriptionRow = {
+    id: string;
+    company_id: string; 
+    price_id: string | null;
+    status: string | null;
+    trial_end: string | null;
+    trial_will_end_notified: boolean | null;
+    cancel_at_period_end: boolean | null;
+    current_period_end: string | null;
+  };
 
 export default function BillingPage() {
   const supabase = createClientComponentClient();
-  const [subscriptionData, setSubscriptionData] = useState<any>(null);
+  const { companyId, loading: authLoading } = useAuthenticatedCompany();
+
+  const [subscriptionData, setSubscriptionData] = useState<SubscriptionRow | null>(null);
+  const [proPlan, setProPlan] = useState<PlanRow | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchSubscription() {
-      const { data, error } = await supabase
-        .from("subscriptions")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
+    async function fetchBillingData() {
+      if (!companyId) return;
 
-      if (error) {
-        console.error("Erro ao buscar assinatura:", error);
-        return;
+      setLoading(true);
+
+      const [{ data: subscription, error: subscriptionError }, { data: plan, error: planError }] =
+        await Promise.all([
+          supabase
+            .from("subscriptions")
+            .select("id, company_id, price_id, status, trial_end, trial_will_end_notified, cancel_at_period_end, current_period_end") 
+            .eq("company_id", companyId)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+          supabase
+            .from("plans")
+            .select("id, name, stripe_price_id, price, currency, interval")
+            .ilike("name", "pro")
+            .maybeSingle(),
+        ]);
+
+      if (subscriptionError) {
+        console.error("Erro ao buscar assinatura:", subscriptionError);
       }
 
-      setSubscriptionData(data);
+      if (planError) {
+        console.error("Erro ao buscar plano Pro:", planError);
+      }
+
+      setSubscriptionData(subscription ?? null);
+      setProPlan(plan ?? null);
+      setLoading(false);
     }
 
-    fetchSubscription();
-  }, []);
+    fetchBillingData();
+  }, [companyId, supabase]);
 
-  if (!subscriptionData) return <div>Carregando assinatura...</div>;
+  if (authLoading || loading) {
+    return <div>Carregando assinatura...</div>;
+  }
 
-  // Mapear o price_id para uma chave de plano
-  let currentPlan: "basic" | "starter" | "enterprise" | null = null;
-  if (subscriptionData.price_id?.includes("BASIC")) currentPlan = "basic";
-  else if (subscriptionData.price_id?.includes("STARTER"))
-    currentPlan = "starter";
-  else if (subscriptionData.price_id?.includes("ENTERPRISE"))
-    currentPlan = "enterprise";
+  if (!companyId) {
+    return <div>Empresa não encontrada.</div>;
+  }
+
+  if (!proPlan) {
+    return <div>Plano Pro não encontrado na tabela plans.</div>;
+  }
 
   return (
-    <SubscriptionManager
-      companyId={subscriptionData.company_id} // caso precise passar
-      subscriptionIdLocal={subscriptionData.id}
-      currentPriceId={subscriptionData.price_id}
-      currentPlan={currentPlan}
-      subscriptionStatus={subscriptionData.status}
-      trialEndsAt={subscriptionData.trial_end}
-    />
+<SubscriptionManager
+  companyId={companyId}
+  subscriptionIdLocal={subscriptionData?.id ?? null}
+  currentPriceId={subscriptionData?.price_id ?? null}
+  subscriptionStatus={subscriptionData?.status ?? null}
+  trialEndsAt={subscriptionData?.trial_end ?? null}
+  cancelAtPeriodEnd={subscriptionData?.cancel_at_period_end ?? false}
+  currentPeriodEnd={subscriptionData?.current_period_end ?? null}
+  trialWillEndNotified={subscriptionData?.trial_will_end_notified ?? false}
+  proPlan={{
+    name: proPlan.name,
+    stripePriceId: proPlan.stripe_price_id,
+    price: proPlan.price,
+    currency: proPlan.currency,
+    interval: proPlan.interval,
+  }}
+/>
   );
 }
