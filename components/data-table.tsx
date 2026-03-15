@@ -1678,7 +1678,7 @@ const clearFilter = () => {
 )}
         </div>
       </div>
-  <div className="grid gap-2 px-4 lg:px-6 py-2 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 items-center">
+<div className="grid gap-2 px-4 lg:px-6 py-2 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 items-center">
         {/* Filtro por data */}
 <div className="relative w-full min-w-0 z-50">
           <DatePicker
@@ -1821,7 +1821,7 @@ const clearFilter = () => {
   onValueChange={handleDateSortChange}
 >
   <SelectTrigger
-    className={`min-w-[120px] w-full ${
+    className={`w-full ${
       sortValue === "default" ? "text-muted-foreground" : ""
     }`}
   >
@@ -1835,7 +1835,7 @@ const clearFilter = () => {
 </Select>
 <Button
   variant="outline"
-  className="min-w-[120px]"
+  className="w-full"
   onClick={clearAllFilters}
 >
   <IconTrash className="mr-2 h-4 w-4" />
