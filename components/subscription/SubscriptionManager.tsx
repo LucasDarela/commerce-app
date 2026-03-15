@@ -279,6 +279,12 @@ const shouldShowTrialWarning =
           </span>
         )}
 
+        {status === "trialing" && trialDays !== null && (
+  <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-sm font-medium text-blue-700">
+    Trial • faltam {trialDays} dias
+  </span>
+)}
+
         {status === "active" && !localCancelAtPeriodEnd && remainingDays !== null && (
           <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-700">
             Renova em {remainingDays} dias

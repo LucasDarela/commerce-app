@@ -132,7 +132,7 @@ export default function NavBar() {
             <div className="hidden md:block">
               <Button asChild>
                 <Link href={isLoggedIn ? "/dashboard" : "/login-signin"}>
-                  {isLoggedIn ? "Dashboard" : "Sign In"}
+                  {isLoggedIn ? "Dashboard" : "Entrar"}
                 </Link>
               </Button>
             </div>
@@ -200,7 +200,7 @@ export default function NavBar() {
                 href={isLoggedIn ? "/dashboard" : "/login-signin"}
                 onClick={toggleMenu}
               >
-                {isLoggedIn ? "Dashboard" : "Sign In"}
+                {isLoggedIn ? "Dashboard" : "Entrar"}
               </Link>
             </Button>
           </li>

@@ -39,6 +39,7 @@ export async function POST(req: Request) {
 
 const session = await stripe.checkout.sessions.create({
   mode: "subscription",
+  payment_method_collection: "always",
   line_items: [{ price: priceId, quantity: 1 }],
   success_url: successUrl,
   cancel_url: cancelUrl,
@@ -48,6 +49,11 @@ const session = await stripe.checkout.sessions.create({
   },
   subscription_data: {
     trial_period_days: 30,
+    trial_settings: {
+      end_behavior: {
+        missing_payment_method: "cancel",
+      },
+    },
     metadata: {
       companyId,
       subscriptionIdLocal: subscriptionIdLocal || "",

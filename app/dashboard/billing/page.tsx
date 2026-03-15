@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import SubscriptionManager from "@/components/subscription/SubscriptionManager";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
+import TrialStartButton from "@/components/subscription/TrialStartButton";
 
 type PlanRow = {
   id: string;
@@ -82,6 +83,43 @@ export default function BillingPage() {
   if (!proPlan) {
     return <div>Plano Pro não encontrado na tabela plans.</div>;
   }
+
+  if (!subscriptionData) {
+  return (
+    <div className="max-w-4xl mx-auto p-6">
+      <div className="rounded-2xl border bg-card p-8 shadow-sm">
+        <div className="max-w-2xl space-y-5">
+          <div>
+            <h1 className="text-3xl font-semibold">Comece seu teste gratuito</h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Para liberar o acesso ao sistema, cadastre seu cartão e inicie seu teste gratuito de 30 dias.
+            </p>
+          </div>
+
+          <div className="space-y-2 text-sm text-muted-foreground">
+            <p>• Acesso completo por 30 dias</p>
+            <p>• Cobrança somente após o período de teste</p>
+            <p>• Cancelamento a qualquer momento antes da cobrança</p>
+            <p>• O sistema será liberado automaticamente após a ativação</p>
+          </div>
+
+          <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+            <p className="text-sm text-blue-700">
+              Seu cartão será solicitado agora, mas nenhuma cobrança será feita antes do fim do período gratuito.
+            </p>
+          </div>
+
+          <div className="pt-2">
+            <TrialStartButton
+              companyId={companyId}
+              priceId={proPlan.stripe_price_id}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
   return (
 <SubscriptionManager

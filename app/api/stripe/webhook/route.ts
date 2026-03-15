@@ -444,38 +444,48 @@ trial_end: subscription.trial_end
 }
 
       case "invoice.payment_succeeded": {
-        const invoice = event.data.object as Stripe.Invoice;
+  const invoice = event.data.object as Stripe.Invoice;
 
-const subscriptionId = getInvoiceSubscriptionId(invoice);
+  const subscriptionId = getInvoiceSubscriptionId(invoice);
 
-        const customerId =
-          typeof invoice.customer === "string"
-            ? invoice.customer
-            : invoice.customer?.id ?? null;
+  const customerId =
+    typeof invoice.customer === "string"
+      ? invoice.customer
+      : invoice.customer?.id ?? null;
 
-        const stripePriceId =
-          invoice.lines?.data?.[0]?.pricing?.type === "price_details"
-            ? invoice.lines.data[0].pricing.price_details?.price ?? null
-            : null;
+  const stripePriceId =
+    invoice.lines?.data?.[0]?.pricing?.type === "price_details"
+      ? invoice.lines.data[0].pricing.price_details?.price ?? null
+      : null;
 
-        if (subscriptionId) {
-          const { error } = await supabase
-            .from("subscriptions")
-            .update({
-              status: "active",
-              stripe_customer_id: customerId,
-              price_id: stripePriceId,
-              latest_invoice_id: invoice.id,
-              raw_payload: invoice,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("stripe_subscription_id", subscriptionId);
+  if (subscriptionId) {
+    const stripeSubscription = await stripe.subscriptions.retrieve(subscriptionId);
 
-          if (error) throw error;
-        }
+    const nextStatus = stripeSubscription.status; // trialing, active, etc.
 
-        break;
-      }
+    const { error } = await supabase
+      .from("subscriptions")
+      .update({
+        status: nextStatus,
+        stripe_customer_id: customerId,
+        price_id: stripePriceId,
+        latest_invoice_id: invoice.id,
+        raw_payload: invoice,
+        updated_at: new Date().toISOString(),
+        trial_start: stripeSubscription.trial_start
+          ? new Date(stripeSubscription.trial_start * 1000).toISOString()
+          : null,
+        trial_end: stripeSubscription.trial_end
+          ? new Date(stripeSubscription.trial_end * 1000).toISOString()
+          : null,
+      })
+      .eq("stripe_subscription_id", subscriptionId);
+
+    if (error) throw error;
+  }
+
+  break;
+}
 
       case "invoice.payment_failed": {
         const invoice = event.data.object as Stripe.Invoice;
