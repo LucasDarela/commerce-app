@@ -4,17 +4,6 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2025-08-27.basil",
-});
-
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-);
-
-const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET!;
-
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error("STRIPE_SECRET_KEY não definida");
 }
@@ -30,6 +19,17 @@ if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
 if (!process.env.STRIPE_WEBHOOK_SECRET) {
   throw new Error("STRIPE_WEBHOOK_SECRET não definida");
 }
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  apiVersion: "2025-08-27.basil",
+});
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
+
+const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
 function extractBillingEventData(event: Stripe.Event) {
   const object = event.data.object as any;
@@ -53,17 +53,17 @@ function extractBillingEventData(event: Stripe.Event) {
         : object.subscription?.id ?? null;
   }
 
-if (object.id && String(object.id).startsWith("in_")) {
-  stripeInvoiceId = object.id;
-}
+  if (object.id && String(object.id).startsWith("in_")) {
+    stripeInvoiceId = object.id;
+  }
 
-if (object.id && String(object.id).startsWith("sub_")) {
-  stripeSubscriptionId = object.id;
-}
+  if (object.id && String(object.id).startsWith("sub_")) {
+    stripeSubscriptionId = object.id;
+  }
 
-if (object.id && String(object.id).startsWith("cus_")) {
-  stripeCustomerId = object.id;
-}
+  if (object.id && String(object.id).startsWith("cus_")) {
+    stripeCustomerId = object.id;
+  }
 
   if (object.latest_invoice) {
     stripeInvoiceId =
@@ -80,10 +80,13 @@ if (object.id && String(object.id).startsWith("cus_")) {
     companyId = object.parent.subscription_details.metadata.companyId;
   }
 
-  if (!stripeSubscriptionId && object.parent?.subscription_details?.subscription) {
+  if (
+    !stripeSubscriptionId &&
+    object.parent?.subscription_details?.subscription
+  ) {
     stripeSubscriptionId =
       object.parent.subscription_details.subscription ?? stripeSubscriptionId;
-  } 
+  }
 
   return {
     stripeCustomerId,
@@ -94,7 +97,7 @@ if (object.id && String(object.id).startsWith("cus_")) {
 }
 
 function getSubscriptionPeriodStart(
-  subscription: Stripe.Subscription | Stripe.Response<Stripe.Subscription>,
+  subscription: Stripe.Subscription | Stripe.Response<Stripe.Subscription>
 ) {
   const item = subscription.items.data[0] as
     | (Stripe.SubscriptionItem & {
@@ -106,7 +109,7 @@ function getSubscriptionPeriodStart(
 }
 
 function getSubscriptionPeriodEnd(
-  subscription: Stripe.Subscription | Stripe.Response<Stripe.Subscription>,
+  subscription: Stripe.Subscription | Stripe.Response<Stripe.Subscription>
 ) {
   const item = subscription.items.data[0] as
     | (Stripe.SubscriptionItem & {
@@ -136,275 +139,29 @@ function getInvoiceSubscriptionId(invoice: Stripe.Invoice) {
     : rawSubscription?.id ?? null;
 }
 
-export async function POST(req: Request) {
-  const body = await req.text();
-  const signature = req.headers.get("stripe-signature");
+async function resolveCompanyIdFromSubscription(
+  stripeSubscriptionId: string,
+  metadataCompanyId?: string | null
+) {
+  if (metadataCompanyId) return metadataCompanyId;
 
-  if (!signature) {
-    console.error("Stripe signature ausente");
-    return NextResponse.json({ error: "Missing stripe-signature" }, { status: 400 });
-  }
-
-  let event: Stripe.Event;
-
-  try {
-    event = stripe.webhooks.constructEvent(body, signature, endpointSecret);
-} catch (err: any) {
-    console.error("Erro ao validar webhook:", err.message);
-    return NextResponse.json(
-      { error: `Webhook error: ${err.message}` },
-      { status: 400 },
-    );
-  } 
-
-  console.log("Webhook recebido:", event.type);
-
-  try {
-      const billingData = extractBillingEventData(event);
-
-      const { error: billingEventInsertError } = await supabase
-        .from("billing_events")
-        .insert({
-          stripe_event_id: event.id,
-          event_type: event.type,
-          stripe_customer_id: billingData.stripeCustomerId,
-          stripe_subscription_id: billingData.stripeSubscriptionId,
-          stripe_invoice_id: billingData.stripeInvoiceId,
-          company_id: billingData.companyId,
-          payload: event,
-          processed: false,
-        });
-
-        if (billingEventInsertError) {
-          const isDuplicate =
-            billingEventInsertError.code === "23505" ||
-            billingEventInsertError.message?.toLowerCase().includes("duplicate") ||
-            billingEventInsertError.message?.toLowerCase().includes("unique");
-
-          if (isDuplicate) {
-            return NextResponse.json({ received: true, duplicate: true });
-          }
-
-          throw billingEventInsertError;
-        }
-
-    switch (event.type) {
-      case "checkout.session.completed": {
-        const session = event.data.object as Stripe.Checkout.Session;
-
-        let companyId = session.metadata?.companyId ?? null;
-        const subscriptionId =
-          typeof session.subscription === "string"
-            ? session.subscription
-            : session.subscription?.id ?? null;
-        const customerId =
-          typeof session.customer === "string"
-            ? session.customer
-            : session.customer?.id ?? null;
-
-        if (!companyId && subscriptionId) {
-          const { data: existingSubscription } = await supabase
-            .from("subscriptions")
-            .select("company_id")
-            .eq("stripe_subscription_id", subscriptionId)
-            .maybeSingle();
-
-          companyId = existingSubscription?.company_id ?? null;
-        }
-
-        if (!companyId) {
-          console.warn("checkout.session.completed sem companyId");
-          break;
-        }
-
-        let stripePriceId: string | null = null;
-let status: string | null = null;
-let currentPeriodStart: string | null = null;
-let currentPeriodEnd: string | null = null;
-let cancelAtPeriodEnd = false;
-let latestInvoiceId: string | null = null;
-let startedAt: string | null = null;
-let trialStart: string | null = null;
-let trialEnd: string | null = null;
-
-if (subscriptionId) {
-  const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
-    expand: ["latest_invoice"],
-  });
-
-  stripePriceId = subscription.items.data[0]?.price?.id ?? null;
-  status = subscription.status;
-  cancelAtPeriodEnd = subscription.cancel_at_period_end;
-
-const rawCurrentPeriodStart = getSubscriptionPeriodStart(subscription);
-const rawCurrentPeriodEnd = getSubscriptionPeriodEnd(subscription);
-
-  currentPeriodStart = rawCurrentPeriodStart
-    ? new Date(rawCurrentPeriodStart * 1000).toISOString()
-    : null;
-
-  currentPeriodEnd = rawCurrentPeriodEnd
-    ? new Date(rawCurrentPeriodEnd * 1000).toISOString()
-    : null;
-
-  latestInvoiceId =
-    typeof subscription.latest_invoice === "string"
-      ? subscription.latest_invoice
-      : subscription.latest_invoice?.id ?? null;
-
-  startedAt = subscription.start_date
-    ? new Date(subscription.start_date * 1000).toISOString()
-    : null;
-
-  trialStart = subscription.trial_start
-    ? new Date(subscription.trial_start * 1000).toISOString()
-    : null;
-
-  trialEnd = subscription.trial_end
-    ? new Date(subscription.trial_end * 1000).toISOString()
-    : null;
-}
-
-console.log("checkout.session.completed -> upsert", {
-  companyId,
-  customerId,
-  subscriptionId,
-  stripePriceId,
-  status,
-});
-
-        const { error } = await supabase.from("subscriptions").upsert(
-          {
-            company_id: companyId,
-            stripe_customer_id: customerId,
-            stripe_subscription_id: subscriptionId,
-            price_id: stripePriceId,
-            status: status ?? "active",
-            started_at: startedAt,
-            current_period_start: currentPeriodStart,
-            current_period_end: currentPeriodEnd,
-            cancel_at_period_end: cancelAtPeriodEnd,
-            latest_invoice_id: latestInvoiceId,
-            metadata: session.metadata ?? {},
-            raw_payload: session,
-            updated_at: new Date().toISOString(),
-            trial_start: trialStart,
-            trial_end: trialEnd,  
-          },
-          {
-            onConflict: "stripe_subscription_id",
-          },
-        );
-
-        if (error) {
-          console.error("Erro ao inserir subscription:", error);
-          throw error;
-        }
-
-        break;
-      }
-
-case "customer.subscription.created": {
-  const subscription = event.data.object as Stripe.Subscription;
-
-const rawCurrentPeriodStart = getSubscriptionPeriodStart(subscription);
-const rawCurrentPeriodEnd = getSubscriptionPeriodEnd(subscription);
-
-const currentPeriodStart = rawCurrentPeriodStart
-  ? new Date(rawCurrentPeriodStart * 1000).toISOString()
-  : null;
-
-const currentPeriodEnd = rawCurrentPeriodEnd
-  ? new Date(rawCurrentPeriodEnd * 1000).toISOString()
-  : null;
-
-  const latestInvoiceId =
-    typeof subscription.latest_invoice === "string"
-      ? subscription.latest_invoice
-      : subscription.latest_invoice?.id ?? null;
-
-  const companyId = subscription.metadata?.companyId ?? null;
-  const customerId =
-    typeof subscription.customer === "string"
-      ? subscription.customer
-      : subscription.customer?.id ?? null;
-
-  const trialStart = subscription.trial_start
-  ? new Date(subscription.trial_start * 1000).toISOString()
-  : null;
-
-const trialEnd = subscription.trial_end
-  ? new Date(subscription.trial_end * 1000).toISOString()
-  : null;
-
-  let resolvedCompanyId = companyId;
-
-  if (!resolvedCompanyId) {
-    const { data: existingSubscription } = await supabase
-      .from("subscriptions")
-      .select("company_id")
-      .eq("stripe_subscription_id", subscription.id)
-      .maybeSingle();
-
-    resolvedCompanyId = existingSubscription?.company_id ?? null;
-  }
-
-  if (!resolvedCompanyId) {
-    throw new Error("company_id não encontrado para customer.subscription.created");
-  }
-
-  console.log("customer.subscription.created -> upsert", {
-  resolvedCompanyId,
-  customerId,
-  subscriptionId: subscription.id,
-  priceId: subscription.items.data[0]?.price?.id ?? null,
-  status: subscription.status,
-});
-
-  const { error } = await supabase.from("subscriptions").upsert(
-    {
-      company_id: resolvedCompanyId,
-      stripe_customer_id: customerId,
-      stripe_subscription_id: subscription.id,
-      price_id: subscription.items.data[0]?.price?.id ?? null,
-      status: subscription.status,
-      cancel_at_period_end: subscription.cancel_at_period_end,
-      canceled_at: subscription.canceled_at
-        ? new Date(subscription.canceled_at * 1000).toISOString()
-        : null,
-      latest_invoice_id: latestInvoiceId,
-      metadata: subscription.metadata ?? {},
-      raw_payload: subscription,
-      updated_at: new Date().toISOString(),
-      current_period_start: currentPeriodStart,
-      current_period_end: currentPeriodEnd,
-      started_at: subscription.start_date
-        ? new Date(subscription.start_date * 1000).toISOString()
-        : null,
-      trial_start: trialStart,
-      trial_end: trialEnd,  
-    },
-    {
-      onConflict: "stripe_subscription_id",
-    },
-  );
+  const { data: existingSubscription, error } = await supabase
+    .from("subscriptions")
+    .select("company_id")
+    .eq("stripe_subscription_id", stripeSubscriptionId)
+    .maybeSingle();
 
   if (error) {
-    console.error("Erro ao criar subscription:", error);
     throw error;
   }
 
-  break;
+  return existingSubscription?.company_id ?? null;
 }
 
-case "customer.subscription.updated":
-case "customer.subscription.deleted": {
-  const eventSubscription = event.data.object as Stripe.Subscription;
-
-  const subscription = await stripe.subscriptions.retrieve(eventSubscription.id, {
-    expand: ["latest_invoice"],
-  });
-
+async function upsertSubscriptionFromStripeSubscription(
+  subscription: Stripe.Subscription | Stripe.Response<Stripe.Subscription>,
+  companyId: string
+) {
   const rawCurrentPeriodStart = getSubscriptionPeriodStart(subscription);
   const rawCurrentPeriodEnd = getSubscriptionPeriodEnd(subscription);
 
@@ -426,139 +183,291 @@ case "customer.subscription.deleted": {
       ? subscription.customer
       : subscription.customer?.id ?? null;
 
-  let resolvedCompanyId = subscription.metadata?.companyId ?? null;
+  const startedAt = subscription.start_date
+    ? new Date(subscription.start_date * 1000).toISOString()
+    : null;
 
-  if (!resolvedCompanyId) {
-    const { data: existingSubscription } = await supabase
-      .from("subscriptions")
-      .select("company_id")
-      .eq("stripe_subscription_id", subscription.id)
-      .maybeSingle();
+  const trialStart = subscription.trial_start
+    ? new Date(subscription.trial_start * 1000).toISOString()
+    : null;
 
-    resolvedCompanyId = existingSubscription?.company_id ?? null;
+  const trialEnd = subscription.trial_end
+    ? new Date(subscription.trial_end * 1000).toISOString()
+    : null;
+
+  const payload = {
+    company_id: companyId,
+    stripe_customer_id: customerId,
+    stripe_subscription_id: subscription.id,
+    price_id: subscription.items.data[0]?.price?.id ?? null,
+    status: subscription.status,
+    started_at: startedAt,
+    current_period_start: currentPeriodStart,
+    current_period_end: currentPeriodEnd,
+    cancel_at_period_end: subscription.cancel_at_period_end,
+    canceled_at: subscription.canceled_at
+      ? new Date(subscription.canceled_at * 1000).toISOString()
+      : null,
+    latest_invoice_id: latestInvoiceId,
+    metadata: subscription.metadata ?? {},
+    raw_payload: subscription,
+    updated_at: new Date().toISOString(),
+    trial_start: trialStart,
+    trial_end: trialEnd,
+  };
+
+  console.log("subscription upsert payload:", {
+    companyId,
+    subscriptionId: subscription.id,
+    customerId,
+    priceId: payload.price_id,
+    status: payload.status,
+  });
+
+  const { error } = await supabase.from("subscriptions").upsert(payload, {
+    onConflict: "stripe_subscription_id",
+  });
+
+  if (error) {
+    console.error("Erro ao fazer upsert da subscription:", error);
+    throw error;
   }
+}
 
-  if (!resolvedCompanyId) {
-    throw new Error(
-      `company_id não encontrado para ${event.type} da subscription ${subscription.id}`
+export async function POST(req: Request) {
+  const body = await req.text();
+  const signature = req.headers.get("stripe-signature");
+
+  if (!signature) {
+    console.error("Stripe signature ausente");
+    return NextResponse.json(
+      { error: "Missing stripe-signature" },
+      { status: 400 }
     );
   }
 
-console.log(`${event.type} -> upsert`, {
-  resolvedCompanyId,
-  customerId,
-  subscriptionId: subscription.id,
-  priceId: subscription.items.data[0]?.price?.id ?? null,
-  status: subscription.status,
-});
+  let event: Stripe.Event;
 
-  const { error } = await supabase.from("subscriptions").upsert(
-    {
-      company_id: resolvedCompanyId,
-      stripe_customer_id: customerId,
-      stripe_subscription_id: subscription.id,
-      price_id: subscription.items.data[0]?.price?.id ?? null,
-      status: subscription.status,
-      cancel_at_period_end: subscription.cancel_at_period_end,
-      canceled_at: subscription.canceled_at
-        ? new Date(subscription.canceled_at * 1000).toISOString()
-        : null,
-      latest_invoice_id: latestInvoiceId,
-      metadata: subscription.metadata ?? {},
-      raw_payload: subscription,
-      updated_at: new Date().toISOString(),
-      current_period_start: currentPeriodStart,
-      current_period_end: currentPeriodEnd,
-      started_at: subscription.start_date
-        ? new Date(subscription.start_date * 1000).toISOString()
-        : null,
-      trial_start: subscription.trial_start
-        ? new Date(subscription.trial_start * 1000).toISOString()
-        : null,
-      trial_end: subscription.trial_end
-        ? new Date(subscription.trial_end * 1000).toISOString()
-        : null,
-    },
-    {
-      onConflict: "stripe_subscription_id",
-    }
-  );
-
-  if (error) {
-    console.error("Erro ao atualizar/upsert subscription:", error);
-    throw error;
+  try {
+    event = stripe.webhooks.constructEvent(body, signature, endpointSecret);
+  } catch (err: any) {
+    console.error("Erro ao validar webhook:", err.message);
+    return NextResponse.json(
+      { error: `Webhook error: ${err.message}` },
+      { status: 400 }
+    );
   }
 
-  break;
-}
+  console.log("Webhook recebido:", event.type);
+
+  try {
+    const billingData = extractBillingEventData(event);
+
+    const { error: billingEventInsertError } = await supabase
+      .from("billing_events")
+      .insert({
+        stripe_event_id: event.id,
+        event_type: event.type,
+        stripe_customer_id: billingData.stripeCustomerId,
+        stripe_subscription_id: billingData.stripeSubscriptionId,
+        stripe_invoice_id: billingData.stripeInvoiceId,
+        company_id: billingData.companyId,
+        payload: event,
+        processed: false,
+      });
+
+    if (billingEventInsertError) {
+      const isDuplicate =
+        billingEventInsertError.code === "23505" ||
+        billingEventInsertError.message?.toLowerCase().includes("duplicate") ||
+        billingEventInsertError.message?.toLowerCase().includes("unique");
+
+      if (isDuplicate) {
+        return NextResponse.json({ received: true, duplicate: true });
+      }
+
+      throw billingEventInsertError;
+    }
+
+    switch (event.type) {
+      case "checkout.session.completed": {
+        const session = event.data.object as Stripe.Checkout.Session;
+
+        let companyId = session.metadata?.companyId ?? null;
+        const subscriptionId =
+          typeof session.subscription === "string"
+            ? session.subscription
+            : session.subscription?.id ?? null;
+
+        if (!subscriptionId) {
+          throw new Error("checkout.session.completed sem subscriptionId");
+        }
+
+        if (!companyId) {
+          companyId = await resolveCompanyIdFromSubscription(subscriptionId);
+        }
+
+        if (!companyId) {
+          throw new Error("checkout.session.completed sem companyId");
+        }
+
+        const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
+          expand: ["latest_invoice"],
+        });
+
+        console.log("checkout.session.completed -> upsert", {
+          companyId,
+          subscriptionId: subscription.id,
+          status: subscription.status,
+        });
+
+        await upsertSubscriptionFromStripeSubscription(subscription, companyId);
+        break;
+      }
+
+      case "customer.subscription.created": {
+        const subscription = event.data.object as Stripe.Subscription;
+
+        const resolvedCompanyId = await resolveCompanyIdFromSubscription(
+          subscription.id,
+          subscription.metadata?.companyId ?? null
+        );
+
+        if (!resolvedCompanyId) {
+          throw new Error(
+            `company_id não encontrado para customer.subscription.created da subscription ${subscription.id}`
+          );
+        }
+
+        console.log("customer.subscription.created -> upsert", {
+          companyId: resolvedCompanyId,
+          subscriptionId: subscription.id,
+          status: subscription.status,
+        });
+
+        await upsertSubscriptionFromStripeSubscription(
+          subscription,
+          resolvedCompanyId
+        );
+        break;
+      }
+
+      case "customer.subscription.updated":
+      case "customer.subscription.deleted": {
+        const eventSubscription = event.data.object as Stripe.Subscription;
+
+        const subscription = await stripe.subscriptions.retrieve(
+          eventSubscription.id,
+          {
+            expand: ["latest_invoice"],
+          }
+        );
+
+        const resolvedCompanyId = await resolveCompanyIdFromSubscription(
+          subscription.id,
+          subscription.metadata?.companyId ?? null
+        );
+
+        if (!resolvedCompanyId) {
+          throw new Error(
+            `company_id não encontrado para ${event.type} da subscription ${subscription.id}`
+          );
+        }
+
+        console.log(`${event.type} -> upsert`, {
+          companyId: resolvedCompanyId,
+          subscriptionId: subscription.id,
+          status: subscription.status,
+        });
+
+        await upsertSubscriptionFromStripeSubscription(
+          subscription,
+          resolvedCompanyId
+        );
+        break;
+      }
 
       case "invoice.payment_succeeded": {
-  const invoice = event.data.object as Stripe.Invoice;
+        const invoice = event.data.object as Stripe.Invoice;
+        const subscriptionId = getInvoiceSubscriptionId(invoice);
 
-  const subscriptionId = getInvoiceSubscriptionId(invoice);
+        if (!subscriptionId) {
+          console.warn("invoice.payment_succeeded sem subscriptionId");
+          break;
+        }
 
-  const customerId =
-    typeof invoice.customer === "string"
-      ? invoice.customer
-      : invoice.customer?.id ?? null;
+        const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
+          expand: ["latest_invoice"],
+        });
 
-  const stripePriceId =
-    invoice.lines?.data?.[0]?.pricing?.type === "price_details"
-      ? invoice.lines.data[0].pricing.price_details?.price ?? null
-      : null;
+        const resolvedCompanyId = await resolveCompanyIdFromSubscription(
+          subscription.id,
+          subscription.metadata?.companyId ?? null
+        );
 
-  if (subscriptionId) {
-    const stripeSubscription = await stripe.subscriptions.retrieve(subscriptionId);
+        if (!resolvedCompanyId) {
+          throw new Error(
+            `company_id não encontrado para invoice.payment_succeeded da subscription ${subscription.id}`
+          );
+        }
 
-    const nextStatus = stripeSubscription.status; // trialing, active, etc.
+        console.log("invoice.payment_succeeded -> upsert", {
+          companyId: resolvedCompanyId,
+          subscriptionId: subscription.id,
+          status: subscription.status,
+        });
 
-    const { error } = await supabase
-      .from("subscriptions")
-      .update({
-        status: nextStatus,
-        stripe_customer_id: customerId,
-        price_id: stripePriceId,
-        latest_invoice_id: invoice.id,
-        raw_payload: invoice,
-        updated_at: new Date().toISOString(),
-        trial_start: stripeSubscription.trial_start
-          ? new Date(stripeSubscription.trial_start * 1000).toISOString()
-          : null,
-        trial_end: stripeSubscription.trial_end
-          ? new Date(stripeSubscription.trial_end * 1000).toISOString()
-          : null,
-      })
-      .eq("stripe_subscription_id", subscriptionId);
-
-    if (error) throw error;
-  }
-
-  break;
-}
+        await upsertSubscriptionFromStripeSubscription(
+          subscription,
+          resolvedCompanyId
+        );
+        break;
+      }
 
       case "invoice.payment_failed": {
         const invoice = event.data.object as Stripe.Invoice;
+        const subscriptionId = getInvoiceSubscriptionId(invoice);
 
-const subscriptionId = getInvoiceSubscriptionId(invoice);
+        if (!subscriptionId) {
+          console.warn("invoice.payment_failed sem subscriptionId");
+          break;
+        }
+
+        const resolvedCompanyId = await resolveCompanyIdFromSubscription(
+          subscriptionId
+        );
+
+        if (!resolvedCompanyId) {
+          throw new Error(
+            `company_id não encontrado para invoice.payment_failed da subscription ${subscriptionId}`
+          );
+        }
 
         const customerId =
           typeof invoice.customer === "string"
             ? invoice.customer
             : invoice.customer?.id ?? null;
 
-        if (subscriptionId) {
-          const { error } = await supabase
-            .from("subscriptions")
-            .update({
-              status: "past_due",
+        const { error } = await supabase
+          .from("subscriptions")
+          .upsert(
+            {
+              company_id: resolvedCompanyId,
               stripe_customer_id: customerId,
+              stripe_subscription_id: subscriptionId,
+              status: "past_due",
               latest_invoice_id: invoice.id,
               raw_payload: invoice,
               updated_at: new Date().toISOString(),
-            })
-            .eq("stripe_subscription_id", subscriptionId);
+            },
+            {
+              onConflict: "stripe_subscription_id",
+            }
+          );
 
-          if (error) throw error;
+        if (error) {
+          console.error("Erro ao processar invoice.payment_failed:", error);
+          throw error;
         }
 
         break;
@@ -567,19 +476,36 @@ const subscriptionId = getInvoiceSubscriptionId(invoice);
       case "customer.subscription.trial_will_end": {
         const subscription = event.data.object as Stripe.Subscription;
 
+        const resolvedCompanyId = await resolveCompanyIdFromSubscription(
+          subscription.id,
+          subscription.metadata?.companyId ?? null
+        );
+
+        if (!resolvedCompanyId) {
+          throw new Error(
+            `company_id não encontrado para customer.subscription.trial_will_end da subscription ${subscription.id}`
+          );
+        }
+
         const trialEnd = subscription.trial_end
           ? new Date(subscription.trial_end * 1000).toISOString()
           : null;
 
         const { error } = await supabase
           .from("subscriptions")
-          .update({
-            trial_will_end_notified: true,
-            trial_will_end_notified_at: new Date().toISOString(),
-            trial_end: trialEnd,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("stripe_subscription_id", subscription.id);
+          .upsert(
+            {
+              company_id: resolvedCompanyId,
+              stripe_subscription_id: subscription.id,
+              trial_will_end_notified: true,
+              trial_will_end_notified_at: new Date().toISOString(),
+              trial_end: trialEnd,
+              updated_at: new Date().toISOString(),
+            },
+            {
+              onConflict: "stripe_subscription_id",
+            }
+          );
 
         if (error) {
           console.error("Erro ao marcar aviso de fim do trial:", error);
@@ -606,32 +532,32 @@ const subscriptionId = getInvoiceSubscriptionId(invoice);
   } catch (err: any) {
     console.error(
       "Erro ao processar webhook:",
-      err instanceof Error ? err.message : err,
-    );  
+      err instanceof Error ? err.message : err
+    );
 
-const errorMessage =
-  err instanceof Error
-    ? err.message
-    : typeof err === "string"
-      ? err
-      : JSON.stringify(err);
-
-await supabase
-  .from("billing_events")
-  .update({
-    processed: false,
-    error: errorMessage,
-  })
-  .eq("stripe_event_id", event.id);
-
-return NextResponse.json(
-  {
-    error:
+    const errorMessage =
       err instanceof Error
         ? err.message
-        : "Erro ao processar webhook",
-  },
-  { status: 500 },
-);
+        : typeof err === "string"
+          ? err
+          : JSON.stringify(err);
+
+    await supabase
+      .from("billing_events")
+      .update({
+        processed: false,
+        error: errorMessage,
+      })
+      .eq("stripe_event_id", event.id);
+
+    return NextResponse.json(
+      {
+        error:
+          err instanceof Error
+            ? err.message
+            : "Erro ao processar webhook",
+      },
+      { status: 500 }
+    );
   }
 }
