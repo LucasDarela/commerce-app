@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import SubscriptionManager from "@/components/subscription/SubscriptionManager";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
@@ -34,107 +34,139 @@ type CompanyRow = {
   billing_exempt: boolean;
 };
 
+type CompanyUserRow = {
+  role: string | null;
+};
+
 export default function BillingPage() {
-  const supabase = createClientComponentClient();
+  const supabase = useMemo(() => createClientComponentClient(), []);
   const { companyId, loading: authLoading } = useAuthenticatedCompany();
-const [userRole, setUserRole] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const success = searchParams.get("success");
+
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [subscriptionData, setSubscriptionData] =
     useState<SubscriptionRow | null>(null);
   const [proPlan, setProPlan] = useState<PlanRow | null>(null);
   const [companyData, setCompanyData] = useState<CompanyRow | null>(null);
-  const searchParams = useSearchParams();
-const success = searchParams.get("success");
   const [loading, setLoading] = useState(true);
 
-useEffect(() => {
-  async function fetchBillingData() {
-    if (!companyId) return;
+  const lastFetchedCompanyIdRef = useRef<string | null>(null);
 
-    setLoading(true);
+  const fetchBillingData = useCallback(
+    async ({ showLoading = false }: { showLoading?: boolean } = {}) => {
+      if (!companyId) return;
 
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+      if (showLoading) {
+        setLoading(true);
+      }
 
-    if (userError) {
-      console.error("Erro ao buscar usuário autenticado:", userError);
-    }
+      try {
+        const {
+          data: { user },
+          error: userError,
+        } = await supabase.auth.getUser();
 
-    const rawRole =
-      (user?.user_metadata?.role as string | undefined) ||
-      (user?.user_metadata?.invited_role as string | undefined) ||
-      (user?.app_metadata?.role as string | undefined) ||
-      null;
+        if (userError) {
+          console.error("Erro ao buscar usuário autenticado:", userError);
+        }
 
-    const normalizedRole =
-      rawRole === "motorista"
-        ? "driver"
-        : rawRole === "usuario"
-          ? "normal"
-          : rawRole;
+        const userId = user?.id ?? null;
 
-    setUserRole(normalizedRole ?? null);
+        const queries = await Promise.all([
+          userId
+            ? supabase
+                .from("company_users")
+                .select("role")
+                .eq("company_id", companyId)
+                .eq("user_id", userId)
+                .maybeSingle<CompanyUserRow>()
+            : Promise.resolve({ data: null, error: null }),
+          supabase
+            .from("subscriptions")
+            .select(
+              "id, company_id, price_id, status, trial_end, trial_will_end_notified, cancel_at_period_end, current_period_end, updated_at"
+            )
+            .eq("company_id", companyId)
+            .order("updated_at", { ascending: false })
+            .limit(1)
+            .maybeSingle<SubscriptionRow>(),
+          supabase
+            .from("plans")
+            .select("id, name, stripe_price_id, price, currency, interval")
+            .ilike("name", "pro")
+            .maybeSingle<PlanRow>(),
+          supabase
+            .from("companies")
+            .select("billing_exempt")
+            .eq("id", companyId)
+            .maybeSingle<CompanyRow>(),
+        ]);
 
-    console.log("Billing rawRole:", rawRole);
-console.log("Billing normalizedRole:", normalizedRole);
+        const [
+          { data: companyUser, error: companyUserError },
+          { data: subscription, error: subscriptionError },
+          { data: plan, error: planError },
+          { data: company, error: companyError },
+        ] = queries;
 
-    const [
-      { data: subscription, error: subscriptionError },
-      { data: plan, error: planError },
-      { data: company, error: companyError },
-    ] = await Promise.all([
-      supabase
-        .from("subscriptions")
-        .select(
-          "id, company_id, price_id, status, trial_end, trial_will_end_notified, cancel_at_period_end, current_period_end, updated_at",
-        )
-        .eq("company_id", companyId)
-        .order("updated_at", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-      supabase
-        .from("plans")
-        .select("id, name, stripe_price_id, price, currency, interval")
-        .ilike("name", "pro")
-        .maybeSingle(),
-      supabase
-        .from("companies")
-        .select("billing_exempt")
-        .eq("id", companyId)
-        .maybeSingle(),
-    ]);
+        if (companyUserError) {
+          console.error("Erro ao buscar role em company_users:", companyUserError);
+        }
 
-    console.log("Billing subscription result:", subscription);
-console.log("Billing subscription error:", subscriptionError);
-console.log("Billing plan result:", plan);
-console.log("Billing plan error:", planError);
-console.log("Billing company result:", company);
-console.log("Billing company error:", companyError);
+        if (subscriptionError) {
+          console.error("Erro ao buscar assinatura:", subscriptionError);
+        }
 
-    if (subscriptionError) {
-      console.error("Erro ao buscar assinatura:", subscriptionError);
-    }
+        if (planError) {
+          console.error("Erro ao buscar plano Pro:", planError);
+        }
 
-    if (planError) {
-      console.error("Erro ao buscar plano Pro:", planError);
-    }
+        if (companyError) {
+          console.error("Erro ao buscar empresa:", companyError);
+        }
 
-    if (companyError) {
-      console.error("Erro ao buscar empresa:", companyError);
-    }
+        const rawRole = companyUser?.role ?? null;
 
-    setSubscriptionData(subscription ?? null);
-    setProPlan(plan ?? null);
-    setCompanyData(company ?? null);
-    setLoading(false);
-  }
+        const normalizedRole =
+          rawRole === "motorista"
+            ? "driver"
+            : rawRole === "usuario"
+              ? "normal"
+              : rawRole;
 
-  fetchBillingData();
+        setUserRole(normalizedRole ?? null);
+        setSubscriptionData(subscription ?? null);
+        setProPlan(plan ?? null);
+        setCompanyData(company ?? null);
 
-  if (companyId && success === "true") {
+        console.log("Billing role from company_users:", rawRole);
+        console.log("Billing normalizedRole:", normalizedRole);
+        console.log("Billing subscription result:", subscription);
+        console.log("Billing plan result:", plan);
+        console.log("Billing company result:", company);
+      } catch (error) {
+        console.error("Erro inesperado ao buscar dados da Billing:", error);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [companyId, supabase]
+  );
+
+  useEffect(() => {
+    if (authLoading || !companyId) return;
+    if (lastFetchedCompanyIdRef.current === companyId) return;
+
+    lastFetchedCompanyIdRef.current = companyId;
+    fetchBillingData({ showLoading: true });
+  }, [authLoading, companyId, fetchBillingData]);
+
+  useEffect(() => {
+    if (!companyId || success !== "true") return;
+
     const interval = setInterval(() => {
-      fetchBillingData();
+      fetchBillingData({ showLoading: false });
     }, 2000);
 
     const timeout = setTimeout(() => {
@@ -145,8 +177,7 @@ console.log("Billing company error:", companyError);
       clearInterval(interval);
       clearTimeout(timeout);
     };
-  }
-}, [companyId, supabase, success]);
+  }, [companyId, success, fetchBillingData]);
 
   if (authLoading || loading) {
     return <div>Carregando assinatura...</div>;
@@ -157,37 +188,37 @@ console.log("Billing company error:", companyError);
   }
 
   if (userRole === "driver") {
-  return (
-    <div className="max-w-3xl mx-auto p-6">
-      <div className="rounded-3xl border bg-card p-8 shadow-sm">
-        <div className="mx-auto max-w-2xl text-center">
-          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full border border-amber-200 bg-amber-50">
-            <span className="text-2xl">🔒</span>
-          </div>
+    return (
+      <div className="max-w-3xl mx-auto p-6">
+        <div className="rounded-3xl border bg-card p-8 shadow-sm">
+          <div className="mx-auto max-w-2xl text-center">
+            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full border border-amber-200 bg-amber-50">
+              <span className="text-2xl">🔒</span>
+            </div>
 
-          <h1 className="text-3xl font-semibold tracking-tight">
-            Acesso indisponível
-          </h1>
+            <h1 className="text-3xl font-semibold tracking-tight">
+              Acesso indisponível
+            </h1>
 
-          <p className="mt-3 text-sm text-muted-foreground md:text-base">
-            A página de cobrança está disponível apenas para administradores e
-            usuários responsáveis pela gestão da assinatura.
-          </p>
+            <p className="mt-3 text-sm text-muted-foreground md:text-base">
+              A página de cobrança está disponível apenas para administradores e
+              usuários responsáveis pela gestão da assinatura.
+            </p>
 
-          <div className="mt-8 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-            Seu perfil não possui permissão para acessar esta área.
-          </div>
+            <div className="mt-8 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+              Seu perfil não possui permissão para acessar esta área.
+            </div>
 
-          <div className="mt-8">
-            <Button asChild className="h-11 px-6">
-              <Link href="/dashboard/orders">Voltar para pedidos</Link>
-            </Button>
+            <div className="mt-8">
+              <Button asChild className="h-11 px-6">
+                <Link href="/dashboard/orders">Voltar para pedidos</Link>
+              </Button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
   if (companyData?.billing_exempt) {
     return (
