@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import SubscriptionManager from "@/components/subscription/SubscriptionManager";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import TrialStartButton from "@/components/subscription/TrialStartButton";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { useSearchParams } from "next/navigation";
 
 type PlanRow = {
   id: string;
@@ -26,6 +27,7 @@ type SubscriptionRow = {
   trial_will_end_notified: boolean | null;
   cancel_at_period_end: boolean | null;
   current_period_end: string | null;
+  updated_at?: string | null;
 };
 
 type CompanyRow = {
@@ -40,84 +42,101 @@ const [userRole, setUserRole] = useState<string | null>(null);
     useState<SubscriptionRow | null>(null);
   const [proPlan, setProPlan] = useState<PlanRow | null>(null);
   const [companyData, setCompanyData] = useState<CompanyRow | null>(null);
+  const searchParams = useSearchParams();
+const success = searchParams.get("success");
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-async function fetchBillingData() {
-  if (!companyId) return;
+useEffect(() => {
+  async function fetchBillingData() {
+    if (!companyId) return;
 
-  setLoading(true);
+    setLoading(true);
 
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
 
-  if (userError) {
-    console.error("Erro ao buscar usuário autenticado:", userError);
-  }
-
-  const rawRole =
-    (user?.user_metadata?.role as string | undefined) ||
-    (user?.user_metadata?.invited_role as string | undefined) ||
-    (user?.app_metadata?.role as string | undefined) ||
-    null;
-
-  const normalizedRole =
-    rawRole === "motorista"
-      ? "driver"
-      : rawRole === "usuario"
-        ? "normal"
-        : rawRole;
-
-  setUserRole(normalizedRole ?? null);
-
-  const [
-    { data: subscription, error: subscriptionError },
-    { data: plan, error: planError },
-    { data: company, error: companyError },
-  ] = await Promise.all([
-        supabase
-          .from("subscriptions")
-          .select(
-            "id, company_id, price_id, status, trial_end, trial_will_end_notified, cancel_at_period_end, current_period_end",
-          )
-          .eq("company_id", companyId)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-        supabase
-          .from("plans")
-          .select("id, name, stripe_price_id, price, currency, interval")
-          .ilike("name", "pro")
-          .maybeSingle(),
-        supabase
-          .from("companies")
-          .select("billing_exempt")
-          .eq("id", companyId)
-          .maybeSingle(),
-      ]);
-
-      if (subscriptionError) {
-        console.error("Erro ao buscar assinatura:", subscriptionError);
-      }
-
-      if (planError) {
-        console.error("Erro ao buscar plano Pro:", planError);
-      }
-
-      if (companyError) {
-        console.error("Erro ao buscar empresa:", companyError);
-      }
-
-      setSubscriptionData(subscription ?? null);
-      setProPlan(plan ?? null);
-      setCompanyData(company ?? null);
-      setLoading(false);
+    if (userError) {
+      console.error("Erro ao buscar usuário autenticado:", userError);
     }
 
-    fetchBillingData();
-  }, [companyId, supabase]);
+    const rawRole =
+      (user?.user_metadata?.role as string | undefined) ||
+      (user?.user_metadata?.invited_role as string | undefined) ||
+      (user?.app_metadata?.role as string | undefined) ||
+      null;
+
+    const normalizedRole =
+      rawRole === "motorista"
+        ? "driver"
+        : rawRole === "usuario"
+          ? "normal"
+          : rawRole;
+
+    setUserRole(normalizedRole ?? null);
+
+    const [
+      { data: subscription, error: subscriptionError },
+      { data: plan, error: planError },
+      { data: company, error: companyError },
+    ] = await Promise.all([
+      supabase
+        .from("subscriptions")
+        .select(
+          "id, company_id, price_id, status, trial_end, trial_will_end_notified, cancel_at_period_end, current_period_end, updated_at",
+        )
+        .eq("company_id", companyId)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("plans")
+        .select("id, name, stripe_price_id, price, currency, interval")
+        .ilike("name", "pro")
+        .maybeSingle(),
+      supabase
+        .from("companies")
+        .select("billing_exempt")
+        .eq("id", companyId)
+        .maybeSingle(),
+    ]);
+
+    if (subscriptionError) {
+      console.error("Erro ao buscar assinatura:", subscriptionError);
+    }
+
+    if (planError) {
+      console.error("Erro ao buscar plano Pro:", planError);
+    }
+
+    if (companyError) {
+      console.error("Erro ao buscar empresa:", companyError);
+    }
+
+    setSubscriptionData(subscription ?? null);
+    setProPlan(plan ?? null);
+    setCompanyData(company ?? null);
+    setLoading(false);
+  }
+
+  fetchBillingData();
+
+  if (companyId && success === "true") {
+    const interval = setInterval(() => {
+      fetchBillingData();
+    }, 2000);
+
+    const timeout = setTimeout(() => {
+      clearInterval(interval);
+    }, 15000);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
+  }
+}, [companyId, supabase, success]);
 
   if (authLoading || loading) {
     return <div>Carregando assinatura...</div>;
