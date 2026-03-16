@@ -76,6 +76,9 @@ useEffect(() => {
 
     setUserRole(normalizedRole ?? null);
 
+    console.log("Billing rawRole:", rawRole);
+console.log("Billing normalizedRole:", normalizedRole);
+
     const [
       { data: subscription, error: subscriptionError },
       { data: plan, error: planError },
@@ -101,6 +104,13 @@ useEffect(() => {
         .eq("id", companyId)
         .maybeSingle(),
     ]);
+
+    console.log("Billing subscription result:", subscription);
+console.log("Billing subscription error:", subscriptionError);
+console.log("Billing plan result:", plan);
+console.log("Billing plan error:", planError);
+console.log("Billing company result:", company);
+console.log("Billing company error:", companyError);
 
     if (subscriptionError) {
       console.error("Erro ao buscar assinatura:", subscriptionError);
