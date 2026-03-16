@@ -20,20 +20,34 @@ export default async function ProtectedOpsLayout({
     redirect("/login-signin");
   }
 
-  const { data: cu, error: companyUserError } = await supabase
-    .from("company_users")
-    .select("role, company_id")
-    .eq("user_id", user.id)
-    .maybeSingle();
+const { data: cu, error: companyUserError } = await supabase
+  .from("company_users")
+  .select("company_id, role")
+  .eq("user_id", user.id)
+  .maybeSingle();
 
-  const role = (cu as any)?.role;
-  const companyId = (cu as any)?.company_id;
+const companyId = (cu as any)?.company_id;
+const companyUserRole = (cu as any)?.role ?? null;
 
   if (companyUserError || !companyId) {
     redirect("/dashboard/forbidden");
   }
 
-  if (!["admin", "normal", "driver"].includes(role)) {
+const rawRole =
+  (user.user_metadata?.role as string | undefined) ||
+  (user.user_metadata?.invited_role as string | undefined) ||
+  (user.app_metadata?.role as string | undefined) ||
+  companyUserRole ||
+  null;
+
+  const normalizedRole =
+    rawRole === "motorista"
+      ? "driver"
+      : rawRole === "usuario"
+        ? "normal"
+        : rawRole;
+
+  if (!normalizedRole || !["admin", "normal", "driver"].includes(normalizedRole)) {
     redirect("/dashboard/forbidden");
   }
 
