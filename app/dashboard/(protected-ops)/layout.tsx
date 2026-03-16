@@ -1,36 +1,10 @@
-// app/dashboard/(protected)/layout.tsx
 export const runtime = "nodejs";
 
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { hasValidSubscription } from "@/lib/billing/has-valid-subscription";
 
-function hasValidSubscription(subscription: {
-  status: string | null;
-  cancel_at_period_end: boolean | null;
-  current_period_end: string | null;
-}) {
-  const now = new Date();
-
-  const periodEnd = subscription.current_period_end
-    ? new Date(subscription.current_period_end)
-    : null;
-
-  if (subscription.status === "trialing") {
-    return true;
-  }
-
-  if (subscription.status === "active") {
-    if (subscription.cancel_at_period_end) {
-      return !!periodEnd && periodEnd > now;
-    }
-
-    return true;
-  }
-
-  return false;
-}
-
-export default async function AdminGateLayout({
+export default async function ProtectedOpsLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -53,12 +27,12 @@ export default async function AdminGateLayout({
   const role = (cu as any)?.role;
   const companyId = (cu as any)?.company_id;
 
-  if (companyUserError || role !== "admin") {
+  if (companyUserError || !companyId) {
     redirect("/dashboard/forbidden");
   }
 
-  if (!companyId) {
-    redirect("/dashboard/billing");
+  if (!["admin", "normal", "driver"].includes(role)) {
+    redirect("/dashboard/forbidden");
   }
 
   const { data: subscription, error: subscriptionError } = await supabase

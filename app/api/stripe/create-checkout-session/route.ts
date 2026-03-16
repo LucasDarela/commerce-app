@@ -2,10 +2,32 @@ export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
+import { createClient } from "@supabase/supabase-js";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+if (!process.env.STRIPE_SECRET_KEY) {
+  throw new Error("STRIPE_SECRET_KEY não definida");
+}
+
+if (!process.env.SUPABASE_URL) {
+  throw new Error("SUPABASE_URL não definida");
+}
+
+if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  throw new Error("SUPABASE_SERVICE_ROLE_KEY não definida");
+}
+
+if (!process.env.NEXT_PUBLIC_SITE_URL) {
+  throw new Error("NEXT_PUBLIC_SITE_URL não definida");
+}
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: "2025-08-27.basil",
 });
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
+);
 
 export async function POST(req: Request) {
   try {
@@ -20,46 +42,56 @@ export async function POST(req: Request) {
     }
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+    const successUrl = `${siteUrl}/dashboard/billing?success=true`;
+    const cancelUrl = `${siteUrl}/dashboard/billing?canceled=true`;
 
-    if (!siteUrl) {
+    const { data: existingSubscription, error: existingSubscriptionError } =
+      await supabase
+        .from("subscriptions")
+        .select("id, status, cancel_at_period_end, current_period_end")
+        .eq("company_id", companyId)
+        .in("status", ["active", "trialing"])
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+    if (existingSubscriptionError) {
       return NextResponse.json(
-        { error: "NEXT_PUBLIC_SITE_URL não está definida no servidor." },
+        { error: existingSubscriptionError.message },
         { status: 500 },
       );
     }
 
-    const successUrl = `${siteUrl}/dashboard/billing?success=true`;
-    const cancelUrl = `${siteUrl}/dashboard/billing?canceled=true`;
+    if (existingSubscription) {
+      return NextResponse.json(
+        { error: "Sua empresa já possui uma assinatura ativa." },
+        { status: 400 },
+      );
+    }
 
-    console.log("NEXT_PUBLIC_SITE_URL:", siteUrl);
-    console.log("SUCCESS URL:", successUrl);
-    console.log("CANCEL URL:", cancelUrl);
-    console.log("priceId:", priceId);
-    console.log("companyId:", companyId);
-
-const session = await stripe.checkout.sessions.create({
-  mode: "subscription",
-  payment_method_collection: "always",
-  line_items: [{ price: priceId, quantity: 1 }],
-  success_url: successUrl,
-  cancel_url: cancelUrl,
-  metadata: {
-    companyId,
-    subscriptionIdLocal: subscriptionIdLocal || "",
-  },
-  subscription_data: {
-    trial_period_days: 30,
-    trial_settings: {
-      end_behavior: {
-        missing_payment_method: "cancel",
+    const session = await stripe.checkout.sessions.create({
+      mode: "subscription",
+      payment_method_collection: "always",
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      metadata: {
+        companyId,
+        subscriptionIdLocal: subscriptionIdLocal || "",
       },
-    },
-    metadata: {
-      companyId,
-      subscriptionIdLocal: subscriptionIdLocal || "",
-    },
-  },
-});
+      subscription_data: {
+        trial_period_days: 30,
+        trial_settings: {
+          end_behavior: {
+            missing_payment_method: "cancel",
+          },
+        },
+        metadata: {
+          companyId,
+          subscriptionIdLocal: subscriptionIdLocal || "",
+        },
+      },
+    });
 
     return NextResponse.json({ url: session.url });
   } catch (err: any) {

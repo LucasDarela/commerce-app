@@ -293,34 +293,34 @@ const shouldShowTrialWarning =
       </div>
     </div>
 
-    <div className="w-full md:w-auto md:min-w-[260px]">
-      {!isSubscribed || !isCurrentPlan ? (
-        <Button
-          className="h-12 w-full text-base font-semibold"
-          onClick={handleSubscribe}
-          disabled={loading}
-        >
-          {loading ? "Redirecionando..." : "Assinar Pro"}
-        </Button>
-      ) : localCancelAtPeriodEnd ? (
-        <Button
-          className="h-12 w-full bg-green-600 text-base font-semibold text-white hover:bg-green-700"
-          onClick={handleReactivate}
-          disabled={loading}
-        >
-          {loading ? "Reativando..." : "Reativar assinatura"}
-        </Button>
-      ) : (
-        <Button
-          className="h-12 w-full text-base font-semibold"
-          variant="outline"
-          onClick={handleManageBilling}
-          disabled={loading}
-        >
-          {loading ? "Abrindo..." : "Atualizar informações"}
-        </Button>
-      )}
-    </div>
+<div className="w-full md:w-auto md:min-w-[260px]">
+  {!isSubscribed ? (
+    <Button
+      className="h-12 w-full text-base font-semibold"
+      onClick={handleSubscribe}
+      disabled={loading}
+    >
+      {loading ? "Redirecionando..." : "Assinar Pro"}
+    </Button>
+  ) : localCancelAtPeriodEnd ? (
+    <Button
+      className="h-12 w-full bg-green-600 text-base font-semibold text-white hover:bg-green-700"
+      onClick={handleReactivate}
+      disabled={loading}
+    >
+      {loading ? "Reativando..." : "Reativar assinatura"}
+    </Button>
+  ) : (
+    <Button
+      className="h-12 w-full text-base font-semibold"
+      variant="outline"
+      onClick={handleManageBilling}
+      disabled={loading}
+    >
+      {loading ? "Abrindo..." : "Atualizar informações"}
+    </Button>
+  )}
+</div>
   </div>
 </div>
 
