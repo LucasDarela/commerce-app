@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import SubscriptionManager from "@/components/subscription/SubscriptionManager";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
@@ -35,7 +35,7 @@ type CompanyRow = {
 export default function BillingPage() {
   const supabase = createClientComponentClient();
   const { companyId, loading: authLoading } = useAuthenticatedCompany();
-
+const [userRole, setUserRole] = useState<string | null>(null);
   const [subscriptionData, setSubscriptionData] =
     useState<SubscriptionRow | null>(null);
   const [proPlan, setProPlan] = useState<PlanRow | null>(null);
@@ -43,16 +43,40 @@ export default function BillingPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchBillingData() {
-      if (!companyId) return;
+async function fetchBillingData() {
+  if (!companyId) return;
 
-      setLoading(true);
+  setLoading(true);
 
-      const [
-        { data: subscription, error: subscriptionError },
-        { data: plan, error: planError },
-        { data: company, error: companyError },
-      ] = await Promise.all([
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError) {
+    console.error("Erro ao buscar usuário autenticado:", userError);
+  }
+
+  const rawRole =
+    (user?.user_metadata?.role as string | undefined) ||
+    (user?.user_metadata?.invited_role as string | undefined) ||
+    (user?.app_metadata?.role as string | undefined) ||
+    null;
+
+  const normalizedRole =
+    rawRole === "motorista"
+      ? "driver"
+      : rawRole === "usuario"
+        ? "normal"
+        : rawRole;
+
+  setUserRole(normalizedRole ?? null);
+
+  const [
+    { data: subscription, error: subscriptionError },
+    { data: plan, error: planError },
+    { data: company, error: companyError },
+  ] = await Promise.all([
         supabase
           .from("subscriptions")
           .select(
@@ -102,6 +126,39 @@ export default function BillingPage() {
   if (!companyId) {
     return <div>Empresa não encontrada.</div>;
   }
+
+  if (userRole === "driver") {
+  return (
+    <div className="max-w-3xl mx-auto p-6">
+      <div className="rounded-3xl border bg-card p-8 shadow-sm">
+        <div className="mx-auto max-w-2xl text-center">
+          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full border border-amber-200 bg-amber-50">
+            <span className="text-2xl">🔒</span>
+          </div>
+
+          <h1 className="text-3xl font-semibold tracking-tight">
+            Acesso indisponível
+          </h1>
+
+          <p className="mt-3 text-sm text-muted-foreground md:text-base">
+            A página de cobrança está disponível apenas para administradores e
+            usuários responsáveis pela gestão da assinatura.
+          </p>
+
+          <div className="mt-8 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+            Seu perfil não possui permissão para acessar esta área.
+          </div>
+
+          <div className="mt-8">
+            <Button asChild className="h-11 px-6">
+              <Link href="/dashboard/orders">Voltar para pedidos</Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
   if (companyData?.billing_exempt) {
     return (
