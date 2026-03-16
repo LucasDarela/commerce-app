@@ -265,6 +265,14 @@ const rawCurrentPeriodEnd = getSubscriptionPeriodEnd(subscription);
     : null;
 }
 
+console.log("checkout.session.completed -> upsert", {
+  companyId,
+  customerId,
+  subscriptionId,
+  stripePriceId,
+  status,
+});
+
         const { error } = await supabase.from("subscriptions").upsert(
           {
             company_id: companyId,
@@ -345,6 +353,14 @@ const trialEnd = subscription.trial_end
     throw new Error("company_id não encontrado para customer.subscription.created");
   }
 
+  console.log("customer.subscription.created -> upsert", {
+  resolvedCompanyId,
+  customerId,
+  subscriptionId: subscription.id,
+  priceId: subscription.items.data[0]?.price?.id ?? null,
+  status: subscription.status,
+});
+
   const { error } = await supabase.from("subscriptions").upsert(
     {
       company_id: resolvedCompanyId,
@@ -389,16 +405,16 @@ case "customer.subscription.deleted": {
     expand: ["latest_invoice"],
   });
 
-const rawCurrentPeriodStart = getSubscriptionPeriodStart(subscription);
-const rawCurrentPeriodEnd = getSubscriptionPeriodEnd(subscription);
+  const rawCurrentPeriodStart = getSubscriptionPeriodStart(subscription);
+  const rawCurrentPeriodEnd = getSubscriptionPeriodEnd(subscription);
 
-const currentPeriodStart = rawCurrentPeriodStart
-  ? new Date(rawCurrentPeriodStart * 1000).toISOString()
-  : null;
+  const currentPeriodStart = rawCurrentPeriodStart
+    ? new Date(rawCurrentPeriodStart * 1000).toISOString()
+    : null;
 
-const currentPeriodEnd = rawCurrentPeriodEnd
-  ? new Date(rawCurrentPeriodEnd * 1000).toISOString()
-  : null;
+  const currentPeriodEnd = rawCurrentPeriodEnd
+    ? new Date(rawCurrentPeriodEnd * 1000).toISOString()
+    : null;
 
   const latestInvoiceId =
     typeof subscription.latest_invoice === "string"
@@ -410,10 +426,37 @@ const currentPeriodEnd = rawCurrentPeriodEnd
       ? subscription.customer
       : subscription.customer?.id ?? null;
 
-  const { error } = await supabase
-    .from("subscriptions")
-    .update({
+  let resolvedCompanyId = subscription.metadata?.companyId ?? null;
+
+  if (!resolvedCompanyId) {
+    const { data: existingSubscription } = await supabase
+      .from("subscriptions")
+      .select("company_id")
+      .eq("stripe_subscription_id", subscription.id)
+      .maybeSingle();
+
+    resolvedCompanyId = existingSubscription?.company_id ?? null;
+  }
+
+  if (!resolvedCompanyId) {
+    throw new Error(
+      `company_id não encontrado para ${event.type} da subscription ${subscription.id}`
+    );
+  }
+
+console.log(`${event.type} -> upsert`, {
+  resolvedCompanyId,
+  customerId,
+  subscriptionId: subscription.id,
+  priceId: subscription.items.data[0]?.price?.id ?? null,
+  status: subscription.status,
+});
+
+  const { error } = await supabase.from("subscriptions").upsert(
+    {
+      company_id: resolvedCompanyId,
       stripe_customer_id: customerId,
+      stripe_subscription_id: subscription.id,
       price_id: subscription.items.data[0]?.price?.id ?? null,
       status: subscription.status,
       cancel_at_period_end: subscription.cancel_at_period_end,
@@ -426,17 +469,23 @@ const currentPeriodEnd = rawCurrentPeriodEnd
       updated_at: new Date().toISOString(),
       current_period_start: currentPeriodStart,
       current_period_end: currentPeriodEnd,
+      started_at: subscription.start_date
+        ? new Date(subscription.start_date * 1000).toISOString()
+        : null,
       trial_start: subscription.trial_start
-  ? new Date(subscription.trial_start * 1000).toISOString()
-  : null,
-trial_end: subscription.trial_end
-  ? new Date(subscription.trial_end * 1000).toISOString()
-  : null,
-    })
-    .eq("stripe_subscription_id", subscription.id);
+        ? new Date(subscription.trial_start * 1000).toISOString()
+        : null,
+      trial_end: subscription.trial_end
+        ? new Date(subscription.trial_end * 1000).toISOString()
+        : null,
+    },
+    {
+      onConflict: "stripe_subscription_id",
+    }
+  );
 
   if (error) {
-    console.error("Erro ao atualizar subscription:", error);
+    console.error("Erro ao atualizar/upsert subscription:", error);
     throw error;
   }
 

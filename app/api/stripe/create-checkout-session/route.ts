@@ -42,7 +42,7 @@ export async function POST(req: Request) {
     }
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
-    const successUrl = `${siteUrl}/dashboard/billing?success=true`;
+    const successUrl = `${siteUrl}/dashboard/billing?success=true&session_id={CHECKOUT_SESSION_ID}`;
     const cancelUrl = `${siteUrl}/dashboard/billing?canceled=true`;
 
     console.log("Stripe key prefix:", process.env.STRIPE_SECRET_KEY?.slice(0, 12));

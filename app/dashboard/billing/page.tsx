@@ -140,11 +140,13 @@ export default function BillingPage() {
         setProPlan(plan ?? null);
         setCompanyData(company ?? null);
 
+      if (process.env.NODE_ENV === "development") {
         console.log("Billing role from company_users:", rawRole);
         console.log("Billing normalizedRole:", normalizedRole);
         console.log("Billing subscription result:", subscription);
         console.log("Billing plan result:", plan);
         console.log("Billing company result:", company);
+      }
       } catch (error) {
         console.error("Erro inesperado ao buscar dados da Billing:", error);
       } finally {
@@ -162,22 +164,23 @@ export default function BillingPage() {
     fetchBillingData({ showLoading: true });
   }, [authLoading, companyId, fetchBillingData]);
 
-  useEffect(() => {
-    if (!companyId || success !== "true") return;
+useEffect(() => {
+  if (!companyId || success !== "true") return;
+  if (subscriptionData) return;
 
-    const interval = setInterval(() => {
-      fetchBillingData({ showLoading: false });
-    }, 2000);
+  const interval = setInterval(() => {
+    fetchBillingData({ showLoading: false });
+  }, 2000);
 
-    const timeout = setTimeout(() => {
-      clearInterval(interval);
-    }, 15000);
+  const timeout = setTimeout(() => {
+    clearInterval(interval);
+  }, 15000);
 
-    return () => {
-      clearInterval(interval);
-      clearTimeout(timeout);
-    };
-  }, [companyId, success, fetchBillingData]);
+  return () => {
+    clearInterval(interval);
+    clearTimeout(timeout);
+  };
+}, [companyId, success, subscriptionData, fetchBillingData]);
 
   if (authLoading || loading) {
     return <div>Carregando assinatura...</div>;
