@@ -45,10 +45,14 @@ export async function POST(req: Request) {
     const successUrl = `${siteUrl}/dashboard/billing?success=true`;
     const cancelUrl = `${siteUrl}/dashboard/billing?canceled=true`;
 
+    console.log("Stripe key prefix:", process.env.STRIPE_SECRET_KEY?.slice(0, 12));
+    console.log("priceId recebido:", priceId);
+    console.log("companyId recebido:", companyId);
+
     const { data: existingSubscription, error: existingSubscriptionError } =
       await supabase
         .from("subscriptions")
-        .select("id, status, cancel_at_period_end, current_period_end")
+        .select("id, status")
         .eq("company_id", companyId)
         .in("status", ["active", "trialing"])
         .order("updated_at", { ascending: false })
@@ -68,6 +72,9 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
+
+    const price = await stripe.prices.retrieve(priceId);
+    console.log("Price encontrado no Stripe:", price.id, price.currency, price.type);
 
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
@@ -96,8 +103,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ url: session.url });
   } catch (err: any) {
     console.error("Erro ao criar checkout session:", err);
+
     return NextResponse.json(
-      { error: err.message || "Erro ao criar checkout session" },
+      {
+        error: err?.raw?.message || err.message || "Erro ao criar checkout session",
+        type: err?.type || null,
+        code: err?.code || null,
+      },
       { status: 500 },
     );
   }

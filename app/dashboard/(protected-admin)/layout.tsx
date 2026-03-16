@@ -16,7 +16,9 @@ export default async function ProtectedAdminLayout({
     error: userError,
   } = await supabase.auth.getUser();
 
-  if (userError || !user) redirect("/login-signin");
+  if (userError || !user) {
+    redirect("/login-signin");
+  }
 
   const { data: cu, error: companyUserError } = await supabase
     .from("company_users")
@@ -24,8 +26,8 @@ export default async function ProtectedAdminLayout({
     .eq("user_id", user.id)
     .maybeSingle();
 
-  const role = (cu as any)?.role;
   const companyId = (cu as any)?.company_id;
+  const role = (cu as any)?.role;
 
   if (companyUserError || !companyId) {
     redirect("/dashboard/forbidden");
@@ -35,20 +37,34 @@ export default async function ProtectedAdminLayout({
     redirect("/dashboard/forbidden");
   }
 
-  const { data: subscription, error: subscriptionError } = await supabase
-    .from("subscriptions")
-    .select("status, cancel_at_period_end, current_period_end")
-    .eq("company_id", companyId)
-    .order("updated_at", { ascending: false })
-    .limit(1)
+  const { data: company, error: companyError } = await supabase
+    .from("companies")
+    .select("billing_exempt")
+    .eq("id", companyId)
     .maybeSingle();
 
-  if (
-    subscriptionError ||
-    !subscription ||
-    !hasValidSubscription(subscription)
-  ) {
-    redirect("/dashboard/billing");
+  if (companyError) {
+    redirect("/dashboard/forbidden");
+  }
+
+  const isBillingExempt = company?.billing_exempt === true;
+
+  if (!isBillingExempt) {
+    const { data: subscription, error: subscriptionError } = await supabase
+      .from("subscriptions")
+      .select("status, cancel_at_period_end, current_period_end")
+      .eq("company_id", companyId)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (
+      subscriptionError ||
+      !subscription ||
+      !hasValidSubscription(subscription)
+    ) {
+      redirect("/dashboard/billing");
+    }
   }
 
   return <>{children}</>;
