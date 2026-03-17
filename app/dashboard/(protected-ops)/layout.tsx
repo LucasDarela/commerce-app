@@ -3,7 +3,7 @@ export const runtime = "nodejs";
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { hasValidSubscription } from "@/lib/billing/has-valid-subscription";
-import UnderDevelopmentModal from "@/components/common/UnderDevelopmentModal";
+import PageUnderDevelopmentGate from "@/components/common/PageUnderDevelopmentGate";
 
 const OWNER_EMAIL = "lucasdarela@live.com";
 
@@ -23,25 +23,25 @@ export default async function ProtectedOpsLayout({
     redirect("/login-signin");
   }
 
-const { data: cu, error: companyUserError } = await supabase
-  .from("company_users")
-  .select("company_id, role")
-  .eq("user_id", user.id)
-  .maybeSingle();
+  const { data: cu, error: companyUserError } = await supabase
+    .from("company_users")
+    .select("company_id, role")
+    .eq("user_id", user.id)
+    .maybeSingle();
 
-const companyId = (cu as any)?.company_id;
-const companyUserRole = (cu as any)?.role ?? null;
+  const companyId = (cu as any)?.company_id;
+  const companyUserRole = (cu as any)?.role ?? null;
 
   if (companyUserError || !companyId) {
     redirect("/dashboard/forbidden");
   }
 
-const rawRole =
-  (user.user_metadata?.role as string | undefined) ||
-  (user.user_metadata?.invited_role as string | undefined) ||
-  (user.app_metadata?.role as string | undefined) ||
-  companyUserRole ||
-  null;
+  const rawRole =
+    (user.user_metadata?.role as string | undefined) ||
+    (user.user_metadata?.invited_role as string | undefined) ||
+    (user.app_metadata?.role as string | undefined) ||
+    companyUserRole ||
+    null;
 
   const normalizedRole =
     rawRole === "motorista"
@@ -82,6 +82,19 @@ const rawRole =
     ) {
       redirect("/dashboard/billing");
     }
+  }
+
+  const isOwner = user.email?.toLowerCase() === OWNER_EMAIL.toLowerCase();
+
+  if (!isOwner) {
+    return (
+      <PageUnderDevelopmentGate
+        title="Em desenvolvimento"
+        description="Esta página está em desenvolvimento, em breve você terá novidades..."
+        backHref="/dashboard"
+        backLabel="Voltar para o dashboard"
+      />
+    );
   }
 
   return <>{children}</>;

@@ -34,10 +34,7 @@ const handleScroll = (
       block: "start",
     });
   }
-  if (closeMenu) {
-    setMenuOpen(false);
-  }
-};
+};  
 
   const sliderSettings = {
     dots: true,
