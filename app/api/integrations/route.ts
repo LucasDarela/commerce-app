@@ -23,7 +23,7 @@ async function getCompanyIdForUser(supabase: any) {
 }
 
 export async function POST(req: Request) {
-  const supabase = createRouteSupabaseClient();
+  const supabase = await createRouteSupabaseClient();
 
   try {
     const body = await req.json().catch(() => ({}));
@@ -64,7 +64,7 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const supabase = createRouteSupabaseClient();
+  const supabase = await createRouteSupabaseClient();
 
   try {
     const provider: Provider = "asaas";

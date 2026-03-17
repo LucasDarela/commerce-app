@@ -24,7 +24,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const supabase = createRouteSupabaseClient();
+    const supabase = await createRouteSupabaseClient();
 
     const { data: order, error: orderError } = await supabase
       .from("orders")

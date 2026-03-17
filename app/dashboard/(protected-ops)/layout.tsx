@@ -12,7 +12,7 @@ export default async function ProtectedOpsLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = createServerSupabaseClient();
+  const supabase = await createServerSupabaseClient();
 
   const {
     data: { user },

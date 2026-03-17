@@ -1,14 +1,78 @@
-//lib/supabase/server.ts
-
-import {
-  createRouteHandlerClient,
-  createServerComponentClient,
-} from "@supabase/auth-helpers-nextjs";
 import { cookies } from "next/headers";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
 
-export function createRouteSupabaseClient() {
-  return createRouteHandlerClient<any>({ cookies });
+type SupabaseCookie = {
+  name: string;
+  value: string;
+  options?: CookieOptions;
+};
+
+export async function createServerSupabaseClient() {
+  const cookieStore = await cookies();
+
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(cookiesToSet: SupabaseCookie[]) {
+          try {
+            cookiesToSet.forEach(
+              ({
+                name,
+                value,
+                options,
+              }: {
+                name: string;
+                value: string;
+                options?: CookieOptions;
+              }) => {
+                cookieStore.set(name, value, options);
+              },
+            );
+          } catch {
+            // ignore
+          }
+        },
+      },
+    },
+  );
 }
-export function createServerSupabaseClient() {
-  return createServerComponentClient<any>({ cookies });
+
+export async function createRouteSupabaseClient() {
+  const cookieStore = await cookies();
+
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(cookiesToSet: SupabaseCookie[]) {
+          try {
+            cookiesToSet.forEach(
+              ({
+                name,
+                value,
+                options,
+              }: {
+                name: string;
+                value: string;
+                options?: CookieOptions;
+              }) => {
+                cookieStore.set(name, value, options);
+              },
+            );
+          } catch {
+            // ignore
+          }
+        },
+      },
+    },
+  );
 }

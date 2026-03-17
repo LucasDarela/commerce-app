@@ -1,10 +1,10 @@
 // lib/permissions.ts
 
-export type UserRole = "admin" | "driver";
+export type UserRole = "admin" | "normal" | "driver";
 
 export const DRIVER_ALLOWED_ROUTES = [
   "/dashboard/orders",
-  "/dashboard/routes-delivery",
+  "/dashboard/routes-delivery", 
   "/dashboard/loan",
   "/dashboard/help",
 ] as const;

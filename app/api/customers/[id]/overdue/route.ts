@@ -7,7 +7,7 @@ export async function GET(
   _req: Request,
   { params }: { params: { id: string } },
 ) {
-  const supabase = createRouteSupabaseClient();
+  const supabase = await createRouteSupabaseClient();
 
   // Descobre company_id do usuário atual (do JWT/claims, sua função atual)
   const { data: comp } = await supabase
