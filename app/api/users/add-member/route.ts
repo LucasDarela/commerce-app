@@ -12,9 +12,9 @@ const admin = createClient(
 function normalizeRole(role: string) {
   const value = role?.toLowerCase().trim();
 
-  if (value === "motorista") return "driver";
-  if (value === "usuario") return "normal";
-  if (value === "administrador") return "admin";
+  if (value === "driver") return "driver";
+  if (value === "normal") return "normal";
+  if (value === "admin") return "admin";
 
   return value;
 }
