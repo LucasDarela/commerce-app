@@ -1,6 +1,6 @@
 // lib/permissions.ts
 
-export type UserRole = "admin" | "motorista";
+export type UserRole = "admin" | "driver";
 
 export const DRIVER_ALLOWED_ROUTES = [
   "/dashboard/orders",
@@ -14,7 +14,7 @@ export function isAdmin(role?: UserRole | null) {
 }
 
 export function isDriver(role?: UserRole | null) {
-  return role === "motorista";
+  return role === "driver";
 }
 
 export function canAccessRoute(

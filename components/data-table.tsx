@@ -463,7 +463,7 @@ useEffect(() => {
     if (!companyId) return;
 
     // motorista não precisa carregar lista de motoristas
-    if (role === "motorista") return;
+    if (role === "driver") return;
 
     const { data, error } = await supabase
       .from("profiles")
@@ -1219,7 +1219,7 @@ data: React.useMemo(() => {
     if (!order.appointment_date) return false;
 
     // motorista logado só vê pedidos dele
-    if (role === "motorista" && order.driver_id !== user?.id) {
+    if (role === "driver" && order.driver_id !== user?.id) {
       return false;
     }
 
@@ -1474,7 +1474,7 @@ function clearAllFilters() {
     : "default";
 
     const driverFilterValue =
-  role === "motorista"
+  role === "driver"
     ? (user?.id ?? "all")
     : (selectedDriverId ?? "all");
 
@@ -1737,10 +1737,10 @@ const clearFilter = () => {
 <Select
   value={driverFilterValue}
   onValueChange={(value) => {
-    if (role === "motorista") return;
+    if (role === "driver") return;
     setSelectedDriverId(value === "all" ? null : value);
   }}
-  disabled={role === "motorista"}
+  disabled={role === "driver"}
 >
   <SelectTrigger
     className={`w-full ${

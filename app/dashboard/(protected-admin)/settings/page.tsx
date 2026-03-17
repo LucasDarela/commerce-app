@@ -17,7 +17,7 @@ export default function SettingsPage() {
   if (loading) {
     return <TableSkeleton />;
   }
-  if (role === "motorista") return null;
+  if (role === "driver") return null;
   
   return (
     <div className="space-y-6 px-10 mt-9">

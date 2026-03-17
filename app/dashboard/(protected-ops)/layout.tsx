@@ -44,9 +44,9 @@ export default async function ProtectedOpsLayout({
     null;
 
   const normalizedRole =
-    rawRole === "motorista"
+    rawRole === "driver"
       ? "driver"
-      : rawRole === "usuario"
+      : rawRole === "normal"
         ? "normal"
         : rawRole;
 

@@ -129,9 +129,9 @@ export default function BillingPage() {
         const rawRole = companyUser?.role ?? null;
 
         const normalizedRole =
-          rawRole === "motorista"
+          rawRole === "driver"
             ? "driver"
-            : rawRole === "usuario"
+            : rawRole === "normal"
               ? "normal"
               : rawRole;
 

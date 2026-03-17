@@ -127,7 +127,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { role } = useAuthenticatedCompany();
 
   const navMainTop =
-  role === "motorista"
+  role === "driver"
     ? data.navMainTop.filter(
         (item) =>
           item.url !== "/dashboard" &&
@@ -136,7 +136,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     : data.navMainTop;
 
 const navSecondary =
-  role === "motorista"
+  role === "driver"
     ? data.navSecondary.filter(
         (item) => item.url !== "/dashboard/settings"
       )

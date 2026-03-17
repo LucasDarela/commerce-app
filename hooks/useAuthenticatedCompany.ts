@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { toast } from "sonner";
 
-type UserRole = "admin" | "motorista";
+type UserRole = "admin" | "driver";
 
 type AuthenticatedCompany = {
   user: any | null;
