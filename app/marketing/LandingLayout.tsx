@@ -18,21 +18,26 @@ import FAQ from "./sections/FAQ";
 import Functionalities from "./sections/Functionalities";
 import Hero from "./sections/Hero";
 import { ScrollToTopButton } from "@/components/ui/ScrollToTopButton";
+import ContactSection from "./sections/ContactSection";
 
 export default function LandingLayout() {
-  const handleScroll = (
-    event: React.MouseEvent<HTMLAnchorElement>,
-    targetId: string,
-  ) => {
-    event.preventDefault();
-    const targetElement = document.querySelector(targetId);
-    if (targetElement) {
-      window.scrollTo({
-        top: (targetElement as HTMLElement).offsetTop - 80,
-        behavior: "smooth",
-      });
-    }
-  };
+const handleScroll = (
+  event: React.MouseEvent<HTMLAnchorElement>,
+  targetId: string,
+  closeMenu?: boolean,
+) => {
+  event.preventDefault();
+  const targetElement = document.querySelector(targetId);
+  if (targetElement) {
+    targetElement.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }
+  if (closeMenu) {
+    setMenuOpen(false);
+  }
+};
 
   const sliderSettings = {
     dots: true,
@@ -50,10 +55,11 @@ export default function LandingLayout() {
       <NavBar />
       <Hero />
       <Functionalities />
-      <Plans />
       <Testimonials />
+      <Plans />
       <CallToAction />
       <FAQ />
+      <ContactSection whatsappNumber="5548991447684" whatsappMessage="Olá! Quero conhecer melhor o Chopp Hub." />
       <Footer />
       <ScrollToTopButton />
     </div>

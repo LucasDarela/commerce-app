@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { ModeToggle } from "@/components/ui/mode-toggle";
 import { ThemeSelector } from "@/components/theme-selector";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ export default function NavBar() {
   const [scrolled, setScrolled] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  const supabase = createClientComponentClient();
+  const supabase = useMemo(() => createClientComponentClient(), []);
 
   const toggleMenu = () => setMenuOpen(!menuOpen);
 
@@ -95,14 +95,6 @@ export default function NavBar() {
             </li>
             <li className="hover:text-primary">
               <Link
-                href="#plans"
-                onClick={(e) => handleScroll(e, "#plans", true)}
-              >
-                Preços
-              </Link>
-            </li>
-            <li className="hover:text-primary">
-              <Link
                 href="#testimonials"
                 onClick={(e) => handleScroll(e, "#testimonials", true)}
               >
@@ -111,15 +103,23 @@ export default function NavBar() {
             </li>
             <li className="hover:text-primary">
               <Link
-                href="#footer"
-                onClick={(e) => handleScroll(e, "#footer", true)}
+                href="#plans"
+                onClick={(e) => handleScroll(e, "#plans", true)}
               >
-                Contato
+                Preços
               </Link>
             </li>
             <li className="hover:text-primary">
               <Link href="#faq" onClick={(e) => handleScroll(e, "#faq", true)}>
-                Ajuda
+                FAQ
+              </Link>
+            </li>
+            <li className="hover:text-primary">
+              <Link
+                href="#contact"
+                onClick={(e) => handleScroll(e, "#contact", true)}
+              >
+                Contato
               </Link>
             </li>
           </ul>
@@ -132,9 +132,9 @@ export default function NavBar() {
             <div className="hidden md:block">
               <Button asChild>
                 <Link href={isLoggedIn ? "/dashboard" : "/login-signin"}>
-                  {isLoggedIn ? "Dashboard" : "Entrar"}
+                  {isLoggedIn ? "Ir para o dashboard" : "Começar teste grátis"}
                 </Link>
-              </Button>
+              </Button> 
             </div>
 
             {/* Menu Mobile */}
@@ -145,13 +145,6 @@ export default function NavBar() {
             </div>
           </div>
         </div>
-
-        {/* Mobile Dropdown */}
-        {menuOpen && (
-          <ul className="bg-muted shadow-md fixed top-16 left-0 w-full flex flex-col items-center p-4 space-y-4 z-[9999]">
-            {/* links mobile */}
-          </ul>
-        )}
       </nav>
 
       {/* Dropdown do Mobile Menu */}
@@ -167,14 +160,6 @@ export default function NavBar() {
           </li>
           <li className="hover:text-primary">
             <Link
-              href="#plans"
-              onClick={(e) => handleScroll(e, "#plans", true)}
-            >
-              Preços
-            </Link>
-          </li>
-          <li className="hover:text-primary">
-            <Link
               href="#testimonials"
               onClick={(e) => handleScroll(e, "#testimonials", true)}
             >
@@ -183,24 +168,29 @@ export default function NavBar() {
           </li>
           <li className="hover:text-primary">
             <Link
-              href="#footer"
-              onClick={(e) => handleScroll(e, "#footer", true)}
+              href="#plans"
+              onClick={(e) => handleScroll(e, "#plans", true)}
             >
-              Contato
+              Preços
             </Link>
           </li>
           <li className="hover:text-primary">
             <Link href="#faq" onClick={(e) => handleScroll(e, "#faq", true)}>
-              Ajuda
+              FAQ
+            </Link>
+          </li>
+          <li className="hover:text-primary">
+            <Link
+              href="#contact"
+              onClick={(e) => handleScroll(e, "#contact", true)}
+            >
+              Contato
             </Link>
           </li>
           <li>
             <Button asChild>
-              <Link
-                href={isLoggedIn ? "/dashboard" : "/login-signin"}
-                onClick={toggleMenu}
-              >
-                {isLoggedIn ? "Dashboard" : "Entrar"}
+              <Link href={isLoggedIn ? "/dashboard" : "/login-signin"}>
+                {isLoggedIn ? "Ir para o dashboard" : "Começar teste grátis"}
               </Link>
             </Button>
           </li>

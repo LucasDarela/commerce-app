@@ -38,18 +38,17 @@ export default function Hero() {
             height={100}
             priority
           />
-          <h2 className="section-title font-bold ">
-            Sitema Responsivo para sua Distribuidora
+          <h2 className="section-title font-bold">
+          Pare de perder dinheiro com pedidos desorganizados
           </h2>
-          <p className="mt-4 section-description ">
-            Gerencia suas vendas através do Celular ou Computador.
+
+          <p className="mt-4 section-description">
+          Controle pedidos, estoque, entregas e financeiro da sua distribuidora em um
+          único sistema.
           </p>
-          <Button
-            asChild
-            className="mt-6 transition transform duration-200 hover:scale-105 text-primary"
-            variant="secondary"
-          >
-            <Link href="#plans">Experimente Agora</Link>
+
+          <Button asChild className="mt-6 hover:scale-105 text-primary" variant="secondary">
+            <Link href="#plans">Começar teste grátis</Link>
           </Button>
         </div>
         <div className="p-10">
@@ -60,19 +59,18 @@ export default function Hero() {
             width={200}
             height={100}
           />
-          <h2 className="section-title font-bold">
-            Controle Total do Seu Negócio
-          </h2>
-          <p className="mt-4 section-description ">
-            Monitore vendas, estoque e clientes em tempo real.
-          </p>
-          <Button
-            asChild
-            className="mt-6 transition transform duration-200 hover:scale-105 text-primary"
-            variant="secondary"
-          >
-            <Link href="#plans">Teste Grátis</Link>
-          </Button>
+        <h2 className="section-title font-bold">
+        Tenha controle total da sua distribuidora
+        </h2>
+
+        <p className="mt-4 section-description">
+        Acompanhe vendas, estoque e clientes em tempo real e tome decisões com dados
+        reais do seu negócio.
+        </p>
+
+        <Button asChild className="mt-6 hover:scale-105 text-primary" variant="secondary">
+          <Link href="#plans">Testar por 30 dias grátis</Link>
+        </Button>
         </div>
         <div className="p-10">
           <Image
@@ -83,17 +81,16 @@ export default function Hero() {
             height={100}
           />
           <h2 className="section-title font-bold">
-            Facilidade e Agilidade nas Entregas
+          Organize suas entregas e nunca mais perca pedidos
           </h2>
+
           <p className="mt-4 section-description">
-            Otimize seu tempo com um sistema de entregas eficiente.
+          Agende entregas, gerencie pedidos e mantenha sua operação funcionando sem
+          confusão.
           </p>
-          <Button
-            asChild
-            className="mt-6 transition transform duration-200 hover:scale-105 text-primary"
-            variant="secondary"
-          >
-            <Link href="#plans">Confira os Planos</Link>
+
+          <Button asChild className="mt-6 hover:scale-105 text-primary" variant="secondary">
+            <Link href="#plans">Ver como funciona</Link>
           </Button>
         </div>
       </Slider>

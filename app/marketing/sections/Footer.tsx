@@ -12,7 +12,7 @@ export default function Footer() {
     const targetElement = document.querySelector(targetId);
     if (targetElement) {
       window.scrollTo({
-        top: (targetElement as HTMLElement).offsetTop - 5,
+        top: (targetElement as HTMLElement).offsetTop - 80, 
         behavior: "smooth",
       });
     }
@@ -36,6 +36,13 @@ export default function Footer() {
           >
             Funcionalidades
           </a>
+                    <a
+            href="#testimonials"
+            className="hover:text-primary"
+            onClick={(e) => handleScroll(e, "#testimonials")}
+          >
+            Clientes
+          </a>
           <a
             href="#plans"
             className="hover:text-primary"
@@ -44,12 +51,13 @@ export default function Footer() {
             Preços
           </a>
           <a
-            href="#testimonials"
+            href="#faq"
             className="hover:text-primary"
-            onClick={(e) => handleScroll(e, "#testimonials")}
+            onClick={(e) => handleScroll(e, "#faq")}
           >
-            Clientes
+            FAQ
           </a>
+
           <a
             href="#contact"
             className="hover:text-primary"
@@ -57,22 +65,16 @@ export default function Footer() {
           >
             Contato
           </a>
-          <a
-            href="#faq"
-            className="hover:text-primary"
-            onClick={(e) => handleScroll(e, "#faq")}
-          >
-            Ajuda
-          </a>
+
         </nav>
         <div className="flex gap-4 justify-center mt-8">
-          <h3>0800 0909 0909</h3>
+          <h3>48 9 9144-7684</h3>
           <h4>contato@chopphub.com</h4>
         </div>
 
         <div className="flex flex-col items-center gap-6 mt-6">
           <p className="mt-6">
-            © 2025 <span className="font-bold">Loading Tecnology</span>. Todos
+            © {new Date().getFullYear()} <span className="font-bold">Chopp Hub</span>. Todos
             os direitos reservados.
           </p>
         </div>

@@ -3,6 +3,9 @@
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import ReCAPTCHA from "react-google-recaptcha";
+import { useRef, useState } from "react";
+import { toast } from "sonner";
 
 import {
   Form,
@@ -15,9 +18,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
-import ReCAPTCHA from "react-google-recaptcha";
-import { useRef, useState } from "react";
 
 const contactSchema = z.object({
   name: z.string().min(2, "Nome obrigatório"),
@@ -28,6 +28,8 @@ const contactSchema = z.object({
 export function ContactForm() {
   const recaptchaRef = useRef<ReCAPTCHA | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
+  const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
+
   const form = useForm<z.infer<typeof contactSchema>>({
     resolver: zodResolver(contactSchema),
     defaultValues: {
@@ -39,7 +41,12 @@ export function ContactForm() {
 
   const onSubmit = async (values: z.infer<typeof contactSchema>) => {
     try {
-      setIsVerifying(true); // desabilita o botão temporariamente
+      if (!siteKey) {
+        toast.error("reCAPTCHA não configurado.");
+        return;
+      }
+
+      setIsVerifying(true);
 
       const token = await recaptchaRef.current?.executeAsync();
       recaptchaRef.current?.reset();
@@ -50,9 +57,10 @@ export function ContactForm() {
         body: JSON.stringify({ ...values, recaptchaToken: token }),
       });
 
+      const data = await res.json();
+
       if (!res.ok) {
-        const { error } = await res.json();
-        toast.error(error || "Erro ao enviar");
+        toast.error(data?.error || "Erro ao enviar");
         return;
       }
 
@@ -67,31 +75,17 @@ export function ContactForm() {
   };
 
   return (
-    <section id="contact" className="max-w-2xl mx-auto mt-20 px-4 py-12">
-      <div>
-        <h2 className="section-title mb-4 text-center text-primary">
-          Fale com a gente
-        </h2>
-        <p className="text-xs text-center text-muted-foreground my-4">
-          Este site é protegido pelo reCAPTCHA e está sujeito à
-          <a
-            href="https://policies.google.com/privacy"
-            target="_blank"
-            className="underline ml-1"
-          >
-            Política de Privacidade
-          </a>{" "}
-          e aos
-          <a
-            href="https://policies.google.com/terms"
-            target="_blank"
-            className="underline ml-1"
-          >
-            Termos de Serviço
-          </a>{" "}
-          do Google.
+    <div className="w-full">
+      <div className="mb-6 text-center">
+        <h3 className="text-xl font-semibold text-primary">
+          Ou envie sua mensagem
+        </h3>
+
+        <p className="mt-2 text-sm text-muted-foreground">
+          Preencha o formulário abaixo e nossa equipe entrará em contato.
         </p>
       </div>
+
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <FormField
@@ -107,6 +101,7 @@ export function ContactForm() {
               </FormItem>
             )}
           />
+
           <FormField
             control={form.control}
             name="email"
@@ -120,6 +115,7 @@ export function ContactForm() {
               </FormItem>
             )}
           />
+
           <FormField
             control={form.control}
             name="message"
@@ -137,16 +133,42 @@ export function ContactForm() {
               </FormItem>
             )}
           />
-          <ReCAPTCHA
-            sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY!}
-            ref={recaptchaRef}
-            size="invisible"
-          />
-          <Button type="submit" className="w-full" disabled={isVerifying}>
+
+          {siteKey && (
+            <ReCAPTCHA
+              sitekey={siteKey}
+              ref={recaptchaRef}
+              size="invisible"
+            />
+          )}
+
+          <Button type="submit" className="w-full h-11" disabled={isVerifying}>
             {isVerifying ? "Validando..." : "Enviar mensagem"}
           </Button>
+
+          <p className="text-xs text-center text-muted-foreground leading-5">
+            Este site é protegido pelo reCAPTCHA e está sujeito à
+            <a
+              href="https://policies.google.com/privacy"
+              target="_blank"
+              rel="noreferrer"
+              className="underline ml-1"
+            >
+              Política de Privacidade
+            </a>{" "}
+            e aos
+            <a
+              href="https://policies.google.com/terms"
+              target="_blank"
+              rel="noreferrer"
+              className="underline ml-1"
+            >
+              Termos de Serviço
+            </a>{" "}
+            do Google.
+          </p>
         </form>
       </Form>
-    </section>
+    </div>
   );
 }

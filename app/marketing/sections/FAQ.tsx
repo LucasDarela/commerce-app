@@ -5,19 +5,24 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 
-export default function () {
+export default function FAQ() {
   return (
-    <div className="my-16 mx-auto" id="faq">
+    <div className="my-16 mx-auto px-4 sm:px-6" id="faq">
       <div className="section-heading section-header">
         <h2 className="section-title mt-5 text-primary">
           Perguntas Frequentes
         </h2>
         <p className="section-description mt-5 text-muted-foreground">
-          Suas dúvidas podem ser esclarecidas a baixo
+          Suas dúvidas podem ser esclarecidas abaixo
         </p>
       </div>
-      <div className="flex justify-center gap-6 mt-10 ">
-        <Accordion type="single" collapsible className="w-[500px]">
+
+      <div className="mt-10 flex justify-center">
+        <Accordion
+          type="single"
+          collapsible
+          className="w-full max-w-2xl"
+        >
           <AccordionItem value="usabilidade">
             <AccordionTrigger>
               Posso usar o sistema tanto no celular quanto no computador?

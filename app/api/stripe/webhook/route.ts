@@ -232,6 +232,24 @@ async function upsertSubscriptionFromStripeSubscription(
     console.error("Erro ao fazer upsert da subscription:", error);
     throw error;
   }
+
+  if (customerId) {
+    const { error: companyUpdateError } = await supabase
+      .from("companies")
+      .update({
+        stripe_customer_id: customerId,
+      })
+      .eq("id", companyId)
+      .or(`stripe_customer_id.is.null,stripe_customer_id.eq.${customerId}`);
+
+    if (companyUpdateError) {
+      console.error(
+        "Erro ao atualizar stripe_customer_id da empresa:",
+        companyUpdateError
+      );
+      throw companyUpdateError;
+    }
+  }
 }
 
 export async function POST(req: Request) {

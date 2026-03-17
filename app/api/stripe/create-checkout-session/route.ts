@@ -26,12 +26,12 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
 export async function POST(req: Request) {
   try {
-    const { priceId, companyId, subscriptionIdLocal } = await req.json();
+    const { priceId, companyId } = await req.json();
 
     if (!priceId) {
       return NextResponse.json({ error: "priceId obrigatório" }, { status: 400 });
@@ -45,16 +45,12 @@ export async function POST(req: Request) {
     const successUrl = `${siteUrl}/dashboard/billing?success=true&session_id={CHECKOUT_SESSION_ID}`;
     const cancelUrl = `${siteUrl}/dashboard/billing?canceled=true`;
 
-    console.log("Stripe key prefix:", process.env.STRIPE_SECRET_KEY?.slice(0, 12));
-    console.log("priceId recebido:", priceId);
-    console.log("companyId recebido:", companyId);
-
     const { data: existingSubscription, error: existingSubscriptionError } =
       await supabase
         .from("subscriptions")
-        .select("id, status")
+        .select("id, status, stripe_subscription_id")
         .eq("company_id", companyId)
-        .in("status", ["active", "trialing"])
+        .in("status", ["active", "trialing", "past_due", "unpaid"])
         .order("updated_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -62,29 +58,79 @@ export async function POST(req: Request) {
     if (existingSubscriptionError) {
       return NextResponse.json(
         { error: existingSubscriptionError.message },
-        { status: 500 },
+        { status: 500 }
       );
     }
 
     if (existingSubscription) {
       return NextResponse.json(
-        { error: "Sua empresa já possui uma assinatura ativa." },
-        { status: 400 },
+        {
+          error: "Sua empresa já possui uma assinatura criada.",
+          code: "SUBSCRIPTION_ALREADY_EXISTS",
+        },
+        { status: 400 }
       );
     }
 
+    const { data: company, error: companyError } = await supabase
+      .from("companies")
+      .select("id, stripe_customer_id, email, name")  
+      .eq("id", companyId)
+      .maybeSingle();
+
+    if (companyError) {
+      return NextResponse.json(
+        { error: companyError.message },
+        { status: 500 }
+      );
+    }
+
+    if (!company) {
+      return NextResponse.json(
+        { error: "Empresa não encontrada" },
+        { status: 404 }
+      );
+    }
+
+    let stripeCustomerId = company.stripe_customer_id ?? null;
+
+    if (!stripeCustomerId) {
+      const customer = await stripe.customers.create({
+        email: company.email ?? undefined,
+        name: company.name ?? undefined,
+        metadata: {
+          companyId,
+        },
+      });
+
+      stripeCustomerId = customer.id;
+
+      const { error: updateCompanyError } = await supabase
+        .from("companies")
+        .update({
+          stripe_customer_id: stripeCustomerId,
+        })
+        .eq("id", companyId);
+
+      if (updateCompanyError) {
+        return NextResponse.json(
+          { error: updateCompanyError.message },
+          { status: 500 }
+        );
+      }
+    }
+
     const price = await stripe.prices.retrieve(priceId);
-    console.log("Price encontrado no Stripe:", price.id, price.currency, price.type);
 
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
+      customer: stripeCustomerId,
       payment_method_collection: "always",
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: successUrl,
       cancel_url: cancelUrl,
       metadata: {
         companyId,
-        subscriptionIdLocal: subscriptionIdLocal || "",
       },
       subscription_data: {
         trial_period_days: 30,
@@ -95,7 +141,6 @@ export async function POST(req: Request) {
         },
         metadata: {
           companyId,
-          subscriptionIdLocal: subscriptionIdLocal || "",
         },
       },
     });
@@ -110,7 +155,7 @@ export async function POST(req: Request) {
         type: err?.type || null,
         code: err?.code || null,
       },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }
