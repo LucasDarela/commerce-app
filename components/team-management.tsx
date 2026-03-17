@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import {
   Table,
   TableHeader,
@@ -34,7 +34,7 @@ type TeamMember = {
 
 export default function TeamManagementPage() {
   const { user, companyId, loading } = useAuthenticatedCompany();
-  const router = useRouter();
+  const supabase = createClientComponentClient();
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [currentUserRole, setCurrentUserRole] = useState<
     "admin" | "normal" | "driver" | null
@@ -60,27 +60,56 @@ export default function TeamManagementPage() {
     if (user?.id && companyId) fetchTeam();
   }, [user?.id, companyId]);
 
-  async function handleAddMember() {
-    if (!newMember.email) return toast.error("Preencha o e-mail.");
-    setIsAdding(true);
-    try {
-      const res = await fetch("/api/users/add-member", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: newMember.email, role: newMember.role }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Erro ao adicionar membro");
+async function handleAddMember() {
+  const email = newMember.email.trim().toLowerCase();
 
-      toast.success("Convite enviado!");
-      setNewMember({ email: "", role: "normal" });
-      fetchTeam();
-    } catch (e: any) {
-      toast.error(e.message);
-    } finally {
-      setIsAdding(false);
-    }
+  if (!email) {
+    return toast.error("Preencha o e-mail.");
   }
+
+  setIsAdding(true);
+
+  try {
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
+
+    if (sessionError || !session?.access_token) {
+      throw new Error("Sessão não encontrada. Faça login novamente.");
+    }
+
+    const res = await fetch("/api/users/add-member", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({
+        email,
+        role: newMember.role,
+      }),
+    });
+
+    const data = await res.json();
+
+    console.log("[frontend][add-member] status:", res.status);
+    console.log("[frontend][add-member] data:", data);
+
+    if (!res.ok) {
+      throw new Error(data?.error || "Erro ao adicionar membro");
+    }
+
+    toast.success("Convite enviado!");
+    setNewMember({ email: "", role: "normal" });
+    fetchTeam();
+  } catch (e: any) {
+    console.error("[frontend][add-member] error:", e);
+    toast.error(e.message);
+  } finally {
+    setIsAdding(false);
+  }
+}
 
   async function handleResendInvite(email: string) {
     try {
