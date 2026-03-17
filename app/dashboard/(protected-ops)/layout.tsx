@@ -84,18 +84,5 @@ export default async function ProtectedOpsLayout({
     }
   }
 
-  const isOwner = user.email?.toLowerCase() === OWNER_EMAIL.toLowerCase();
-
-  if (!isOwner) {
-    return (
-      <PageUnderDevelopmentGate
-        title="Em desenvolvimento"
-        description="Esta página está em desenvolvimento, em breve você terá novidades..."
-        backHref="/dashboard"
-        backLabel="Voltar para o dashboard"
-      />
-    );
-  }
-
   return <>{children}</>;
 }

@@ -91,8 +91,8 @@ export default async function ProtectedOpsLayout({
       <PageUnderDevelopmentGate
         title="Em desenvolvimento"
         description="Esta página está em desenvolvimento, em breve você terá novidades..."
-        backHref="/dashboard"
-        backLabel="Voltar para o dashboard"
+        backHref="/dashboard/orders"
+        backLabel="Voltar para o Vendas"
       />
     );
   }
