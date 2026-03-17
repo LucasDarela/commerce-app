@@ -1,8 +1,8 @@
 // app/api/users/add-member/route.ts
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
+import { createClient } from "@supabase/supabase-js";
+import { createServerClient } from "@supabase/ssr";
 
 const admin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -12,28 +12,54 @@ const admin = createClient(
 function normalizeRole(role: string) {
   const value = role?.toLowerCase().trim();
 
-  if (value === "driver") return "driver";
-  if (value === "normal") return "normal";
-  if (value === "admin") return "admin";
+  if (value === "driver" || value === "motorista") return "driver";
+  if (value === "normal" || value === "usuario") return "normal";
+  if (value === "admin" || value === "administrador") return "admin";
 
   return value;
 }
 
 export async function POST(req: Request) {
   try {
-    const supa = createRouteHandlerClient({ cookies });
+    const cookieStore = await cookies();
+
+    const supa = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll();
+          },
+          setAll(cookiesToSet) {
+            try {
+              cookiesToSet.forEach(({ name, value, options }) => {
+                cookieStore.set(name, value, options);
+              });
+            } catch {
+              // em alguns contextos de route handler pode ser ignorado
+            }
+          },
+        },
+      },
+    );
 
     const {
       data: { user: inviter },
+      error: inviterError,
     } = await supa.auth.getUser();
 
-    if (!inviter) {
+    if (inviterError || !inviter) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
     const body = await req.json();
     const email = body?.email?.trim()?.toLowerCase();
     const role = normalizeRole(body?.role ?? "");
+
+    console.log("[add-member] inviter:", inviter.email);
+    console.log("[add-member] body:", body);
+    console.log("[add-member] normalized role:", role);
 
     if (!email || !role) {
       return NextResponse.json(
@@ -48,6 +74,8 @@ export async function POST(req: Request) {
       .eq("user_id", inviter.id)
       .maybeSingle();
 
+    console.log("[add-member] company user:", cu, cuErr);
+
     if (cuErr || !cu?.company_id) {
       return NextResponse.json(
         { error: "Company not found for inviter" },
@@ -58,10 +86,7 @@ export async function POST(req: Request) {
     const validRoles = ["admin", "normal", "driver"];
 
     if (!validRoles.includes(role)) {
-      return NextResponse.json(
-        { error: "Role inválida." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "Role inválida." }, { status: 400 });
     }
 
     if (role === "admin" && cu.role !== "admin") {
@@ -80,6 +105,8 @@ export async function POST(req: Request) {
       );
     }
 
+    console.log("[add-member] siteUrl:", siteUrl);
+
     const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
       data: {
         company_id: cu.company_id,
@@ -93,14 +120,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
+    console.log("[add-member] invite success:", data.user?.id);
+
     return NextResponse.json(
       { ok: true, userId: data.user?.id },
       { status: 200 },
     );
   } catch (e: any) {
-    console.error("[add-member] error:", e?.message || e);
+    console.error("[add-member] fatal error:", e);
     return NextResponse.json(
-      { error: "Erro interno no add-member." },
+      { error: e?.message || "Erro interno no add-member." },
       { status: 500 },
     );
   }
