@@ -30,6 +30,12 @@ export async function POST(req: Request) {
   try {
     const cookieStore = await cookies();
 
+    const allCookies = cookieStore.getAll();
+    console.log(
+      "[add-member] cookies received:",
+      allCookies.map((c) => c.name),
+    );
+
     const supa = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -58,11 +64,17 @@ export async function POST(req: Request) {
       error: inviterError,
     } = await supa.auth.getUser();
 
-    console.log("[add-member] inviter:", inviter?.email);
-    console.log("[add-member] inviter error:", inviterError);
+    console.log("[add-member] inviter:", inviter?.email ?? null);
+    console.log("[add-member] inviterError:", inviterError ?? null);
 
     if (inviterError || !inviter) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      return NextResponse.json(
+        {
+          error: "Not authenticated",
+          details: inviterError?.message ?? "No session user found",
+        },
+        { status: 401 },
+      );
     }
 
     const body = await req.json();
@@ -80,8 +92,6 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
-
-    console.log("[add-member] fetching company user");
 
     const { data: cu, error: cuErr } = await admin
       .from("company_users")
@@ -101,8 +111,6 @@ export async function POST(req: Request) {
 
     const validRoles = ["admin", "normal", "driver"];
 
-    console.log("[add-member] validating role");
-
     if (!validRoles.includes(role)) {
       return NextResponse.json({ error: "Role inválida." }, { status: 400 });
     }
@@ -115,7 +123,6 @@ export async function POST(req: Request) {
     }
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
-
     console.log("[add-member] siteUrl:", siteUrl);
 
     if (!siteUrl) {
