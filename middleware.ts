@@ -1,6 +1,6 @@
 // middleware.ts
 import { NextResponse, type NextRequest } from "next/server";
-import { createMiddlewareClient } from "@supabase/auth-helpers-nextjs";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
 
 function isStatic(pathname: string) {
   return (
@@ -10,11 +10,43 @@ function isStatic(pathname: string) {
   );
 }
 
+function createSupabaseMiddlewareClient(req: NextRequest, res: NextResponse) {
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return req.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(
+            ({
+              name,
+              value,
+              options,
+            }: {
+              name: string;
+              value: string;
+              options?: CookieOptions;
+            }) => {
+              res.cookies.set(name, value, options);
+            },
+          );
+        },
+      },
+    },
+  );
+}
+
 export async function middleware(req: NextRequest) {
   const { pathname, hostname, search } = req.nextUrl;
 
-  if (isStatic(pathname)) return NextResponse.next();
+  if (isStatic(pathname)) {
+    return NextResponse.next();
+  }
 
+  // força domínio canônico
   if (hostname === "chopphub.com") {
     return NextResponse.redirect(
       new URL(`https://www.chopphub.com${pathname}${search}`),
@@ -24,19 +56,30 @@ export async function middleware(req: NextRequest) {
 
   if (pathname.startsWith("/dashboard")) {
     const res = NextResponse.next();
-    const supabase = createMiddlewareClient({ req, res });
+    const supabase = createSupabaseMiddlewareClient(req, res);
 
-    const { data, error } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
 
-    if (error || !data?.user) {
-      return NextResponse.redirect(new URL("/login-signin", req.url));
+    console.log("[middleware] pathname:", pathname);
+    console.log("[middleware] user:", user?.email ?? null);
+    console.log("[middleware] userError:", userError ?? null);
+
+    if (userError || !user) {
+      const loginUrl = new URL("/login-signin", req.url);
+      return NextResponse.redirect(loginUrl);
     }
 
     const { data: companyUser, error: roleError } = await supabase
       .from("company_users")
       .select("role")
-      .eq("user_id", data.user.id)
+      .eq("user_id", user.id)
       .single();
+
+    console.log("[middleware] companyUser:", companyUser);
+    console.log("[middleware] roleError:", roleError ?? null);
 
     if (!roleError && pathname === "/dashboard" && companyUser?.role === "driver") {
       return NextResponse.redirect(new URL("/dashboard/orders", req.url));
