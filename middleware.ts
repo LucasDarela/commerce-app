@@ -2,6 +2,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 
+type SupabaseCookie = {
+  name: string;
+  value: string;
+  options?: CookieOptions;
+};
+
 function isStatic(pathname: string) {
   return (
     pathname.startsWith("/_next") ||
@@ -19,7 +25,7 @@ function createSupabaseMiddlewareClient(req: NextRequest, res: NextResponse) {
         getAll() {
           return req.cookies.getAll();
         },
-        setAll(cookiesToSet) {
+        setAll(cookiesToSet: SupabaseCookie[]) {
           cookiesToSet.forEach(
             ({
               name,
@@ -46,7 +52,6 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // força domínio canônico
   if (hostname === "chopphub.com") {
     return NextResponse.redirect(
       new URL(`https://www.chopphub.com${pathname}${search}`),
@@ -63,13 +68,8 @@ export async function middleware(req: NextRequest) {
       error: userError,
     } = await supabase.auth.getUser();
 
-    console.log("[middleware] pathname:", pathname);
-    console.log("[middleware] user:", user?.email ?? null);
-    console.log("[middleware] userError:", userError ?? null);
-
     if (userError || !user) {
-      const loginUrl = new URL("/login-signin", req.url);
-      return NextResponse.redirect(loginUrl);
+      return NextResponse.redirect(new URL("/login-signin", req.url));
     }
 
     const { data: companyUser, error: roleError } = await supabase
@@ -78,10 +78,14 @@ export async function middleware(req: NextRequest) {
       .eq("user_id", user.id)
       .single();
 
-    console.log("[middleware] companyUser:", companyUser);
-    console.log("[middleware] roleError:", roleError ?? null);
+    const normalizedRole =
+      companyUser?.role === "motorista"
+        ? "driver"
+        : companyUser?.role === "usuario"
+          ? "normal"
+          : companyUser?.role;
 
-    if (!roleError && pathname === "/dashboard" && companyUser?.role === "driver") {
+    if (!roleError && pathname === "/dashboard" && normalizedRole === "driver") {
       return NextResponse.redirect(new URL("/dashboard/orders", req.url));
     }
 
