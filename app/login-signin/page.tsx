@@ -1,6 +1,4 @@
-import { createServerComponentClient } from "@supabase/auth-helpers-nextjs";
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CreateAccountForm } from "@/components/auth/create-account-form";
 import { LoginAccountForm } from "@/components/auth/login-account-form";
@@ -10,7 +8,7 @@ import Link from "next/link";
 export default async function LogInSignIn() {
   return (
     <>
-      <RedirectIfAuthenticated />
+      {/* <RedirectIfAuthenticated /> */}
       <div className="flex flex-col h-screen w-full justify-center items-center">
         {/* Account Tabs and Password */}
         <Tabs
