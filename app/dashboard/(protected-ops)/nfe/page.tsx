@@ -74,7 +74,6 @@ useEffect(() => {
         id,
         company_id,
         order_id,
-        customer_id,
         customer_name,
         numero,
         note_number,
@@ -252,7 +251,6 @@ useEffect(() => {
                 <RefreshButton
                   refId={invoice.ref}
                   companyId={invoice.company_id}
-                  customerId={invoice.customer_id}
                   setInvoices={setInvoices}
                 />
               )}
