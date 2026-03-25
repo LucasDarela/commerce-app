@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { ProductForm } from "@/components/products/ProductForm";
 
 export default function EditProductPage() {
-  const supabase = createClientComponentClient();
+  const supabase = createBrowserSupabaseClient();
   const params = useParams();
   const id = params.id as string;
 

@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
 export async function POST(request: Request) {
-  const supabase = createClientComponentClient();
+  const supabase = createBrowserSupabaseClient();
 
   const body = await request.json();
   const { deliveryIds, driverId, date, type } = body;

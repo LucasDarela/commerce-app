@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,116 +11,276 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { IconSelector } from "@/components/icon-selector";
 import { toast } from "sonner";
 
+type ProfileRow = {
+  username: string | null;
+  email: string | null;
+  avatar: string | null;
+};
+
+type CompanyRow = {
+  name: string | null;
+};
+
 export default function AccountPage() {
+  const router = useRouter();
+  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const { user, companyId } = useAuthenticatedCompany();
-  const [profile, setProfile] = useState<any>(null);
+
+  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<ProfileRow | null>(null);
   const [username, setUsername] = useState("User");
   const [email, setEmail] = useState("");
   const [avatar, setAvatar] = useState<string | null>(null);
   const [companyName, setCompanyName] = useState("");
-  const [teamMembers, setTeamMembers] = useState<any[]>([]);
-  const [newMember, setNewMember] = useState({ email: "", password: "" });
+  const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
   useEffect(() => {
     if (!user?.id || !companyId) return;
 
-    const fetchProfile = async () => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("username, email, avatar")
-        .eq("id", user.id)
-        .single();
+    let isMounted = true;
 
-      if (!error && data) {
-        setProfile(data);
-        setUsername(data.username);
-        setEmail(data.email);
-        setAvatar(data.avatar);
+    const fetchData = async () => {
+      setLoading(true);
+
+      try {
+        const [profileRes, companyRes] = await Promise.all([
+          supabase
+            .from("profiles")
+            .select("username, email, avatar")
+            .eq("id", user.id)
+            .single(),
+          supabase
+            .from("companies")
+            .select("name")
+            .eq("id", companyId)
+            .single(),
+        ]);
+
+        if (!isMounted) return;
+
+        if (profileRes.error) {
+          console.error("Erro ao buscar profile:", profileRes.error);
+        } else if (profileRes.data) {
+          const data = profileRes.data as ProfileRow;
+          setProfile(data);
+          setUsername(data.username ?? "User");
+          setEmail(data.email ?? "");
+          setAvatar(data.avatar ?? null);
+        }
+
+        if (companyRes.error) {
+          console.error("Erro ao buscar empresa:", companyRes.error);
+        } else if (companyRes.data) {
+          const data = companyRes.data as CompanyRow;
+          setCompanyName(data.name ?? "");
+        }
+      } catch (error) {
+        console.error("Erro inesperado ao carregar conta:", error);
+        toast.error("Erro ao carregar dados da conta.");
+      } finally {
+        if (isMounted) setLoading(false);
       }
     };
 
-    const fetchCompany = async () => {
-      const { data, error } = await supabase
-        .from("companies")
-        .select("name")
-        .eq("id", companyId)
-        .limit(1)
-        .single();
+    fetchData();
 
-      if (!error && data) setCompanyName(data.name);
+    return () => {
+      isMounted = false;
     };
-
-    fetchProfile();
-    fetchCompany();
-  }, [user?.id, companyId]);
+  }, [user?.id, companyId, supabase]);
 
   const handleUpdateProfile = async () => {
-    if (!user || !companyId) return;
+    if (!user?.id || !companyId || isSaving) return;
 
-    const { error: profileError } = await supabase
-      .from("profiles")
-      .update({ username, email })
-      .eq("id", user.id);
+    setIsSaving(true);
 
-    const { error: companyError } = await supabase
-      .from("companies")
-      .update({ name: companyName })
-      .eq("id", companyId);
+    try {
+      const trimmedUsername = username.trim();
+      const trimmedEmail = email.trim().toLowerCase();
+      const trimmedCompanyName = companyName.trim();
 
-    if (profileError || companyError) toast.error("Failed to update profile.");
-    else toast.success("Profile updated!");
-    window.location.reload();
+      const [profileRes, companyRes] = await Promise.all([
+        supabase
+          .from("profiles")
+          .update({
+            username: trimmedUsername || null,
+            email: trimmedEmail || null,
+          })
+          .eq("id", user.id),
+        supabase
+          .from("companies")
+          .update({
+            name: trimmedCompanyName || null,
+          })
+          .eq("id", companyId),
+      ]);
+
+      if (profileRes.error || companyRes.error) {
+        console.error("Erro ao atualizar perfil:", profileRes.error);
+        console.error("Erro ao atualizar empresa:", companyRes.error);
+        toast.error("Erro ao atualizar perfil.");
+        return;
+      }
+
+      setProfile((prev) =>
+        prev
+          ? {
+              ...prev,
+              username: trimmedUsername || null,
+              email: trimmedEmail || null,
+            }
+          : {
+              username: trimmedUsername || null,
+              email: trimmedEmail || null,
+              avatar,
+            },
+      );
+
+      toast.success("Perfil atualizado com sucesso!");
+      router.refresh();
+    } catch (error) {
+      console.error("Erro inesperado ao atualizar perfil:", error);
+      toast.error("Erro inesperado ao atualizar perfil.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleChangeAvatar = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChangeAvatar = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const file = e.target.files?.[0];
-    if (!file || !user) return;
+    if (!file || !user?.id || !companyId || isUploadingAvatar) return;
 
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const img = new Image();
-      img.src = event.target?.result as string;
+    setIsUploadingAvatar(true);
 
-      img.onload = async () => {
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
-        canvas.width = 150;
-        canvas.height = 150;
-        ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+    try {
+      const allowedTypes = [
+        "image/png",
+        "image/jpeg",
+        "image/jpg",
+        "image/heic",
+        "image/webp",
+      ];
 
-        canvas.toBlob(
-          async (blob) => {
-            if (!blob) return toast.error("Failed to compress image.");
+      if (!allowedTypes.includes(file.type)) {
+        toast.error("Formato de imagem inválido.");
+        return;
+      }
 
-            const fileName = `avatar_${user.id}.webp`;
-            await supabase.storage.from("avatars").remove([fileName]);
+      const reader = new FileReader();
 
-            const { error: uploadError } = await supabase.storage
-              .from("avatars")
-              .upload(fileName, blob, {
-                cacheControl: "3600",
-                upsert: true,
-              });
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
 
-            if (uploadError) return toast.error("Failed to upload avatar.");
+        img.onload = async () => {
+          try {
+            const canvas = document.createElement("canvas");
+            const ctx = canvas.getContext("2d");
 
-            const publicURL = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/avatars/${fileName}`;
-            const { error: updateError } = await supabase
-              .from("profiles")
-              .update({ avatar: publicURL })
-              .eq("id", user.id);
+            if (!ctx) {
+              toast.error("Erro ao processar imagem.");
+              setIsUploadingAvatar(false);
+              return;
+            }
 
-            if (updateError) return toast.error("Failed to update avatar.");
-            setAvatar(`${publicURL}?t=${Date.now()}`);
-            toast.success("Avatar updated!");
-          },
-          "image/webp",
-          0.8,
-        );
+            canvas.width = 150;
+            canvas.height = 150;
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+            canvas.toBlob(
+              async (blob) => {
+                try {
+                  if (!blob) {
+                    toast.error("Falha ao comprimir imagem.");
+                    return;
+                  }
+
+                  const filePath = `${companyId}/avatar_${user.id}.webp`;
+
+                  const { error: uploadError } = await supabase.storage
+                    .from("avatars")
+                    .upload(filePath, blob, {
+                      cacheControl: "3600",
+                      upsert: true,
+                      contentType: "image/webp",
+                    });
+
+                  if (uploadError) {
+                    console.error("Erro no upload:", uploadError);
+                    toast.error("Falha ao enviar avatar.");
+                    return;
+                  }
+
+                  const { data: publicUrlData } = supabase.storage
+                    .from("avatars")
+                    .getPublicUrl(filePath);
+
+                  const publicURL = publicUrlData.publicUrl;
+
+                  const { error: updateError } = await supabase
+                    .from("profiles")
+                    .update({ avatar: publicURL })
+                    .eq("id", user.id);
+
+                  if (updateError) {
+                    console.error("Erro ao salvar avatar no profile:", updateError);
+                    toast.error("Falha ao atualizar avatar.");
+                    return;
+                  }
+
+                  const bustedUrl = `${publicURL}?t=${Date.now()}`;
+                  setAvatar(bustedUrl);
+                  setProfile((prev) =>
+                    prev
+                      ? { ...prev, avatar: bustedUrl }
+                      : {
+                          username,
+                          email,
+                          avatar: bustedUrl,
+                        },
+                  );
+
+                  toast.success("Avatar atualizado!");
+                  router.refresh();
+                } catch (error) {
+                  console.error("Erro inesperado no avatar:", error);
+                  toast.error("Erro inesperado ao atualizar avatar.");
+                } finally {
+                  setIsUploadingAvatar(false);
+                }
+              },
+              "image/webp",
+              0.8,
+            );
+          } catch (error) {
+            console.error("Erro ao renderizar imagem:", error);
+            toast.error("Erro ao processar imagem.");
+            setIsUploadingAvatar(false);
+          }
+        };
+
+        img.onerror = () => {
+          toast.error("Erro ao carregar imagem.");
+          setIsUploadingAvatar(false);
+        };
       };
-    };
 
-    reader.readAsDataURL(file);
+      reader.onerror = () => {
+        toast.error("Erro ao ler arquivo.");
+        setIsUploadingAvatar(false);
+      };
+
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error("Erro inesperado ao trocar avatar:", error);
+      toast.error("Erro inesperado ao trocar avatar.");
+      setIsUploadingAvatar(false);
+    } finally {
+      e.target.value = "";
+    }
   };
 
   return (
@@ -136,6 +297,7 @@ export default function AccountPage() {
               </AvatarFallback>
             </Avatar>
           </label>
+
           <input
             name="avatar-upload"
             type="file"
@@ -144,6 +306,10 @@ export default function AccountPage() {
             className="hidden"
             onChange={handleChangeAvatar}
           />
+
+          {isUploadingAvatar && (
+            <p className="text-sm text-muted-foreground">Enviando avatar...</p>
+          )}
         </CardContent>
       </Card>
 
@@ -157,7 +323,9 @@ export default function AccountPage() {
             placeholder="Nome de Usuário"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
+            disabled={loading || isSaving}
           />
+
           <label className="text-sm mb-1 block font-medium text-muted-foreground">
             Email
           </label>
@@ -166,7 +334,9 @@ export default function AccountPage() {
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            disabled={loading || isSaving}
           />
+
           <label className="text-sm mb-1 block font-medium text-muted-foreground">
             Nome da Empresa
           </label>
@@ -175,10 +345,14 @@ export default function AccountPage() {
             placeholder="Nome da Empresa"
             value={companyName}
             onChange={(e) => setCompanyName(e.target.value)}
+            disabled={loading || isSaving}
           />
+
           <IconSelector />
 
-          <Button onClick={handleUpdateProfile}>Salvar Alterações</Button>
+          <Button onClick={handleUpdateProfile} disabled={loading || isSaving}>
+            {isSaving ? "Salvando..." : "Salvar Alterações"}
+          </Button>
         </CardContent>
       </Card>
     </div>

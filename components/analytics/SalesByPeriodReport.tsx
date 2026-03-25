@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { Card, CardContent } from "@/components/ui/card";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
 import {
@@ -91,6 +91,7 @@ export function SalesByPeriodReport({
   endDate,
   customerId,
 }: SalesByPeriodReportProps) {
+  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<OrderRow[]>([]);
   const [triggerDownload, setTriggerDownload] = useState(false);
@@ -108,8 +109,14 @@ export function SalesByPeriodReport({
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+
     const fetchSales = async () => {
-      if (!companyId || !startDate) return;
+      if (!companyId || !startDate) {
+        setRows([]);
+        setLoading(false);
+        return;
+      }
 
       setLoading(true);
 
@@ -142,6 +149,8 @@ export function SalesByPeriodReport({
 
         const { data, error } = await query;
 
+        if (cancelled) return;
+
         if (error) {
           console.error("Erro ao buscar relatório de vendas:", error);
           toast.error("Erro ao carregar relatório de vendas.");
@@ -163,19 +172,30 @@ export function SalesByPeriodReport({
 
         setRows(parsed);
       } catch (error) {
-        console.error(error);
-        toast.error("Erro inesperado ao carregar relatório.");
-        setRows([]);
+        if (!cancelled) {
+          console.error(error);
+          toast.error("Erro inesperado ao carregar relatório.");
+          setRows([]);
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
 
     fetchSales();
-  }, [companyId, startDate, endDate, customerId]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId, startDate, endDate, customerId, supabase]);
 
   const summary = useMemo(() => {
-    const totalSales = rows.reduce((acc, row) => acc + Number(row.total ?? 0), 0);
+    const totalSales = rows.reduce(
+      (acc, row) => acc + Number(row.total ?? 0),
+      0,
+    );
     const totalPaid = rows.reduce(
       (acc, row) => acc + Number(row.total_payed ?? 0),
       0,
@@ -227,7 +247,9 @@ export function SalesByPeriodReport({
         <Card>
           <CardContent className="py-5">
             <p className="text-sm text-muted-foreground">Total de vendas</p>
-            <p className="text-2xl font-bold">{formatCurrency(summary.totalSales)}</p>
+            <p className="text-2xl font-bold">
+              {formatCurrency(summary.totalSales)}
+            </p>
             <p className="text-xs text-muted-foreground mt-1">
               {summary.count} registro(s)
             </p>
@@ -237,14 +259,18 @@ export function SalesByPeriodReport({
         <Card>
           <CardContent className="py-5">
             <p className="text-sm text-muted-foreground">Total recebido</p>
-            <p className="text-2xl font-bold">{formatCurrency(summary.totalPaid)}</p>
+            <p className="text-2xl font-bold">
+              {formatCurrency(summary.totalPaid)}
+            </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="py-5">
             <p className="text-sm text-muted-foreground">Total em aberto</p>
-            <p className="text-2xl font-bold">{formatCurrency(summary.totalOpen)}</p>
+            <p className="text-2xl font-bold">
+              {formatCurrency(summary.totalOpen)}
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -260,9 +286,15 @@ export function SalesByPeriodReport({
                   <TableHead className="min-w-[90px]">Nota</TableHead>
                   <TableHead className="min-w-[220px]">Cliente</TableHead>
                   <TableHead className="min-w-[260px]">Produtos</TableHead>
-                  <TableHead className="min-w-[130px] text-right">Total</TableHead>
-                  <TableHead className="min-w-[130px] text-right">Pago</TableHead>
-                  <TableHead className="min-w-[130px] text-right">Restante</TableHead>
+                  <TableHead className="min-w-[130px] text-right">
+                    Total
+                  </TableHead>
+                  <TableHead className="min-w-[130px] text-right">
+                    Pago
+                  </TableHead>
+                  <TableHead className="min-w-[130px] text-right">
+                    Restante
+                  </TableHead>
                   <TableHead className="min-w-[120px]">Status</TableHead>
                 </TableRow>
               </TableHeader>

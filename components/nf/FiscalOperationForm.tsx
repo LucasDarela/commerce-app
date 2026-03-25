@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -15,7 +15,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { supabase } from "@/lib/supabase";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import { Pencil, Trash } from "lucide-react";
 
@@ -31,10 +31,8 @@ const formSchema = z
     group: z.string().optional(),
     specification: z.string().optional(),
 
-    // ICMS/CSOSN (digitável)
     icms_situacao_tributaria: z.string().min(1, "Informe o ICMS/CSOSN"),
 
-    // se usar CST/CSOSN separados na sua tabela, mantemos opcionais aqui
     cst_icms: z.string().optional(),
     csosn_icms: z.string().optional(),
 
@@ -50,7 +48,6 @@ const formSchema = z
     modalidade_frete: z.enum(["0", "1", "2", "9"]),
     icms_origem: z.enum(["0", "1", "2", "4", "5", "6", "7"]),
 
-    // ST: opcionais no schema base, mas exigidos quando ICMS=60
     vbc_st_ret: z.string().optional(),
     pst: z.string().optional(),
     vicms_substituto: z.string().optional(),
@@ -74,20 +71,53 @@ const formSchema = z
 
 type FiscalOperationFormData = z.infer<typeof formSchema>;
 
+type FiscalOperationRow = {
+  id: string;
+  company_id: string;
+  operation_id: number;
+  natureza_operacao: string;
+  tipo_documento: "0" | "1";
+  cfop: string;
+  cst_icms?: string | null;
+  csosn_icms?: string | null;
+  icms_situacao_tributaria?: string | null;
+  ipi?: string | null;
+  pis?: string | null;
+  cofins?: string | null;
+  state?: string | null;
+  description?: string | null;
+  group?: string | null;
+  specification?: string | null;
+  ncm?: string | null;
+  local_destino?: "1" | "2" | "3";
+  finalidade_emissao?: "1" | "2" | "3" | "4";
+  consumidor_final?: "0" | "1";
+  presenca_comprador?: "0" | "1" | "2" | "3" | "4" | "9";
+  modalidade_frete?: "0" | "1" | "2" | "9";
+  icms_origem?: "0" | "1" | "2" | "4" | "5" | "6" | "7";
+  vbc_st_ret?: string | null;
+  pst?: string | null;
+  vicms_substituto?: string | null;
+  vicms_st_ret?: string | null;
+};
+
 /** ---------- Utils ---------- */
 const pad2 = (v?: string | number | null) =>
-  v == null ? undefined : v.toString().padStart(2, "0");
+  v == null || v === "" ? undefined : v.toString().padStart(2, "0");
 
 /** ---------- Componente ---------- */
 export default function FiscalOperationForm() {
-  const { companyId } = useAuthenticatedCompany();
+  const { companyId, loading: companyLoading } = useAuthenticatedCompany();
+
+  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
 
   // 1=SN, 2=SN sublimite, 3=Normal, 4=MEI
   const [crt, setCrt] = useState<number | null>(null);
-  const isSN = useMemo(() => crt === 1 || crt === 2 || crt === 4, [crt]);
-
-  const [operations, setOperations] = useState<any[]>([]);
+  const [operations, setOperations] = useState<FiscalOperationRow[]>([]);
   const [editId, setEditId] = useState<string | null>(null);
+  const [loadingInitial, setLoadingInitial] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const isSN = useMemo(() => crt === 1 || crt === 2 || crt === 4, [crt]);
 
   const form = useForm<FiscalOperationFormData>({
     resolver: zodResolver(formSchema),
@@ -99,187 +129,288 @@ export default function FiscalOperationForm() {
       presenca_comprador: "1",
       modalidade_frete: "0",
       icms_origem: "0",
-      icms_situacao_tributaria: "", // importante
-      // demais começam vazios/undefined
+      icms_situacao_tributaria: "",
+      description: "",
+      cfop: "",
+      ncm: "",
+      pis: "",
+      cofins: "",
+      operation_id: 1,
+      group: "",
+      specification: "",
+      cst_icms: "",
+      csosn_icms: "",
+      ipi: "",
+      state: "",
+      natureza_operacao: "",
+      vbc_st_ret: "",
+      pst: "",
+      vicms_substituto: "",
+      vicms_st_ret: "",
     },
   });
 
-  /** Regime tributário da empresa */
-  useEffect(() => {
+  const fetchOperations = useCallback(async () => {
     if (!companyId) return;
-    supabase
-      .from("companies")
-      .select("regime_tributario")
-      .eq("id", companyId)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (error) {
-          console.error(error);
-          return;
-        }
-        setCrt(data?.regime_tributario ?? null);
-      });
-  }, [companyId]);
 
-  /** Busca operações já salvas */
-  const fetchOperations = async () => {
-    if (!companyId) return;
     const { data, error } = await supabase
       .from("fiscal_operations")
       .select("*")
-      .eq("company_id", companyId);
-
-    if (error) toast.error("Erro ao carregar operações fiscais");
-    else setOperations(data || []);
-  };
-  useEffect(() => {
-    fetchOperations();
-  }, [companyId]);
-
-  /** Submit */
-  const onSubmit = async (data: FiscalOperationFormData) => {
-    if (!companyId) return;
-
-    // regra: monta tudo, mas só envia campos conhecidos
-    const full = {
-      ...data,
-      company_id: companyId,
-      cst_icms: isSN ? null : pad2(data.cst_icms),
-      csosn_icms: isSN ? (data.csosn_icms ?? "") : null,
-      pis: pad2(data.pis),
-      cofins: pad2(data.cofins),
-      ipi: pad2(data.ipi),
-    };
-
-    // ❗️Se a sua tabela ainda não tem as novas colunas, REMOVA-AS do payload aqui.
-    // Deixe somente campos que você tem certeza que existem.
-    const allow: (keyof typeof full)[] = [
-      "company_id",
-      "operation_id",
-      "natureza_operacao",
-      "tipo_documento",
-      "local_destino",
-      "finalidade_emissao",
-      "consumidor_final",
-      "presenca_comprador",
-      "modalidade_frete",
-      "icms_origem",
-      "cfop",
-      "ncm",
-      "pis",
-      "cofins",
-      "ipi",
-      "state",
-      // acrescente as de baixo SOMENTE se você já criou as colunas no banco:
-      "icms_situacao_tributaria",
-      "vbc_st_ret",
-      "pst",
-      "vicms_substituto",
-      "vicms_st_ret",
-      "cst_icms",
-      "csosn_icms",
-      "description",
-      "group",
-      "specification",
-    ];
-    const payload = Object.fromEntries(
-      Object.entries(full).filter(([k, _]) => allow.includes(k as any)),
-    );
-
-    // se NÃO for ST, limpe os campos de ST para evitar erro de tipo
-    if (full.icms_situacao_tributaria?.trim() !== "60") {
-      delete (payload as any).vbc_st_ret;
-      delete (payload as any).pst;
-      delete (payload as any).vicms_substituto;
-      delete (payload as any).vicms_st_ret;
-    }
-
-    console.log("[fiscal_operations] payload =>", payload);
-
-    // checa duplicidade do operation_id
-    const { data: existing, error: fetchError } = await supabase
-      .from("fiscal_operations")
-      .select("id, operation_id")
       .eq("company_id", companyId)
-      .eq("operation_id", data.operation_id)
-      .maybeSingle();
+      .order("operation_id", { ascending: true });
 
-    if (fetchError) {
-      console.error(fetchError);
-      toast.error("Erro ao verificar duplicidade");
+    if (error) {
+      console.error("Erro ao carregar operações fiscais:", error);
+      toast.error("Erro ao carregar operações fiscais");
       return;
     }
 
-    if (editId) {
-      if (existing && existing.id !== editId) {
-        toast.error("Já existe uma operação com esse código");
+    setOperations((data as FiscalOperationRow[]) || []);
+  }, [companyId, supabase]);
+
+  useEffect(() => {
+    const loadInitialData = async () => {
+      if (!companyId || companyLoading) return;
+
+      setLoadingInitial(true);
+
+      try {
+        const [companyRes, operationsRes] = await Promise.all([
+          supabase
+            .from("companies")
+            .select("regime_tributario")
+            .eq("id", companyId)
+            .maybeSingle(),
+          supabase
+            .from("fiscal_operations")
+            .select("*")
+            .eq("company_id", companyId)
+            .order("operation_id", { ascending: true }),
+        ]);
+
+        if (companyRes.error) {
+          console.error("Erro ao buscar regime tributário:", companyRes.error);
+        } else {
+          setCrt(companyRes.data?.regime_tributario ?? null);
+        }
+
+        if (operationsRes.error) {
+          console.error(
+            "Erro ao carregar operações fiscais:",
+            operationsRes.error,
+          );
+          toast.error("Erro ao carregar operações fiscais");
+        } else {
+          setOperations((operationsRes.data as FiscalOperationRow[]) || []);
+        }
+      } finally {
+        setLoadingInitial(false);
+      }
+    };
+
+    loadInitialData();
+  }, [companyId, companyLoading, supabase]);
+
+  const onSubmit = async (data: FiscalOperationFormData) => {
+    if (!companyId) {
+      toast.error("Empresa não identificada.");
+      return;
+    }
+
+    if (saving) return;
+    setSaving(true);
+
+    try {
+      const full = {
+        ...data,
+        company_id: companyId,
+        cst_icms: isSN ? null : pad2(data.cst_icms),
+        csosn_icms: isSN ? (data.csosn_icms ?? "") : null,
+        pis: pad2(data.pis),
+        cofins: pad2(data.cofins),
+        ipi: pad2(data.ipi),
+        state: data.state?.toUpperCase() || undefined,
+      };
+
+      const allow: (keyof typeof full)[] = [
+        "company_id",
+        "operation_id",
+        "natureza_operacao",
+        "tipo_documento",
+        "local_destino",
+        "finalidade_emissao",
+        "consumidor_final",
+        "presenca_comprador",
+        "modalidade_frete",
+        "icms_origem",
+        "cfop",
+        "ncm",
+        "pis",
+        "cofins",
+        "ipi",
+        "state",
+        "icms_situacao_tributaria",
+        "vbc_st_ret",
+        "pst",
+        "vicms_substituto",
+        "vicms_st_ret",
+        "cst_icms",
+        "csosn_icms",
+        "description",
+        "group",
+        "specification",
+      ];
+
+      const payload = Object.fromEntries(
+        Object.entries(full).filter(([k]) => allow.includes(k as any)),
+      );
+
+      if (full.icms_situacao_tributaria?.trim() !== "60") {
+        delete (payload as any).vbc_st_ret;
+        delete (payload as any).pst;
+        delete (payload as any).vicms_substituto;
+        delete (payload as any).vicms_st_ret;
+      }
+
+      const { data: existing, error: fetchError } = await supabase
+        .from("fiscal_operations")
+        .select("id, operation_id")
+        .eq("company_id", companyId)
+        .eq("operation_id", data.operation_id)
+        .maybeSingle();
+
+      if (fetchError) {
+        console.error("Erro ao verificar duplicidade:", fetchError);
+        toast.error("Erro ao verificar duplicidade");
         return;
       }
 
-      const { error } = await supabase
-        .from("fiscal_operations")
-        .update(payload)
-        .eq("id", editId)
-        .select(); // força o PostgREST retornar erro detalhado
+      if (editId) {
+        if (existing && existing.id !== editId) {
+          toast.error("Já existe uma operação com esse código");
+          return;
+        }
 
-      if (error) {
-        console.error("[UPDATE fiscal_operations] =>", error);
-        toast.error(`Erro ao atualizar operação fiscal: ${error.message}`);
-      } else {
+        const { error } = await supabase
+          .from("fiscal_operations")
+          .update(payload)
+          .eq("id", editId)
+          .eq("company_id", companyId)
+          .select();
+
+        if (error) {
+          console.error("[UPDATE fiscal_operations] =>", error);
+          toast.error(`Erro ao atualizar operação fiscal: ${error.message}`);
+          return;
+        }
+
         toast.success("Operação atualizada com sucesso");
-        setEditId(null);
-        form.reset();
-        fetchOperations();
-      }
-    } else {
-      if (existing) {
-        toast.error("Já existe uma operação com esse código");
-        return;
-      }
-
-      const { error } = await supabase
-        .from("fiscal_operations")
-        .insert(payload)
-        .select();
-
-      if (error) {
-        console.error("[INSERT fiscal_operations] =>", error);
-        toast.error(`Erro ao salvar operação fiscal: ${error.message}`);
       } else {
+        if (existing) {
+          toast.error("Já existe uma operação com esse código");
+          return;
+        }
+
+        const { error } = await supabase
+          .from("fiscal_operations")
+          .insert(payload)
+          .select();
+
+        if (error) {
+          console.error("[INSERT fiscal_operations] =>", error);
+          toast.error(`Erro ao salvar operação fiscal: ${error.message}`);
+          return;
+        }
+
         toast.success("Operação fiscal salva");
-        form.reset();
-        fetchOperations();
       }
+
+      setEditId(null);
+      form.reset({
+        finalidade_emissao: "1",
+        tipo_documento: "1",
+        local_destino: "1",
+        consumidor_final: "1",
+        presenca_comprador: "1",
+        modalidade_frete: "0",
+        icms_origem: "0",
+        icms_situacao_tributaria: "",
+        description: "",
+        cfop: "",
+        ncm: "",
+        pis: "",
+        cofins: "",
+        operation_id: 1,
+        group: "",
+        specification: "",
+        cst_icms: "",
+        csosn_icms: "",
+        ipi: "",
+        state: "",
+        natureza_operacao: "",
+        vbc_st_ret: "",
+        pst: "",
+        vicms_substituto: "",
+        vicms_st_ret: "",
+      });
+
+      await fetchOperations();
+    } finally {
+      setSaving(false);
     }
   };
 
-  /** Editar */
-  const handleEdit = (row: any) => {
+  const handleEdit = (row: FiscalOperationRow) => {
     setEditId(row.id);
     form.reset({
-      ...row,
-      // garante strings
+      description: row.description ?? "",
+      cfop: row.cfop ?? "",
+      ncm: row.ncm ?? "",
+      pis: row.pis ?? "",
+      cofins: row.cofins ?? "",
+      operation_id: row.operation_id ?? 1,
+      group: row.group ?? "",
+      specification: row.specification ?? "",
       icms_situacao_tributaria: String(row.icms_situacao_tributaria ?? ""),
-      cst_icms: row.cst_icms ?? undefined,
-      csosn_icms: row.csosn_icms ?? undefined,
-      vbc_st_ret: row.vbc_st_ret ?? undefined,
-      pst: row.pst ?? undefined,
-      vicms_substituto: row.vicms_substituto ?? undefined,
-      vicms_st_ret: row.vicms_st_ret ?? undefined,
+      cst_icms: row.cst_icms ?? "",
+      csosn_icms: row.csosn_icms ?? "",
+      ipi: row.ipi ?? "",
+      state: row.state ?? "",
+      natureza_operacao: row.natureza_operacao ?? "",
+      tipo_documento: row.tipo_documento ?? "1",
+      local_destino: row.local_destino ?? "1",
+      finalidade_emissao: row.finalidade_emissao ?? "1",
+      consumidor_final: row.consumidor_final ?? "1",
+      presenca_comprador: row.presenca_comprador ?? "1",
+      modalidade_frete: row.modalidade_frete ?? "0",
+      icms_origem: row.icms_origem ?? "0",
+      vbc_st_ret: row.vbc_st_ret ?? "",
+      pst: row.pst ?? "",
+      vicms_substituto: row.vicms_substituto ?? "",
+      vicms_st_ret: row.vicms_st_ret ?? "",
     });
   };
 
-  /** Excluir */
   const handleDelete = async (id: string) => {
+    if (!companyId) {
+      toast.error("Empresa não identificada.");
+      return;
+    }
+
     const { error } = await supabase
       .from("fiscal_operations")
       .delete()
-      .eq("id", id);
-    if (error) toast.error("Erro ao excluir operação");
-    else {
-      toast.success("Operação excluída");
-      fetchOperations();
+      .eq("id", id)
+      .eq("company_id", companyId);
+
+    if (error) {
+      console.error("Erro ao excluir operação:", error);
+      toast.error("Erro ao excluir operação");
+      return;
     }
+
+    toast.success("Operação excluída");
+    await fetchOperations();
   };
 
   const icms = form.watch("icms_situacao_tributaria")?.trim();
@@ -467,7 +598,6 @@ export default function FiscalOperationForm() {
           </p>
         </div>
 
-        {/* ST somente quando ICMS = 60 */}
         {icms === "60" && (
           <>
             <div className="space-y-2">
@@ -563,56 +693,70 @@ export default function FiscalOperationForm() {
       </div>
 
       <div className="pt-4 pb-4">
-        <Button type="submit" className="mt-2 w-full md:w-auto">
-          {editId ? "Atualizar Operação" : "Salvar Operação"}
+        <Button
+          type="submit"
+          className="mt-2 w-full md:w-auto"
+          disabled={saving || !companyId}
+        >
+          {saving
+            ? "Salvando..."
+            : editId
+              ? "Atualizar Operação"
+              : "Salvar Operação"}
         </Button>
       </div>
 
       <hr className="my-4" />
 
-      {/* Lista */}
       <div className="pt-4">
         <h3 className="font-medium mb-2">Operações já cadastradas</h3>
-        <ul className="space-y-1">
-          {operations.map((row) => (
-            <li
-              key={row.id}
-              className="border p-2 rounded-md flex justify-between items-center"
-            >
-              <div>
-                <strong>
-                  {row.operation_id} -{" "}
-                  {row.tipo_documento === "0" ? "Entrada" : "Saída"} -{" "}
-                  {row.natureza_operacao}
-                </strong>{" "}
-                - CFOP: {row.cfop},{" "}
-                {row.csosn_icms ? (
-                  <>ICMS: CSOSN {row.csosn_icms}</>
-                ) : (
-                  <>ICMS: CST {row.cst_icms ?? "—"}</>
-                )}
-                , IPI: {row.ipi ?? "—"}, PIS: {row.pis}, COFINS: {row.cofins},
-                Estado: {row.state}
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleEdit(row)}
-                >
-                  <Pencil className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleDelete(row.id)}
-                >
-                  <Trash className="w-4 h-4 text-red-500" />
-                </Button>
-              </div>
-            </li>
-          ))}
-        </ul>
+
+        {loadingInitial ? (
+          <div className="text-sm text-muted-foreground">Carregando...</div>
+        ) : (
+          <ul className="space-y-1">
+            {operations.map((row) => (
+              <li
+                key={row.id}
+                className="border p-2 rounded-md flex justify-between items-center"
+              >
+                <div>
+                  <strong>
+                    {row.operation_id} -{" "}
+                    {row.tipo_documento === "0" ? "Entrada" : "Saída"} -{" "}
+                    {row.natureza_operacao}
+                  </strong>{" "}
+                  - CFOP: {row.cfop},{" "}
+                  {row.csosn_icms ? (
+                    <>ICMS: CSOSN {row.csosn_icms}</>
+                  ) : (
+                    <>ICMS: CST {row.cst_icms ?? "—"}</>
+                  )}
+                  , IPI: {row.ipi ?? "—"}, PIS: {row.pis}, COFINS: {row.cofins},
+                  Estado: {row.state}
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleEdit(row)}
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </Button>
+
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleDelete(row.id)}
+                  >
+                    <Trash className="w-4 h-4 text-red-500" />
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </form>
   );

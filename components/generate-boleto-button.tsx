@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
 function formatYMD(d: Date) {
   return d.toISOString().slice(0, 10);
@@ -41,7 +41,7 @@ export function GenerateBoletoButtons({
   paymentMethod: string;
   signatureData: string;
 }) {
-  const supabase = createClientComponentClient();
+  const supabase = createBrowserSupabaseClient();
   const [provider, setProvider] = useState<Provider>(null);
   const [checking, setChecking] = useState(true);
 
@@ -107,7 +107,7 @@ function GenerateBoletoMPButton({
   paymentMethod: string;
   signatureData: string;
 }) {
-  const supabase = createClientComponentClient();
+  const supabase = createBrowserSupabaseClient();
   const [loading, setLoading] = useState(false);
 
   const handleGenerateBoleto = async () => {
@@ -203,7 +203,7 @@ function GenerateBoletoAsaasButton({
   orderId: string;
   paymentMethod: string;
 }) {
-  const supabase = createClientComponentClient();
+  const supabase = createBrowserSupabaseClient();
   const [loading, setLoading] = useState(false);
 
   const handleGenerateBoletoAsaas = async () => {

@@ -3,12 +3,12 @@
 
 import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
 export default function AuthCallbackPage() {
   const router = useRouter();
   const search = useSearchParams();
-  const supabase = createClientComponentClient();
+  const supabase = createBrowserSupabaseClient();
 
   useEffect(() => {
     async function run() {

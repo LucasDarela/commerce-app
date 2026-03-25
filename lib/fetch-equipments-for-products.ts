@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
 type EquipmentItem = {
   equipment_id: string;
@@ -6,75 +6,109 @@ type EquipmentItem = {
   quantity: number;
 };
 
-type LinkedEquipment = {
+type ParsedProduct = {
+  name: string;
+  quantity: number;
+};
+
+type LinkedEquipmentRow = {
+  product_id: number;
   equipment_id: string;
   quantity: number;
-  equipment: { name: string } | null;
+  equipment: { name: string } | { name: string }[] | null;
 };
 
 export async function fetchEquipmentsForOrderProducts(
   productsText: string,
+  companyId: string,
 ): Promise<EquipmentItem[]> {
-  if (!productsText) return [];
+  const supabase = createBrowserSupabaseClient(); 
+  if (!productsText || !companyId) return [];
 
-  const parsed = productsText
+  const parsed: ParsedProduct[] = productsText
     .split(",")
     .map((entry) => {
       const match = entry.trim().match(/^(.+?) \((\d+)x\)$/);
       if (!match) return null;
+
       const [, name, quantity] = match;
-      return { name: name.trim(), quantity: Number(quantity) };
+      return {
+        name: name.trim(),
+        quantity: Number(quantity),
+      };
     })
-    .filter(Boolean) as { name: string; quantity: number }[];
+    .filter(Boolean) as ParsedProduct[];
+
+  if (parsed.length === 0) return [];
 
   const productNames = parsed.map((p) => p.name);
 
   const { data: productsData, error: productsError } = await supabase
     .from("products")
     .select("id, name")
-    .in("name", productNames);
+    .in("name", productNames)
+    .eq("company_id", companyId);
 
   if (productsError || !productsData) {
     console.error("Erro ao buscar produtos:", productsError);
     return [];
   }
 
-  const equipments: EquipmentItem[] = [];
+  if (productsData.length === 0) return [];
+
+  const productIds = productsData.map((p) => p.id);
+
+  const { data: linkedEquipmentsRaw, error: linkError } = await supabase
+    .from("product_loans")
+    .select("product_id, equipment_id, quantity, equipment:equipment_id(name)")
+    .in("product_id", productIds)
+    .eq("company_id", companyId);
+
+  if (linkError || !linkedEquipmentsRaw) {
+    console.error("Erro ao buscar equipamentos vinculados:", linkError);
+    return [];
+  }
+
+  const linkedEquipments = (linkedEquipmentsRaw as LinkedEquipmentRow[]).map(
+    (item) => {
+      const equipment = Array.isArray(item.equipment)
+        ? item.equipment[0] || null
+        : item.equipment;
+
+      return {
+        product_id: item.product_id,
+        equipment_id: item.equipment_id,
+        quantity: item.quantity,
+        equipment,
+      };
+    },
+  );
+
+  const resultMap = new Map<string, EquipmentItem>();
 
   for (const parsedProduct of parsed) {
     const product = productsData.find((p) => p.name === parsedProduct.name);
     if (!product) continue;
 
-    const { data: linkedEquipmentsRaw, error: linkError } = await supabase
-      .from("product_loans")
-      .select("equipment_id, quantity, equipment:equipment_id(name)")
-      .eq("product_id", product.id);
+    const equipmentsForProduct = linkedEquipments.filter(
+      (item) => item.product_id === product.id,
+    );
 
-    const linkedEquipments = (linkedEquipmentsRaw || []).map((item) => {
-      const equipment = Array.isArray(item.equipment)
-        ? item.equipment[0] || null // corrige se vier como array inesperado
-        : item.equipment;
+    for (const item of equipmentsForProduct) {
+      const totalQuantity = item.quantity * parsedProduct.quantity;
+      const existing = resultMap.get(item.equipment_id);
 
-      return {
-        equipment_id: item.equipment_id,
-        quantity: item.quantity,
-        equipment: equipment,
-      } satisfies LinkedEquipment;
-    });
-
-    if (linkError) {
-      console.error("Erro ao buscar equipamentos vinculados:", linkError);
-      continue;
+      if (existing) {
+        existing.quantity += totalQuantity;
+      } else {
+        resultMap.set(item.equipment_id, {
+          equipment_id: item.equipment_id,
+          name: item.equipment?.name || "Equipamento",
+          quantity: totalQuantity,
+        });
+      }
     }
-
-    linkedEquipments.forEach((item) => {
-      equipments.push({
-        equipment_id: item.equipment_id,
-        name: item.equipment?.name || "Equipamento",
-        quantity: item.quantity * parsedProduct.quantity,
-      });
-    });
   }
 
-  return equipments;
+  return Array.from(resultMap.values());
 }

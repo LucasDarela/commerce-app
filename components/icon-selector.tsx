@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Select,
   SelectTrigger,
@@ -9,7 +9,8 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
-import { supabase } from "@/lib/supabase";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
+import { toast } from "sonner";
 
 import {
   IconBeerFilled,
@@ -40,32 +41,69 @@ const iconOptions = [
 ];
 
 export function IconSelector() {
+  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const { companyId } = useAuthenticatedCompany();
+
   const [selectedIcon, setSelectedIcon] = useState("IconBeerFilled");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+
     const loadIcon = async () => {
-      if (!companyId) return;
+      if (!companyId) {
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+
       const { data, error } = await supabase
         .from("companies")
         .select("icon")
         .eq("id", companyId)
-        .single();
+        .maybeSingle();
 
-      if (!error && data?.icon) setSelectedIcon(data.icon);
+      if (cancelled) return;
+
+      if (error) {
+        console.error("Erro ao carregar ícone da empresa:", error);
+      } else if (data?.icon) {
+        setSelectedIcon(data.icon);
+      }
+
+      setLoading(false);
     };
 
     loadIcon();
-  }, [companyId]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId, supabase]);
 
   const handleChange = async (value: string) => {
-    setSelectedIcon(value);
-    if (!companyId) return;
+    if (!companyId || saving) return;
 
-    await supabase
+    const previousIcon = selectedIcon;
+    setSelectedIcon(value);
+    setSaving(true);
+
+    const { error } = await supabase
       .from("companies")
       .update({ icon: value })
       .eq("id", companyId);
+
+    if (error) {
+      console.error("Erro ao salvar ícone da empresa:", error);
+      setSelectedIcon(previousIcon);
+      toast.error("Erro ao salvar ícone da empresa.");
+    } else {
+      toast.success("Ícone atualizado com sucesso.");
+    }
+
+    setSaving(false);
   };
 
   return (
@@ -73,10 +111,16 @@ export function IconSelector() {
       <label className="text-sm mb-1 block font-medium text-muted-foreground">
         Company Icon
       </label>
-      <Select value={selectedIcon} onValueChange={handleChange}>
+
+      <Select
+        value={selectedIcon}
+        onValueChange={handleChange}
+        disabled={!companyId || loading || saving}
+      >
         <SelectTrigger className="w-full">
           <SelectValue placeholder="Choose an icon..." />
         </SelectTrigger>
+
         <SelectContent>
           {iconOptions.map((option) => (
             <SelectItem key={option.value} value={option.value}>

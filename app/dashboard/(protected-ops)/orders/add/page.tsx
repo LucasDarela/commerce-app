@@ -19,11 +19,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { toast } from "sonner";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Trash, Calendar as CalendarIcon } from "lucide-react";
+import {  Check, ChevronsUpDown, Trash, Calendar as CalendarIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   Popover,
   PopoverTrigger,
@@ -43,6 +44,14 @@ import { orderSchema, type Order } from "@/components/types/orderSchema";
 import React, { useMemo } from "react";
 import { useOverdueCheck } from "@/components/billing/useOverdueCheck";
 import { OverdueModal } from "@/components/billing/OverdueModal";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 
 type OrderFormData = z.infer<typeof orderSchema> & { id?: string };
 
@@ -86,8 +95,8 @@ type Driver = {
 
 export default function AddOrder() {
   const router = useRouter();
-  const supabase = React.useMemo(() => createClientComponentClient(), []);
-  const { companyId } = useAuthenticatedCompany();
+  const supabase = React.useMemo(() => createBrowserSupabaseClient(), []);
+  const { companyId, loading: companyLoading } = useAuthenticatedCompany();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
     null,
@@ -109,6 +118,8 @@ export default function AddOrder() {
   const addCustomerUrl = `/dashboard/customers/add?redirect=/dashboard/orders/add&fromOrder=true`;
   const searchParams = useSearchParams();
   const newCustomerId = searchParams.get("newCustomerId");
+  const [productOpen, setProductOpen] = useState(false);
+const [productSearch, setProductSearch] = useState("");
   const { check, items: overdueItems, error: overdueError } = useOverdueCheck();
   const [appointment, setAppointment] = useState({
     date: undefined as Date | undefined,
@@ -162,27 +173,42 @@ export default function AddOrder() {
   const [loading, setLoading] = useState<boolean>(false);
   const isSubmittingRef = useRef(false);
 
-  useEffect(() => {
-    const fetchCustomers = async () => {
-      const { data, error } = await supabase
-        .from("customers")
-        .select("*")
-        .eq("company_id", companyId);
-      if (!error) setCustomers(data || []);
-    };
-    const fetchProducts = async () => {
-      const { data, error } = await supabase
-        .from("products")
-        .select("id, code, name, standard_price, stock")
-        .eq("company_id", companyId);
+useEffect(() => {
+  if (companyLoading) return;
+  if (!companyId) {
+    console.error("companyId não carregado no AddOrder");
+    return;
+  }
 
-      if (!error) setProducts(data || []);
-    };
-    if (companyId) {
-      fetchCustomers();
-      fetchProducts();
+  const fetchData = async () => {
+    const [{ data: customersData, error: customersError }, { data: productsData, error: productsError }] =
+      await Promise.all([
+        supabase
+          .from("customers")
+          .select("*")
+          .eq("company_id", companyId)
+          .order("name", { ascending: true }),
+        supabase
+          .from("products")
+          .select("id, code, name, standard_price, stock")
+          .eq("company_id", companyId),
+      ]);
+
+    if (customersError) {
+      console.error("Erro ao buscar clientes:", customersError);
+    } else {
+      setCustomers(customersData || []);
     }
-  }, [companyId]);
+
+    if (productsError) {
+      console.error("Erro ao buscar produtos:", productsError);
+    } else {
+      setProducts(productsData || []);
+    }
+  };
+
+  fetchData();
+}, [companyId, companyLoading, supabase]);
 
   useEffect(() => {
     if (!companyId || order?.document_type !== "internal" || order.note_number)
@@ -222,14 +248,6 @@ useEffect(() => {
 
   fetchDrivers();
 }, [companyId, supabase]);
-
-  const filteredCustomers = searchCustomer.trim()
-    ? customers.filter(
-        (customer) =>
-          customer.name.toLowerCase().includes(searchCustomer.toLowerCase()) ||
-          customer.document.includes(searchCustomer),
-      )
-    : [];
 
   const handleSelectCustomer = async (customer: Customer) => {
     setSelectedCustomer(customer);
@@ -447,45 +465,59 @@ useEffect(() => {
     }
   };
 
-  const customersFiltered = searchCustomer.trim()
-    ? customers.filter(
-        (customer) =>
-          customer.name.toLowerCase().includes(searchCustomer.toLowerCase()) ||
-          (customer.fantasy_name &&
-            customer.fantasy_name
-              .toLowerCase()
-              .includes(searchCustomer.toLowerCase())) ||
-          customer.document.includes(searchCustomer),
-      )
-    : [];
+  const filteredProducts = products
+  .slice()
+  .sort((a, b) => Number(a.code) - Number(b.code))
+  .filter((product) => {
+    const search = productSearch.toLowerCase().trim();
+    if (!search) return true;
 
-  const dropdownRef = useRef<HTMLDivElement>(null);
+    return (
+      product.name.toLowerCase().includes(search) ||
+      String(product.code).toLowerCase().includes(search)
+    );
+  });
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
-      ) {
-        setShowCustomers(false);
-      }
-    };
+const customersFiltered = searchCustomer.trim()
+  ? customers.filter(
+      (customer) =>
+        customer.name.toLowerCase().includes(searchCustomer.toLowerCase()) ||
+        (customer.fantasy_name &&
+          customer.fantasy_name
+            .toLowerCase()
+            .includes(searchCustomer.toLowerCase())) ||
+        (customer.document ?? "").includes(searchCustomer),
+    )
+  : customers;
 
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
+const dropdownRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const fetchReservedStock = async () => {
-      if (!selectedProduct) return;
-      const reserved = await getReservedStock(selectedProduct.id);
-      setReservedStock(reserved);
-    };
+useEffect(() => {
+  const handleClickOutside = (event: MouseEvent) => {
+    if (
+      dropdownRef.current &&
+      !dropdownRef.current.contains(event.target as Node)
+    ) {
+      setShowCustomers(false);
+    }
+  };
 
-    fetchReservedStock();
-  }, [selectedProduct, quantity]);
+  document.addEventListener("mousedown", handleClickOutside);
+  return () => {
+    document.removeEventListener("mousedown", handleClickOutside);
+  };
+}, []);
+
+useEffect(() => {
+  const fetchReservedStock = async () => {
+    if (!selectedProduct || !companyId) return;
+
+    const reserved = await getReservedStock(selectedProduct.id, companyId);
+    setReservedStock(reserved);
+  };
+
+  fetchReservedStock();
+}, [selectedProduct, companyId]);
 
   useEffect(() => {
     const fetchNewCustomer = async () => {
@@ -524,6 +556,10 @@ useEffect(() => {
     products.forEach((p) => m.set(String(p.id), p));
     return m;
   }, [products]);
+
+  if (companyLoading) {
+  return <div className="p-6">Carregando...</div>;
+}
 
   return (
     <div className="w-full max-w-4xl mx-auto p-6 rounded-lg shadow-md">
@@ -654,33 +690,41 @@ useEffect(() => {
         <CardContent>
           <h2 className="text-xl font-bold mb-4">Informações do Cliente</h2>
           <div className="grid grid-cols-5 gap-4 mb-4">
-            <div className="col-span-3 relative">
-              <Input
-                type="text"
-                placeholder="Procurar Cliente..."
-                value={searchCustomer}
-                onChange={(e) => {
-                  setSearchCustomer(e.target.value);
-                  setShowCustomers(true);
-                }}
-              />
-              {showCustomers && customersFiltered.length > 0 && (
-                <div
-                  ref={dropdownRef}
-                  className="absolute z-10 mt-1 w-full border rounded-md shadow-md max-h-40 overflow-y-auto bg-muted"
-                >
-                  {customersFiltered.map((customer) => (
-                    <div
-                      key={customer.id}
-                      className="p-2 hover:bg-accent/60 transition-colors cursor-pointer"
-                      onClick={() => handleSelectCustomer(customer)}
-                    >
-                      {customer.name} - {customer.document}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+<div ref={dropdownRef} className="col-span-3 relative">
+  <Input
+    type="text"
+    placeholder="Procurar Cliente..."
+    value={searchCustomer}
+    onFocus={() => setShowCustomers(true)}
+    onChange={(e) => {
+      setSearchCustomer(e.target.value);
+      setShowCustomers(true);
+    }}
+  />
+
+  {showCustomers && (
+    <div className="absolute top-full left-0 z-50 mt-1 w-full border rounded-md shadow-md max-h-60 overflow-y-auto bg-background">
+      {customersFiltered.length > 0 ? (
+        customersFiltered.map((customer) => (
+          <div
+            key={customer.id}
+            className="p-2 hover:bg-accent/60 transition-colors cursor-pointer"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              handleSelectCustomer(customer);
+            }}
+          >
+            {customer.fantasy_name || customer.name} - {customer.document}
+          </div>
+        ))
+      ) : (
+        <div className="p-2 text-sm text-muted-foreground">
+          Nenhum cliente encontrado
+        </div>
+      )}
+    </div>
+  )}
+</div>
             <div className="col-span-2">
               <Link href={addCustomerUrl} className="w-full">
                 <Button variant="default" className="w-full">
@@ -751,7 +795,68 @@ useEffect(() => {
 
           {/* Seção para Adicionar Novo Produto */}
           <div className="grid grid-cols-5 gap-4 items-center">
-            <Select
+            <div className="col-span-3">
+  <Popover open={productOpen} onOpenChange={setProductOpen}>
+    <PopoverTrigger asChild>
+      <Button
+        variant="outline"
+        role="combobox"
+        aria-expanded={productOpen}
+        className="w-full justify-between border rounded-md shadow-sm"
+      >
+        {selectedProduct
+          ? `${selectedProduct.code} - ${selectedProduct.name}`
+          : "Selecionar Produto"}
+        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+      </Button>
+    </PopoverTrigger>
+
+    <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
+      <Command shouldFilter={false}>
+        <CommandInput
+          placeholder="Buscar produto..."
+          value={productSearch}
+          onValueChange={setProductSearch}
+        />
+        <CommandList>
+          <CommandEmpty>Nenhum produto encontrado.</CommandEmpty>
+          <CommandGroup>
+            {filteredProducts.map((product) => (
+              <CommandItem
+                key={product.id}
+                value={`${product.code} ${product.name}`}
+                onSelect={() => {
+                  setSelectedProduct(product);
+
+                  const catalogPrice = catalogPrices[String(product.id)];
+                  setStandardPrice(
+                    typeof catalogPrice === "number"
+                      ? catalogPrice
+                      : product.standard_price,
+                  );
+
+                  setProductOpen(false);
+                  setProductSearch("");
+                }}
+              >
+                <Check
+                  className={cn(
+                    "mr-2 h-4 w-4",
+                    selectedProduct?.id === product.id
+                      ? "opacity-100"
+                      : "opacity-0",
+                  )}
+                />
+                {product.code} - {product.name}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        </CommandList>
+      </Command>
+    </PopoverContent>
+  </Popover>
+</div>
+            {/* <Select
               onValueChange={(value) => {
                 const product = products.find((p) => p.id.toString() === value);
                 if (product) {
@@ -782,7 +887,7 @@ useEffect(() => {
                     </SelectItem>
                   ))}
               </SelectContent>
-            </Select>
+            </Select> */}
             <Button
               className="col-span-2 w-full cursor-pointer"
               onClick={() => {
@@ -804,7 +909,7 @@ useEffect(() => {
                 }
               }}
             >
-              Adicionar
+              Criar
             </Button>
           </div>
           <div className="flex w-full">

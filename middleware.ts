@@ -1,4 +1,3 @@
-// middleware.ts
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 
@@ -59,42 +58,24 @@ export async function middleware(req: NextRequest) {
     );
   }
 
-  if (pathname.startsWith("/dashboard")) {
-    const res = NextResponse.next();
-    const supabase = createSupabaseMiddlewareClient(req, res);
+  const res = NextResponse.next();
+  const supabase = createSupabaseMiddlewareClient(req, res);
 
+  await supabase.auth.getUser();
+
+  if (pathname.startsWith("/dashboard")) {
     const {
       data: { user },
-      error: userError,
     } = await supabase.auth.getUser();
 
-    if (userError || !user) {
+    if (!user) {
       return NextResponse.redirect(new URL("/login-signin", req.url));
     }
-
-    const { data: companyUser, error: roleError } = await supabase
-      .from("company_users")
-      .select("role")
-      .eq("user_id", user.id)
-      .single();
-
-    const normalizedRole =
-      companyUser?.role === "motorista"
-        ? "driver"
-        : companyUser?.role === "usuario"
-          ? "normal"
-          : companyUser?.role;
-
-    if (!roleError && pathname === "/dashboard" && normalizedRole === "driver") {
-      return NextResponse.redirect(new URL("/dashboard/orders", req.url));
-    }
-
-    return res;
   }
 
-  return NextResponse.next();
+  return res;
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };

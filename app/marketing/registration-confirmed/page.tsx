@@ -1,59 +1,87 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import Link from "next/link";
 import confetti from "canvas-confetti";
 import { Button } from "@/components/ui/button";
-import { useSearchParams, useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { useSearchParams } from "next/navigation";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
 export default function RegistrationConfirmed() {
   const sp = useSearchParams();
-  const router = useRouter();
+  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
 
   useEffect(() => {
-    confetti({ particleCount: 100, spread: 160, origin: { y: 0.6 } });
+    confetti({
+      particleCount: 100,
+      spread: 160,
+      origin: { y: 0.6 },
+    });
 
     const run = async () => {
-      const { data: s1 } = await supabase.auth.getSession();
-      let session = s1?.session;
-      const code = sp.get("code");
+      try {
+        const {
+          data: { session: currentSession },
+          error: sessionError,
+        } = await supabase.auth.getSession();
 
-      if (!session && code) {
-        const { data, error } =
-          await supabase.auth.exchangeCodeForSession(code);
-        if (!error) session = data.session ?? null;
-      }
+        if (sessionError) {
+          console.error("Erro ao obter sessão:", sessionError);
+        }
 
-      // 2) com sessão em mãos, roda o bootstrap (idempotente)
-      if (session) {
+        let session = currentSession ?? null;
+        const code = sp.get("code");
+
+        if (!session && code) {
+          const { data, error } = await supabase.auth.exchangeCodeForSession(
+            code,
+          );
+
+          if (error) {
+            console.error("Erro ao trocar code por sessão:", error);
+          } else {
+            session = data.session ?? null;
+          }
+        }
+
+        if (!session?.user?.id) return;
+
         const key = `bootstrap_done_${session.user.id}`;
-        if (!localStorage.getItem(key)) {
+
+        if (typeof window !== "undefined" && !localStorage.getItem(key)) {
           try {
-            await supabase.rpc("bootstrap_user");
+            const { error } = await supabase.rpc("bootstrap_user");
+
+            if (error) {
+              console.warn("bootstrap_user retornou erro:", error);
+            }
           } catch (e) {
             console.warn("bootstrap_user falhou (ok continuar):", e);
           } finally {
             localStorage.setItem(key, "1");
           }
         }
+      } catch (error) {
+        console.error("Erro inesperado em RegistrationConfirmed:", error);
       }
     };
 
     run();
-  }, [sp]);
+  }, [sp, supabase]);
 
   return (
     <main className="flex items-center justify-center h-screen bg-background">
       <div className="text-center space-y-6 p-6 rounded-2xl shadow-xl border bg-card max-w-md w-full animate-fade-in">
         <h1 className="text-2xl font-bold">🎉 Conta criada com sucesso!</h1>
+
         <p className="text-muted-foreground">
           Acesse a página de login para começar a usar o sistema.
         </p>
+
         <Link href="/login-signin">
           {/* <Button className="w-full">Ir para Login</Button> */}
         </Link>
-        {/* Se quiser já mandar pro app, troque o link acima por: */}
+
         <Link href="/dashboard">
           <Button className="w-full">Ir para o Dashboard</Button>
         </Link>

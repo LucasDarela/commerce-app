@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
-import { supabase } from "@/lib/supabase";
-import { Card, CardContent } from "@/components/ui/card";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface StockReservationReportProps {
@@ -19,17 +18,39 @@ interface ReservationItem {
   quantity: number;
 }
 
+type RawOrderRow = {
+  appointment_date: string;
+  order_items: {
+    quantity: number;
+    products:
+      | {
+          name: string;
+        }
+      | {
+          name: string;
+        }[]
+      | null;
+  }[];
+};
+
 export function StockReservationReport({
   companyId,
   startDate,
   endDate,
 }: StockReservationReportProps) {
+  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [reservations, setReservations] = useState<ReservationItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
+
     const fetchReport = async () => {
-      if (!companyId || !startDate) return;
+      if (!companyId || !startDate) {
+        setReservations([]);
+        setLoading(false);
+        return;
+      }
 
       setLoading(true);
 
@@ -37,7 +58,8 @@ export function StockReservationReport({
         .from("orders")
         .select("appointment_date, order_items(quantity, products(name))")
         .eq("company_id", companyId)
-        .gte("appointment_date", startDate);
+        .gte("appointment_date", startDate)
+        .order("appointment_date", { ascending: true });
 
       if (endDate) {
         query = query.lte("appointment_date", endDate);
@@ -45,44 +67,80 @@ export function StockReservationReport({
 
       const { data, error } = await query;
 
-      if (!error && data) {
-        const flattened: ReservationItem[] = data.flatMap((order: any) =>
-          order.order_items.map((item: any) => ({
-            appointment_date: order.appointment_date,
-            product_name: item.products?.name || "Produto desconhecido",
-            quantity: item.quantity,
-          })),
-        );
+      if (cancelled) return;
 
-        // Agrupar por data e produto
-        const grouped: Record<string, Record<string, number>> = {};
-
-        flattened.forEach((item) => {
-          const date = format(new Date(item.appointment_date), "dd/MM/yyyy");
-          if (!grouped[date]) grouped[date] = {};
-          if (!grouped[date][item.product_name])
-            grouped[date][item.product_name] = 0;
-          grouped[date][item.product_name] += item.quantity;
-        });
-
-        // Transformar agrupamento em lista de exibição
-        const result: ReservationItem[] = [];
-        Object.entries(grouped).forEach(([date, products]) => {
-          Object.entries(products).forEach(([product_name, quantity]) => {
-            result.push({ appointment_date: date, product_name, quantity });
-          });
-        });
-
-        setReservations(result);
-      } else {
+      if (error) {
         console.error("Erro ao buscar relatório de reservas:", error);
+        setReservations([]);
+        setLoading(false);
+        return;
       }
 
+      const rows = (data ?? []) as RawOrderRow[];
+
+      const flattened: ReservationItem[] = rows.flatMap((order) =>
+        (order.order_items || []).map((item) => {
+          const product = Array.isArray(item.products)
+            ? item.products[0]
+            : item.products;
+
+          return {
+            appointment_date: order.appointment_date,
+            product_name: product?.name || "Produto desconhecido",
+            quantity: Number(item.quantity) || 0,
+          };
+        }),
+      );
+
+      const grouped = new Map<string, Map<string, number>>();
+
+      for (const item of flattened) {
+        const dateLabel = format(new Date(item.appointment_date), "dd/MM/yyyy");
+
+        if (!grouped.has(dateLabel)) {
+          grouped.set(dateLabel, new Map<string, number>());
+        }
+
+        const productsMap = grouped.get(dateLabel)!;
+        productsMap.set(
+          item.product_name,
+          (productsMap.get(item.product_name) || 0) + item.quantity,
+        );
+      }
+
+      const result: ReservationItem[] = [];
+
+      for (const [date, products] of grouped.entries()) {
+        for (const [product_name, quantity] of products.entries()) {
+          result.push({
+            appointment_date: date,
+            product_name,
+            quantity,
+          });
+        }
+      }
+
+      setReservations(result);
       setLoading(false);
     };
 
     fetchReport();
-  }, [companyId, startDate, endDate]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId, startDate, endDate, supabase]);
+
+  const groupedByDate = useMemo(() => {
+    return reservations.reduce<Record<string, ReservationItem[]>>(
+      (acc, item) => {
+        if (!acc[item.appointment_date]) acc[item.appointment_date] = [];
+        acc[item.appointment_date].push(item);
+        return acc;
+      },
+      {},
+    );
+  }, [reservations]);
 
   if (loading) {
     return (
@@ -94,15 +152,6 @@ export function StockReservationReport({
     );
   }
 
-  const groupedByDate = reservations.reduce<Record<string, ReservationItem[]>>(
-    (acc, item) => {
-      if (!acc[item.appointment_date]) acc[item.appointment_date] = [];
-      acc[item.appointment_date].push(item);
-      return acc;
-    },
-    {},
-  );
-
   return (
     <div className="space-y-4">
       {Object.entries(groupedByDate).map(([date, items]) => (
@@ -110,7 +159,7 @@ export function StockReservationReport({
           <div className="p-4 space-y-1">
             <h3 className="font-semibold">{date}</h3>
             {items.map((item, idx) => (
-              <p key={idx}>
+              <p key={`${date}-${item.product_name}-${idx}`}>
                 {item.product_name} — {item.quantity} unidade(s)
               </p>
             ))}

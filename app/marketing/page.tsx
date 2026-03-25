@@ -2,11 +2,11 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import LandingLayout from "./LandingLayout";
 
 export default function LandingPage() {
-  const supabase = createClientComponentClient();
+  const supabase = createBrowserSupabaseClient();
   const router = useRouter();
 
   useEffect(() => {

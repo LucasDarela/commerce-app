@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
+import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -14,15 +16,24 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
-import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
-import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
+
+type EquipmentForm = {
+  name: string;
+  code: string;
+  value: string;
+  stock: string;
+  type: string;
+  is_available: boolean;
+  description: string;
+};
 
 export default function AddEquipmentPage() {
-  const { companyId } = useAuthenticatedCompany();
   const router = useRouter();
+  const supabase = createBrowserSupabaseClient();
+  const { companyId, loading: companyLoading } = useAuthenticatedCompany();
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<EquipmentForm>({
     name: "",
     code: "",
     value: "",
@@ -32,48 +43,97 @@ export default function AddEquipmentPage() {
     description: "",
   });
 
-  const handleChange = (field: string, value: any) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
+  const [saving, setSaving] = useState(false);
+
+  const handleChange = <K extends keyof EquipmentForm>(
+    field: K,
+    value: EquipmentForm[K],
+  ) => {
+    setForm((prev) => ({
+      ...prev,
+      [field]:
+        field === "name" || field === "code"
+          ? String(value).toUpperCase()
+          : value,
+    }));
+  };
+
+  const validateForm = () => {
+    if (!form.name.trim()) return "Preencha o nome.";
+    if (!form.code.trim()) return "Preencha o código.";
+    if (!form.type.trim()) return "Selecione o tipo.";
+
+    if (form.value && Number.isNaN(Number(form.value))) {
+      return "Valor inválido.";
+    }
+
+    if (form.stock && Number.isNaN(Number(form.stock))) {
+      return "Estoque inválido.";
+    }
+
+    return null;
   };
 
   const handleSubmit = async () => {
-    if (!companyId) return toast.error("Empresa não identificada.");
-
-    if (!form.name || !form.code || !form.type) {
-      return toast.error("Preencha os campos obrigatórios.");
+    if (companyLoading) return;
+    if (!companyId) {
+      toast.error("Empresa não identificada.");
+      return;
     }
 
-    // 🔎 Verifica se já existe um equipamento com o mesmo código para a empresa
-    const { data: existing, error: fetchError } = await supabase
-      .from("equipments")
-      .select("id")
-      .eq("code", form.code)
-      .eq("company_id", companyId)
-      .maybeSingle();
-
-    if (fetchError) {
-      console.error("Erro ao verificar duplicação:", fetchError);
-      return toast.error("Erro ao verificar código existente.");
+    const validationError = validateForm();
+    if (validationError) {
+      toast.error(validationError);
+      return;
     }
 
-    if (existing) {
-      return toast.error("Já existe um equipamento com esse código.");
-    }
+    setSaving(true);
 
-    // ✅ Se não existir, insere
-    const { error } = await supabase.from("equipments").insert({
-      ...form,
-      value: Number(form.value),
-      stock: Number(form.stock),
-      company_id: companyId,
-    });
+    try {
+      const normalizedCode = form.code.trim().toUpperCase();
 
-    if (error) {
-      toast.error("Erro ao salvar equipamento.");
-      console.error(error);
-    } else {
+      const { data: existing, error: existingError } = await supabase
+        .from("equipments")
+        .select("id")
+        .eq("company_id", companyId)
+        .eq("code", normalizedCode)
+        .maybeSingle();
+
+      if (existingError) {
+        console.error("Erro ao verificar duplicidade:", existingError);
+        toast.error("Erro ao verificar código existente.");
+        return;
+      }
+
+      if (existing) {
+        toast.error("Já existe um equipamento com esse código.");
+        return;
+      }
+
+      const payload = {
+        company_id: companyId,
+        name: form.name.trim().toUpperCase(),
+        code: normalizedCode,
+        value: form.value.trim() === "" ? 0 : Number(form.value),
+        stock: form.stock.trim() === "" ? 0 : Number(form.stock),
+        type: form.type,
+        is_available: form.is_available,
+        description: form.description.trim() || null,
+      };
+
+      const { error } = await supabase.from("equipments").insert(payload);
+
+      if (error) {
+        console.error("Erro ao salvar equipamento:", error);
+        toast.error("Erro ao salvar equipamento.");
+        return;
+      }
+
       toast.success("Equipamento cadastrado com sucesso!");
       router.push("/dashboard/equipments");
+      router.refresh();
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -151,7 +211,9 @@ export default function AddEquipmentPage() {
         <div className="flex items-center justify-baseline">
           <Checkbox
             checked={form.is_available}
-            onCheckedChange={(checked) => handleChange("is_available", checked)}
+            onCheckedChange={(checked) =>
+              handleChange("is_available", Boolean(checked))
+            }
           />
           <Label className="ml-2">Disponível</Label>
         </div>
@@ -167,8 +229,12 @@ export default function AddEquipmentPage() {
         />
       </div>
 
-      <Button onClick={handleSubmit} className="w-full mt-4">
-        Salvar Equipamento
+      <Button
+        onClick={handleSubmit}
+        className="w-full mt-4"
+        disabled={saving || companyLoading}
+      >
+        {saving ? "Salvando..." : "Salvar Equipamento"}
       </Button>
     </div>
   );

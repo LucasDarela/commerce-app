@@ -1,13 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
-// ✅ se você quer “destravar”, pode trocar por <any> aqui e remover o import do Database
-import type { Database } from "@/lib/database.types";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
 export function useCompanyIntegration(provider: string) {
-  const supabase = createClientComponentClient<Database>();
-  // const supabase = createClientComponentClient<any>();
+  const supabase = createBrowserSupabaseClient();
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

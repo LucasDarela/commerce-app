@@ -1,4 +1,3 @@
-// components/orders/DeleteOrderButton.tsx
 "use client";
 
 import * as React from "react";
@@ -14,44 +13,63 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
 
 type Props = {
   orderId: string;
-  /** Se true, renderiza como item do DropdownMenu */
+  companyId: string;
   asDropdownItem?: boolean;
+  onDeleted?: () => void;
 };
 
 export function DeleteOrderButton({
   orderId,
+  companyId,
   asDropdownItem = false,
   onDeleted,
-}: {
-  orderId: string;
-  asDropdownItem?: boolean;
-  onDeleted?: () => void;
-}) {
-  const supabase = createClientComponentClient();
-  const router = useRouter();
+}: Props) {
+  const supabase = React.useMemo(() => createBrowserSupabaseClient(), []);
   const [open, setOpen] = React.useState(false);
   const [confirm, setConfirm] = React.useState("");
+  const [deleting, setDeleting] = React.useState(false);
+
   const valid = confirm.trim().toLowerCase() === "deletar pedido";
+
   const onDelete = async () => {
+    if (!valid || deleting) return;
+
     try {
-      const { error } = await supabase
+      setDeleting(true);
+
+      console.log("DELETE DEBUG", { companyId, orderId });
+
+      const { data, error } = await supabase
         .from("orders")
         .delete()
-        .eq("id", orderId);
-      if (error) throw error;
+        .eq("id", orderId)
+        .eq("company_id", companyId)
+        .select("id");
+
+      console.log("DELETE RESULT", { data, error });
+
+      if (error) {
+        throw error;
+      }
+
+      if (!data || data.length === 0) {
+        throw new Error("Pedido não encontrado no banco.");
+      }
+
       toast.success("Pedido deletado com sucesso.");
-      window.location.reload();
       onDeleted?.();
-      router.refresh();
       setOpen(false);
+      setConfirm("");
     } catch (e: any) {
+      console.error("Erro ao deletar pedido:", e);
       toast.error(e?.message || "Falha ao deletar pedido.");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -73,7 +91,15 @@ export function DeleteOrderButton({
         </Button>
       )}
 
-      <AlertDialog open={open} onOpenChange={setOpen}>
+      <AlertDialog
+        open={open}
+        onOpenChange={(next) => {
+          setOpen(next);
+          if (!next) {
+            setConfirm("");
+          }
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
@@ -98,9 +124,13 @@ export function DeleteOrderButton({
           </div>
 
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <Button variant="destructive" onClick={onDelete} disabled={!valid}>
-              Deletar
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <Button
+              variant="destructive"
+              onClick={onDelete}
+              disabled={!valid || deleting}
+            >
+              {deleting ? "Deletando..." : "Deletar"}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

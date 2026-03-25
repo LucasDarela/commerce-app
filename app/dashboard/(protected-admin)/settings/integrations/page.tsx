@@ -1,6 +1,6 @@
 "use client";
 
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -39,7 +39,7 @@ function detectProviderFromToken(token: string): Provider | "unknown" {
 }
 
 export default function IntegrationsPage() {
-  const supabase = createClientComponentClient();
+  const supabase = createBrowserSupabaseClient();
   const [integrations, setIntegrations] = useState<IntegrationRow[]>([]);
   const [loading, setLoading] = useState(true);
 

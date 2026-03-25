@@ -1,6 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
+import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
+import { StockReservationReport } from "@/components/analytics/stockReservations";
+import { EquipmentLoansHistoryReport } from "@/components/analytics/EquipmentLoansHistoryReport";
+import { TableSkeleton } from "../ui/TableSkeleton";
+import { X, Filter, FileText } from "lucide-react";
+import { toast } from "sonner";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { SalesByPeriodReport } from "./SalesByPeriodReport";
+import { SalesGroupedByCustomerReport } from "./SalesGroupedByCustomerReport";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,20 +21,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
-import { StockReservationReport } from "@/components/analytics/stockReservations";
-import { EquipmentLoansHistoryReport } from "@/components/analytics/EquipmentLoansHistoryReport";
-import { TableSkeleton } from "../ui/TableSkeleton";
-import { supabase } from "@/lib/supabase";
-import { X, Filter, FileText } from "lucide-react";
-import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { SalesByPeriodReport } from "./SalesByPeriodReport";
-import { SalesGroupedByCustomerReport } from "./SalesGroupedByCustomerReport";
 
 type SimpleCustomer = { id: string; name: string };
 
+type ReportParams = {
+  companyId: string;
+  startDate: string;
+  endDate?: string;
+  customerId?: string;
+  supplierFilter?: string;
+  reportType: string;
+};
+
 export default function ReportsPage() {
+  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const { companyId, loading } = useAuthenticatedCompany();
 
   const [reportType, setReportType] = useState("");
@@ -37,25 +47,19 @@ export default function ReportsPage() {
   const [selectedCustomer, setSelectedCustomer] =
     useState<SimpleCustomer | null>(null);
 
-    
-
   const [supplierFilter, setSupplierFilter] = useState("");
 
-  const [params, setParams] = useState<{
-    companyId: string;
-    startDate: string;
-    endDate?: string;
-    customerId?: string;
-    supplierFilter?: string;
-    reportType: string;
-  } | null>(null);
+  const [params, setParams] = useState<ReportParams | null>(null);
 
   const debounceRef = useRef<number | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+
     if (!companyId) return;
 
     const q = customerQuery.trim();
+
     if (q.length < 2) {
       setCustomerOptions([]);
       return;
@@ -72,13 +76,21 @@ export default function ReportsPage() {
         .order("name", { ascending: true })
         .limit(20);
 
-      if (!error && data) setCustomerOptions(data as SimpleCustomer[]);
+      if (cancelled) return;
+
+      if (error) {
+        console.error("Erro ao buscar clientes:", error);
+        return;
+      }
+
+      setCustomerOptions((data as SimpleCustomer[]) || []);
     }, 250);
 
     return () => {
+      cancelled = true;
       if (debounceRef.current) window.clearTimeout(debounceRef.current);
     };
-  }, [companyId, customerQuery]);
+  }, [companyId, customerQuery, supabase]);
 
   const handlePickCustomer = (c: SimpleCustomer) => {
     setSelectedCustomer(c);
@@ -101,6 +113,7 @@ export default function ReportsPage() {
     setSelectedCustomer(null);
     setSupplierFilter("");
     setParams(null);
+    setReportType("");
   };
 
   const handleGenerate = () => {
@@ -108,6 +121,11 @@ export default function ReportsPage() {
 
     if (!startDate) {
       toast.error("Adicione a Data Inicial para gerar o relatório.");
+      return;
+    }
+
+    if (!reportType) {
+      toast.error("Selecione o tipo de relatório.");
       return;
     }
 
@@ -135,48 +153,49 @@ export default function ReportsPage() {
     toast.success("Filtros aplicados. Gerando relatório…");
   };
 
-const normalizedReportType = String(reportType || "").trim();
+  const normalizedReportType = String(reportType || "").trim();
 
-const showDownloadButton = [
-  "sales_by_period",
-  "sales_grouped_by_customer",
-].includes(normalizedReportType);
+  const showDownloadButton = [
+    "sales_by_period",
+    "sales_grouped_by_customer",
+  ].includes(normalizedReportType);
 
   if (loading) return <TableSkeleton />;
 
   return (
     <div className="p-4 md:p-6 space-y-6">
       <div className="flex items-start justify-between gap-4">
-  <div className="space-y-1">
-    <h1 className="text-2xl font-bold tracking-tight">Relatórios</h1>
-    <p className="text-sm text-muted-foreground">
-      Gere relatórios por período e aplique filtros específicos conforme o
-      tipo selecionado.
-    </p>
-  </div>
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold tracking-tight">Relatórios</h1>
+          <p className="text-sm text-muted-foreground">
+            Gere relatórios por período e aplique filtros específicos conforme o
+            tipo selecionado.
+          </p>
+        </div>
 
-  {showDownloadButton ? (
-    <Button
-      variant="outline"
-      className="shrink-0 gap-2"
-      disabled={!params}
-      onClick={() =>
-        window.dispatchEvent(
-          new Event(
-            normalizedReportType === "sales_grouped_by_customer"
-              ? "download-sales-grouped-report"
-              : "download-sales-report",
-          ),
-        )
-      }
-    >
-      <FileText className="h-4 w-4" />
-      Baixar PDF
-    </Button>
-  ) : (
-    <div className="w-[140px]" />
-  )}
-</div>
+        {showDownloadButton ? (
+          <Button
+            variant="outline"
+            className="shrink-0 gap-2"
+            disabled={!params}
+            onClick={() =>
+              window.dispatchEvent(
+                new Event(
+                  normalizedReportType === "sales_grouped_by_customer"
+                    ? "download-sales-grouped-report"
+                    : "download-sales-report",
+                ),
+              )
+            }
+          >
+            <FileText className="h-4 w-4" />
+            Baixar PDF
+          </Button>
+        ) : (
+          <div className="w-[140px]" />
+        )}
+      </div>
+
       <Card className="border shadow-sm">
         <CardHeader className="pb-4">
           <CardTitle className="flex items-center gap-2 text-lg">
@@ -188,153 +207,146 @@ const showDownloadButton = [
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
             <div className="space-y-2">
-  <Label>Tipo de Relatório</Label>
-  <Select
-    value={reportType}
-    onValueChange={(value) => {
-      console.log("Select value:", value);
-      setReportType(value);
-    }}
-  >
-    <SelectTrigger className="min-w-[260px] max-w-[360px] w-full">
-      <SelectValue placeholder="Selecione um relatório" />
-    </SelectTrigger>
+              <Label>Tipo de Relatório</Label>
+              <Select
+                value={reportType}
+                onValueChange={(value) => {
+                  setReportType(value);
+                }}
+              >
+                <SelectTrigger className="min-w-[260px] max-w-[360px] w-full">
+                  <SelectValue placeholder="Selecione um relatório" />
+                </SelectTrigger>
 
-    <SelectContent className="max-h-[420px]">
-      {/* VENDAS E RECEBIMENTOS */}
-      <div className="px-2 py-1.5 text-xs font-semibold uppercase text-muted-foreground">
-        Vendas e Recebimentos
-      </div>
-      <SelectItem value="sales_by_period">
-        Vendas por Período
-      </SelectItem>
-      <SelectItem value="sales_grouped_by_customer">
-        Vendas Agrupadas por Cliente
-      </SelectItem>
-      <SelectItem value="overdue_receivables" disabled>
-        Contas a Receber Vencidas
-      </SelectItem>
-      <SelectItem value="customer_statement" disabled>
-        Extrato por Cliente
-      </SelectItem>
-      <SelectItem value="receipts_by_period" disabled>
-        Recebimentos por Período
-      </SelectItem>
-      <SelectItem value="customer_default" disabled>
-        Inadimplência por Cliente
-      </SelectItem>
-      <SelectItem value="sales_by_product" disabled>
-        Vendas por Produto
-      </SelectItem>
-      <SelectItem value="top_customers" disabled>
-        Clientes que Mais Compram
-      </SelectItem>
+                <SelectContent className="max-h-[420px]">
+                  <div className="px-2 py-1.5 text-xs font-semibold uppercase text-muted-foreground">
+                    Vendas e Recebimentos
+                  </div>
+                  <SelectItem value="sales_by_period">
+                    Vendas por Período
+                  </SelectItem>
+                  <SelectItem value="sales_grouped_by_customer">
+                    Vendas Agrupadas por Cliente
+                  </SelectItem>
+                  <SelectItem value="overdue_receivables" disabled>
+                    Contas a Receber Vencidas
+                  </SelectItem>
+                  <SelectItem value="customer_statement" disabled>
+                    Extrato por Cliente
+                  </SelectItem>
+                  <SelectItem value="receipts_by_period" disabled>
+                    Recebimentos por Período
+                  </SelectItem>
+                  <SelectItem value="customer_default" disabled>
+                    Inadimplência por Cliente
+                  </SelectItem>
+                  <SelectItem value="sales_by_product" disabled>
+                    Vendas por Produto
+                  </SelectItem>
+                  <SelectItem value="top_customers" disabled>
+                    Clientes que Mais Compram
+                  </SelectItem>
 
-      {/* FINANCEIRO */}
-      <div className="mt-2 px-2 py-1.5 text-xs font-semibold uppercase text-muted-foreground">
-        Financeiro
-      </div>
-      <SelectItem value="cash_flow" disabled>
-        Fluxo de Caixa por Período
-      </SelectItem>
-      <SelectItem value="accounts_payable" disabled>
-        Contas a Pagar
-      </SelectItem>
-      <SelectItem value="overdue_payables" disabled>
-        Contas a Pagar Vencidas
-      </SelectItem>
-      <SelectItem value="expenses_by_category" disabled>
-        Despesas por Categoria
-      </SelectItem>
-      <SelectItem value="revenue_vs_expense" disabled>
-        Receita x Despesa
-      </SelectItem>
-      <SelectItem value="monthly_financial_summary" disabled>
-        Resumo Financeiro Mensal
-      </SelectItem>
+                  <div className="mt-2 px-2 py-1.5 text-xs font-semibold uppercase text-muted-foreground">
+                    Financeiro
+                  </div>
+                  <SelectItem value="cash_flow" disabled>
+                    Fluxo de Caixa por Período
+                  </SelectItem>
+                  <SelectItem value="accounts_payable" disabled>
+                    Contas a Pagar
+                  </SelectItem>
+                  <SelectItem value="overdue_payables" disabled>
+                    Contas a Pagar Vencidas
+                  </SelectItem>
+                  <SelectItem value="expenses_by_category" disabled>
+                    Despesas por Categoria
+                  </SelectItem>
+                  <SelectItem value="revenue_vs_expense" disabled>
+                    Receita x Despesa
+                  </SelectItem>
+                  <SelectItem value="monthly_financial_summary" disabled>
+                    Resumo Financeiro Mensal
+                  </SelectItem>
 
-      {/* ESTOQUE */}
-      <div className="mt-2 px-2 py-1.5 text-xs font-semibold uppercase text-muted-foreground">
-        Estoque
-      </div>
-      <SelectItem value="stock_reservations">
-        Reservas de Estoque
-      </SelectItem>
-      <SelectItem value="stock_movements" disabled>
-        Estoque / Movimentações
-      </SelectItem>
-      <SelectItem value="current_stock_position" disabled>
-        Posição Atual de Estoque
-      </SelectItem>
-      <SelectItem value="low_stock" disabled>
-        Produtos com Estoque Baixo
-      </SelectItem>
-      <SelectItem value="product_returns" disabled>
-        Devoluções por Produto
-      </SelectItem>
+                  <div className="mt-2 px-2 py-1.5 text-xs font-semibold uppercase text-muted-foreground">
+                    Estoque
+                  </div>
+                  <SelectItem value="stock_reservations">
+                    Reservas de Estoque
+                  </SelectItem>
+                  <SelectItem value="stock_movements" disabled>
+                    Estoque / Movimentações
+                  </SelectItem>
+                  <SelectItem value="current_stock_position" disabled>
+                    Posição Atual de Estoque
+                  </SelectItem>
+                  <SelectItem value="low_stock" disabled>
+                    Produtos com Estoque Baixo
+                  </SelectItem>
+                  <SelectItem value="product_returns" disabled>
+                    Devoluções por Produto
+                  </SelectItem>
 
-      {/* CLIENTES */}
-      <div className="mt-2 px-2 py-1.5 text-xs font-semibold uppercase text-muted-foreground">
-        Clientes
-      </div>
-      <SelectItem value="customer_statement_full" disabled>
-        Histórico Completo por Cliente
-      </SelectItem>
-      <SelectItem value="active_inactive_customers" disabled>
-        Clientes Ativos e Inativos
-      </SelectItem>
-      <SelectItem value="new_customers_by_period" disabled>
-        Novos Clientes por Período
-      </SelectItem>
-      <SelectItem value="customer_price_tables" disabled>
-        Clientes por Tabela de Preço
-      </SelectItem>
+                  <div className="mt-2 px-2 py-1.5 text-xs font-semibold uppercase text-muted-foreground">
+                    Clientes
+                  </div>
+                  <SelectItem value="customer_statement_full" disabled>
+                    Histórico Completo por Cliente
+                  </SelectItem>
+                  <SelectItem value="active_inactive_customers" disabled>
+                    Clientes Ativos e Inativos
+                  </SelectItem>
+                  <SelectItem value="new_customers_by_period" disabled>
+                    Novos Clientes por Período
+                  </SelectItem>
+                  <SelectItem value="customer_price_tables" disabled>
+                    Clientes por Tabela de Preço
+                  </SelectItem>
 
-      {/* EQUIPAMENTOS E COMODATO */}
-      <div className="mt-2 px-2 py-1.5 text-xs font-semibold uppercase text-muted-foreground">
-        Equipamentos e Comodato
-      </div>
-      <SelectItem value="equipment_loans_history">
-        Histórico de Comodatos
-      </SelectItem>
-      <SelectItem value="equipment_by_customer" disabled>
-        Equipamentos por Cliente
-      </SelectItem>
-      <SelectItem value="unreturned_equipments" disabled>
-        Equipamentos Não Retornados
-      </SelectItem>
-      <SelectItem value="available_vs_loaned_equipments" disabled>
-        Equipamentos Disponíveis x Emprestados
-      </SelectItem>
-      <SelectItem value="equipment_movement_history" disabled>
-        Movimentações de Equipamentos
-      </SelectItem>
+                  <div className="mt-2 px-2 py-1.5 text-xs font-semibold uppercase text-muted-foreground">
+                    Equipamentos e Comodato
+                  </div>
+                  <SelectItem value="equipment_loans_history">
+                    Histórico de Comodatos
+                  </SelectItem>
+                  <SelectItem value="equipment_by_customer" disabled>
+                    Equipamentos por Cliente
+                  </SelectItem>
+                  <SelectItem value="unreturned_equipments" disabled>
+                    Equipamentos Não Retornados
+                  </SelectItem>
+                  <SelectItem value="available_vs_loaned_equipments" disabled>
+                    Equipamentos Disponíveis x Emprestados
+                  </SelectItem>
+                  <SelectItem value="equipment_movement_history" disabled>
+                    Movimentações de Equipamentos
+                  </SelectItem>
 
-      {/* FISCAL */}
-      <div className="mt-2 px-2 py-1.5 text-xs font-semibold uppercase text-muted-foreground">
-        Fiscal
-      </div>
-      <SelectItem value="issued_invoices" disabled>
-        NF-e Emitidas por Período
-      </SelectItem>
-      <SelectItem value="invoice_status" disabled>
-        NF-e Autorizadas / Rejeitadas
-      </SelectItem>
-      <SelectItem value="invoices_by_customer" disabled>
-        NF-e por Cliente
-      </SelectItem>
-      <SelectItem value="fiscal_operation_summary" disabled>
-        Resumo Fiscal por Operação
-      </SelectItem>
-      <SelectItem value="pending_invoice_issuance" disabled>
-        Notas Pendentes de Emissão
-      </SelectItem>
-      <SelectItem value="fiscal_field_issues" disabled>
-        Divergências Fiscais de Produtos
-      </SelectItem>
-    </SelectContent>
-  </Select>
-</div>
+                  <div className="mt-2 px-2 py-1.5 text-xs font-semibold uppercase text-muted-foreground">
+                    Fiscal
+                  </div>
+                  <SelectItem value="issued_invoices" disabled>
+                    NF-e Emitidas por Período
+                  </SelectItem>
+                  <SelectItem value="invoice_status" disabled>
+                    NF-e Autorizadas / Rejeitadas
+                  </SelectItem>
+                  <SelectItem value="invoices_by_customer" disabled>
+                    NF-e por Cliente
+                  </SelectItem>
+                  <SelectItem value="fiscal_operation_summary" disabled>
+                    Resumo Fiscal por Operação
+                  </SelectItem>
+                  <SelectItem value="pending_invoice_issuance" disabled>
+                    Notas Pendentes de Emissão
+                  </SelectItem>
+                  <SelectItem value="fiscal_field_issues" disabled>
+                    Divergências Fiscais de Produtos
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
             <div className="space-y-2">
               <Label>Data Inicial</Label>
@@ -390,7 +402,9 @@ const showDownloadButton = [
                   onFocus={() =>
                     setShowCustomerList(customerQuery.trim().length >= 2)
                   }
-                  onBlur={() => setTimeout(() => setShowCustomerList(false), 150)}
+                  onBlur={() =>
+                    setTimeout(() => setShowCustomerList(false), 150)
+                  }
                 />
 
                 {customerQuery && (
@@ -447,22 +461,23 @@ const showDownloadButton = [
       </Card>
 
       {params?.reportType === "sales_by_period" && params.companyId && (
-  <SalesByPeriodReport
-    companyId={params.companyId}
-    startDate={params.startDate}
-    endDate={params.endDate}
-    customerId={params.customerId}
-  />
-)}
+        <SalesByPeriodReport
+          companyId={params.companyId}
+          startDate={params.startDate}
+          endDate={params.endDate}
+          customerId={params.customerId}
+        />
+      )}
 
-{params?.reportType === "sales_grouped_by_customer" && params.companyId && (
-  <SalesGroupedByCustomerReport
-    companyId={params.companyId}
-    startDate={params.startDate}
-    endDate={params.endDate}
-    customerId={params.customerId}
-  />
-)}
+      {params?.reportType === "sales_grouped_by_customer" &&
+        params.companyId && (
+          <SalesGroupedByCustomerReport
+            companyId={params.companyId}
+            startDate={params.startDate}
+            endDate={params.endDate}
+            customerId={params.customerId}
+          />
+        )}
 
       {params && (
         <Card className="border-dashed">

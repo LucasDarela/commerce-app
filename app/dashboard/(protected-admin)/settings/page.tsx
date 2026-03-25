@@ -27,7 +27,8 @@ export default function SettingsPage() {
       <IntegrationsPage />
       <FocusNFeSection />
       <RegisterBankAccount />
-      <PaymentSettingsCard />
+      {/* Em desenvolvimento */}
+      {/* <PaymentSettingsCard /> */}
     </div>
   );
 }

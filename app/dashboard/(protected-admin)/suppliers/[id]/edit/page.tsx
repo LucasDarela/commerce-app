@@ -1,18 +1,23 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/lib/supabase";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { toast } from "sonner";
 import { useRouter, useParams } from "next/navigation";
 import axios from "axios";
 
 export default function EditSupplier() {
   const router = useRouter();
-  const { id } = useParams();
+  const params = useParams();
+  const id = String(params?.id ?? "");
   const inputRefs = useRef<HTMLInputElement[]>([]);
+  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
+
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
   const [supplier, setSupplier] = useState({
     document: "",
     name: "",
@@ -45,58 +50,101 @@ export default function EditSupplier() {
     state_registration: "State Registration",
   };
 
+  const sanitizeDigits = (value: string) => value.replace(/\D/g, "");
+
   const formatUppercase = (value: string, field: string) => {
     return field === "email" ? value : value.toUpperCase();
   };
 
+  const formatPhone = (value: string) => {
+    const phone = value.replace(/\D/g, "").slice(0, 11);
+    return phone.length > 10
+      ? phone.replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3")
+      : phone.replace(/(\d{2})(\d{4})(\d{4})/, "($1) $2-$3");
+  };
+
   useEffect(() => {
     const fetchSupplier = async () => {
-      if (!id) return;
+      if (!id) {
+        toast.error("Fornecedor inválido.");
+        setLoading(false);
+        return;
+      }
 
       const { data, error } = await supabase
         .from("suppliers")
-        .select("*")
+        .select(
+          `
+          document,
+          name,
+          fantasy_name,
+          zip_code,
+          address,
+          neighborhood,
+          city,
+          state,
+          number,
+          complement,
+          phone,
+          email,
+          state_registration
+        `,
+        )
         .eq("id", id)
         .single();
 
       if (error || !data) {
         toast.error("Error loading supplier");
-        console.error("❌ Supplier fetch error:", error?.message);
-      } else {
-        setSupplier({
-          ...data,
-          name: formatUppercase(data.name || "", "name"),
-          fantasy_name: formatUppercase(
-            data.fantasy_name || "",
-            "fantasy_name",
-          ),
-          address: formatUppercase(data.address || "", "address"),
-          neighborhood: formatUppercase(
-            data.neighborhood || "",
-            "neighborhood",
-          ),
-          city: formatUppercase(data.city || "", "city"),
-          state: formatUppercase(data.state || "", "state"),
-          state_registration: formatUppercase(
-            data.state_registration || "",
-            "state_registration",
-          ),
-        });
+        console.error("Supplier fetch error:", error?.message);
+        setLoading(false);
+        return;
       }
+
+      setSupplier({
+        document: data.document ?? "",
+        name: formatUppercase(data.name || "", "name"),
+        fantasy_name: formatUppercase(
+          data.fantasy_name || "",
+          "fantasy_name",
+        ),
+        zip_code: sanitizeDigits(data.zip_code || ""),
+        address: formatUppercase(data.address || "", "address"),
+        neighborhood: formatUppercase(
+          data.neighborhood || "",
+          "neighborhood",
+        ),
+        city: formatUppercase(data.city || "", "city"),
+        state: formatUppercase(data.state || "", "state"),
+        number: data.number ? String(data.number) : "",
+        complement: data.complement || "",
+        phone: data.phone ? formatPhone(data.phone) : "",
+        email: data.email || "",
+        state_registration: formatUppercase(
+          data.state_registration || "",
+          "state_registration",
+        ),
+      });
+
       setLoading(false);
     };
 
     fetchSupplier();
-  }, [id]);
+  }, [id, supabase]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value: rawValue } = e.target;
-    const formattedValue =
-      name === "phone"
-        ? formatPhone(rawValue)
-        : name === "email"
-          ? rawValue.trim()
-          : formatUppercase(rawValue, name);
+
+    let formattedValue = rawValue;
+
+    if (name === "phone") {
+      formattedValue = formatPhone(rawValue);
+    } else if (name === "email") {
+      formattedValue = rawValue.trim().toLowerCase();
+    } else if (name === "zip_code") {
+      formattedValue = sanitizeDigits(rawValue).slice(0, 8);
+    } else {
+      formattedValue = formatUppercase(rawValue, name);
+    }
 
     setSupplier((prevSupplier) => ({
       ...prevSupplier,
@@ -116,12 +164,15 @@ export default function EditSupplier() {
   };
 
   const fetchAddress = async () => {
-    if (!supplier.zip_code || supplier.zip_code.length !== 8) return;
+    const cleanZip = sanitizeDigits(supplier.zip_code);
+
+    if (cleanZip.length !== 8) return;
 
     try {
       const { data } = await axios.get(
-        `https://viacep.com.br/ws/${supplier.zip_code}/json/`,
+        `https://viacep.com.br/ws/${cleanZip}/json/`,
       );
+
       if (data.erro) {
         toast.error("Invalid ZIP Code!");
         setSupplier((prev) => ({
@@ -131,39 +182,71 @@ export default function EditSupplier() {
           city: "",
           state: "",
         }));
-      } else {
-        setSupplier((prev) => ({
-          ...prev,
-          address: formatUppercase(data.logradouro || "", "address"),
-          neighborhood: formatUppercase(data.bairro || "", "neighborhood"),
-          city: formatUppercase(data.localidade || "", "city"),
-          state: formatUppercase(data.uf || "", "state"),
-        }));
+        return;
       }
+
+      setSupplier((prev) => ({
+        ...prev,
+        zip_code: cleanZip,
+        address: formatUppercase(data.logradouro || "", "address"),
+        neighborhood: formatUppercase(data.bairro || "", "neighborhood"),
+        city: formatUppercase(data.localidade || "", "city"),
+        state: formatUppercase(data.uf || "", "state"),
+      }));
     } catch (error) {
+      console.error("fetchAddress", error);
       toast.error("Error fetching address!");
     }
   };
 
   const handleUpdate = async () => {
-    const { error } = await supabase
-      .from("suppliers")
-      .update(supplier)
-      .eq("id", id);
+    if (!id) {
+      toast.error("Fornecedor inválido.");
+      return;
+    }
 
-    if (error) {
-      toast.error("Error updating supplier: " + error.message);
-    } else {
+    if (!supplier.name.trim()) {
+      toast.error("Nome do fornecedor é obrigatório.");
+      return;
+    }
+
+    try {
+      setSaving(true);
+
+      const payload = {
+        name: supplier.name.trim().toUpperCase(),
+        fantasy_name: supplier.fantasy_name.trim().toUpperCase() || null,
+        zip_code: sanitizeDigits(supplier.zip_code) || null,
+        address: supplier.address.trim().toUpperCase() || null,
+        neighborhood: supplier.neighborhood.trim().toUpperCase() || null,
+        city: supplier.city.trim().toUpperCase() || null,
+        state: supplier.state.trim().toUpperCase() || null,
+        number: supplier.number.trim() || null,
+        complement: supplier.complement.trim() || null,
+        phone: sanitizeDigits(supplier.phone) || null,
+        email: supplier.email.trim().toLowerCase() || null,
+        state_registration:
+          supplier.state_registration.trim().toUpperCase() || null,
+      };
+
+      const { error } = await supabase
+        .from("suppliers")
+        .update(payload)
+        .eq("id", id);
+
+      if (error) {
+        toast.error("Error updating supplier: " + error.message);
+        return;
+      }
+
       toast.success("Supplier updated successfully!");
       router.push("/dashboard/suppliers");
+    } catch (error) {
+      console.error("handleUpdate", error);
+      toast.error("Erro inesperado ao atualizar fornecedor.");
+    } finally {
+      setSaving(false);
     }
-  };
-
-  const formatPhone = (value: string) => {
-    const phone = value.replace(/\D/g, "").slice(0, 11);
-    return phone.length > 10
-      ? phone.replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3")
-      : phone.replace(/(\d{2})(\d{4})(\d{4})/, "($1) $2-$3");
   };
 
   if (loading) {
@@ -194,8 +277,8 @@ export default function EditSupplier() {
         />
       ))}
 
-      <Button className="mt-4 w-full" onClick={handleUpdate}>
-        Update
+      <Button className="mt-4 w-full" onClick={handleUpdate} disabled={saving}>
+        {saving ? "Updating..." : "Update"}
       </Button>
     </div>
   );

@@ -19,14 +19,10 @@ function normalizeCpfCnpj(v?: string | null) {
 
 function normalizePhoneBR(v?: string | null) {
   if (!v) return undefined;
-
   let d = String(v).replace(/\D/g, "");
-
   if (d.startsWith("55")) d = d.slice(2);
   if (d.length >= 1 && d[0] === "0") d = d.slice(1);
-
   if (d.length === 10 || d.length === 11) return d;
-
   return d || undefined;
 }
 
@@ -40,7 +36,6 @@ function mapToAsaasCustomer(row: any): AsaasCustomer & Record<string, any> {
   if (mobileDigits) {
     mobilePhone = mobileDigits;
   }
-
   if (phoneDigits) {
     if (!mobilePhone && phoneDigits.length === 11) {
       mobilePhone = phoneDigits;
@@ -66,18 +61,18 @@ function mapToAsaasCustomer(row: any): AsaasCustomer & Record<string, any> {
 }
 
 export async function POST(req: Request) {
-  const supabase = await createServerSupabaseClient();
-
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
-  }
-
   try {
+    const supabase = await createServerSupabaseClient();
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+    }
+
     const { customerId } = bodySchema.parse(await req.json());
 
     const { data: companyRow, error: compErr } = await supabase
@@ -88,16 +83,18 @@ export async function POST(req: Request) {
     if (compErr || !companyRow?.company_id) {
       return NextResponse.json(
         { error: "company_id não encontrado" },
-        { status: 401 }
+        { status: 403 },
       );
     }
 
-    const companyId = companyRow.company_id as string;
+    const companyId = companyRow.company_id;
+    const idFilter =
+      typeof customerId === "number" ? String(customerId) : customerId;
 
     const { data: row, error: cErr } = await supabase
       .from("customers")
       .select("*")
-      .eq("id", customerId)
+      .eq("id", idFilter)
       .eq("company_id", companyId)
       .maybeSingle();
 
@@ -108,7 +105,7 @@ export async function POST(req: Request) {
     if (!row) {
       return NextResponse.json(
         { error: "Cliente não encontrado" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -117,14 +114,14 @@ export async function POST(req: Request) {
     if (!desired.name) {
       return NextResponse.json(
         { error: "Nome é obrigatório para o Asaas" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!desired.cpfCnpj && !desired.email) {
       return NextResponse.json(
         { error: "Informe CPF/CNPJ ou e-mail para sincronizar com o Asaas" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -180,7 +177,12 @@ export async function POST(req: Request) {
         });
       }
 
-      const updated = await updateCustomer(supabase, companyId, asaasId, patch);
+      const updated = await updateCustomer(
+        supabase,
+        companyId,
+        asaasId,
+        patch,
+      );
 
       return NextResponse.json({
         ok: true,
@@ -213,10 +215,9 @@ export async function POST(req: Request) {
     }
   } catch (e: any) {
     console.error("❌ Sync Asaas - erro:", e);
-
     return NextResponse.json(
       { error: e?.message ?? "Erro inesperado" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 }

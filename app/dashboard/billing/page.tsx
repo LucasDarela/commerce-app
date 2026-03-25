@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import SubscriptionManager from "@/components/subscription/SubscriptionManager";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import TrialStartButton from "@/components/subscription/TrialStartButton";
@@ -39,7 +39,7 @@ type CompanyUserRow = {
 };
 
 export default function BillingPage() {
-  const supabase = useMemo(() => createClientComponentClient(), []);
+  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const { companyId, loading: authLoading } = useAuthenticatedCompany();
   const searchParams = useSearchParams();
   const success = searchParams.get("success");

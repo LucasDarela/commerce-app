@@ -1,31 +1,28 @@
 // app/api/users/team/route.ts
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import { createClient } from "@supabase/supabase-js";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
+
+const admin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+);
 
 export async function GET() {
   try {
-    const supa = createRouteHandlerClient({ cookies });
+    const supabase = await createServerSupabaseClient();
 
     const {
       data: { user: inviter },
-      error: sessErr,
-    } = await supa.auth.getUser();
+      error: authError,
+    } = await supabase.auth.getUser();
 
-    if (sessErr || !inviter) {
+    console.log("[team] inviter:", inviter?.email ?? null);
+    console.log("[team] authError:", authError ?? null);
+
+    if (authError || !inviter) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
-
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!url || !serviceKey) {
-      console.error("[team] Missing env", { hasUrl: !!url, hasServiceKey: !!serviceKey });
-      return NextResponse.json({ error: "Missing server env" }, { status: 500 });
-    }
-
-    const admin = createClient(url, serviceKey);
 
     const { data: cu, error: cuErr } = await admin
       .from("company_users")
@@ -33,7 +30,12 @@ export async function GET() {
       .eq("user_id", inviter.id)
       .maybeSingle();
 
-    if (cuErr || !cu?.company_id) {
+    if (cuErr) {
+      console.error("[team] company_users error:", cuErr);
+      return NextResponse.json({ error: cuErr.message }, { status: 400 });
+    }
+
+    if (!cu?.company_id) {
       return NextResponse.json(
         { error: "Company not found for inviter" },
         { status: 400 },
@@ -46,33 +48,52 @@ export async function GET() {
       .eq("company_id", cu.company_id);
 
     if (listErr) {
+      console.error("[team] list members error:", listErr);
       return NextResponse.json({ error: listErr.message }, { status: 400 });
     }
 
     const userIds = (rows ?? []).map((r) => r.user_id).filter(Boolean);
 
-    const { data: profiles, error: профErr } = await admin
+    if (!userIds.length) {
+      return NextResponse.json({ members: [] }, { status: 200 });
+    }
+
+    const { data: profiles, error: profilesErr } = await admin
       .from("profiles")
-      .select("id, email, is_blocked")
+      .select("id, email, is_blocked, username")
       .in("id", userIds);
 
-    if (профErr) {
-      return NextResponse.json({ error: профErr.message }, { status: 400 });
+    if (profilesErr) {
+      console.error("[team] profiles error:", profilesErr);
+      return NextResponse.json({ error: profilesErr.message }, { status: 400 });
     }
 
     const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]));
 
     const members = await Promise.all(
-      (rows ?? []).map(async (row: any) => {
-        const { data: ures, error: uErr } = await admin.auth.admin.getUserById(row.user_id);
-        if (uErr) console.warn("[team] getUserById error:", uErr.message);
+      (rows ?? []).map(async (row: { user_id: string; role: string | null }) => {
+        const { data: ures, error: uErr } = await admin.auth.admin.getUserById(
+          row.user_id,
+        );
+
+        if (uErr) {
+          console.warn("[team] getUserById error:", uErr.message);
+        }
 
         const u = ures?.user;
-        const p: any = profileMap.get(row.user_id);
+        const p = profileMap.get(row.user_id) as
+          | {
+              id: string;
+              email: string | null;
+              is_blocked: boolean | null;
+              username?: string | null;
+            }
+          | undefined;
 
         return {
           id: row.user_id,
           email: p?.email ?? u?.email ?? "",
+          username: p?.username ?? "",
           role: row.role,
           isBlocked: !!p?.is_blocked,
           emailConfirmed: !!u?.confirmed_at,
@@ -85,6 +106,7 @@ export async function GET() {
     return NextResponse.json({ members }, { status: 200 });
   } catch (e: any) {
     console.error("[team] GET error:", e);
+
     return NextResponse.json(
       { error: e?.message || "Internal error listing team" },
       { status: 500 },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -12,7 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { toast } from "sonner";
 import { Pencil, Trash } from "lucide-react";
 import {
@@ -49,7 +49,9 @@ type Supplier = {
 
 export default function ListSuppliers() {
   const router = useRouter();
-  const { user, companyId, loading } = useAuthenticatedCompany();
+  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
+  const { companyId, loading } = useAuthenticatedCompany();
+
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [search, setSearch] = useState<string>("");
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(
@@ -58,10 +60,12 @@ export default function ListSuppliers() {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
+    if (loading || !companyId) return;
+
+    let isMounted = true;
+
     const fetchSuppliers = async () => {
       try {
-        if (!companyId) return;
-
         let query = supabase
           .from("suppliers")
           .select("*")
@@ -72,7 +76,7 @@ export default function ListSuppliers() {
           const raw = search.trim();
           const cleaned = raw.replace(/\D/g, "");
 
-          const filters = [];
+          const filters: string[] = [];
 
           if (raw) {
             filters.push(`name.ilike.%${raw}%`);
@@ -91,24 +95,26 @@ export default function ListSuppliers() {
         const { data, error } = await query;
 
         if (error) {
-          console.error("❌ Erro ao buscar fornecedores:", error.message);
+          console.error("Erro ao buscar fornecedores:", error.message);
           toast.error("Erro ao carregar fornecedores.");
-        } else {
-          setSuppliers(data ?? []);
+          return;
+        }
+
+        if (isMounted) {
+          setSuppliers((data as Supplier[]) ?? []);
         }
       } catch (error) {
-        console.error("❌ Erro inesperado:", error);
+        console.error("Erro inesperado:", error);
         toast.error("Erro inesperado ao carregar fornecedores.");
       }
     };
 
-    if (!loading && companyId) {
-      fetchSuppliers();
-    }
-  }, [companyId, loading, search]);
+    fetchSuppliers();
 
-  const normalizeText = (text: string) =>
-    text.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+    return () => {
+      isMounted = false;
+    };
+  }, [companyId, loading, search, supabase]);
 
   const openModal = (supplier: Supplier) => {
     setSelectedSupplier(supplier);
@@ -121,21 +127,35 @@ export default function ListSuppliers() {
   };
 
   const handleEdit = () => {
-    if (selectedSupplier) {
-      router.push(`/dashboard/suppliers/${selectedSupplier.id}/edit`);
-      closeModal();
-    }
+    if (!selectedSupplier) return;
+    router.push(`/dashboard/suppliers/${selectedSupplier.id}/edit`);
+    closeModal();
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm("Are you sure you want to delete this supplier?")) {
-      const { error } = await supabase.from("suppliers").delete().eq("id", id);
-      if (error) {
-        toast.error("Failed to delete supplier: " + error.message);
-      } else {
-        toast.success("Supplier deleted successfully!");
-        setSuppliers((prev) => prev.filter((s) => s.id !== id));
-      }
+    if (!companyId) {
+      toast.error("Empresa não identificada.");
+      return;
+    }
+
+    if (!confirm("Are you sure you want to delete this supplier?")) return;
+
+    const { error } = await supabase
+      .from("suppliers")
+      .delete()
+      .eq("id", id)
+      .eq("company_id", companyId);
+
+    if (error) {
+      toast.error("Failed to delete supplier: " + error.message);
+      return;
+    }
+
+    toast.success("Supplier deleted successfully!");
+    setSuppliers((prev) => prev.filter((s) => s.id !== id));
+
+    if (selectedSupplier?.id === id) {
+      closeModal();
     }
   };
 
@@ -146,6 +166,7 @@ export default function ListSuppliers() {
   return (
     <div className="p-6 mt-3">
       <h2 className="text-xl font-bold mb-4">Fornecedores</h2>
+
       <div className="mb-6 flex flex-col sm:flex-row gap-4 items-stretch">
         <Input
           type="text"
@@ -154,6 +175,7 @@ export default function ListSuppliers() {
           onChange={(e) => setSearch(e.target.value)}
           className="w-full h-8 p-2 border rounded-md"
         />
+
         <Link href="/dashboard/suppliers/add">
           <Button
             variant="default"
@@ -177,6 +199,7 @@ export default function ListSuppliers() {
               <TableHead className="hidden md:table-cell">Cidade</TableHead>
             </TableRow>
           </TableHeader>
+
           <TableBody>
             {suppliers.length > 0 ? (
               suppliers.map((supplier) => (
@@ -217,16 +240,19 @@ export default function ListSuppliers() {
             <DialogHeader>
               <DialogTitle>Detalhes do Fornecedor</DialogTitle>
             </DialogHeader>
+
             <div className="space-y-2">
               <p>
                 <strong>Nome:</strong> {selectedSupplier.name}
               </p>
+
               {selectedSupplier.fantasy_name && (
                 <p>
                   <strong>Nome Fantasia:</strong>{" "}
                   {selectedSupplier.fantasy_name}
                 </p>
               )}
+
               <p>
                 <strong>Tipo:</strong> {selectedSupplier.type}
               </p>
@@ -249,11 +275,13 @@ export default function ListSuppliers() {
                   .filter(Boolean)
                   .join(", ")}
               </p>
+
               {selectedSupplier.complement && (
                 <p>
                   <strong>Complemento:</strong> {selectedSupplier.complement}
                 </p>
               )}
+
               <p>
                 <strong>Cidade:</strong> {selectedSupplier.city}
               </p>
@@ -263,6 +291,7 @@ export default function ListSuppliers() {
               <p>
                 <strong>Email:</strong> {selectedSupplier.email || ""}
               </p>
+
               {selectedSupplier.state_registration && (
                 <p>
                   <strong>Inscrição Estadual:</strong>{" "}
@@ -270,11 +299,13 @@ export default function ListSuppliers() {
                 </p>
               )}
             </div>
+
             <DialogFooter className="w-full">
               <div className="grid grid-cols-4 gap-4 w-full">
                 <Button onClick={handleEdit} className="col-span-3">
                   <Pencil className="h-4 w-4" /> Editar
                 </Button>
+
                 <Button
                   variant="destructive"
                   onClick={() => handleDelete(selectedSupplier.id)}

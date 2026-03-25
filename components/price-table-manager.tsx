@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import * as React from "react";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import { supabase } from "@/lib/supabase";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import {
   Table,
@@ -24,12 +24,14 @@ type Product = {
 };
 
 type Catalog = {
-  id?: string; // agora pode ter ID
+  id?: string;
   name: string;
   products: { product_id: string; price: number }[];
 };
 
 export function PriceTableManager() {
+  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
+
   const [savedCatalogs, setSavedCatalogs] = useState<Catalog[]>([]);
   const [catalogs, setCatalogs] = useState<Catalog[]>([]);
   const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
@@ -39,21 +41,35 @@ export function PriceTableManager() {
     null,
   );
 
+  // ================= PRODUCTS =================
   useEffect(() => {
+    let cancelled = false;
+
     const fetchProducts = async () => {
       const { data, error } = await supabase
         .from("products")
         .select("id, name");
+
+      if (cancelled) return;
+
       if (error) {
         toast.error("Erro ao carregar produtos");
       } else {
         setAvailableProducts(data || []);
       }
     };
-    fetchProducts();
-  }, []);
 
+    fetchProducts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase]);
+
+  // ================= CATALOGS =================
   useEffect(() => {
+    let cancelled = false;
+
     const fetchSavedCatalogs = async () => {
       if (!companyId) return;
 
@@ -62,24 +78,20 @@ export function PriceTableManager() {
         .select("id, name")
         .eq("company_id", companyId);
 
+      if (cancelled) return;
+
       if (error) {
-        toast.error("Erro ao buscar catálogos salvos.");
-        console.error(error);
+        toast.error("Erro ao buscar catálogos.");
         return;
       }
 
       const fullCatalogs: Catalog[] = [];
 
-      for (const table of tables) {
-        const { data: products, error: productError } = await supabase
+      for (const table of tables || []) {
+        const { data: products } = await supabase
           .from("price_table_products")
           .select("product_id, price")
           .eq("price_table_id", table.id);
-
-        if (productError) {
-          toast.error(`Erro ao carregar produtos de ${table.name}`);
-          continue;
-        }
 
         fullCatalogs.push({
           id: table.id,
@@ -88,20 +100,29 @@ export function PriceTableManager() {
         });
       }
 
-      setSavedCatalogs(fullCatalogs);
+      if (!cancelled) {
+        setSavedCatalogs(fullCatalogs);
+      }
     };
 
     fetchSavedCatalogs();
-  }, [companyId]);
 
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId, supabase]);
+
+  // ================= ACTIONS =================
   const handleAddCatalog = () => {
     setCatalogs((prev) => [...prev, { name: "", products: [] }]);
   };
 
   const updateCatalog = (index: number, updatedCatalog: Catalog) => {
-    const updated = [...catalogs];
-    updated[index] = updatedCatalog;
-    setCatalogs(updated);
+    setCatalogs((prev) => {
+      const updated = [...prev];
+      updated[index] = updatedCatalog;
+      return updated;
+    });
   };
 
   const handleSaveCatalogs = async () => {
@@ -110,25 +131,24 @@ export function PriceTableManager() {
       return;
     }
 
-    const newSavedCatalogs: Catalog[] = [];
+    const newSaved: Catalog[] = [];
 
     for (const catalog of catalogs) {
       if (!catalog.name) {
-        toast.error("Todos os catálogos precisam de um nome.");
+        toast.error("Todos os catálogos precisam de nome.");
         return;
       }
 
-      const hasValidPrice = catalog.products.some((p) => Number(p.price) > 0);
+      const validProducts = catalog.products.filter(
+        (p) => !isNaN(p.price) && p.price > 0,
+      );
 
-      if (!hasValidPrice) {
-        toast.error(
-          `O catálogo "${catalog.name}" precisa ter pelo menos 1 preço.`,
-        );
+      if (validProducts.length === 0) {
+        toast.error(`"${catalog.name}" precisa de pelo menos 1 preço.`);
         continue;
       }
 
-      // 1. Cria o catálogo
-      const { data: priceTable, error: tableError } = await supabase
+      const { data: table, error } = await supabase
         .from("price_tables")
         .insert({
           name: catalog.name,
@@ -137,64 +157,43 @@ export function PriceTableManager() {
         .select("id")
         .single();
 
-      if (tableError) {
-        toast.error(`Erro ao salvar catálogo: ${catalog.name}`);
-        console.error(tableError);
+      if (error || !table) {
+        toast.error(`Erro ao salvar ${catalog.name}`);
         continue;
       }
 
-      // 2. Filtra apenas produtos com preço válido
-      const productsData = Array.from(
-        new Map(
-          catalog.products
-            .filter((p) => !isNaN(p.price) && p.price > 0)
-            .map((p) => [p.product_id, p]),
-        ).values(),
-      ).map((p) => ({
-        price_table_id: priceTable.id,
+      const payload = validProducts.map((p) => ({
+        price_table_id: table.id,
         product_id: p.product_id,
         price: p.price,
       }));
 
-      if (productsData.length === 0) {
-        await supabase.from("price_tables").delete().eq("id", priceTable.id);
-
-        toast.error(`Catálogo ${catalog.name} não possui preços válidos.`);
-        continue;
-      }
-
-      const { error: productsError } = await supabase
+      const { error: insertError } = await supabase
         .from("price_table_products")
-        .insert(productsData);
+        .insert(payload);
 
-      if (productsError) {
-        await supabase.from("price_tables").delete().eq("id", priceTable.id);
-
-        toast.error(`Erro ao salvar produtos para ${catalog.name}`);
-        console.error("Erro ao salvar produtos:", productsError);
+      if (insertError) {
+        await supabase.from("price_tables").delete().eq("id", table.id);
+        toast.error(`Erro ao salvar produtos de ${catalog.name}`);
         continue;
       }
 
-      // ✅ Adiciona catálogo salvo para exibição
-      newSavedCatalogs.push({
-        id: priceTable.id, // agora temos ID
+      newSaved.push({
+        id: table.id,
         name: catalog.name,
-        products: productsData.map((p) => ({
-          product_id: p.product_id,
-          price: p.price,
-        })),
+        products: payload,
       });
     }
 
-    if (newSavedCatalogs.length > 0) {
-      toast.success("Catálogos salvos com sucesso!");
-      setCatalogs([]); // limpa inputs
-      setSavedCatalogs((prev) => [...prev, ...newSavedCatalogs]); // atualiza tabela abaixo
+    if (newSaved.length > 0) {
+      toast.success("Catálogos salvos!");
+      setCatalogs([]);
+      setSavedCatalogs((prev) => [...prev, ...newSaved]);
     }
   };
 
-  const handleDeleteCatalog = async (catalogIndex: number) => {
-    const catalog = savedCatalogs[catalogIndex];
+  const handleDeleteCatalog = async (index: number) => {
+    const catalog = savedCatalogs[index];
     if (!catalog.id) return;
 
     const { error } = await supabase
@@ -203,57 +202,56 @@ export function PriceTableManager() {
       .eq("id", catalog.id);
 
     if (error) {
-      toast.error("Erro ao deletar catálogo.");
+      toast.error("Erro ao deletar.");
       return;
     }
 
-    toast.success("Catálogo deletado com sucesso.");
-    setSavedCatalogs((prev) => prev.filter((_, i) => i !== catalogIndex));
+    setSavedCatalogs((prev) => prev.filter((_, i) => i !== index));
+    toast.success("Deletado!");
   };
 
-  if (loading) {
-    return <TableSkeleton />;
-  }
+  if (loading) return <TableSkeleton />;
 
   return (
     <div className="space-y-6 px-6 mt-9">
       <h2 className="text-xl font-bold">Catálogo Personalizado</h2>
+
+      {/* ================= LIST ================= */}
       <Table>
         <TableHeader>
           <TableRow>
             <TableHead>#</TableHead>
-            <TableHead>Nome do Catálogo</TableHead>
-            <TableHead>Total de Produtos</TableHead>
+            <TableHead>Nome</TableHead>
+            <TableHead>Produtos</TableHead>
             <TableHead>Ações</TableHead>
           </TableRow>
         </TableHeader>
+
         <TableBody>
           {savedCatalogs.map((catalog, idx) => (
-            <React.Fragment key={`catalog-${idx}`}>
+            <React.Fragment key={catalog.id || idx}>
               <TableRow>
                 <TableCell>{idx + 1}</TableCell>
                 <TableCell>{catalog.name}</TableCell>
                 <TableCell>{catalog.products.length}</TableCell>
                 <TableCell className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setEditingCatalogIndex(idx)}
-                  >
+                  <Button size="sm" onClick={() => setEditingCatalogIndex(idx)}>
                     Editar
                   </Button>
                   <Button
-                    variant="secondary"
                     size="sm"
+                    variant="secondary"
                     onClick={() =>
-                      setExpandedIndex((prev) => (prev === idx ? null : idx))
+                      setExpandedIndex((prev) =>
+                        prev === idx ? null : idx,
+                      )
                     }
                   >
-                    {expandedIndex === idx ? "Ocultar" : "Ver Produtos"}
+                    {expandedIndex === idx ? "Ocultar" : "Ver"}
                   </Button>
                   <Button
-                    variant="destructive"
                     size="sm"
+                    variant="destructive"
                     onClick={() => handleDeleteCatalog(idx)}
                   >
                     Delete
@@ -264,28 +262,20 @@ export function PriceTableManager() {
               {expandedIndex === idx && (
                 <TableRow>
                   <TableCell colSpan={4}>
-                    <div className="space-y-2 pl-4">
-                      {[
-                        ...new Map(
-                          catalog.products.map((p) => [p.product_id, p]),
-                        ).values(),
-                      ].map((product) => {
-                        const productInfo = availableProducts.find(
-                          (p) => p.id === product.product_id,
-                        );
-                        return (
-                          <div
-                            key={product.product_id}
-                            className="flex justify-between"
-                          >
-                            <span>
-                              {productInfo?.name || "Produto desconhecido"}
-                            </span>
-                            <span>R$ {Number(product.price).toFixed(2)}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
+                    {catalog.products.map((p) => {
+                      const info = availableProducts.find(
+                        (ap) => ap.id === p.product_id,
+                      );
+                      return (
+                        <div
+                          key={p.product_id}
+                          className="flex justify-between"
+                        >
+                          <span>{info?.name || "Produto"}</span>
+                          <span>R$ {p.price.toFixed(2)}</span>
+                        </div>
+                      );
+                    })}
                   </TableCell>
                 </TableRow>
               )}
@@ -294,13 +284,13 @@ export function PriceTableManager() {
         </TableBody>
       </Table>
 
-      <Button onClick={handleAddCatalog}>+ Adicionar Catálogo</Button>
+      {/* ================= CREATE ================= */}
+      <Button onClick={handleAddCatalog}>+ Adicionar</Button>
 
       {catalogs.map((catalog, index) => (
         <Card key={index} className="p-4 space-y-4">
-          <h2 className="text-lg font-semibold">Catálogo #{index + 1}</h2>
           <Input
-            placeholder="Nome do catálogo (ex: Delivery, PDV)"
+            placeholder="Nome do catálogo"
             value={catalog.name}
             onChange={(e) =>
               updateCatalog(index, { ...catalog, name: e.target.value })
@@ -308,58 +298,46 @@ export function PriceTableManager() {
           />
 
           {availableProducts.map((product) => {
-            const selectedProduct = catalog.products.find(
+            const selected = catalog.products.find(
               (p) => p.product_id === product.id,
             );
+
             return (
-              <div
-                key={product.id}
-                className="grid grid-cols-2 items-center gap-4"
-              >
+              <div key={product.id} className="grid grid-cols-2 gap-4">
                 <span>{product.name}</span>
                 <Input
-                  placeholder="R$"
                   type="number"
-                  step="0.01"
-                  value={selectedProduct?.price ?? ""}
+                  value={selected?.price ?? ""}
                   onChange={(e) => {
-                    const raw = e.target.value; // mantém o valor digitado
-                    const price = parseFloat(raw);
+                    const price = parseFloat(e.target.value);
+                    const updated = [...catalog.products];
 
-                    const currentCatalog = catalogs[index];
-                    const updatedProducts = [...currentCatalog.products];
-
-                    const existingProductIndex = updatedProducts.findIndex(
+                    const idx = updated.findIndex(
                       (p) => p.product_id === product.id,
                     );
 
-                    // se apagar o input, remove o produto da lista (ou zera)
-                    if (raw === "") {
-                      const cleaned = updatedProducts.filter(
-                        (p) => p.product_id !== product.id,
-                      );
+                    if (!e.target.value) {
                       updateCatalog(index, {
-                        ...currentCatalog,
-                        products: cleaned,
+                        ...catalog,
+                        products: updated.filter(
+                          (p) => p.product_id !== product.id,
+                        ),
                       });
                       return;
                     }
 
-                    if (existingProductIndex >= 0) {
-                      updatedProducts[existingProductIndex] = {
-                        ...updatedProducts[existingProductIndex],
-                        price: isNaN(price) ? 0 : price,
-                      };
+                    if (idx >= 0) {
+                      updated[idx].price = price || 0;
                     } else {
-                      updatedProducts.push({
+                      updated.push({
                         product_id: product.id,
-                        price: isNaN(price) ? 0 : price,
+                        price: price || 0,
                       });
                     }
 
                     updateCatalog(index, {
-                      ...currentCatalog,
-                      products: updatedProducts,
+                      ...catalog,
+                      products: updated,
                     });
                   }}
                 />
@@ -371,126 +349,8 @@ export function PriceTableManager() {
 
       {catalogs.length > 0 && (
         <Button onClick={handleSaveCatalogs} className="w-full">
-          Salvar Catálogo no Banco de Dados
+          Salvar
         </Button>
-      )}
-
-      {editingCatalogIndex !== null && (
-        <Card className="p-4 space-y-4 mt-4">
-          <h2 className="text-lg font-semibold">
-            Editando: {savedCatalogs[editingCatalogIndex].name}
-          </h2>
-
-          {availableProducts.map((product) => {
-            const catalog = savedCatalogs[editingCatalogIndex]!;
-            const selectedProduct = catalog.products.find(
-              (p) => p.product_id === product.id,
-            );
-
-            return (
-              <div
-                key={product.id}
-                className="grid grid-cols-2 items-center gap-4"
-              >
-                <span>{product.name}</span>
-                <Input
-                  placeholder="R$"
-                  type="number"
-                  step="0.01"
-                  value={selectedProduct?.price ?? ""}
-                  onChange={(e) => {
-                    const price = parseFloat(e.target.value);
-
-                    const catalog = savedCatalogs[editingCatalogIndex]!;
-                    const existingProductIndex = catalog.products.findIndex(
-                      (p) => p.product_id === product.id,
-                    );
-                    let updatedProducts = [...catalog.products];
-
-                    if (existingProductIndex >= 0) {
-                      updatedProducts[existingProductIndex] = {
-                        ...updatedProducts[existingProductIndex],
-                        price,
-                      };
-                    } else if (!isNaN(price) && price > 0) {
-                      updatedProducts.push({ product_id: product.id, price });
-                    }
-
-                    const updatedCatalog = {
-                      ...catalog,
-                      products: updatedProducts,
-                    };
-
-                    const updatedSaved = [...savedCatalogs];
-                    updatedSaved[editingCatalogIndex] = updatedCatalog;
-                    setSavedCatalogs(updatedSaved);
-                  }}
-                />
-              </div>
-            );
-          })}
-
-          <div className="flex gap-2">
-            <Button
-              onClick={async () => {
-                const catalog = savedCatalogs[editingCatalogIndex];
-                if (!catalog.id) return;
-
-                const cleanedProducts = Array.from(
-                  new Map(
-                    catalog.products
-                      .filter((p) => !isNaN(p.price) && p.price > 0)
-                      .map((p) => [p.product_id, p]),
-                  ).values(),
-                );
-
-                const { error: deleteError } = await supabase
-                  .from("price_table_products")
-                  .delete()
-                  .eq("price_table_id", catalog.id);
-
-                if (deleteError) {
-                  toast.error("Erro ao limpar catálogo antigo.");
-                  return;
-                }
-
-                const { error: insertError } = await supabase
-                  .from("price_table_products")
-                  .insert(
-                    cleanedProducts.map((p) => ({
-                      price_table_id: catalog.id,
-                      product_id: p.product_id,
-                      price: p.price,
-                    })),
-                  );
-
-                if (insertError) {
-                  toast.error("Erro ao atualizar produtos.");
-                  return;
-                }
-
-                toast.success("Catálogo atualizado com sucesso.");
-
-                const updatedCatalogs = [...savedCatalogs];
-                updatedCatalogs[editingCatalogIndex] = {
-                  ...catalog,
-                  products: cleanedProducts,
-                };
-                setSavedCatalogs(updatedCatalogs);
-
-                setEditingCatalogIndex(null);
-              }}
-            >
-              Salvar Alterações
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => setEditingCatalogIndex(null)}
-            >
-              Cancelar
-            </Button>
-          </div>
-        </Card>
       )}
     </div>
   );

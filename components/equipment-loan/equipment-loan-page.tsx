@@ -1,42 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import { supabase } from "@/lib/supabase";
-import { toast } from "sonner";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Checkbox } from "@/components/ui/checkbox";
-import Link from "next/link";
-import {
-  IconChevronLeft,
-  IconChevronRight,
-  IconChevronsLeft,
-  IconChevronsRight,
-  IconPlus,
-} from "@tabler/icons-react";
+import { toast } from "sonner";
 import { LoanEquipmentModal } from "@/components/equipment-loan/LoanEquipmentModal";
 import { ReturnEquipmentModal } from "./ReturnEquipmentModal";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import type { Order } from "@/components/types/orders";
 import { Input } from "../ui/input";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
-
-type LoanWithDetails = {
-  id: string;
-  quantity: number;
-  note_number: string;
-  note_date: string;
-  customer_id: string;
-  customer: { name: string };
-  equipment: { name: string };
-};
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
 type GroupedByCustomer = {
   customerId: string;
@@ -48,70 +21,107 @@ type GroupedByCustomer = {
   }[];
 };
 
+type EquipmentRow = {
+  id: string;
+  name: string;
+};
+
+type LoanRow = {
+  id: string;
+  equipment_id: string;
+  quantity: number | string | null;
+  customer_id: string;
+  customer_name: string | null;
+  company_id?: string;
+};
+
 export default function LoanByCustomerPage() {
   const { user, companyId, loading } = useAuthenticatedCompany();
+  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
+
   const [groupedData, setGroupedData] = useState<GroupedByCustomer[]>([]);
   const [openModal, setOpenModal] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(
     null,
   );
-  const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [isLoanModalOpen, setIsLoanModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [search, setSearch] = useState("");
+  const [isFetching, setIsFetching] = useState(false);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     if (!companyId) return;
 
-    const { data, error } = await supabase
-      .from("equipment_loans")
-      .select("id, equipment_id, quantity, customer_id, customer_name")
-      .eq("status", "active");
+    setIsFetching(true);
 
-    const { data: equipmentList } = await supabase
-      .from("equipments")
-      .select("id, name")
-      .eq("company_id", companyId);
+    const [loansRes, equipmentsRes] = await Promise.all([
+      supabase
+        .from("equipment_loans")
+        .select("id, equipment_id, quantity, customer_id, customer_name, company_id")
+        .eq("company_id", companyId)
+        .eq("status", "active"),
+      supabase
+        .from("equipments")
+        .select("id, name")
+        .eq("company_id", companyId),
+    ]);
 
-    if (!error && data && equipmentList) {
-      const grouped: Record<string, GroupedByCustomer> = {};
+    const { data: loans, error: loansError } = loansRes;
+    const { data: equipmentList, error: equipmentsError } = equipmentsRes;
 
-      for (const loan of data) {
-        const customerId = loan.customer_id;
-        const customerName = loan.customer_name ?? "Desconhecido";
-        const equipmentName =
-          equipmentList.find((eq) => eq.id === loan.equipment_id)?.name ||
-          "Equipamento";
+    if (loansError || equipmentsError) {
+      console.error("Erro ao buscar dados de comodato:", {
+        loansError,
+        equipmentsError,
+      });
+      toast.error("Erro ao buscar dados");
+      setIsFetching(false);
+      return;
+    }
 
-        if (!grouped[customerId]) {
-          grouped[customerId] = {
-            customerId,
-            customerName,
-            items: [],
-          };
-        }
+    const equipmentsMap = new Map(
+      ((equipmentList as EquipmentRow[]) || []).map((eq) => [eq.id, eq.name]),
+    );
 
-        grouped[customerId].items.push({
-          loanId: loan.id,
-          equipmentName,
-          quantity: Number(loan.quantity) || 1,
-        });
+    const grouped: Record<string, GroupedByCustomer> = {};
+
+    for (const loan of ((loans as LoanRow[]) || [])) {
+      const customerId = loan.customer_id;
+      if (!customerId) continue;
+
+      const customerName = loan.customer_name ?? "Desconhecido";
+      const equipmentName =
+        equipmentsMap.get(loan.equipment_id) || "Equipamento";
+
+      if (!grouped[customerId]) {
+        grouped[customerId] = {
+          customerId,
+          customerName,
+          items: [],
+        };
       }
 
-      setGroupedData(Object.values(grouped));
-    } else {
-      toast.error("Erro ao buscar dados");
-      console.error(error);
+      grouped[customerId].items.push({
+        loanId: loan.id,
+        equipmentName,
+        quantity: Number(loan.quantity) || 1,
+      });
     }
-  };
+
+    setGroupedData(Object.values(grouped));
+    setIsFetching(false);
+  }, [companyId, supabase]);
 
   useEffect(() => {
-    if (companyId) {
-      fetchData();
-    }
-  }, [companyId]);
+    if (!companyId) return;
+    fetchData();
+  }, [companyId, fetchData]);
 
-  if (loading) {
+  const filteredGroups = groupedData.filter((group) =>
+    group.customerName.toLowerCase().includes(search.toLowerCase()),
+  );
+
+  if (loading || isFetching) {
     return <TableSkeleton />;
   }
 
@@ -130,6 +140,7 @@ export default function LoanByCustomerPage() {
           onLoanSaved={fetchData}
         />
       </div>
+
       <div className="flex items-center gap-4 mb-4">
         <Input
           type="text"
@@ -140,53 +151,48 @@ export default function LoanByCustomerPage() {
         />
       </div>
 
-      {groupedData.length === 0 ? (
+      {filteredGroups.length === 0 ? (
         <p className="text-muted-foreground">
           Nenhum empréstimo ativo encontrado.
         </p>
       ) : (
         <div className="space-y-6">
-          {groupedData
-            .filter((group) =>
-              group.customerName.toLowerCase().includes(search.toLowerCase()),
-            )
-            .map((group) => (
-              <div key={`customer-${group.customerId}`} className="mb-6">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-lg font-semibold text-primary">
-                    {group.customerName}
-                  </h2>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setSelectedCustomerId(group.customerId);
-                      setOpenModal(true);
-                      setSelectedItems([]);
-                    }}
-                  >
-                    Retornar Itens
-                  </Button>
-                </div>
+          {filteredGroups.map((group) => (
+            <div key={`customer-${group.customerId}`} className="mb-6">
+              <div className="flex justify-between items-center">
+                <h2 className="text-lg font-semibold text-primary">
+                  {group.customerName}
+                </h2>
 
-                <ul className="list-disc pl-6 text-sm text-muted-foreground mt-2">
-                  {group.items.map((item, index) => (
-                    <li
-                      key={`${group.customerId}-${item.equipmentName}-${index}`}
-                    >
-                      {item.equipmentName} – {item.quantity}
-                    </li>
-                  ))}
-                </ul>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setSelectedCustomerId(group.customerId);
+                    setOpenModal(true);
+                  }}
+                >
+                  Retornar Itens
+                </Button>
               </div>
-            ))}
+
+              <ul className="list-disc pl-6 text-sm text-muted-foreground mt-2">
+                {group.items.map((item, index) => (
+                  <li key={`${group.customerId}-${item.loanId}-${index}`}>
+                    {item.equipmentName} – {item.quantity}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
       )}
 
-      {openModal && selectedCustomerId && (
+      {openModal && selectedCustomerId && companyId && (
         <ReturnEquipmentModal
           open={openModal}
           onOpenChange={setOpenModal}
+          companyId={companyId}
           order={selectedOrder}
           user={user}
           customerId={selectedCustomerId}
@@ -196,7 +202,6 @@ export default function LoanByCustomerPage() {
           }
           onReturnSuccess={() => {
             setOpenModal(false);
-            setSelectedItems([]);
             fetchData();
           }}
           onOpenProductReturnModal={() => {}}

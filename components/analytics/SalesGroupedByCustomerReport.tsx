@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { Card, CardContent } from "@/components/ui/card";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
 import {
@@ -108,13 +108,20 @@ export function SalesGroupedByCustomerReport({
   endDate,
   customerId,
 }: SalesGroupedByCustomerReportProps) {
+  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<OrderRow[]>([]);
   const [triggerDownload, setTriggerDownload] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+
     const fetchSales = async () => {
-      if (!companyId || !startDate) return;
+      if (!companyId || !startDate) {
+        setRows([]);
+        setLoading(false);
+        return;
+      }
 
       setLoading(true);
 
@@ -148,6 +155,8 @@ export function SalesGroupedByCustomerReport({
 
         const { data, error } = await query;
 
+        if (cancelled) return;
+
         if (error) {
           console.error("Erro ao buscar relatório agrupado:", error);
           toast.error("Erro ao carregar relatório agrupado.");
@@ -169,16 +178,24 @@ export function SalesGroupedByCustomerReport({
 
         setRows(parsed);
       } catch (error) {
-        console.error(error);
-        toast.error("Erro inesperado ao carregar relatório.");
-        setRows([]);
+        if (!cancelled) {
+          console.error(error);
+          toast.error("Erro inesperado ao carregar relatório.");
+          setRows([]);
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
 
     fetchSales();
-  }, [companyId, startDate, endDate, customerId]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId, startDate, endDate, customerId, supabase]);
 
   const grouped = useMemo<CustomerGroup[]>(() => {
     const map = new Map<string, OrderRow[]>();
@@ -228,44 +245,48 @@ export function SalesGroupedByCustomerReport({
   }, [rows, grouped]);
 
   useEffect(() => {
-  const handleDownload = () => {
-    setTriggerDownload(true);
-  };
+    const handleDownload = () => {
+      setTriggerDownload(true);
+    };
 
-  window.addEventListener("download-sales-grouped-report", handleDownload);
+    window.addEventListener("download-sales-grouped-report", handleDownload);
 
-  return () => {
-    window.removeEventListener("download-sales-grouped-report", handleDownload);
-  };
-}, []);
+    return () => {
+      window.removeEventListener(
+        "download-sales-grouped-report",
+        handleDownload,
+      );
+    };
+  }, []);
 
   if (loading) return <TableSkeleton />;
 
   return (
     <div className="space-y-4">
-            {triggerDownload && (
-      <div className="hidden">
-        <PDFDownloadLink
-          document={
-            <SalesGroupedByCustomerPDF
-              groups={grouped}
-              startDate={startDate}
-              endDate={endDate}
-              summary={summary}
-            />
-          }
-          fileName={`relatorio-vendas-agrupadas-${startDate}${endDate ? `-ate-${endDate}` : ""}.pdf`}
-        >
-          {({ url }) => {
-            if (url) {
-              window.open(url, "_blank");
-              setTimeout(() => setTriggerDownload(false), 300);
+      {triggerDownload && (
+        <div className="hidden">
+          <PDFDownloadLink
+            document={
+              <SalesGroupedByCustomerPDF
+                groups={grouped}
+                startDate={startDate}
+                endDate={endDate}
+                summary={summary}
+              />
             }
-            return null;
-          }}
-        </PDFDownloadLink>
-      </div>
-    )}
+            fileName={`relatorio-vendas-agrupadas-${startDate}${endDate ? `-ate-${endDate}` : ""}.pdf`}
+          >
+            {({ url }) => {
+              if (url) {
+                window.open(url, "_blank");
+                setTimeout(() => setTriggerDownload(false), 300);
+              }
+              return null;
+            }}
+          </PDFDownloadLink>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="py-5">
@@ -339,70 +360,76 @@ export function SalesGroupedByCustomerReport({
                 </div>
               </div>
 
-                <div className="overflow-x-auto px-6">
+              <div className="overflow-x-auto px-6">
                 <Table>
-                    <TableHeader>
+                  <TableHeader>
                     <TableRow>
-                        <TableHead className="min-w-[110px]">Data</TableHead>
-                        <TableHead className="min-w-[110px]">Vencimento</TableHead>
-                        <TableHead className="min-w-[90px]">Nota</TableHead>
-                        <TableHead className="min-w-[260px]">Produtos</TableHead>
-                        <TableHead className="min-w-[120px]">Status</TableHead>
-                        <TableHead className="min-w-[130px] text-right">Pago</TableHead>
-                        <TableHead className="min-w-[130px] text-right">Restante</TableHead>
-                        <TableHead className="min-w-[130px] text-right">Total</TableHead>
+                      <TableHead className="min-w-[110px]">Data</TableHead>
+                      <TableHead className="min-w-[110px]">Vencimento</TableHead>
+                      <TableHead className="min-w-[90px]">Nota</TableHead>
+                      <TableHead className="min-w-[260px]">Produtos</TableHead>
+                      <TableHead className="min-w-[120px]">Status</TableHead>
+                      <TableHead className="min-w-[130px] text-right">
+                        Pago
+                      </TableHead>
+                      <TableHead className="min-w-[130px] text-right">
+                        Restante
+                      </TableHead>
+                      <TableHead className="min-w-[130px] text-right">
+                        Total
+                      </TableHead>
                     </TableRow>
-                    </TableHeader>
+                  </TableHeader>
 
-                    <TableBody>
+                  <TableBody>
                     {group.rows.map((row) => {
-                        const remaining = Math.max(
+                      const remaining = Math.max(
                         Number(row.total) - Number(row.total_payed),
                         0,
-                        );
+                      );
 
-                        return (
+                      return (
                         <TableRow key={row.id}>
-                            <TableCell>{formatDate(row.appointment_date)}</TableCell>
-                            <TableCell>{formatDate(row.due_date)}</TableCell>
-                            <TableCell>{row.note_number ?? "—"}</TableCell>
-                            <TableCell className="max-w-[320px] whitespace-pre-wrap break-words uppercase">
+                          <TableCell>{formatDate(row.appointment_date)}</TableCell>
+                          <TableCell>{formatDate(row.due_date)}</TableCell>
+                          <TableCell>{row.note_number ?? "—"}</TableCell>
+                          <TableCell className="max-w-[320px] whitespace-pre-wrap break-words uppercase">
                             {row.products || "—"}
-                            </TableCell>
-                            <TableCell>
+                          </TableCell>
+                          <TableCell>
                             <Badge variant={getStatusVariant(row.payment_status)}>
-                                {translatePaymentStatus(row.payment_status)}
+                              {translatePaymentStatus(row.payment_status)}
                             </Badge>
-                            </TableCell>
-                            <TableCell className="text-right">
+                          </TableCell>
+                          <TableCell className="text-right">
                             {formatCurrency(row.total_payed)}
-                            </TableCell>
-                            <TableCell className="text-right">
+                          </TableCell>
+                          <TableCell className="text-right">
                             {formatCurrency(remaining)}
-                            </TableCell>
-                            <TableCell className="text-right">
+                          </TableCell>
+                          <TableCell className="text-right">
                             {formatCurrency(row.total)}
-                            </TableCell>
+                          </TableCell>
                         </TableRow>
-                        );
+                      );
                     })}
 
                     <TableRow className="bg-muted/20">
-                        <TableCell colSpan={4} className="font-semibold">
+                      <TableCell colSpan={4} className="font-semibold">
                         Totais do cliente
-                        </TableCell>
-                        <TableCell />
-                        <TableCell />
-                        <TableCell className="text-right font-semibold">
+                      </TableCell>
+                      <TableCell />
+                      <TableCell />
+                      <TableCell className="text-right font-semibold">
                         {formatCurrency(group.totalOverdue)}
-                        </TableCell>
-                        <TableCell className="text-right font-semibold">
+                      </TableCell>
+                      <TableCell className="text-right font-semibold">
                         {formatCurrency(group.totalNotes)}
-                        </TableCell>
+                      </TableCell>
                     </TableRow>
-                    </TableBody>
+                  </TableBody>
                 </Table>
-                </div>
+              </div>
             </CardContent>
           </Card>
         ))

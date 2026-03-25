@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { z } from "zod";
 
 const UpsertSchema = z.object({
@@ -17,25 +17,58 @@ const UpsertSchema = z.object({
   default_days: z.number().int().min(0).default(0),
 });
 
+async function createSupabaseRouteClient() {
+  const cookieStore = await cookies();
+
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(
+          cookiesToSet: { name: string; value: string; options?: CookieOptions }[],
+        ) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              cookieStore.set(name, value, options);
+            });
+          } catch {
+            // sem alterar comportamento
+          }
+        },
+      },
+    },
+  );
+}
+
 export async function GET() {
-  const supabase = createRouteHandlerClient({ cookies });
+  const supabase = await createSupabaseRouteClient();
+
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user)
+
+  if (!user) {
     return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+  }
 
   const { data: cu } = await supabase
     .from("company_users")
     .select("company_id")
     .eq("user_id", user.id)
     .maybeSingle();
+
   const companyId = cu?.company_id;
-  if (!companyId)
+
+  if (!companyId) {
     return NextResponse.json(
       { error: "Empresa não encontrada" },
       { status: 400 },
     );
+  }
 
   const { data, error } = await supabase
     .from("payment_methods")
@@ -44,8 +77,10 @@ export async function GET() {
     .order("enabled", { ascending: false })
     .order("name", { ascending: true });
 
-  if (error)
+  if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
   return NextResponse.json(
     { methods: data },
     { headers: { "Cache-Control": "no-store" } },
@@ -53,32 +88,40 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const supabase = createRouteHandlerClient({ cookies });
+  const supabase = await createSupabaseRouteClient();
+
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user)
+
+  if (!user) {
     return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+  }
 
   const json = await req.json();
   const parsed = UpsertSchema.safeParse(json);
-  if (!parsed.success)
+
+  if (!parsed.success) {
     return NextResponse.json(
       { error: parsed.error.flatten() },
       { status: 400 },
     );
+  }
 
   const { data: cu } = await supabase
     .from("company_users")
     .select("company_id")
     .eq("user_id", user.id)
     .maybeSingle();
+
   const companyId = cu?.company_id;
-  if (!companyId)
+
+  if (!companyId) {
     return NextResponse.json(
       { error: "Empresa não encontrada" },
       { status: 400 },
     );
+  }
 
   const row = {
     ...parsed.data,
@@ -91,13 +134,18 @@ export async function POST(req: Request) {
       .from("payment_methods")
       .update(row)
       .eq("id", row.id);
-    if (error)
+
+    if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
   } else {
     const { error } = await supabase.from("payment_methods").insert(row);
-    if (error)
+
+    if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
   }
+
   return NextResponse.json(
     { success: true },
     { headers: { "Cache-Control": "no-store" } },
@@ -105,23 +153,30 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const supabase = createRouteHandlerClient({ cookies });
+  const supabase = await createSupabaseRouteClient();
+
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user)
+
+  if (!user) {
     return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+  }
 
   const { id } = await req.json();
-  if (!id)
+
+  if (!id) {
     return NextResponse.json({ error: "id é obrigatório" }, { status: 400 });
+  }
 
   const { error } = await supabase
     .from("payment_methods")
     .delete()
     .eq("id", id);
-  if (error)
+
+  if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 
   return NextResponse.json(
     { success: true },

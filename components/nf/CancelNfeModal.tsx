@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { supabase } from "@/lib/supabase";
 import {
   Dialog,
   DialogContent,
@@ -30,42 +29,62 @@ export function CancelNfeModal({
   const [loading, setLoading] = useState(false);
 
   const handleCancelNfe = async () => {
+    if (loading) return;
+
+    if (!reason.trim()) {
+      toast.error("Informe o motivo do cancelamento.");
+      return;
+    }
+
+    if (!refId || !companyId) {
+      toast.error("Dados inválidos para cancelamento.");
+      return;
+    }
+
+    setLoading(true);
+
     try {
-      if (!reason.trim())
-        return toast.error("Informe o motivo do cancelamento.");
-
-      setLoading(true);
-
-      // ✅ Chamar sua API interna, não a Focus diretamente
       const res = await fetch("/api/nfe/cancel", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ref: refId, motivo: reason, companyId }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ref: refId,
+          motivo: reason.trim(),
+          companyId,
+        }),
       });
 
-      let data: any;
+      let data: any = null;
+
       try {
         data = await res.json();
       } catch {
-        const text = await res.text().catch(() => "");
-        data = { mensagem: text || "Resposta inválida do servidor" };
+        // fallback seguro
       }
 
       if (!res.ok) {
-        const errorMessage =
+        const message =
           data?.mensagem ||
           data?.error ||
           data?.message ||
           "Erro ao cancelar NF-e.";
-        throw new Error(errorMessage);
+        throw new Error(message);
       }
 
       toast.success(
         data?.message || data?.mensagem || "NF-e cancelada com sucesso!",
       );
-      window.location.reload();
+
+      // ✅ melhor que reload (evita quebrar estado do app)
       onOpenChange(false);
+
+      // 👉 aqui você pode depois disparar refetch ao invés de reload
+      // ex: onSuccess()
+
     } catch (err: any) {
+      console.error("Erro ao cancelar NF-e:", err);
       toast.error(err.message || "Erro ao cancelar NF-e.");
     } finally {
       setLoading(false);
@@ -73,7 +92,13 @@ export function CancelNfeModal({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (loading) return; // bloqueia fechar durante request
+        onOpenChange(nextOpen);
+      }}
+    >
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Cancelar NF-e</DialogTitle>
@@ -83,18 +108,25 @@ export function CancelNfeModal({
           <label htmlFor="reason" className="text-sm font-medium">
             Motivo do cancelamento
           </label>
+
           <Input
             id="reason"
             placeholder="Ex: Nota emitida com dados incorretos"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
+            disabled={loading}
           />
         </div>
 
         <DialogFooter className="mt-4">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={loading}
+          >
             Fechar
           </Button>
+
           <Button onClick={handleCancelNfe} disabled={loading}>
             {loading ? "Cancelando..." : "Confirmar Cancelamento"}
           </Button>

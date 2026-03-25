@@ -14,11 +14,12 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
-import { supabase } from "@/lib/supabase/client";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { toast } from "sonner";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 
 export default function EditEquipmentPage() {
+  const supabase = createBrowserSupabaseClient();     
   const { companyId } = useAuthenticatedCompany();
   const router = useRouter();
   const params = useParams();

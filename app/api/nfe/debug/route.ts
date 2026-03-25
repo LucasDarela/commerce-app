@@ -1,47 +1,47 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { invoiceSchema } from "@/lib/focus-nfe/invoiceSchema";
 
 export async function POST(req: Request) {
-  const supabase = createRouteHandlerClient({ cookies });
-
   try {
-    const body = await req.json();
-    let { companyId, invoiceData } = body;
+    const supabase = await createServerSupabaseClient();
 
-    if (!companyId) {
-      const {
-        data: { user },
-        error: userErr,
-      } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
 
-      if (userErr || !user) {
-        return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
-      }
-
-      const { data: row, error: compErr } = await supabase
-        .from("company_users")
-        .select("company_id")
-        .eq("user_id", user.id)
-        .single();
-
-      if (compErr || !row?.company_id) {
-        return NextResponse.json(
-          { error: "company_id não encontrado para o usuário" },
-          { status: 400 },
-        );
-      }
-
-      companyId = row.company_id;
+    if (userError || !user) {
+      return NextResponse.json(
+        { error: "Não autenticado" },
+        { status: 401 },
+      );
     }
 
-    if (!companyId || !invoiceData) {
+    const body = await req.json();
+    const { invoiceData } = body;
+
+    if (!invoiceData) {
       return NextResponse.json(
-        { error: "companyId e invoiceData são obrigatórios" },
+        { error: "invoiceData é obrigatório" },
         { status: 400 },
       );
     }
+
+    const { data: row, error: compErr } = await supabase
+      .from("company_users")
+      .select("company_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (compErr || !row?.company_id) {
+      return NextResponse.json(
+        { error: "company_id não encontrado para o usuário" },
+        { status: 403 },
+      );
+    }
+
+    const companyId = row.company_id;
 
     const parsed = invoiceSchema.safeParse(invoiceData);
 

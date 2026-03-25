@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
+import {  
   Table,
   TableBody,
   TableCell,
@@ -12,7 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { toast } from "sonner";
 import { Pencil, Trash } from "lucide-react";
 import {
@@ -55,6 +55,7 @@ type Cliente = {
 };
 
 export default function ListCustomers() {
+  const supabase = createBrowserSupabaseClient();
   const router = useRouter();
   const { user, companyId, loading } = useAuthenticatedCompany();
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -164,7 +165,11 @@ export default function ListCustomers() {
 
   const handleDelete = async (id: number) => {
     if (confirm("Tem certeza que deseja excluir este cliente?")) {
-      const { error } = await supabase.from("customers").delete().eq("id", id);
+      const { error } = await supabase
+        .from("customers")
+        .delete()
+        .eq("id", id)
+        .eq("company_id", companyId); 
 
       if (error) {
         toast.error("Erro ao excluir cliente: " + error.message);

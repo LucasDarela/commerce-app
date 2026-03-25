@@ -5,8 +5,7 @@ import { useCompanyIntegration } from "@/hooks/use-company-integration";
 import { toast } from "sonner";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
-// import { supabase } from "@/lib/supabase";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { PaymentModal } from "@/components/payment-modal";
 import { YourFinancialRecords } from "@/components/your-financial-modal";
 import { DataTableConfig } from "./DataTableConfig";
@@ -14,6 +13,7 @@ import { FinancialFilters as Filters } from "./Filters";
 import { HeaderActions } from "./HeaderActions";
 import { PaymentSheet } from "./PaymentSheet";
 import { mapToFinancialPaymentMethod, groupByDueMonth } from "./utils";
+import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import {
   useReactTable,
   getCoreRowModel,
@@ -69,6 +69,7 @@ function toISO(d: Date | null) {
 export type CombinedRecord = Order | FinancialRecord;
 
 export default function DataFinancialTable() {
+  const { companyId } = useAuthenticatedCompany();
   useEffect(() => {});
   const [orders, setOrders] = useState<Order[]>([]);
   const [financialRecords, setFinancialRecords] = useState<FinancialRecord[]>(
@@ -88,7 +89,7 @@ export default function DataFinancialTable() {
   const [columnVisibility, setColumnVisibility] = useState(
     getInitialColumnVisibility,
   );
-  const supabase = createClientComponentClient();
+  const supabase = React.useMemo(() => createBrowserSupabaseClient(), []);
   const { accessToken } = useCompanyIntegration("mercado_pago");
   const [issueDateInput, setIssueDateInput] = useState("");
   const [dueDateInput, setDueDateInput] = useState("");
@@ -150,62 +151,104 @@ export default function DataFinancialTable() {
     [suppliers, deleteOrderById, setSelectedOrder, setIsPaymentOpen],
   );
 
-  const fetchAll = async () => {
-    const [ordersRes, financialRes, suppliersRes] = await Promise.all([
-      supabase
-        .from("orders")
-        .select("*")
-        .order("order_index", { ascending: true }),
-      supabase
-        .from("financial_records")
-        .select("*")
-        .order("issue_date", { ascending: false }),
-      supabase.from("suppliers").select("id, name"),
-    ]);
-
-    const parsedOrders = orderSchema
-      .array()
-      .safeParse(ordersRes.data?.map((o) => ({ ...o, source: "order" })));
-    if (parsedOrders.success) {
-      setOrders(parsedOrders.data.map((o) => ({ ...o, source: "order" })));
-    } else {
-      console.error("Erro ao validar orders:", parsedOrders.error);
-    }
-
-    const parsedFinancials = financialSchema
-      .array()
-      .safeParse(
-        financialRes.data?.map((f) => ({ ...f, source: "financial" })),
-      );
-    if (parsedFinancials.success) {
-      setFinancialRecords(
-        parsedFinancials.data.map((f) => ({ ...f, source: "financial" })),
-      );
-    } else {
-      console.error(
-        "Erro ao validar financial records:",
-        parsedFinancials.error,
-      );
-    }
-
-    setSuppliers(suppliersRes.data || []);
+const fetchAll = async () => {
+  if (!companyId) {
+    setOrders([]);
+    setFinancialRecords([]);
+    setSuppliers([]);
     setLoading(false);
-  };
+    return;
+  }
 
-  const refreshOrders = async () => {
-    const { data } = await supabase
+  setLoading(true);
+
+  const [ordersRes, financialRes, suppliersRes] = await Promise.all([
+    supabase
       .from("orders")
       .select("*")
-      .order("order_index", { ascending: true });
-    const parsed = orderSchema.array().safeParse(data);
-    if (parsed.success) {
-      setOrders(parsed.data.map((o) => ({ ...o, source: "order" })));
-    }
-  };
+      .eq("company_id", companyId)
+      .order("order_index", { ascending: true }),
 
-  useEffect(() => {
-    fetchAll();
-  }, []);
+    supabase
+      .from("financial_records")
+      .select("*")
+      .eq("company_id", companyId)
+      .order("issue_date", { ascending: false }),
+
+    supabase
+      .from("suppliers")
+      .select("id, name")
+      .eq("company_id", companyId),
+  ]);
+
+  const parsedOrders = orderSchema
+    .array()
+    .safeParse(
+      (ordersRes.data ?? []).map((o) => ({
+        ...o,
+        source: "order" as const,
+      })),
+    );
+
+  if (parsedOrders.success) {
+    setOrders(parsedOrders.data);
+  } else {
+    console.error("Erro ao validar orders:", parsedOrders.error);
+    setOrders([]);
+  }
+
+  const parsedFinancials = financialSchema
+    .array()
+    .safeParse(
+      (financialRes.data ?? []).map((f) => ({
+        ...f,
+        source: "financial" as const,
+      })),
+    );
+
+  if (parsedFinancials.success) {
+    setFinancialRecords(parsedFinancials.data);
+  } else {
+    console.error(
+      "Erro ao validar financial records:",
+      parsedFinancials.error,
+    );
+    setFinancialRecords([]);
+  }
+
+  setSuppliers(suppliersRes.data || []);
+  setLoading(false);
+};
+
+const refreshOrders = async () => {
+  if (!companyId) return;
+
+  const { data, error } = await supabase
+    .from("orders")
+    .select("*")
+    .eq("company_id", companyId)
+    .order("order_index", { ascending: true });
+
+  if (error) {
+    console.error("Erro ao recarregar orders:", error);
+    return;
+  }
+
+  const parsed = orderSchema.array().safeParse(
+    (data ?? []).map((o) => ({ ...o, source: "order" as const })),
+  );
+
+  if (parsed.success) {
+    setOrders(parsed.data);
+  } else {
+    console.error("Erro ao validar orders no refresh:", parsed.error);
+  }
+};
+
+useEffect(() => {
+  if (!companyId) return;
+  fetchAll();
+}, [companyId]);
 
   useEffect(() => {
     persistColumnVisibility(columnVisibility);
@@ -477,20 +520,20 @@ export default function DataFinancialTable() {
         </Button>
       </div>
 
-      {selectedOrder && isOrder(selectedOrder) && (
-        <PaymentModal
-          order={{
-            ...selectedOrder,
-            total_payed: selectedOrder.total_payed ?? 0,
-          }}
-          open={isPaymentOpen}
-          onClose={() => setIsPaymentOpen(false)}
-          onSuccess={() => {
-            refreshOrders();
-            setIsPaymentOpen(false);
-          }}
-        />
-      )}
+{selectedOrder && isOrder(selectedOrder) && (
+  <PaymentModal
+    order={{
+      ...selectedOrder,
+      total_payed: selectedOrder.total_payed ?? 0,
+    }}
+    open={isPaymentOpen}
+    onClose={() => setIsPaymentOpen(false)}
+    onSuccess={() => {
+      refreshOrders();
+      setIsPaymentOpen(false);
+    }}
+  />
+)}
 
       {selectedFinancial && (
         <YourFinancialRecords
@@ -517,23 +560,24 @@ export default function DataFinancialTable() {
         refreshOrders={refreshOrders}
         fetchAll={fetchAll}
       />
-      {selectedOrder?.source === "financial" && (
-        <FinancialPaymentModal
-          order={selectedOrder as FinancialRecord}
-          open={isPaymentOpen}
-          onClose={() => {
-            setIsPaymentOpen(false);
-            setSelectedOrder(null);
-          }}
-          onSuccess={(id) => {
-            setFinancialRecords((prev) =>
-              prev.map((record) =>
-                record.id === id ? { ...record, status: "Paid" } : record,
-              ),
-            );
-          }}
-        />
-      )}
+{selectedOrder?.source === "financial" && companyId && (
+  <FinancialPaymentModal
+    order={selectedOrder as FinancialRecord}
+    companyId={companyId}
+    open={isPaymentOpen}
+    onClose={() => {
+      setIsPaymentOpen(false);
+      setSelectedOrder(null);
+    }}
+    onSuccess={(id) => {
+      setFinancialRecords((prev) =>
+        prev.map((record) =>
+          record.id === id ? { ...record, status: "Paid" } : record,
+        ),
+      );
+    }}
+  />
+)}
     </>
   );
 }

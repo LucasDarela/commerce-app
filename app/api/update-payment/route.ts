@@ -1,6 +1,4 @@
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { createServerComponentClient } from "@supabase/auth-helpers-nextjs";
 import { createRouteSupabaseClient } from "@/lib/supabase/server";
 
 export async function POST(req: Request) {

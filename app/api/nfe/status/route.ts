@@ -4,14 +4,42 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { fetchInvoiceStatus } from "@/lib/focus-nfe/fetchInvoiceStatus";
 
+async function createSupabaseRouteClient() {
+  const cookieStore = await cookies();
+
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(
+        cookiesToSet: { name: string; value: string; options?: CookieOptions }[],
+        ) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              cookieStore.set(name, value, options);
+            });
+          } catch {
+            // sem alterar comportamento
+          }
+        },
+      },
+    },
+  );
+}
+
 export async function POST(req: Request) {
-  const supabase = createRouteHandlerClient({ cookies });
+  const supabase = await createSupabaseRouteClient();
 
   try {
     const { ref, companyId: companyIdFromBody } = await req.json();
+
     if (!ref) {
       return NextResponse.json(
         { error: "ref é obrigatório" },
@@ -20,22 +48,26 @@ export async function POST(req: Request) {
     }
 
     let companyId: string | undefined = companyIdFromBody;
+
     if (!companyId) {
       const {
         data: { user },
         error: userErr,
       } = await supabase.auth.getUser();
+
       if (userErr || !user) {
         return NextResponse.json(
           { error: "Não autenticado" },
           { status: 401, headers: { "Cache-Control": "no-store" } },
         );
       }
+
       const { data: cu } = await supabase
         .from("company_users")
         .select("company_id")
         .eq("user_id", user.id)
         .maybeSingle();
+
       companyId = cu?.company_id ?? undefined;
     }
 

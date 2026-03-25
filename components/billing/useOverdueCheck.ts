@@ -1,10 +1,10 @@
 // components/billing/useOverdueCheck.ts
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { useState } from "react";
 import type { OverdueItem } from "./types";
 
 export function useOverdueCheck() {
-  const supabase = createClientComponentClient();
+  const supabase = createBrowserSupabaseClient();
   const [items, setItems] = useState<OverdueItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

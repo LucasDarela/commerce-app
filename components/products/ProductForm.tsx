@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { toast } from "sonner";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -79,7 +79,7 @@ export function ProductForm({
   productId,
   initialData,
 }: ProductFormProps) {
-  const supabase = createClientComponentClient();
+  const supabase = createBrowserSupabaseClient();
   const router = useRouter();
   const { companyId, loading: loadingCompany } = useAuthenticatedCompany();
 

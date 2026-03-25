@@ -1,9 +1,36 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import type { NextRequest } from "next/server";
 
 export const runtime = "nodejs";
+
+async function createSupabaseRouteClient() {
+  const cookieStore = await cookies();
+
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(
+          cookiesToSet: { name: string; value: string; options?: CookieOptions }[],
+        ) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              cookieStore.set(name, value, options);
+            });
+          } catch {
+            // sem alterar comportamento
+          }
+        },
+      },
+    },
+  );
+}
 
 export async function DELETE(
   _req: NextRequest,
@@ -12,13 +39,14 @@ export async function DELETE(
   const { id } = await params;
   const orderId = id;
 
-  const supabase = createRouteHandlerClient({ cookies });
+  const supabase = await createSupabaseRouteClient();
 
   try {
     const {
       data: { user },
       error: userErr,
     } = await supabase.auth.getUser();
+
     if (userErr || !user) {
       return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
     }
@@ -30,6 +58,7 @@ export async function DELETE(
       .maybeSingle();
 
     const companyId = rel?.company_id;
+
     if (!companyId) {
       return NextResponse.json(
         { error: "Empresa não encontrada" },
@@ -57,6 +86,7 @@ export async function DELETE(
       .from("orders")
       .delete()
       .eq("id", orderId);
+
     if (delErr) {
       return NextResponse.json({ error: delErr.message }, { status: 500 });
     }

@@ -6,8 +6,7 @@ import { Bell, Trash2, Check } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
-import { supabase } from "@/lib/supabase/client";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
 interface Notification {
   id: string;
@@ -17,8 +16,8 @@ interface Notification {
   read: boolean;
 }
 
-export default function NotificationsPage() {
-  const supabase = createClientComponentClient<any>();
+export default function NotificationsPage() { 
+  const supabase = createBrowserSupabaseClient();     
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
 

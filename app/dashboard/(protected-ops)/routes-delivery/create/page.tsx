@@ -100,7 +100,7 @@ import {
 } from "@/components/ui/sheet";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { PaymentModal } from "@/components/payment-modal";
 import { LoanEquipmentModal } from "@/components/equipment-loan/LoanEquipmentModal";
@@ -111,7 +111,6 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import CustomDateInput from "@/components/ui/CustomDateInput";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
-import { parseOrderProducts } from "@/lib/orders/parseOrderProducts";
 import type { Equipment } from "@/components/types/equipments";
 import type { ProductItem } from "@/components/types/products";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
@@ -211,8 +210,14 @@ function DraggableRow({
 async function updateStockBasedOnOrder(
   supabaseClient: SupabaseClient,
   order: Order,
+  companyId: string,
 ) {
-  const items = await parseProductsWithIds(supabaseClient, order.products);
+  const items = await parseProductsWithIds(
+    supabaseClient,
+    order.products,
+    companyId,
+  );
+
   for (const item of items) {
     await supabaseClient.rpc("decrement_stock", {
       product_id: item.id,
@@ -229,6 +234,7 @@ type ParsedProduct = {
 async function parseProductsWithIds(
   supabaseClient: SupabaseClient,
   products: string,
+  companyId: string,
 ): Promise<{ id: number; quantity: number }[]> {
   if (!products) return [];
 
@@ -243,7 +249,8 @@ async function parseProductsWithIds(
   const { data, error } = await supabaseClient
     .from("products")
     .select("id, name")
-    .in("name", names);
+    .in("name", names)
+    .eq("company_id", companyId);
 
   if (error || !data) {
     console.error("Erro ao buscar IDs dos produtos:", error);
@@ -268,7 +275,7 @@ export default function RoutesTable({
   );
   const { user } = useAuthenticatedCompany();
   const [sheetOpen, setSheetOpen] = React.useState(false);
-  const supabase = createClientComponentClient();
+  const supabase = createBrowserSupabaseClient();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSavingOrder, setIsSavingOrder] = useState(false);
@@ -714,80 +721,6 @@ export default function RoutesTable({
       size: 50,
       meta: { className: "w-[50px]" },
       cell: ({ row }) => {
-        // return (
-        //   <DropdownMenu>
-        //     <DropdownMenuTrigger asChild>
-        //       <Button
-        //         variant="ghost"
-        //         size="icon"
-        //         className="text-muted-foreground"
-        //       >
-        //         <IconDotsVertical size={16} />
-        //       </Button>
-        //     </DropdownMenuTrigger>
-        //     <DropdownMenuContent align="end">
-        //       <DropdownMenuItem asChild>
-        //         <a
-        //           href={`/dashboard/orders/${row.original.id}/view`}
-        //           rel="noopener noreferrer"
-        //           className="w-full text-left"
-        //         >
-        //           Ver Espelho
-        //         </a>
-        //       </DropdownMenuItem>
-        //       <DropdownMenuItem
-        //         onClick={() => {
-        //           setSelectedOrder(row.original);
-        //           setIsPaymentOpen(true);
-        //         }}
-        //       >
-        //         Pagar
-        //       </DropdownMenuItem>
-        //       {/* <EmitNfeMenuItem
-        //         orderId={row.original.id}
-        //         customerId={row.original.customer_id}
-        //         emitNfFromOrder={(row.original as any)?.emit_nf}
-        //         emitNfFromCustomer={
-        //           (row.original as any)?.customer_rel?.emit_nf
-        //         }
-        //         showDebug={false}
-        //       /> */}
-        //       <DropdownMenuSeparator />
-        //       {!row.original.customer_signature ? (
-        //         <DropdownMenuItem asChild>
-        //           <Link href={`/dashboard/orders/${row.original.id}/edit`}>
-        //             Editar
-        //           </Link>
-        //         </DropdownMenuItem>
-        //       ) : (
-        //         <DropdownMenuItem
-        //           disabled
-        //           className="text-foreground text-sm tracking-tighter"
-        //         >
-        //           Edição bloqueada
-        //         </DropdownMenuItem>
-        //       )}
-        //       <DropdownMenuItem
-        //         onClick={() => {
-        //           fetchOrderProductsForReturnModal(row.original.id);
-        //           setSelectedCustomer(row.original);
-        //         }}
-        //       >
-        //         Retornar Produto
-        //       </DropdownMenuItem>
-        //       <DeleteOrderButton
-        //         orderId={row.original.id}
-        //         asDropdownItem
-        //         onDeleted={() => {
-        //           // ATENÇÃO: use o mesmo setter de estado que povoa a tabela
-        //           setData((prev) =>
-        //             prev.filter((o) => o.id !== row.original.id),
-        //           );
-        //         }}
-        //       />
-        //     </DropdownMenuContent>
-        //   </DropdownMenu>
-        // );
       },
     },
   ];
@@ -887,9 +820,34 @@ export default function RoutesTable({
 
     let nextStatus: "Coletar" | "Coletado" | null = null;
 
-    if (selectedCustomer.delivery_status === "Entregar") {
-      nextStatus = "Coletar";
-    } else if (selectedCustomer.delivery_status === "Coletar") {
+if (selectedCustomer.delivery_status === "Entregar") {
+  const equipmentItems =
+    await fetchEquipmentsForOrderProducts(
+      selectedCustomer.products,
+      companyId,
+    );
+
+  const {
+    data: matchingCustomer,
+    error: customerError,
+  } = await supabase
+    .from("customers")
+    .select("id, name")
+    .eq("name", selectedCustomer.customer)
+    .maybeSingle();
+
+  if (!matchingCustomer || customerError) {
+    toast.error("Cliente não encontrado na tabela de clientes.");
+    return;
+  }
+
+  setInitialLoanCustomer({
+    id: matchingCustomer.id,
+    name: matchingCustomer.name,
+  });
+  setInitialLoanItems(equipmentItems);
+  setIsLoanModalOpen(true);
+} else if (selectedCustomer.delivery_status === "Coletar") {
       nextStatus = "Coletado";
     }
 
@@ -914,7 +872,7 @@ export default function RoutesTable({
         );
 
         if (nextStatus === "Coletado") {
-          await updateStockBasedOnOrder(supabase, selectedCustomer);
+          await updateStockBasedOnOrder(supabase, selectedCustomer, companyId);
         }
       } else {
         toast.error("Erro ao atualizar status.");
@@ -1496,6 +1454,7 @@ export default function RoutesTable({
                               const equipmentItems =
                                 await fetchEquipmentsForOrderProducts(
                                   selectedCustomer.products,
+                                  companyId,
                                 );
                               const {
                                 data: matchingCustomer,
@@ -1686,6 +1645,7 @@ export default function RoutesTable({
         <ReturnEquipmentModal
           open={isReturnModalOpen}
           onOpenChange={setIsReturnModalOpen}
+          companyId={companyId}
           customerId={returnModalCustomerId}
           items={returnEquipmentItems}
           order={selectedCustomer}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { supabase } from "@/lib/supabase";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import type { ProductItem } from "@/components/types/products";
 
 interface ReturnProductModalProps {
@@ -34,24 +34,41 @@ export function ReturnProductModal({
   createdBy,
   onSuccess,
 }: ReturnProductModalProps) {
+  const supabase = createBrowserSupabaseClient();   
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [returnQuantities, setReturnQuantities] = useState<
     Record<string, number>
   >({});
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    if (!open) {
+      setSelectedProductIds([]);
+      setReturnQuantities({});
+    }
+  }, [open]);
+
   const handleConfirm = async () => {
     setLoading(true);
 
     try {
+      if (!companyId || !orderId) {
+        throw new Error("Dados da empresa ou do pedido não encontrados.");
+      }
+
       const productsToReturn = selectedProductIds
-        .map((productId) => ({
-          productId,
-          quantity: returnQuantities[productId] ?? 0,
-        }))
+        .map((productId) => {
+          const originalItem = (items ?? []).find((item) => item.id === productId);
+          const requestedQuantity = returnQuantities[productId] ?? 0;
+          const maxQuantity = Number(originalItem?.quantity ?? 0);
+
+          return {
+            productId,
+            quantity: Math.min(Math.max(requestedQuantity, 0), maxQuantity),
+          };
+        })
         .filter((item) => item.quantity > 0);
 
-      // ✅ Se não houver nenhum produto selecionado → apenas fecha o modal
       if (productsToReturn.length === 0) {
         toast.info("Nenhum produto selecionado para retorno.");
         onClose();
@@ -63,20 +80,20 @@ export function ReturnProductModal({
       for (const { productId, quantity } of productsToReturn) {
         const { data: orderItem, error: orderItemError } = await supabase
           .from("order_items")
-          .select("price")
+          .select("price, order_id, product_id")
           .eq("order_id", orderId)
           .eq("product_id", productId)
-          .single();
+          .maybeSingle();
 
         if (orderItemError || !orderItem) {
           console.error("Erro ao buscar preço da venda:", orderItemError);
           throw new Error("Erro ao buscar preço da venda.");
         }
 
-        const unitPrice = Number(orderItem.price);
+        const unitPrice = Number(orderItem.price ?? 0);
         totalDiscount += unitPrice * quantity;
 
-        await fetch("/api/stock-movements/register", {
+        const movementRes = await fetch("/api/stock-movements/register", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -89,25 +106,34 @@ export function ReturnProductModal({
             createdBy,
           }),
         });
+
+        if (!movementRes.ok) {
+          const movementData = await movementRes.json().catch(() => null);
+          console.error("Erro ao registrar movimentação:", movementData);
+          throw new Error("Erro ao registrar retorno no estoque.");
+        }
       }
 
       const { data: orderData, error: orderError } = await supabase
         .from("orders")
-        .select("total")
+        .select("id, total, company_id")
         .eq("id", orderId)
-        .single();
+        .eq("company_id", companyId)
+        .maybeSingle();
 
       if (orderError || !orderData) {
         console.error("Erro ao buscar total da venda:", orderError);
         throw new Error("Erro ao buscar total da venda.");
       }
 
-      const newTotal = Number(orderData.total) - totalDiscount;
+      const currentTotal = Number(orderData.total ?? 0);
+      const newTotal = Math.max(0, currentTotal - totalDiscount);
 
       const { error: updateOrderError } = await supabase
         .from("orders")
         .update({ total: newTotal })
-        .eq("id", orderId);
+        .eq("id", orderId)
+        .eq("company_id", companyId);
 
       if (updateOrderError) {
         console.error("Erro ao atualizar o total da venda:", updateOrderError);
@@ -119,7 +145,11 @@ export function ReturnProductModal({
       onSuccess();
     } catch (error) {
       console.error(error);
-      toast.error("Erro ao processar o retorno de produtos.");
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Erro ao processar o retorno de produtos.",
+      );
     } finally {
       setLoading(false);
     }
@@ -169,12 +199,14 @@ export function ReturnProductModal({
               max={item.quantity}
               disabled={!selectedProductIds.includes(item.id)}
               value={returnQuantities[item.id] ?? ""}
-              onChange={(e) =>
+              onChange={(e) => {
+                const raw = Number(e.target.value);
+                const clamped = Math.max(1, Math.min(raw, item.quantity));
                 setReturnQuantities((prev) => ({
                   ...prev,
-                  [item.id]: Number(e.target.value),
-                }))
-              }
+                  [item.id]: Number.isNaN(clamped) ? 1 : clamped,
+                }));
+              }}
               className="w-16 text-sm"
             />
           </div>

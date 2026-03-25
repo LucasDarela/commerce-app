@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/lib/supabase";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { toast } from "sonner";
 import { useRouter, useSearchParams } from "next/navigation";
 import axios from "axios";
@@ -17,6 +17,7 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import Link from "next/link";
+
 const initialCliente = {
   type: "CPF",
   document: "",
@@ -41,15 +42,38 @@ function limparNumero(valor: string | null | undefined): number | null {
   return limpo ? Number(limpo) : null;
 }
 
+function formatarTelefone(valor: string) {
+  const numeros = valor.replace(/\D/g, "").slice(0, 13);
+
+  if (numeros.length >= 12) {
+    return numeros.replace(/^(\d{2})(\d{2})(\d{5})(\d{4})$/, "+$1 ($2) $3-$4");
+  }
+
+  if (numeros.length >= 11) {
+    return numeros.replace(
+      /^(\d{2})(\d{2})(\d{4,5})(\d{0,4})$/,
+      "+$1 ($2) $3-$4",
+    );
+  }
+
+  return "+" + numeros;
+}
+
 export default function CreateClient() {
+  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const router = useRouter();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const inputRefs = useRef<HTMLInputElement[]>([]);
-  const { user, companyId, loading } = useAuthenticatedCompany();
-  const [cliente, setCliente] = useState(initialCliente);
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirect");
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const inputRefs = useRef<HTMLInputElement[]>([]);
+  const { companyId, loading } = useAuthenticatedCompany();
+
+  const [cliente, setCliente] = useState(initialCliente);
   const [emitNf, setEmitNf] = useState(false);
+  const [catalogs, setCatalogs] = useState<{ id: string; name: string }[]>([]);
+  const [selectedCatalog, setSelectedCatalog] = useState("");
+
   const placeholdersMap: Record<string, string> = {
     document: "CPF/CNPJ",
     name: "Nome Completo / Razão Social",
@@ -65,11 +89,14 @@ export default function CreateClient() {
     email: "Email (Obrigatório caso gere boleto)",
     state_registration: "Inscrição Estadual",
   };
+
   const formatarMaiusculo = (valor: string, campo: string) => {
-    return campo === "email" ? valor : valor.toUpperCase();
+    return campo === "email" ? valor.trim() : valor.toUpperCase();
   };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value: rawValue } = e.target;
+
     const formattedValue =
       name === "phone"
         ? formatarTelefone(rawValue)
@@ -82,45 +109,40 @@ export default function CreateClient() {
       [name]: formattedValue,
     }));
   };
+
   const setTipoCliente = (tipo: "CPF" | "CNPJ") => {
     setCliente({
+      ...initialCliente,
       type: tipo,
-      document: "",
-      name: "",
-      fantasy_name: "",
-      zip_code: "",
-      address: "",
-      neighborhood: "",
-      city: "",
-      state: "",
-      number: "",
-      complement: "",
-      phone: "",
-      email: "",
-      state_registration: "",
-      emit_nf: "",
     });
+    setEmitNf(false);
+    setSelectedCatalog("");
   };
+
   const buscarEndereco = async () => {
     const cep = cliente.zip_code.replace(/\D/g, "");
-    if (!cep || cep.length !== 8) return;
+    if (cep.length !== 8) return;
+
     try {
       const { data } = await axios.get(`https://viacep.com.br/ws/${cep}/json/`);
+
       if (data.erro) {
         toast.error("CEP inválido!");
-      } else {
-        setCliente((prev) => ({
-          ...prev,
-          address: formatarMaiusculo(data.logradouro || "", "address"),
-          neighborhood: formatarMaiusculo(data.bairro || "", "neighborhood"),
-          city: formatarMaiusculo(data.localidade || "", "city"),
-          state: formatarMaiusculo(data.uf || "", "state"),
-        }));
+        return;
       }
+
+      setCliente((prev) => ({
+        ...prev,
+        address: formatarMaiusculo(data.logradouro || "", "address"),
+        neighborhood: formatarMaiusculo(data.bairro || "", "neighborhood"),
+        city: formatarMaiusculo(data.localidade || "", "city"),
+        state: formatarMaiusculo(data.uf || "", "state"),
+      }));
     } catch {
       toast.error("Erro ao buscar endereço!");
     }
   };
+
   const buscarCNPJ = async () => {
     const cnpjLimpo = cliente.document.replace(/\D/g, "");
 
@@ -159,6 +181,7 @@ export default function CreateClient() {
       toast.error("Erro ao buscar CNPJ!");
     }
   };
+
   const handleKeyDown = (
     e: React.KeyboardEvent<HTMLInputElement>,
     index: number,
@@ -166,32 +189,42 @@ export default function CreateClient() {
     if (e.key === "Enter") {
       e.preventDefault();
       const nextInput = inputRefs.current[index + 1];
-      if (nextInput) {
-        nextInput.focus();
-      }
+      if (nextInput) nextInput.focus();
     }
   };
+
   const validarCPF = (cpf: string): boolean => {
     cpf = cpf.replace(/\D/g, "");
     if (cpf.length !== 11 || /^([0-9])\1+$/.test(cpf)) return false;
+
     let soma = 0;
     for (let i = 0; i < 9; i++) soma += parseInt(cpf[i]) * (10 - i);
+
     let resto = (soma * 10) % 11;
     if (resto === 10 || resto === 11) resto = 0;
     if (resto !== parseInt(cpf[9])) return false;
+
     soma = 0;
     for (let i = 0; i < 10; i++) soma += parseInt(cpf[i]) * (11 - i);
+
     resto = (soma * 10) % 11;
     if (resto === 10 || resto === 11) resto = 0;
+
     return resto === parseInt(cpf[10]);
   };
+
   const handleSubmit = async () => {
-    if (isSubmitting) return;
+    if (isSubmitting || loading) return;
     setIsSubmitting(true);
 
     try {
-      if (!cliente.name || !cliente.document) {
+      if (!cliente.name.trim() || !cliente.document.trim()) {
         toast.error("Preencha os campos obrigatórios!");
+        return;
+      }
+
+      if (!companyId) {
+        toast.error("Erro ao identificar a empresa do usuário!");
         return;
       }
 
@@ -200,13 +233,8 @@ export default function CreateClient() {
         return;
       }
 
-      if (!companyId) {
-        toast.error("Erro ao identificar a empresa do usuário!");
-        return;
-      }
       const documentoLimpo = cliente.document.replace(/\D/g, "");
-      const telefoneLimpo = cliente.phone.replace(/\D/g, "");
-      // 🔹 Verificar duplicidade correta (ajustado para usar company_id)
+
       const { data: clienteExistente, error: consultaError } = await supabase
         .from("customers")
         .select("id")
@@ -214,7 +242,8 @@ export default function CreateClient() {
         .eq("company_id", companyId)
         .maybeSingle();
 
-      if (consultaError && consultaError.code !== "PGRST116") {
+      if (consultaError) {
+        console.error("Erro ao verificar cliente existente:", consultaError);
         toast.error("Erro ao verificar CPF/CNPJ!");
         return;
       }
@@ -224,33 +253,37 @@ export default function CreateClient() {
         return;
       }
 
-      // Limpar e converter telefone e número
       const telefoneNumerico = limparNumero(cliente.phone);
       const numeroEnderecoNumerico = limparNumero(cliente.number);
 
+      const payload = {
+        ...cliente,
+        document: documentoLimpo,
+        phone: telefoneNumerico,
+        number: numeroEnderecoNumerico,
+        fantasy_name:
+          cliente.type === "CPF" ? null : cliente.fantasy_name.trim() || null,
+        state_registration:
+          cliente.type === "CPF"
+            ? null
+            : cliente.state_registration.trim() || null,
+        price_table_id: selectedCatalog || null,
+        company_id: companyId,
+        emit_nf: emitNf,
+      };
+
       const { data: insertedCustomer, error } = await supabase
         .from("customers")
-        .insert([
-          {
-            ...cliente,
-            document: documentoLimpo,
-            phone: telefoneNumerico,
-            number: numeroEnderecoNumerico,
-            price_table_id: selectedCatalog || null,
-            company_id: companyId,
-            emit_nf: emitNf,
-          },
-        ])
-        .select()
+        .insert([payload])
+        .select("id")
         .single();
 
-      const clienteIdRecemCriado = insertedCustomer?.id;
-
       if (error) {
+        console.error("Erro ao cadastrar cliente:", error);
         toast.error(
           <div>
             Erro ao cadastrar cliente: Os campos Cpf/Cnpj, Nome/Razão Social,
-            Telefone e Catálogo são Obrigatórios.{" "}
+            Telefone e Catálogo são obrigatórios.{" "}
             <Link href="/dashboard/help" className="underline font-medium">
               Acesse aqui
             </Link>{" "}
@@ -258,26 +291,31 @@ export default function CreateClient() {
           </div>,
           { duration: 6000 },
         );
-      } else {
-        toast.success("Cliente cadastrado com sucesso!");
-        setCliente({
-          ...initialCliente,
-          type: cliente.type,
-        });
-        router.refresh();
+        return;
+      }
 
-        if (redirectTo) {
-          router.push(`${redirectTo}?newCustomerId=${clienteIdRecemCriado}`);
-        } else {
-          router.push("/dashboard/customers");
-        }
+      const clienteIdRecemCriado = insertedCustomer?.id;
+
+      toast.success("Cliente cadastrado com sucesso!");
+      setCliente({
+        ...initialCliente,
+        type: cliente.type,
+      });
+      setEmitNf(false);
+      setSelectedCatalog("");
+
+      router.refresh();
+
+      if (redirectTo) {
+        router.push(`${redirectTo}?newCustomerId=${clienteIdRecemCriado}`);
+      } else {
+        router.push("/dashboard/customers");
       }
     } finally {
       setIsSubmitting(false);
     }
   };
-  const [catalogs, setCatalogs] = useState<{ id: string; name: string }[]>([]);
-  const [selectedCatalog, setSelectedCatalog] = useState<string>("");
+
   useEffect(() => {
     const fetchCatalogs = async () => {
       if (!companyId) return;
@@ -285,23 +323,27 @@ export default function CreateClient() {
       const { data, error } = await supabase
         .from("price_tables")
         .select("id, name")
-        .eq("company_id", companyId);
+        .eq("company_id", companyId)
+        .order("name", { ascending: true });
 
       if (error) {
+        console.error("Erro ao buscar catálogos:", error);
         toast.error("Erro ao buscar catálogos de preço");
-      } else {
-        setCatalogs(data || []);
+        return;
       }
+
+      setCatalogs(data || []);
     };
 
     fetchCatalogs();
-  }, [companyId]);
+  }, [companyId, supabase]);
+
   return (
     <div className="max-w-3xl mx-auto w-full px-4 py-6 rounded-lg shadow-md">
       <div className="flex gap-2 items-center justify-center">
         <h1 className="text-2xl font-bold mb-4">Adicionar Cliente</h1>
       </div>
-      {/* 🔹 Botões para selecionar CPF ou CNPJ */}
+
       <div className="flex gap-2 mb-6 items-center justify-center">
         <Button
           variant={cliente.type === "CPF" ? "default" : "outline"}
@@ -316,13 +358,15 @@ export default function CreateClient() {
           Pessoa Jurídica
         </Button>
       </div>
-      {/* 🔹 Campos do formulário */}
+
       {Object.keys(placeholdersMap).map((campo, index) => {
         if (
           cliente.type === "CPF" &&
           ["fantasy_name", "state_registration"].includes(campo)
-        )
+        ) {
           return null;
+        }
+
         return (
           <Input
             key={campo}
@@ -346,7 +390,7 @@ export default function CreateClient() {
           />
         );
       })}
-      {/* price catalog  */}
+
       <div className="mt-4">
         <Select value={selectedCatalog} onValueChange={setSelectedCatalog}>
           <SelectTrigger className="w-full">
@@ -372,31 +416,14 @@ export default function CreateClient() {
           Emitir Nota Fiscal
         </label>
       </div>
+
       <Button
         className="mt-4 w-full"
         onClick={handleSubmit}
-        disabled={isSubmitting}
+        disabled={isSubmitting || loading}
       >
         {isSubmitting ? "Salvando" : "Cadastrar"}
       </Button>
     </div>
   );
-}
-function formatarTelefone(valor: string) {
-  const numeros = valor.replace(/\D/g, "").slice(0, 13);
-
-  // Ex: +55 (48) 99999-9999
-  if (numeros.length >= 12) {
-    return numeros.replace(/^(\d{2})(\d{2})(\d{5})(\d{4})$/, "+$1 ($2) $3-$4");
-  }
-
-  // Se ainda estiver incompleto, formatar parcialmente
-  if (numeros.length >= 11) {
-    return numeros.replace(
-      /^(\d{2})(\d{2})(\d{4,5})(\d{0,4})$/,
-      "+$1 ($2) $3-$4",
-    );
-  }
-
-  return "+" + numeros;
 }

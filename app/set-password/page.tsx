@@ -2,7 +2,7 @@
 "use client";
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { Button } from "@/components/ui/button";
 import { PasswordInput } from "@/components/ui/password-input";
 import { toast } from "sonner";
@@ -13,7 +13,7 @@ export default function SetPasswordPage() {
   const [loading, setLoading] = useState(false);
 
   const router = useRouter();
-  const supabase = createClientComponentClient();
+  const supabase = createBrowserSupabaseClient();
 
   // Regras simples
   const minLen = 8;

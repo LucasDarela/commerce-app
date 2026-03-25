@@ -25,7 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { supabase } from "@/lib/supabase/client"; // ✅ wrapper client (<any>)
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
 const chartConfig = {
   desktop: { label: "Orders", color: "var(--primary)" },
@@ -33,6 +33,7 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export function ChartAreaInteractive() {
+  const supabase = createBrowserSupabaseClient();     
   const isMobile = useIsMobile();
   const [timeRange, setTimeRange] = React.useState("90d");
   const [chartData, setChartData] = React.useState<any[]>([]);

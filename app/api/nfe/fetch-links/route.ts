@@ -1,17 +1,46 @@
 // app/api/nfe/fetch-links/route.ts
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { fetchInvoiceStatus } from "@/lib/focus-nfe/fetchInvoiceStatus";
 import { fetchAndStoreNfeFiles } from "@/lib/focus-nfe/fetchAndStoreNfeFiles";
 
+async function createSupabaseRouteClient() {
+  const cookieStore = await cookies();
+
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(
+          cookiesToSet: { name: string; value: string; options?: CookieOptions }[],
+        ) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              cookieStore.set(name, value, options);
+            });
+          } catch {
+            // sem alterar comportamento
+          }
+        },
+      },
+    },
+  );
+}
+
 export async function POST(req: Request) {
-  const supabase = createRouteHandlerClient({ cookies });
+  const supabase = await createSupabaseRouteClient();
+
   const toIso = (s?: string | null) => {
     if (!s) return null;
     const d = new Date(s);
     return isNaN(d.getTime()) ? null : d.toISOString();
   };
+
   try {
     const { ref, companyId, invoiceId } = await req.json();
 
@@ -43,8 +72,10 @@ export async function POST(req: Request) {
     let d = res.data ?? {};
 
     const isAuth = (d.status || "").toLowerCase().includes("autorizad");
+
     if (isAuth && (!d.xml_url || !d.danfe_url) && invoiceId) {
       const stored = await fetchAndStoreNfeFiles(ref, invoiceId, companyId);
+
       if (stored.success) {
         d = {
           ...d,

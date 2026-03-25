@@ -1,11 +1,10 @@
 // app/api/users/delete/route.ts
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
+import { createRouteSupabaseClient } from "@/lib/supabase/server";
 import { createClient } from "@supabase/supabase-js";
 
 export async function POST(req: Request) {
-  const supa = createRouteHandlerClient({ cookies });
+  const supa = await createRouteSupabaseClient();
   const {
     data: { user: requester },
     error: authErr,

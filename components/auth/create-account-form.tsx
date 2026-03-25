@@ -13,7 +13,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { PasswordInput } from "../ui/password-input";
@@ -50,7 +50,7 @@ export function CreateAccountForm() {
     try {
       setLoading(true);
 
-      const supabase = createClientComponentClient();
+      const supabase = createBrowserSupabaseClient();
       const { email, password } = values;
 
       const siteUrl =

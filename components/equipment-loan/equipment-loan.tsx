@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,73 +13,107 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
-import { supabase } from "@/lib/supabase";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { toast } from "sonner";
 import { PlusCircle, Trash2 } from "lucide-react";
 
+type EquipmentOption = {
+  id: string;
+  name: string;
+};
+
+type LoanItem = {
+  equipment_id: string;
+  name: string;
+};
+
 export default function LoanEquipmentComponent() {
   const { companyId } = useAuthenticatedCompany();
-  const [equipmentList, setEquipmentList] = useState<any[]>([]);
-  const [customerName, setCustomerName] = useState("");
-  const [loanItems, setLoanItems] = useState<any[]>([]);
-  const [selectedEquipmentId, setSelectedEquipmentId] = useState("");
+  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
 
-  const fetchEquipments = async () => {
+  const [equipmentList, setEquipmentList] = useState<EquipmentOption[]>([]);
+  const [customerName, setCustomerName] = useState("");
+  const [loanItems, setLoanItems] = useState<LoanItem[]>([]);
+  const [selectedEquipmentId, setSelectedEquipmentId] = useState("");
+  const [loadingEquipments, setLoadingEquipments] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const fetchEquipments = useCallback(async () => {
     if (!companyId) return;
+
+    setLoadingEquipments(true);
+
     const { data, error } = await supabase
       .from("equipments")
       .select("id, name")
-      .eq("company_id", companyId);
+      .eq("company_id", companyId)
+      .order("name", { ascending: true });
 
     if (error) {
+      console.error("Erro ao buscar equipamentos:", error);
       toast.error("Erro ao buscar equipamentos");
     } else {
-      setEquipmentList(data || []);
+      setEquipmentList((data as EquipmentOption[]) || []);
     }
-  };
+
+    setLoadingEquipments(false);
+  }, [companyId, supabase]);
 
   const handleAddItem = () => {
     if (!selectedEquipmentId) return;
+
     const equipment = equipmentList.find((e) => e.id === selectedEquipmentId);
-    if (equipment) {
-      setLoanItems([
-        ...loanItems,
-        { equipment_id: equipment.id, name: equipment.name },
-      ]);
-      setSelectedEquipmentId("");
-    }
+    if (!equipment) return;
+
+    setLoanItems((prev) => [
+      ...prev,
+      { equipment_id: equipment.id, name: equipment.name },
+    ]);
+
+    setSelectedEquipmentId("");
   };
 
   const handleRemoveItem = (index: number) => {
-    setLoanItems(loanItems.filter((_, i) => i !== index));
+    setLoanItems((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async () => {
-    if (!companyId || !customerName || loanItems.length === 0) {
+    if (isSubmitting) return;
+
+    if (!companyId || !customerName.trim() || loanItems.length === 0) {
       toast.error("Preencha todos os campos");
       return;
     }
 
-    const { data, error } = await supabase.from("equipment_loans").insert([
-      {
-        company_id: companyId,
-        customer_name: customerName,
-        items: loanItems,
-      },
-    ]);
+    setIsSubmitting(true);
 
-    if (error) {
-      toast.error("Erro ao salvar empréstimo");
-    } else {
+    try {
+      const payload = {
+        company_id: companyId,
+        customer_name: customerName.trim(),
+        items: loanItems,
+      };
+
+      const { error } = await supabase.from("equipment_loans").insert([payload]);
+
+      if (error) {
+        console.error("Erro ao salvar empréstimo:", error);
+        toast.error("Erro ao salvar empréstimo");
+        return;
+      }
+
       toast.success("Empréstimo registrado com sucesso");
       setCustomerName("");
       setLoanItems([]);
+      setSelectedEquipmentId("");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   useEffect(() => {
     fetchEquipments();
-  }, [companyId]);
+  }, [fetchEquipments]);
 
   return (
     <div className="max-w-3xl mx-auto p-4">
@@ -100,15 +134,24 @@ export default function LoanEquipmentComponent() {
               className="border rounded-md px-2 py-1"
               value={selectedEquipmentId}
               onChange={(e) => setSelectedEquipmentId(e.target.value)}
+              disabled={loadingEquipments || isSubmitting}
             >
-              <option value="">Selecionar Equipamento</option>
+              <option value="">
+                {loadingEquipments
+                  ? "Carregando equipamentos..."
+                  : "Selecionar Equipamento"}
+              </option>
               {equipmentList.map((eq) => (
                 <option key={eq.id} value={eq.id}>
                   {eq.name}
                 </option>
               ))}
             </select>
-            <Button onClick={handleAddItem}>
+
+            <Button
+              onClick={handleAddItem}
+              disabled={!selectedEquipmentId || isSubmitting}
+            >
               <PlusCircle className="w-4 h-4 mr-1" /> Adicionar
             </Button>
           </div>
@@ -123,12 +166,13 @@ export default function LoanEquipmentComponent() {
               </TableHeader>
               <TableBody>
                 {loanItems.map((item, index) => (
-                  <TableRow key={index}>
+                  <TableRow key={`${item.equipment_id}-${index}`}>
                     <TableCell>{item.name}</TableCell>
                     <TableCell>
                       <Button
                         variant="ghost"
                         onClick={() => handleRemoveItem(index)}
+                        disabled={isSubmitting}
                       >
                         <Trash2 className="w-4 h-4 text-red-500" />
                       </Button>
@@ -139,8 +183,12 @@ export default function LoanEquipmentComponent() {
             </Table>
           )}
 
-          <Button onClick={handleSubmit} className="w-full mt-4">
-            Salvar Empréstimo
+          <Button
+            onClick={handleSubmit}
+            className="w-full mt-4"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? "Salvando..." : "Salvar Empréstimo"}
           </Button>
         </CardContent>
       </Card>

@@ -5,12 +5,12 @@ import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import { PasswordInput } from "../ui/password-input";
 
 export function ResetOrUpdatePasswordForm() {
-  const supabase = createClientComponentClient();
+  const supabase = createBrowserSupabaseClient();
   const router = useRouter();
   const { user, loading } = useAuthenticatedCompany();
 

@@ -4,12 +4,11 @@ import { useEffect, useState } from "react";
 import { fetchEquipments } from "@/lib/fetchEquipments";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import { DataEquipments } from "@/components/data-equipments";
-import { Equipment } from "@/components/types/equipments";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
 
 export default function EquipmentsPage() {
   const { companyId, loading } = useAuthenticatedCompany();
-  const [equipments, setEquipments] = useState<Equipment[]>([]);
+  const [equipments, setEquipments] = useState<Awaited<ReturnType<typeof fetchEquipments>>>([]);
   const [isFetching, setIsFetching] = useState(true);
 
   useEffect(() => {
@@ -17,15 +16,16 @@ export default function EquipmentsPage() {
 
     const getData = async () => {
       setIsFetching(true);
+
       const data = await fetchEquipments(companyId);
-      setEquipments(data);
+      setEquipments(data ?? []);
       setIsFetching(false);
     };
 
     getData();
   }, [companyId]);
 
-  if (loading) {
+  if (loading || isFetching) {
     return <TableSkeleton />;
   }
 

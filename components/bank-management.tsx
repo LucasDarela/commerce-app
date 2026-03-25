@@ -1,23 +1,21 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
-  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
-import { Card } from "./ui/card";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import { TableSkeleton } from "./ui/TableSkeleton";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
 interface BankAccount {
   id: string;
@@ -81,127 +79,118 @@ const defaultNewAccount: NewAccountInput = {
 };
 
 export default function BankManagement() {
-  const { loading } = useAuthenticatedCompany();
+  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
+  const { companyId, loading } = useAuthenticatedCompany();
+
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [newAccount, setNewAccount] =
     useState<NewAccountInput>(defaultNewAccount);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [companyId, setCompanyId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchCompany = async () => {
-      const {
-        data: { user },
-        error: authError,
-      } = await supabase.auth.getUser();
-      if (authError || !user) {
-        toast.error("Error loading user info");
-        return;
-      }
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("company_id")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      if (error || !data) {
-        toast.error("Error loading company info");
-        return;
-      }
-      setCompanyId(data.company_id);
-    };
-    fetchCompany();
-  }, []);
+  const [isSaving, setIsSaving] = useState(false);
 
   const fetchAccounts = async () => {
+    if (!companyId) return;
+
     const { data, error } = await supabase
       .from("bank_accounts")
       .select("id, name, branch, account, agency_name, bank_code")
+      .eq("company_id", companyId)
+      .order("name", { ascending: true })
       .returns<BankAccount[]>();
 
     if (error) {
+      console.error(error);
       toast.error("Error loading bank accounts");
-    } else if (data) {
-      const formatted: BankAccount[] = data.map((item) => ({
-        id: item.id,
-        name: item.name,
-        branch: item.branch,
-        account: item.account,
-        agency_name: item.agency_name,
-        bank_code: item.bank_code,
-      }));
-      setBankAccounts(formatted);
+      return;
     }
+
+    setBankAccounts(data || []);
   };
 
   useEffect(() => {
     fetchAccounts();
-  }, []);
-
-  const [isSaving, setIsSaving] = useState(false);
+  }, [companyId]);
 
   const handleAddAccount = async () => {
-    const isEmpty = (val: unknown) =>
-      typeof val !== "string" || val.trim() === "";
-
-    if (
-      !newAccount.bankName ||
-      !newAccount.branch ||
-      !newAccount.accountNumber ||
-      !companyId
-    ) {
-      toast.error("Please fill: Bank Name, Branch, and Account Number");
+    if (!companyId) {
+      toast.error("Empresa não identificada.");
       return;
     }
-    setIsSaving(true);
-    const { error } = await supabase.from("bank_accounts").insert({
-      name: newAccount.bankName,
-      branch: newAccount.branch,
-      account: newAccount.accountNumber,
-      bank_code: newAccount.bankCode,
-      company_id: companyId,
-      agency_name: newAccount.agencyName,
-      remittance_program: newAccount.remittanceProgram,
-      return_program: newAccount.returnProgram,
-      company_code: newAccount.companyCode,
-      launch_account: newAccount.launchAccount,
-      boleto_issuer: newAccount.boletoIssuer,
-      main_account: newAccount.mainAccount,
-      emits_check: newAccount.emitsCheck,
-      wallet: newAccount.wallet,
-      interest: newAccount.interest,
-      protest_days: newAccount.protestDays,
-      late_fee: newAccount.lateFee,
-      cedent_account: newAccount.cedentAccount,
-      initial_number: newAccount.initialNumber,
-      final_number: newAccount.finalNumber,
-      message_1: newAccount.messageLine1,
-      message_2: newAccount.messageLine2,
-      message_3: newAccount.messageLine3,
-      message_4: newAccount.messageLine4,
-    });
 
-    if (error) {
-      toast.error("Error saving bank account");
-    } else {
+    if (
+      !newAccount.bankName.trim() ||
+      !newAccount.branch.trim() ||
+      !newAccount.accountNumber.trim()
+    ) {
+      toast.error("Porfavor Preencha: Nome do Banco, Agência e Conta");
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+
+      const payload = {
+        name: newAccount.bankName.trim(),
+        branch: newAccount.branch.trim(),
+        account: newAccount.accountNumber.trim(),
+        bank_code: newAccount.bankCode.trim() || null,
+        company_id: companyId,
+        agency_name: newAccount.agencyName.trim() || null,
+        remittance_program: newAccount.remittanceProgram.trim() || null,
+        return_program: newAccount.returnProgram.trim() || null,
+        company_code: newAccount.companyCode.trim() || null,
+        launch_account: newAccount.launchAccount.trim() || null,
+        boleto_issuer: newAccount.boletoIssuer.trim() || null,
+        main_account: newAccount.mainAccount,
+        emits_check: newAccount.emitsCheck,
+        wallet: newAccount.wallet.trim() || null,
+        interest: newAccount.interest.trim() || null,
+        protest_days: newAccount.protestDays.trim() || null,
+        late_fee: newAccount.lateFee.trim() || null,
+        cedent_account: newAccount.cedentAccount.trim() || null,
+        initial_number: newAccount.initialNumber.trim() || null,
+        final_number: newAccount.finalNumber.trim() || null,
+        message_1: newAccount.messageLine1.trim() || null,
+        message_2: newAccount.messageLine2.trim() || null,
+        message_3: newAccount.messageLine3.trim() || null,
+        message_4: newAccount.messageLine4.trim() || null,
+      };
+
+      const { error } = await supabase.from("bank_accounts").insert(payload);
+
+      if (error) {
+        console.error(error);
+        toast.error("Error saving bank account");
+        return;
+      }
+
       toast.success("Bank account added successfully!");
-      setModalOpen(false);
       setNewAccount(defaultNewAccount);
       await fetchAccounts();
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const handleDeleteAccount = async (id: string) => {
+    if (!companyId) {
+      toast.error("Empresa não identificada.");
+      return;
+    }
+
     const { error } = await supabase
       .from("bank_accounts")
       .delete()
-      .eq("id", id);
+      .eq("id", id)
+      .eq("company_id", companyId);
+
     if (error) {
+      console.error(error);
       toast.error("Error deleting bank account.");
-    } else {
-      toast.success("Bank account deleted.");
-      setBankAccounts((prev) => prev.filter((acc) => acc.id !== id));
+      return;
     }
+
+    toast.success("Bank account deleted.");
+    setBankAccounts((prev) => prev.filter((acc) => acc.id !== id));
   };
 
   if (loading) {
@@ -211,51 +200,54 @@ export default function BankManagement() {
   return (
     <div className="space-y-6 py-8">
       <h2 className="text-xl font-bold mb-4">Registre uma Conta Bancária</h2>
+
       <div className="w-full flex justify-center gap-2 pb-4">
         <Input
-          placeholder="Bank Code"
+          placeholder="Código do Banco"
           value={newAccount.bankCode}
           onChange={(e) =>
             setNewAccount({ ...newAccount, bankCode: e.target.value })
           }
         />
         <Input
-          placeholder="Bank Name"
+          placeholder="Nome do Banco"
           value={newAccount.bankName}
           onChange={(e) =>
             setNewAccount({ ...newAccount, bankName: e.target.value })
           }
         />
         <Input
-          placeholder="Account Number"
+          placeholder="Conta"
           value={newAccount.accountNumber}
           onChange={(e) =>
             setNewAccount({ ...newAccount, accountNumber: e.target.value })
           }
         />
       </div>
+
       <Tabs defaultValue="account" className="w-full">
         <TabsList className="w-full h-auto">
-          <TabsTrigger value="account">Cadastrate</TabsTrigger>
-          <TabsTrigger value="tickets">Tickets</TabsTrigger>
+          <TabsTrigger value="account">Cadastrar</TabsTrigger>
+          <TabsTrigger value="tickets" disabled>Boletos</TabsTrigger>
         </TabsList>
+
         <TabsContent value="account" className="grid grid-cols-2 gap-4 mt-4">
           <Input
-            placeholder="Branch"
+            placeholder="Agência"
             value={newAccount.branch}
             onChange={(e) =>
               setNewAccount({ ...newAccount, branch: e.target.value })
             }
           />
           <Input
-            placeholder="Agency Name"
+            placeholder="Nome da Agência"
             value={newAccount.agencyName}
             onChange={(e) =>
               setNewAccount({ ...newAccount, agencyName: e.target.value })
             }
           />
           <Input
-            placeholder="Remittance Program"
+            placeholder="Programa de Remessa"
             value={newAccount.remittanceProgram}
             onChange={(e) =>
               setNewAccount({
@@ -265,34 +257,35 @@ export default function BankManagement() {
             }
           />
           <Input
-            placeholder="Return Program"
+            placeholder="Programa de Retorno"
             value={newAccount.returnProgram}
             onChange={(e) =>
               setNewAccount({ ...newAccount, returnProgram: e.target.value })
             }
           />
           <Input
-            placeholder="Company Code"
+            placeholder="Código da Empresa"
             value={newAccount.companyCode}
             onChange={(e) =>
               setNewAccount({ ...newAccount, companyCode: e.target.value })
             }
           />
           <Input
-            placeholder="Launch Account"
+            placeholder="Conta de Lançamento"
             value={newAccount.launchAccount}
             onChange={(e) =>
               setNewAccount({ ...newAccount, launchAccount: e.target.value })
             }
           />
           <Input
-            placeholder="Boleto Issuer"
+            placeholder="Cedente do Boleto"
             value={newAccount.boletoIssuer}
             onChange={(e) =>
               setNewAccount({ ...newAccount, boletoIssuer: e.target.value })
             }
           />
         </TabsContent>
+
         <TabsContent value="tickets" className="grid grid-cols-2 gap-4 mt-4">
           <Input
             placeholder="Wallet"
@@ -343,7 +336,6 @@ export default function BankManagement() {
               setNewAccount({ ...newAccount, finalNumber: e.target.value })
             }
           />
-
           <Input
             placeholder="Message Line 1"
             value={newAccount.messageLine1}
@@ -380,9 +372,9 @@ export default function BankManagement() {
           onClick={handleAddAccount}
           disabled={
             isSaving ||
-            !newAccount.bankName ||
-            !newAccount.branch ||
-            !newAccount.accountNumber
+            !newAccount.bankName.trim() ||
+            !newAccount.branch.trim() ||
+            !newAccount.accountNumber.trim()
           }
           className="w-full"
         >
@@ -393,12 +385,13 @@ export default function BankManagement() {
       <Table className="mt-6">
         <TableHeader>
           <TableRow>
-            <TableHead className="w-[100px]">Bank Code</TableHead>
-            <TableHead>Bank Name</TableHead>
-            <TableHead>Account Number</TableHead>
+            <TableHead className="w-[100px]">Código do Banco</TableHead>
+            <TableHead>Nome do Banco</TableHead>
+            <TableHead>Conta</TableHead>
             <TableHead className="text-right"></TableHead>
           </TableRow>
         </TableHeader>
+
         <TableBody>
           {bankAccounts.length > 0 ? (
             bankAccounts.map((account) => (

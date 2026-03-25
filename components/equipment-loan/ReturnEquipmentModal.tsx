@@ -1,4 +1,3 @@
-//components/equipment-loan/ReturnEquipmentModal.tsx
 "use client";
 
 import { useState } from "react";
@@ -12,9 +11,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { supabase } from "@/lib/supabase";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
-type Item = {
+export type EquipmentItem = {
   loanId: string;
   equipmentName: string;
   quantity: number;
@@ -25,17 +24,12 @@ type Props = {
   onOpenChange: (open: boolean) => void;
   customerId: string | null;
   customerName?: string;
+  companyId: string;
   items: EquipmentItem[];
-  order?: any; // Se quiser, tipa como Order
-  user: any; // Se quiser, tipa como User
+  order?: unknown;
+  user?: { id?: string } | null;
   onReturnSuccess: () => void;
   onOpenProductReturnModal: () => void;
-};
-
-export type EquipmentItem = {
-  loanId: string;
-  equipmentName: string;
-  quantity: number;
 };
 
 export function ReturnEquipmentModal({
@@ -43,147 +37,115 @@ export function ReturnEquipmentModal({
   onOpenChange,
   customerId,
   customerName,
+  companyId,
   items,
   order,
   user,
   onReturnSuccess,
   onOpenProductReturnModal,
 }: Props) {
+  const supabase = createBrowserSupabaseClient();       
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
-
-  // const handleConfirmReturn = async () => {
-  //   let barrisRetornados = false;
-
-  //   if (selectedItems.length === 0) {
-  //     const confirmed = confirm(
-  //       "Você não realizou coletas nessa viagem, confirma?",
-  //     );
-  //     if (!confirmed) return;
-
-  //     if (customerId) {
-  //       const { error } = await supabase
-  //         .from("equipment_loans")
-  //         .update({
-  //           status: "returned",
-  //           return_date: new Date().toISOString().split("T")[0],
-  //           quantity: 0,
-  //         })
-  //         .eq("customer_id", customerId)
-  //         .eq("status", "delivered");
-
-  //       if (error) {
-  //         toast.error("Erro ao atualizar o status dos empréstimos.");
-  //         console.error(error);
-  //         return;
-  //       } else {
-  //         toast.success("Retorno registrado como nenhum item coletado.");
-  //         barrisRetornados = true;
-  //       }
-  //     }
-  //   } else {
-  //     const updates = selectedItems.map((loanId) => ({
-  //       id: loanId,
-  //       quantity: quantities[loanId] ?? 1,
-  //     }));
-
-  //     const results = await Promise.all(
-  //       updates.map(({ id, quantity }) =>
-  //         supabase
-  //           .from("equipment_loans")
-  //           .update({
-  //             status: "returned",
-  //             return_date: new Date().toISOString().split("T")[0],
-  //             quantity,
-  //           })
-  //           .eq("id", id),
-  //       ),
-  //     );
-
-  //     const hasError = results.some((res) => res.error);
-  //     if (hasError) {
-  //       toast.error("Erro ao retornar um ou mais itens");
-  //       console.error("Erros:", results);
-  //       return;
-  //     } else {
-  //       toast.success("Itens de comodato retornados com sucesso!");
-  //       barrisRetornados = true;
-  //     }
-  //   }
-
-  //   if (barrisRetornados) {
-  //     onReturnSuccess();
-  //     onOpenProductReturnModal();
-  //   }
-  // };
+  const [loading, setLoading] = useState(false);
 
   const handleConfirmReturn = async () => {
-    // Se nada foi selecionado, não altere a base (apenas confirma a viagem sem coleta)
+    if (loading) return;
+
+    if (!companyId) {
+      toast.error("Empresa não identificada.");
+      return;
+    }
+
+    if (!customerId) {
+      toast.error("Cliente não identificado.");
+      return;
+    }
+
+    if (!items?.length) {
+      toast.error("Nenhum item disponível para retorno.");
+      return;
+    }
+
     if (selectedItems.length === 0) {
-      const confirmed = confirm(
+      const confirmed = window.confirm(
         "Você não realizou coletas nessa viagem, confirma?",
       );
+
       if (!confirmed) return;
+
       toast.success("Viagem registrada sem coletas.");
       onReturnSuccess();
       onOpenProductReturnModal();
       return;
     }
 
-    const itemById = new Map(items.map((i) => [i.loanId, i]));
-    const today = new Date().toISOString().split("T")[0];
+    setLoading(true);
 
-    const updates = selectedItems.map(async (loanId) => {
-      const original = itemById.get(loanId);
-      if (!original) return { error: new Error("Item não encontrado") };
+    try {
+      const itemById = new Map(items.map((item) => [item.loanId, item]));
+      const today = new Date().toISOString().split("T")[0];
 
-      // qtd devolvida informada no input
-      const returnedQty = Math.max(
-        1,
-        Math.min(original.quantity, quantities[loanId] ?? 1),
-      );
+      const updates = selectedItems.map(async (loanId) => {
+        const original = itemById.get(loanId);
 
-      // o que fica com o cliente
-      const remaining = Math.max(0, original.quantity - returnedQty);
+        if (!original) {
+          throw new Error(`Item ${loanId} não encontrado.`);
+        }
 
-      if (remaining > 0) {
-        // Ainda há itens emprestados → mantém ativo e atualiza para o remanescente
-        return await supabase
+        const requestedQty = quantities[loanId] ?? original.quantity;
+        const returnedQty = Math.max(
+          1,
+          Math.min(original.quantity, requestedQty),
+        );
+        const remaining = Math.max(0, original.quantity - returnedQty);
+
+        const payload =
+          remaining > 0
+            ? {
+                quantity: remaining,
+                status: "active",
+                return_date: today,
+              }
+            : {
+                quantity: 0,
+                status: "returned",
+                return_date: today,
+              };
+
+        const { error } = await supabase
           .from("equipment_loans")
-          .update({
-            quantity: remaining, // 💡 remanescente
-            status: "active", // ou "delivered", padronize
-            return_date: today, // opcional: data do último retorno parcial
-          })
-          .eq("id", loanId);
-      } else {
-        // Tudo devolvido → encerra o comodato
-        return await supabase
-          .from("equipment_loans")
-          .update({
-            quantity: 0,
-            status: "returned",
-            return_date: today,
-          })
-          .eq("id", loanId);
-      }
-    });
+          .update(payload)
+          .eq("id", loanId)
+          .eq("company_id", companyId)
+          .eq("customer_id", customerId);
 
-    const results = await Promise.all(updates);
-    const hasError = results.some((r) => (r as any).error);
-    if (hasError) {
-      console.error(results);
+        if (error) {
+          throw error;
+        }
+      });
+
+      await Promise.all(updates);
+
+      toast.success("Retorno registrado com sucesso!");
+      onReturnSuccess();
+      onOpenProductReturnModal();
+    } catch (error) {
+      console.error("Erro ao registrar retorno:", error);
       toast.error("Erro ao registrar retorno de um ou mais itens.");
-      return;
+    } finally {
+      setLoading(false);
     }
-
-    toast.success("Retorno registrado com sucesso!");
-    onReturnSuccess();
-    onOpenProductReturnModal();
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (loading) return;
+        onOpenChange(nextOpen);
+      }}
+    >
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Selecionar Itens para Retorno</DialogTitle>
@@ -192,37 +154,47 @@ export function ReturnEquipmentModal({
         <div className="space-y-2">
           {(items ?? []).map((item) => {
             const isSelected = selectedItems.includes(item.loanId);
+
             return (
               <div key={item.loanId} className="flex items-center space-x-2">
                 <Checkbox
                   id={item.loanId}
                   checked={isSelected}
                   onCheckedChange={(checked) => {
+                    const enabled = checked === true;
+
                     setSelectedItems((prev) =>
-                      checked
+                      enabled
                         ? [...prev, item.loanId]
                         : prev.filter((id) => id !== item.loanId),
                     );
+
                     setQuantities((prev) => ({
                       ...prev,
-                      [item.loanId]: checked ? item.quantity : 0,
+                      [item.loanId]: enabled ? item.quantity : 0,
                     }));
                   }}
                 />
+
                 <label htmlFor={item.loanId} className="text-sm flex-1">
                   {item.equipmentName} - emprestado: {item.quantity}
                 </label>
+
                 <input
                   type="number"
                   min={1}
                   max={item.quantity}
-                  disabled={!isSelected}
+                  disabled={!isSelected || loading}
                   value={quantities[item.loanId] ?? ""}
                   onChange={(e) => {
-                    const value = parseInt(e.target.value);
+                    const parsed = parseInt(e.target.value, 10);
+                    const safeValue = Number.isNaN(parsed)
+                      ? 1
+                      : Math.max(1, Math.min(item.quantity, parsed));
+
                     setQuantities((prev) => ({
                       ...prev,
-                      [item.loanId]: isNaN(value) ? 1 : value,
+                      [item.loanId]: safeValue,
                     }));
                   }}
                   className="w-16 border rounded px-2 py-1 text-sm"
@@ -233,7 +205,9 @@ export function ReturnEquipmentModal({
         </div>
 
         <DialogFooter>
-          <Button onClick={handleConfirmReturn}>Confirmar Retorno</Button>
+          <Button onClick={handleConfirmReturn} disabled={loading}>
+            {loading ? "Confirmando..." : "Confirmar Retorno"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

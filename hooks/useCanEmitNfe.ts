@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
 export function toBool(v: any): boolean | null {
   if (v === true || v === false) return v;
@@ -32,7 +32,7 @@ export function useCanEmitNfe({
   emitNfFromOrder?: boolean | null;
   emitNfFromCustomer?: boolean | null;
 }) {
-  const supabase = createClientComponentClient();
+  const supabase = createBrowserSupabaseClient();
   const [canEmit, setCanEmit] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);

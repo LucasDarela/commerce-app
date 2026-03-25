@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import {
   Tooltip,
@@ -38,7 +38,7 @@ export default function EmitNfeMenuItem({
   emitNfFromCustomer,
   showDebug = false,
 }: Props) {
-  const supabase = createClientComponentClient();
+  const supabase = createBrowserSupabaseClient();
 
   // 1) tenta decidir imediatamente a partir dos valores já carregados
   const initial = useMemo(() => {

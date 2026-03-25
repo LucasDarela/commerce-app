@@ -42,6 +42,9 @@ export type OrderDetails = {
     state?: string | null;
     zip_code?: string | null;
     emit_nf?: boolean | null;
+    fantasy_name?: string | null;
+    complement?: string | null;
+    state_registration?: string | null;
   };
 
   // itens já resolvidos (não o order_items cru):

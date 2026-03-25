@@ -1,6 +1,6 @@
 "use client";
 
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { useRouter } from "next/navigation";
 import { useUnreadNotifications } from "@/hooks/useUnreadNotifications";
 import { Badge } from "@/components/ui/badge";
@@ -43,7 +43,7 @@ export function NavUser({
 }) {
   const { isMobile } = useSidebar();
 
-  const supabase = createClientComponentClient();
+  const supabase = createBrowserSupabaseClient();
   const router = useRouter();
 
   // const unreadCount = useUnreadNotifications()

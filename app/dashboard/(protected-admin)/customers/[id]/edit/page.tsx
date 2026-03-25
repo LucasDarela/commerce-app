@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/lib/supabase";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { toast } from "sonner";
 import { useRouter, useParams } from "next/navigation";
 import axios from "axios";
@@ -15,6 +15,8 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
+import { TableSkeleton } from "@/components/ui/TableSkeleton";
 
 type Cliente = {
   id?: string;
@@ -42,9 +44,32 @@ function limparNumero(valor: string | number | null | undefined) {
   return valor.replace(/\D/g, "");
 }
 
+function formatarTelefone(valor: string) {
+  const numeros = valor.replace(/\D/g, "").slice(0, 13);
+
+  if (numeros.length >= 12) {
+    return numeros.replace(
+      /^(\d{2})(\d{2})(\d{5})(\d{4})$/,
+      "+$1 ($2) $3-$4",
+    );
+  }
+
+  if (numeros.length >= 11) {
+    return numeros.replace(
+      /^(\d{2})(\d{2})(\d{4,5})(\d{0,4})$/,
+      "+$1 ($2) $3-$4",
+    );
+  }
+
+  return "+" + numeros;
+}
+
 export default function EditClient() {
+  const supabase = createBrowserSupabaseClient();     
   const router = useRouter();
   const { id } = useParams();
+  const { companyId, loading: authLoading } = useAuthenticatedCompany();
+
   const inputRefs = useRef<HTMLInputElement[]>([]);
   const [loading, setLoading] = useState(true);
   const [catalogs, setCatalogs] = useState<{ id: string; name: string }[]>([]);
@@ -88,52 +113,60 @@ export default function EditClient() {
 
   useEffect(() => {
     const fetchCliente = async () => {
-      if (!id) return;
+      if (!id || !companyId || authLoading) return;
 
       const { data, error } = await supabase
         .from("customers")
         .select("*")
         .eq("id", id)
-        .single();
+        .eq("company_id", companyId)
+        .maybeSingle();
 
       if (error || !data) {
         toast.error("Erro ao carregar cliente");
         console.error("❌ Erro ao buscar cliente:", error?.message);
-      } else {
-        setCliente({
-          ...data,
-          name: formatarMaiusculo(data.name || "", "name"),
-          fantasy_name: formatarMaiusculo(
-            data.fantasy_name || "",
-            "fantasy_name",
-          ),
-          address: formatarMaiusculo(data.address || "", "address"),
-          neighborhood: formatarMaiusculo(
-            data.neighborhood || "",
-            "neighborhood",
-          ),
-          city: formatarMaiusculo(data.city || "", "city"),
-          state: formatarMaiusculo(data.state || "", "state"),
-          state_registration: formatarMaiusculo(
-            data.state_registration || "",
-            "state_registration",
-          ),
-          price_table_id: data.price_table_id || "",
-          emit_nf: data.emit_nf ?? false,
-          phone: formatarTelefone(String(data.phone || "")),
-        });
+        setLoading(false);
+        return;
       }
+
+      setCliente({
+        ...data,
+        name: formatarMaiusculo(data.name || "", "name"),
+        fantasy_name: formatarMaiusculo(
+          data.fantasy_name || "",
+          "fantasy_name",
+        ),
+        address: formatarMaiusculo(data.address || "", "address"),
+        neighborhood: formatarMaiusculo(
+          data.neighborhood || "",
+          "neighborhood",
+        ),
+        city: formatarMaiusculo(data.city || "", "city"),
+        state: formatarMaiusculo(data.state || "", "state"),
+        state_registration: formatarMaiusculo(
+          data.state_registration || "",
+          "state_registration",
+        ),
+        price_table_id: data.price_table_id || "",
+        emit_nf: data.emit_nf ?? false,
+        phone: formatarTelefone(String(data.phone || "")),
+      });
+
       setLoading(false);
     };
 
     fetchCliente();
-  }, [id]);
+  }, [id, companyId, authLoading]);
 
   useEffect(() => {
     const fetchCatalogs = async () => {
+      if (!companyId || authLoading) return;
+
       const { data, error } = await supabase
         .from("price_tables")
-        .select("id, name");
+        .select("id, name")
+        .eq("company_id", companyId)
+        .order("name", { ascending: true });
 
       if (error) {
         toast.error("Erro ao buscar catálogos");
@@ -143,10 +176,11 @@ export default function EditClient() {
     };
 
     fetchCatalogs();
-  }, []);
+  }, [companyId, authLoading]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value: rawValue } = e.target;
+
     const formattedValue =
       name === "phone"
         ? formatarTelefone(rawValue)
@@ -180,6 +214,7 @@ export default function EditClient() {
       const { data } = await axios.get(
         `https://viacep.com.br/ws/${cliente.zip_code}/json/`,
       );
+
       if (data.erro) {
         toast.error("CEP inválido!");
         setCliente((prev) => ({
@@ -198,12 +233,17 @@ export default function EditClient() {
           state: formatarMaiusculo(data.uf || "", "state"),
         }));
       }
-    } catch (error) {
+    } catch {
       toast.error("Erro ao buscar endereço!");
     }
   };
 
   const handleUpdate = async () => {
+    if (!companyId) {
+      toast.error("Empresa não identificada.");
+      return;
+    }
+
     const clienteToUpdate = { ...cliente };
     delete clienteToUpdate.id;
     delete clienteToUpdate.created_at;
@@ -212,7 +252,6 @@ export default function EditClient() {
       clienteToUpdate.email = null;
     }
 
-    // Limpar e converter phone e number para tipo number
     const phoneCleaned = limparNumero(cliente.phone);
     clienteToUpdate.phone = phoneCleaned ? String(Number(phoneCleaned)) : null;
 
@@ -221,13 +260,13 @@ export default function EditClient() {
       ? String(Number(numberCleaned))
       : null;
 
-    // Força o valor de 'type' para garantir integridade
     clienteToUpdate.type = cliente.type === "CNPJ" ? "CNPJ" : "CPF";
 
     const { error } = await supabase
       .from("customers")
       .update(clienteToUpdate)
-      .eq("id", id);
+      .eq("id", id)
+      .eq("company_id", companyId);
 
     if (error) {
       toast.error("Erro ao atualizar cliente: " + error.message);
@@ -237,25 +276,9 @@ export default function EditClient() {
     }
   };
 
-  const formatarTelefone = (valor: string) => {
-    const numeros = valor.replace(/\D/g, "").slice(0, 13);
-
-    if (numeros.length >= 12) {
-      return numeros.replace(
-        /^(\d{2})(\d{2})(\d{5})(\d{4})$/,
-        "+$1 ($2) $3-$4",
-      );
-    }
-
-    if (numeros.length >= 11) {
-      return numeros.replace(
-        /^(\d{2})(\d{2})(\d{4,5})(\d{0,4})$/,
-        "+$1 ($2) $3-$4",
-      );
-    }
-
-    return "+" + numeros;
-  };
+  if (authLoading || loading) {
+    return <TableSkeleton />;
+  }
 
   return (
     <div className="max-w-3xl mx-auto w-full px-4 py-6 rounded-lg shadow-md">
@@ -282,11 +305,16 @@ export default function EditClient() {
         if (
           cliente.type === "CPF" &&
           ["fantasy_name", "state_registration"].includes(campo)
-        )
+        ) {
           return null;
+        }
+
         return (
           <Input
             key={campo}
+            ref={(el) => {
+              if (el) inputRefs.current[index] = el;
+            }}
             type={campo === "email" ? "email" : "text"}
             name={campo}
             placeholder={placeholdersMap[campo]}
@@ -318,6 +346,7 @@ export default function EditClient() {
           </SelectContent>
         </Select>
       </div>
+
       <div className="flex items-center space-x-2 mt-4">
         <Checkbox
           id="emit_nf"

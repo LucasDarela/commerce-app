@@ -7,15 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useOverdueCheck } from "@/components/billing/useOverdueCheck";
 import { OverdueModal } from "@/components/billing/OverdueModal";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
-import { supabase } from "@/lib/supabase/client";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
 type Props = {
   defaultCustomerId?: string | null;
 };
 
 export default function NewOrderForm({ defaultCustomerId = null }: Props) {
-  const supabase = createClientComponentClient<any>();
+  const supabase = createBrowserSupabaseClient();     
   const [customerId, setCustomerId] = useState(defaultCustomerId ?? "");
   const [total, setTotal] = useState<number>(150);
   const [saving, setSaving] = useState(false);

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { useEffect, useMemo, useState } from "react";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 
 import {
@@ -21,27 +21,43 @@ const iconMap: Record<string, React.ElementType> = {
 };
 
 export function CompanyBrand() {
+  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const { companyId, loading } = useAuthenticatedCompany();
+
   const [companyName, setCompanyName] = useState("My Company");
   const [iconKey, setIconKey] = useState("IconBeerFilled");
 
   useEffect(() => {
+    let cancelled = false;
+
     const fetchCompany = async () => {
       if (loading || !companyId) return;
+
       const { data, error } = await supabase
         .from("companies")
         .select("name, icon")
         .eq("id", companyId)
-        .single();
+        .maybeSingle();
 
-      if (!error && data) {
-        setCompanyName(data.name);
+      if (cancelled) return;
+
+      if (error) {
+        console.error("Erro ao buscar dados da empresa:", error);
+        return;
+      }
+
+      if (data) {
+        setCompanyName(data.name || "My Company");
         setIconKey(data.icon || "IconBeerFilled");
       }
     };
 
     fetchCompany();
-  }, [companyId]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId, loading, supabase]);
 
   const IconComponent = iconMap[iconKey] || IconBeerFilled;
 

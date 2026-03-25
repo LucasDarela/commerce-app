@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -12,9 +12,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { toast } from "sonner";
-import { Pencil, Trash, ChevronDown, ChevronUp } from "lucide-react";
+import { Pencil, Trash } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -22,14 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { Card } from "@/components/ui/card";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
-import { PriceTableManager } from "@/components/price-table-manager";
 import Link from "next/link";
 import { IconPlus } from "@tabler/icons-react";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
@@ -40,41 +33,43 @@ type Equipment = {
   name: string;
 };
 
-// 🔹 Product Type
 type Product = {
   id: number;
-  code: string | number | null; 
+  code: string | number | null;
   name: string | null;
-  manufacturer: string;
-  standard_price: string;
-  material_class: string;
-  submaterial_class: string;
-  material_origin: string;
-  aplication: string;
-  loan_product_code?: string;
-  stock: number;
-
-  ncm: string;
-  cfop: string;
-  csosn: string;
-  unit: string;
-  icms_rate: string;
-  pis_rate: string;
-  cofins_rate: string;
+  manufacturer: string | null;
+  standard_price: string | number | null;
+  material_class: string | null;
+  submaterial_class: string | null;
+  material_origin: string | null;
+  aplication: string | null;
+  loan_product_code?: string | null;
+  stock: number | null;
+  ncm: string | null;
+  cfop: string | null;
+  csosn: string | null;
+  unit: string | null;
+  icms_rate: string | null;
+  pis_rate: string | null;
+  cofins_rate: string | null;
+  company_id?: string;
 };
 
 export default function ListProduct() {
-  const { user, companyId, loading } = useAuthenticatedCompany();
+  const { companyId, loading } = useAuthenticatedCompany();
   const router = useRouter();
+  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
+
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [equipments, setEquipments] = useState<Equipment[]>([]);
-  const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
     if (!companyId || loading) return;
+
+    let isMounted = true;
 
     const fetchProducts = async () => {
       try {
@@ -87,8 +82,11 @@ export default function ListProduct() {
         if (error) {
           toast.error("Failed to load products.");
           console.error(error.message);
-        } else {
-          setProducts(data ?? []);
+          return;
+        }
+
+        if (isMounted) {
+          setProducts((data as Product[]) ?? []);
         }
       } catch (error) {
         toast.error("Unexpected error while loading products.");
@@ -97,10 +95,16 @@ export default function ListProduct() {
     };
 
     fetchProducts();
-  }, [companyId, loading]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [companyId, loading, supabase]);
 
   useEffect(() => {
     if (!companyId || loading) return;
+
+    let isMounted = true;
 
     const fetchEquipments = async () => {
       const { data, error } = await supabase
@@ -110,22 +114,28 @@ export default function ListProduct() {
 
       if (error) {
         toast.error("Erro ao buscar equipamentos");
-      } else {
-        setEquipments(data ?? []);
+        return;
+      }
+
+      if (isMounted) {
+        setEquipments((data as Equipment[]) ?? []);
       }
     };
 
     fetchEquipments();
-  }, [companyId, loading]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [companyId, loading, supabase]);
 
   const filteredProducts = products.filter((product) => {
     const term = search.trim().toLowerCase();
-  
     const name = String(product.name ?? "").toLowerCase();
     const code = String(product.code ?? "").toLowerCase();
-  
+
     if (!term) return true;
-  
+
     return name.includes(term) || code.includes(term);
   });
 
@@ -148,24 +158,34 @@ export default function ListProduct() {
   };
 
   const handleEdit = () => {
-    if (selectedProduct) {
-      router.push(`/dashboard/products/${selectedProduct.id}/edit`);
-      closeModal();
-    }
+    if (!selectedProduct) return;
+    router.push(`/dashboard/products/${selectedProduct.id}/edit`);
+    closeModal();
   };
 
   const handleDelete = async (id: number) => {
+    if (!companyId) {
+      toast.error("Empresa não identificada.");
+      return;
+    }
+
     if (!confirm("Are you sure you want to delete this product?")) return;
 
-    const { error } = await supabase.from("products").delete().eq("id", id);
+    const { error } = await supabase
+      .from("products")
+      .delete()
+      .eq("id", id)
+      .eq("company_id", companyId);
+
     if (error) {
       toast.error("Failed to delete product.");
       console.error(error.message);
-    } else {
-      toast.success("Product successfully deleted!");
-      setProducts((prev) => prev.filter((p) => p.id !== id));
-      closeModal();
+      return;
     }
+
+    toast.success("Product successfully deleted!");
+    setProducts((prev) => prev.filter((p) => p.id !== id));
+    closeModal();
   };
 
   if (loading) {
@@ -175,6 +195,7 @@ export default function ListProduct() {
   return (
     <div className="p-6 mt-3">
       <h2 className="text-xl font-bold mb-4">Produtos</h2>
+
       <div className="mb-6 flex flex-col sm:flex-row gap-4 items-stretch">
         <Input
           type="text"
@@ -183,6 +204,7 @@ export default function ListProduct() {
           onChange={(e) => setSearch(e.target.value)}
           className="w-full h-8 p-2 border rounded-md"
         />
+
         <Link href="/dashboard/products/add">
           <Button
             variant="default"
@@ -207,6 +229,7 @@ export default function ListProduct() {
               <TableHead>Equipamento Vinculado</TableHead>
             </TableRow>
           </TableHeader>
+
           <TableBody>
             {filteredProducts.length > 0 ? (
               filteredProducts.map((product) => (
@@ -219,7 +242,7 @@ export default function ListProduct() {
                   <TableCell>{product.name}</TableCell>
                   <TableCell>{product.material_class || "N/A"}</TableCell>
                   <TableCell>{product.standard_price}</TableCell>
-                  <TableCell>{product.stock}</TableCell>
+                  <TableCell>{product.stock ?? 0}</TableCell>
                   <TableCell>
                     {equipmentMap[product.loan_product_code ?? ""] ?? ""}
                   </TableCell>
@@ -235,6 +258,7 @@ export default function ListProduct() {
           </TableBody>
         </Table>
       </div>
+
       <div className="flex justify-end w-full my-4">
         <ExportProductsButton />
       </div>
@@ -245,6 +269,7 @@ export default function ListProduct() {
             <DialogHeader>
               <DialogTitle>Detalhes do Produto</DialogTitle>
             </DialogHeader>
+
             <div className="space-y-2">
               <p>
                 <strong>Código:</strong> {selectedProduct.code}
@@ -266,57 +291,6 @@ export default function ListProduct() {
                 {equipmentMap[selectedProduct.loan_product_code ?? ""] ??
                   "Sem equipamento vinculado"}
               </p>
-              {/* <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-                <CollapsibleTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="flex items-center gap-2 text-sm"
-                  >
-                    {isOpen ? (
-                      <ChevronUp size={16} />
-                    ) : (
-                      <ChevronDown size={16} />
-                    )}
-                    Informações Fiscais
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-2 mt-2">
-                  <p>
-                    <strong>Origem:</strong> {selectedProduct.material_origin}
-                  </p>
-                  <p>
-                    <strong>Classe:</strong> {selectedProduct.material_class}
-                  </p>
-                  <p>
-                    <strong>Subclasse:</strong>{" "}
-                    {selectedProduct.submaterial_class}
-                  </p>
-                  <p>
-                    <strong>Aplicação:</strong> {selectedProduct.aplication}
-                  </p>
-                  <p>
-                    <strong>NCM:</strong> {selectedProduct.ncm}
-                  </p>
-                  <p>
-                    <strong>CFOP:</strong> {selectedProduct.cfop}
-                  </p>
-                  <p>
-                    <strong>CSOSN:</strong> {selectedProduct.csosn}
-                  </p>
-                  <p>
-                    <strong>UNIT:</strong> {selectedProduct.unit}
-                  </p>
-                  <p>
-                    <strong>ICMS:</strong> {selectedProduct.icms_rate}
-                  </p>
-                  <p>
-                    <strong>PIS:</strong> {selectedProduct.pis_rate}
-                  </p>
-                  <p>
-                    <strong>COFINS:</strong> {selectedProduct.cofins_rate}
-                  </p>
-                </CollapsibleContent>
-              </Collapsible> */}
             </div>
 
             <DialogFooter className="w-full">

@@ -1,30 +1,6 @@
-import { supabase } from "@/lib/supabase";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
-export async function getCompanyLogoAsDataUrl(companyId: string) {
-  const { data: files, error: listError } = await supabase.storage
-    .from("companylogos")
-    .list(companyId, { limit: 1 });
-
-  if (listError || !files || files.length === 0) {
-    console.error("Nenhuma logo encontrada:", listError);
-    return null;
-  }
-
-  const logoFileName = files[0].name;
-  const path = `${companyId}/${logoFileName}`;
-
-  const { data: file, error: downloadError } = await supabase.storage
-    .from("companylogos")
-    .download(path);
-
-  if (downloadError || !file) {
-    console.error("Erro ao baixar a logo:", downloadError);
-    return null;
-  }
-
-  const blob = file;
-  return await blobToDataURL(blob);
-}
+const supabase = createBrowserSupabaseClient();
 
 function blobToDataURL(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -33,4 +9,20 @@ function blobToDataURL(blob: Blob): Promise<string> {
     reader.onerror = reject;
     reader.readAsDataURL(blob);
   });
+}
+
+export async function getCompanyLogoAsDataUrl(logoPath: string) {
+  if (!logoPath) return null;
+
+  const { data, error } = await supabase.storage
+    .from("companylogos")
+    .createSignedUrl(logoPath, 60);
+
+  if (error || !data?.signedUrl) return null;
+
+  const res = await fetch(data.signedUrl);
+  if (!res.ok) return null;
+
+  const blob = await res.blob();
+  return blobToDataURL(blob);
 }

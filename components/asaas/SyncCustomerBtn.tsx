@@ -4,14 +4,14 @@ import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
 export function SyncAsaasButton({
   customerId,
 }: {
   customerId: string | number;
 }) {
-  const supabase = createClientComponentClient();
+  const supabase = createBrowserSupabaseClient();
   const [hasAsaasIntegration, setHasAsaasIntegration] = useState(false);
   const [loadingCheck, setLoadingCheck] = useState(true);
   const [syncing, setSyncing] = useState(false);

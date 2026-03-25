@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -45,7 +45,7 @@ export default function EmitNfePage() {
   const params = useParams();
 const id = Array.isArray(params.id) ? params.id[0] : params.id;
   const { companyId } = useAuthenticatedCompany();
-  const supabase = useMemo(() => createClientComponentClient(), []);
+  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
 
   const [order, setOrder] = useState<any>(null);
   const [products, setProducts] = useState<UiProduct[]>([]);

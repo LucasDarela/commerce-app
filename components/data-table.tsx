@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { format, parseISO } from "date-fns";
-import { useEffect, useState } from "react";
+import { useMemo, useEffect, useState } from "react";
 import {
   DndContext,
   KeyboardSensor,
@@ -97,8 +97,7 @@ import {
 } from "@/components/ui/sheet";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { PaymentModal } from "@/components/payment-modal";
 import { LoanEquipmentModal } from "@/components/equipment-loan/LoanEquipmentModal";
 import { fetchEquipmentsForOrderProducts } from "@/lib/fetch-equipments-for-products";
@@ -107,8 +106,6 @@ import { getTranslatedStatus } from "@/utils/getTranslatedStatus";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import CustomDateInput from "@/components/ui/CustomDateInput";
-import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
-import { parseOrderProducts } from "@/lib/orders/parseOrderProducts";
 import { ReturnProductModal } from "./products/ReturnProductModal";
 import type { Equipment } from "@/components/types/equipments";
 import type { ProductItem } from "@/components/types/products";
@@ -124,14 +121,15 @@ import {
   canEditOrder,
   canDeleteOrder,
   canViewFinancial,
+  type UserRole,
 } from "@/lib/permissions";
 
 type Sale = z.infer<typeof orderSchema>;
 
 type DataTableProps = {
-  data: z.infer<typeof orderSchema>[];
   companyId: string;
-  onRowClick?: (order: z.infer<typeof orderSchema>) => void;
+  user: { id: string } | null;
+  role: UserRole | null;
 };
 
 type CustomColumnMeta = {
@@ -226,10 +224,16 @@ function DraggableRow({
 }
 
 async function updateStockBasedOnOrder(
-  supabaseClient: SupabaseClient,
+  supabaseClient: ReturnType<typeof createBrowserSupabaseClient>,
   order: Order,
+  companyId: string,
 ) {
-  const items = await parseProductsWithIds(supabaseClient, order.products);
+  const items = await parseProductsWithIds(
+    supabaseClient,
+    order.products,
+    companyId,
+  );
+
   for (const item of items) {
     await supabaseClient.rpc("decrement_stock", {
       product_id: item.id,
@@ -244,8 +248,9 @@ type ParsedProduct = {
 };
 
 async function parseProductsWithIds(
-  supabaseClient: SupabaseClient,
+  supabaseClient: ReturnType<typeof createBrowserSupabaseClient>,
   products: string,
+  companyId: string,
 ): Promise<{ id: number; quantity: number }[]> {
   if (!products) return [];
 
@@ -261,7 +266,8 @@ async function parseProductsWithIds(
   const { data, error } = await supabaseClient
     .from("products")
     .select("id, name")
-    .in("name", names);
+    .in("name", names)
+    .eq("company_id", companyId);
 
   if (error || !data) {
     console.error("Erro ao buscar IDs dos produtos:", error);
@@ -270,7 +276,7 @@ async function parseProductsWithIds(
 
   return parsed
     .map((p) => {
-      const match = data.find((d) => d.name === p.name);
+      const match = data.find((d: { id: number; name: string }) => d.name === p.name);
       return { id: match?.id ?? 0, quantity: p.quantity };
     })
     .filter((p) => p.id !== 0);
@@ -278,13 +284,20 @@ async function parseProductsWithIds(
 
 export function DataTable({
   companyId,
+  user,
+  role,
 }: DataTableProps) {
+  const supabase = useMemo(() => createBrowserSupabaseClient(), []); 
+  const safeRole: UserRole | null =
+    role === "admin" || role === "driver" || role === "normal"
+      ? role
+      : null;
   const [selectedCustomer, setSelectedCustomer] = React.useState<Sale | null>(
     null,
   );
-  const { user, role } = useAuthenticatedCompany();
+  // const { user, role } = useAuthenticatedCompany();
   const [sheetOpen, setSheetOpen] = React.useState(false);
-const supabase = React.useMemo(() => createClientComponentClient(), []);
+
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSavingOrder, setIsSavingOrder] = useState(false);
@@ -457,13 +470,11 @@ const [sorting, setSorting] = React.useState<SortingState>(() => {
 
   // driver select
 
-  const [drivers, setDrivers] = useState<Driver[]>([]);
+const [drivers, setDrivers] = useState<Driver[]>([]);
+
 useEffect(() => {
   async function fetchDrivers() {
     if (!companyId) return;
-
-    // motorista não precisa carregar lista de motoristas
-    if (role === "driver") return;
 
     const { data, error } = await supabase
       .from("profiles")
@@ -473,6 +484,7 @@ useEffect(() => {
 
     if (error) {
       console.error("Erro ao buscar motoristas:", error);
+      setDrivers([]);
       return;
     }
 
@@ -485,13 +497,14 @@ useEffect(() => {
   }
 
   fetchDrivers();
-}, [companyId, role]);
+}, [companyId, supabase]);
 
   async function setOrderDriver(orderId: string, driverId: string | null) {
     const { data, error } = await supabase
       .from("orders")
       .update({ driver_id: driverId })
       .eq("id", orderId)
+      .eq("company_id", companyId)  
       .select("id, driver_id")
       .single();
 
@@ -647,7 +660,8 @@ const refreshOrders = async () => {
         emit_nf
       )
     `)
-    .order("order_index", { ascending: true });
+    .order("order_index", { ascending: true })
+    .eq("company_id", companyId);
 
   if (error) {
     console.error("Erro ao buscar pedidos:", error);
@@ -721,6 +735,10 @@ const refreshOrders = async () => {
 
 useEffect(() => {
   async function fetchOrders() {
+        if (!companyId) {
+      setLoading(false);
+      return;
+    }
     const { data, error } = await supabase
       .from("orders")
       .select(`
@@ -755,7 +773,8 @@ useEffect(() => {
           emit_nf
         )
       `)
-      .order("order_index", { ascending: true });
+      .order("order_index", { ascending: true })
+      .eq("company_id", companyId);
 
     if (error) {
       console.error("Erro ao buscar pedidos:", error);
@@ -781,11 +800,13 @@ useEffect(() => {
       console.error("Erro ao validar schema Zod:", parsed.error);
     }
 
+    if (!companyId) return;
+
     setLoading(false);
   }
 
   fetchOrders();
-}, [supabase]);
+}, [companyId]);
 
 const columns = React.useMemo<CustomColumnDef<Order>[]>(() => [
     {
@@ -896,7 +917,7 @@ const columns = React.useMemo<CustomColumnDef<Order>[]>(() => [
   size: 160,
   meta: { className: "w-[150px] truncate" },
   cell: ({ row }) => {
-    const canAssign = canAssignDriver(role);
+    const canAssign = canAssignDriver(safeRole);
 
     return (
       <div onClick={(e) => e.stopPropagation()}>
@@ -1186,12 +1207,11 @@ const columns = React.useMemo<CustomColumnDef<Order>[]>(() => [
 
               <DeleteOrderButton
                 orderId={row.original.id}
+                companyId={companyId}
                 asDropdownItem
                 onDeleted={() => {
-                  setOrders((prev) =>
-                    prev.filter((o) => o.id !== row.original.id),
-                  );
-                }}  
+                  setOrders((prev) => prev.filter((o) => o.id !== row.original.id));
+                }}
               />
             </DropdownMenuContent>
           </DropdownMenu>
@@ -1311,7 +1331,8 @@ function handleDateSortChange(value: string) {
         supabase
           .from("orders")
           .update({ order_index: index })
-          .eq("id", item.id),
+          .eq("id", item.id)
+          .eq("company_id", companyId),
       ),
     )
       .then(() => {
@@ -1357,7 +1378,8 @@ function clearAllFilters() {
       const { error } = await supabase
         .from("orders")
         .update({ delivery_status: nextStatus })
-        .eq("id", selectedCustomer.id);
+        .eq("id", selectedCustomer.id)
+        .eq("company_id", companyId);
 
       if (!error) {
         setSelectedCustomer({
@@ -1374,7 +1396,7 @@ function clearAllFilters() {
         );
 
         if (nextStatus === "Coletado") {
-          await updateStockBasedOnOrder(supabase, selectedCustomer);
+          await updateStockBasedOnOrder(supabase, selectedCustomer, companyId);
         }
       } else {
         toast.error("Erro ao atualizar status.");
@@ -1596,7 +1618,7 @@ const clearFilter = () => {
       <div className="w-full flex justify-between items-start px-4 lg:px-6 my-2">
         <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3">
           <h2 className="text-xl font-bold">Vendas</h2>
-          {canViewFinancial(role) &&  (
+          {canViewFinancial(safeRole) &&  (
             <Badge variant="secondary" className="text-sm w-fit">
               Total:{formattedFilteredSalesTotal}
             </Badge>
@@ -1634,7 +1656,7 @@ const clearFilter = () => {
             </DropdownMenuContent>
           </DropdownMenu>
 
-{canCreateOrder(role) ? (
+{canCreateOrder(safeRole) ? (
   <Link href="/dashboard/orders/add">
     <Button
       variant="default"
@@ -2071,7 +2093,8 @@ const clearFilter = () => {
                               const equipmentItems =
                                 await fetchEquipmentsForOrderProducts(
                                   selectedCustomer.products,
-                                );
+                                  companyId,
+                                );  
                               const {
                                 data: matchingCustomer,
                                 error: customerError,
@@ -2079,7 +2102,8 @@ const clearFilter = () => {
                                 .from("customers")
                                 .select("id, name")
                                 .eq("name", selectedCustomer.customer)
-                                .maybeSingle();
+                                .eq("company_id", companyId)
+                                .maybeSingle(); 
 
                               if (!matchingCustomer || customerError) {
                                 toast.error(
@@ -2104,7 +2128,8 @@ const clearFilter = () => {
                                 .from("customers")
                                 .select("id, name")
                                 .eq("name", selectedCustomer.customer)
-                                .maybeSingle();
+                                .eq("company_id", companyId)
+                                .maybeSingle();   
 
                               if (!matchingCustomer || customerError) {
                                 toast.error(
@@ -2119,7 +2144,8 @@ const clearFilter = () => {
                                   "id, quantity, equipment:equipment_id(name)",
                                 )
                                 .eq("customer_id", matchingCustomer.id)
-                                .eq("status", "active");
+                                .eq("company_id", companyId)
+                                .eq("status", "active");  
 
                               if (error || !loans) {
                                 toast.error(
@@ -2275,6 +2301,7 @@ const clearFilter = () => {
         <ReturnEquipmentModal
           open={isReturnModalOpen}
           onOpenChange={setIsReturnModalOpen}
+          companyId={companyId}
           customerId={returnModalCustomerId}
           items={returnEquipmentItems}
           order={selectedCustomer}
@@ -2298,7 +2325,7 @@ const clearFilter = () => {
           items={returnProductItems}
           orderId={selectedCustomer?.id ?? ""}
           companyId={companyId}
-          createdBy={user.id}
+          createdBy={user?.id ?? ""}
           onSuccess={() => {
             refreshOrders();
             setIsProductReturnModalOpen(false);

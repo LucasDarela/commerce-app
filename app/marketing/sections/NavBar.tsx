@@ -6,14 +6,14 @@ import { ModeToggle } from "@/components/ui/mode-toggle";
 import { ThemeSelector } from "@/components/theme-selector";
 import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
 export default function NavBar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  const supabase = useMemo(() => createClientComponentClient(), []);
+  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
 
   const toggleMenu = () => setMenuOpen(!menuOpen);
 

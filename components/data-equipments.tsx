@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { useEffect, useState } from "react";
-import { fetchEquipments } from "@/lib/fetchEquipments";
 import { format, parseISO } from "date-fns";
 import {
   DndContext,
@@ -110,8 +109,8 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import Link from "next/link";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
-import { Equipment } from "@/components/types/equipments";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
+import type { Equipment } from "@/lib/fetchEquipments";
 import { ExportEquipmentsButton } from "./equipments/ExportEquipmentButton";
 
 //New Schema
@@ -200,9 +199,8 @@ export function DataEquipments({
   const [selectedEquipment, setSelectedEquipment] =
     React.useState<Equipment | null>(null);
   const [sheetOpen, setSheetOpen] = React.useState(false);
-  const supabase = createClientComponentClient();
-  const [equipments, setEquipments] = useState<Equipment[]>([]);
-  const [loading, setLoading] = useState(true);
+  const supabase = createBrowserSupabaseClient();
+  const [equipments, setEquipments] = useState<Equipment[]>(initialData ?? []);
   const [isSavingEquipment, setIsSavingEquipment] = useState(false);
   const [search, setSearch] = useState("");
 
@@ -228,16 +226,8 @@ export function DataEquipments({
   };
 
   useEffect(() => {
-    if (!companyId) return;
-
-    async function loadEquipments() {
-      const data = await fetchEquipments(companyId);
-      setEquipments(data);
-      setLoading(false);
-    }
-
-    loadEquipments();
-  }, [companyId]);
+  setEquipments(initialData ?? []);
+}, [initialData]);
 
   //const columns
   const columns: CustomColumnDef<Equipment>[] = [
@@ -321,7 +311,7 @@ export function DataEquipments({
     },
   ];
 
-  const [data, setData] = React.useState(() => initialData);
+  const data = equipments;
   const [rowSelection, setRowSelection] = React.useState({});
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
@@ -340,21 +330,24 @@ export function DataEquipments({
     useSensor(KeyboardSensor, {}),
   );
 
-  const dataIds = React.useMemo<UniqueIdentifier[]>(
-    () => data?.map(({ id }) => id) || [],
-    [data],
-  );
+const dataIds = React.useMemo<UniqueIdentifier[]>(
+  () => equipments?.map(({ id }) => id) || [],
+  [equipments],
+);
 
-  const filteredEquipments = React.useMemo(() => {
-    if (!search) return equipments;
-    const lowerSearch = search.toLowerCase();
+const filteredEquipments = React.useMemo(() => {
+  if (!search) return equipments;
+  const lowerSearch = search.toLowerCase();
 
-    return equipments.filter(
-      (equipment) =>
-        equipment.name?.toLowerCase().includes(lowerSearch) ||
-        equipment.code?.toLowerCase().includes(lowerSearch),
+  return equipments.filter((equipment) => {
+    const code = equipment.code != null ? String(equipment.code) : "";
+
+    return (
+      equipment.name?.toLowerCase().includes(lowerSearch) ||
+      code.toLowerCase().includes(lowerSearch)
     );
-  }, [search, equipments]);
+  });
+}, [search, equipments]);
 
   const table = useReactTable<Equipment>({
     data: filteredEquipments,
@@ -703,7 +696,7 @@ export function DataEquipments({
             </div>
           </div>
           <div className="flex justify-end w-full">
-            <ExportEquipmentsButton />
+            {companyId && <ExportEquipmentsButton companyId={companyId} />}
           </div>
         </TabsContent>
       </Tabs>

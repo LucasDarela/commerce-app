@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,7 +11,7 @@ import { isValidCPF } from "@/lib/validators";
 import { PasswordInput } from "../ui/password-input";
 
 export default function FocusNFeSection() {
-  const supabase = createClientComponentClient();
+  const supabase = createBrowserSupabaseClient();
   const { companyId } = useAuthenticatedCompany();
   const [loading, setLoading] = useState(false);
   const [focusToken, setFocusToken] = useState("");

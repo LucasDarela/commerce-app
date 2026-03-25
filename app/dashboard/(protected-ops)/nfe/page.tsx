@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { fetchOrders } from "@/lib/fetchOrders";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import DataFinancialTable from "@/components/financial/DataFinancialTable";
 import { Order } from "@/components/types/order";
 import FiscalOperationsPage from "@/components/nf/FiscalOperationForm";
@@ -25,7 +25,6 @@ import { Button } from "@/components/ui/button";
 import { InvoicesFilters } from "@/components/nf/InvoicesFilters";
 import RefreshButton from "@/components/nf/RefreshButton";
 import ViewDanfeButton from "@/components/nf/ViewDanfeButton";
-import { Database } from "@/components/types/supabase";
 import { InvoiceStatusButton } from "@/components/nf/InvoiceStatusButton";
 import Link from "next/link";
 import {
@@ -50,9 +49,8 @@ import {
 } from "@tabler/icons-react";
 import { NfeActionsDropdown } from "@/components/nf/NfeActionsDropdown";
 
-const supabase = createClientComponentClient<Database>();
-
 export default function NfePage() {
+  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const { companyId, loading } = useAuthenticatedCompany();
   const [invoices, setInvoices] = useState<any[]>([]);
   const [filters, setFilters] = useState({
@@ -66,26 +64,47 @@ export default function NfePage() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  useEffect(() => {
-    if (!companyId) return;
-    const fetchInvoices = async () => {
-      const { data, error } = await supabase
-        .from("invoices")
-        .select("*")
-        .eq("company_id", companyId)
-        .order("numero", { ascending: false });
+useEffect(() => {
+  if (!companyId) return;
 
-      if (error) {
-        console.error("Erro ao buscar notas fiscais:", error);
-      } else {
-        setInvoices(data);
-      }
-    };
+  const fetchInvoices = async () => {
+    const { data, error } = await supabase
+      .from("invoices")
+      .select(`
+        id,
+        company_id,
+        order_id,
+        customer_id,
+        customer_name,
+        numero,
+        note_number,
+        natureza_operacao,
+        valor_total,
+        status,
+        data_emissao,
+        danfe_url,
+        xml_url,
+        ref,
+        created_at
+      `)
+      .eq("company_id", companyId)
+      .order("created_at", { ascending: false });
 
-    if (companyId) {
-      fetchInvoices();
+    console.log("companyId:", companyId);
+    console.log("invoices error:", error);
+    console.log("invoices data:", data);
+
+    if (error) {
+      console.error("Erro ao buscar notas fiscais:", error);
+      setInvoices([]);
+      return;
     }
-  }, [companyId]);
+
+    setInvoices(data ?? []);
+  };
+
+  fetchInvoices();
+}, [companyId, supabase]);
 
   const filtered = invoices.filter((invoice) => {
     const matchesCustomer =
@@ -142,7 +161,7 @@ export default function NfePage() {
     currentPage * itemsPerPage,
   );
 
-  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
   // helpers
   const isAuthorized = (s?: string) =>
     (s || "").toLowerCase().includes("autorizad");

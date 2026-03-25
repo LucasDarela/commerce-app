@@ -1,24 +1,34 @@
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
-import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export async function POST(req: Request) {
   try {
-    const { ref, motivo } = await req.json();
-    const supabase = createRouteHandlerClient({ cookies });
+    const supabase = await createServerSupabaseClient();
 
-    // 🔒 Pega o usuário autenticado
+    // 🔒 1. autenticação SEMPRE primeiro
     const {
       data: { user },
+      error: userError,
     } = await supabase.auth.getUser();
 
-    if (!user) {
-      return Response.json(
-        { error: "Usuário não autenticado" },
+    if (userError || !user) {
+      return NextResponse.json(
+        { error: "Não autenticado" },
         { status: 401 },
       );
     }
 
-    // 🔗 Busca o company_id vinculado ao usuário
+    // 📦 2. body
+    const { ref, motivo } = await req.json();
+
+    if (!ref || !motivo) {
+      return NextResponse.json(
+        { error: "ref e motivo são obrigatórios" },
+        { status: 400 },
+      );
+    }
+
+    // 🔗 3. company_id
     const { data: companyUser, error: companyError } = await supabase
       .from("company_users")
       .select("company_id")
@@ -26,7 +36,7 @@ export async function POST(req: Request) {
       .maybeSingle();
 
     if (companyError || !companyUser?.company_id) {
-      return Response.json(
+      return NextResponse.json(
         { error: "Empresa não encontrada para este usuário" },
         { status: 401 },
       );
@@ -34,7 +44,7 @@ export async function POST(req: Request) {
 
     const companyId = companyUser.company_id;
 
-    // 🔍 Busca o token na tabela nfe_credentials
+    // 🔐 4. credenciais NFe
     const { data: credentials, error: credentialsError } = await supabase
       .from("nfe_credentials")
       .select("focus_token, environment")
@@ -42,7 +52,7 @@ export async function POST(req: Request) {
       .maybeSingle();
 
     if (credentialsError || !credentials?.focus_token) {
-      return Response.json(
+      return NextResponse.json(
         { error: "Token Focus NFe não encontrado" },
         { status: 401 },
       );
@@ -50,7 +60,6 @@ export async function POST(req: Request) {
 
     const { focus_token, environment } = credentials;
 
-    // Define a URL com base no ambiente
     const baseUrl =
       environment === "homologacao"
         ? "https://homologacao.focusnfe.com.br"
@@ -58,7 +67,7 @@ export async function POST(req: Request) {
 
     const url = `${baseUrl}/v2/nfe/${ref}`;
 
-    // Faz o cancelamento (HTTP DELETE com justificativa)
+    // 🚀 5. request Focus
     const response = await fetch(url, {
       method: "DELETE",
       headers: {
@@ -71,13 +80,13 @@ export async function POST(req: Request) {
     const data = await response.json();
 
     if (!response.ok) {
-      return Response.json(
+      return NextResponse.json(
         { error: "Erro ao cancelar NFe", details: data },
         { status: response.status },
       );
     }
 
-    // ✅ Atualiza o status no Supabase
+    // ✅ 6. update local
     const { error: updateError } = await supabase
       .from("invoices")
       .update({ status: "cancelado" })
@@ -88,10 +97,11 @@ export async function POST(req: Request) {
       console.error("Erro ao atualizar status no Supabase:", updateError);
     }
 
-    return Response.json({ success: true, data });
+    return NextResponse.json({ success: true, data });
   } catch (error) {
     console.error("Erro ao cancelar NFe:", error);
-    return Response.json(
+
+    return NextResponse.json(
       { error: "Erro interno no servidor" },
       { status: 500 },
     );

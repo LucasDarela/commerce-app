@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useRouter, useParams } from "next/navigation";
@@ -12,20 +12,15 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
-// import Link from "next/link";
+import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
 interface BankAccount {
   id: string;
   name: string;
   agency_name: string;
   account: string;
-}
-
-interface Supplier {
-  id: string;
-  name: string;
 }
 
 interface Product {
@@ -40,6 +35,37 @@ interface ProductEntry {
   unitPrice: number;
 }
 
+type NoteType = "input" | "output";
+type CategoryType =
+  | "compra_produto"
+  | "compra_equipamento"
+  | "pgto_funcionario"
+  | "vale_funcionario"
+  | "combustivel"
+  | "veiculo"
+  | "aluguel"
+  | "contabilidade"
+  | "utilidades"
+  | "others"
+  | "";
+
+type ExistingFinancialRecord = {
+  id: string;
+  company_id: string;
+  category: string | null;
+  supplier: string | null;
+  payment_method: string | null;
+  amount: number | null;
+  description: string | null;
+  due_date: string | null;
+  issue_date: string | null;
+  invoice_number: string | null;
+  notes: string | null;
+  bank_account_id: string | null;
+  type: NoteType;
+  days_ticket?: number | null;
+};
+
 function toISODate(dateStr: string): string {
   const parts = dateStr.split("/");
   if (parts.length !== 3) return "";
@@ -47,22 +73,44 @@ function toISODate(dateStr: string): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-type Entry = {
-  quantity?: number;
-  unitPrice?: number;
-  [key: string]: number | string | undefined;
-};
+function formatDate(value: string) {
+  if (!value) return "";
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [yyyy, mm, dd] = value.split("-");
+    return `${dd}/${mm}/${yyyy}`;
+  }
+
+  const cleaned = value.replace(/\D/g, "").slice(0, 8);
+  const parts = [];
+
+  if (cleaned.length >= 2) {
+    parts.push(cleaned.slice(0, 2));
+    if (cleaned.length >= 4) {
+      parts.push(cleaned.slice(2, 4));
+      parts.push(cleaned.slice(4, 8));
+    } else {
+      parts.push(cleaned.slice(2));
+    }
+  } else {
+    parts.push(cleaned);
+  }
+
+  return parts.join("/");
+}
 
 export default function EditFinancialRecord() {
   const router = useRouter();
   const params = useParams();
   const id = params?.id as string;
+
+  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
+  const { companyId, loading: authLoading } = useAuthenticatedCompany();
+
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
-  // const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  // const [newEntries, setNewEntries] = useState<Entry[]>([])
   const [selectedAccount, setSelectedAccount] = useState<string>("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [selectedCategory, setSelectedCategory] = useState<CategoryType>("");
   const [customCategory, setCustomCategory] = useState<string>("");
   const [selectedSupplier, setSelectedSupplier] = useState<string>("");
   const [paymentMethod, setPaymentMethod] = useState<string>("Pix");
@@ -73,16 +121,18 @@ export default function EditFinancialRecord() {
   const [invoiceNumber, setInvoiceNumber] = useState<string>("");
   const [issueDate, setIssueDate] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
-  const [companyId, setCompanyId] = useState<string | null>(null);
   const [productEntries, setProductEntries] = useState<ProductEntry[]>([]);
   const [loading, setLoading] = useState(false);
+  const [pageLoading, setPageLoading] = useState(true);
   const [noteType, setNoteType] = useState<"input" | "output">("input");
   const [entities, setEntities] = useState<{ id: string; name: string }[]>([]);
   const [showEntityDropdown, setShowEntityDropdown] = useState(false);
+  const [existingRecord, setExistingRecord] =
+    useState<ExistingFinancialRecord | null>(null);
 
   const handleAddProduct = () => {
-    setProductEntries([
-      ...productEntries,
+    setProductEntries((prev) => [
+      ...prev,
       { productId: "", quantity: 1, unitPrice: 0 },
     ]);
   };
@@ -100,17 +150,15 @@ export default function EditFinancialRecord() {
       prev.map((entry, i) => {
         if (i !== index) return entry;
 
-        // Quando mudar o produto selecionado
         if (field === "productId") {
           const selectedProduct = products.find((p) => p.id === value);
           return {
             ...entry,
             productId: value as string,
-            unitPrice: selectedProduct?.price || 0, // aqui já puxa o preço
+            unitPrice: selectedProduct?.price || 0,
           };
         }
 
-        // Atualiza normalmente se mudar quantidade ou unitPrice
         return {
           ...entry,
           [field]:
@@ -123,14 +171,218 @@ export default function EditFinancialRecord() {
   };
 
   const totalAmount =
-    selectedCategory === "product_purchase"
+    selectedCategory === "compra_produto" ||
+    selectedCategory === "compra_equipamento"
       ? productEntries.reduce(
           (sum, item) => sum + item.quantity * item.unitPrice,
           0,
         )
       : amount;
 
+  async function restorePreviousStock() {
+    if (!existingRecord || !companyId) return;
+
+    if (existingRecord.category === "compra_produto") {
+      const { data, error } = await supabase
+        .from("financial_products")
+        .select("product_id, quantity")
+        .eq("note_id", existingRecord.id)
+        .eq("company_id", companyId);
+
+      if (error) {
+        throw new Error("Erro ao buscar produtos antigos da nota.");
+      }
+
+      for (const item of data ?? []) {
+        const { data: product, error: productError } = await supabase
+          .from("products")
+          .select("stock")
+          .eq("id", item.product_id)
+          .eq("company_id", companyId)
+          .maybeSingle();
+
+        if (productError || !product) continue;
+
+        const currentStock = Number(product.stock ?? 0);
+        const restoredStock = Math.max(currentStock - Number(item.quantity || 0), 0);
+
+        const { error: updateError } = await supabase
+          .from("products")
+          .update({ stock: restoredStock })
+          .eq("id", item.product_id)
+          .eq("company_id", companyId);
+
+        if (updateError) {
+          throw new Error("Erro ao restaurar estoque anterior dos produtos.");
+        }
+      }
+
+      const { error: deleteError } = await supabase
+        .from("financial_products")
+        .delete()
+        .eq("note_id", existingRecord.id)
+        .eq("company_id", companyId);
+
+      if (deleteError) {
+        throw new Error("Erro ao limpar produtos antigos da nota.");
+      }
+    }
+
+    if (existingRecord.category === "compra_equipamento") {
+      const { data, error } = await supabase
+        .from("financial_equipments")
+        .select("equipment_id, quantity")
+        .eq("financial_record_id", existingRecord.id)
+        .eq("company_id", companyId);
+
+      if (error) {
+        throw new Error("Erro ao buscar equipamentos antigos da nota.");
+      }
+
+      for (const item of data ?? []) {
+        const { data: equipment, error: equipmentError } = await supabase
+          .from("equipments")
+          .select("stock")
+          .eq("id", item.equipment_id)
+          .eq("company_id", companyId)
+          .maybeSingle();
+
+        if (equipmentError || !equipment) continue;
+
+        const currentStock = Number(equipment.stock ?? 0);
+        const restoredStock = Math.max(currentStock - Number(item.quantity || 0), 0);
+
+        const { error: updateError } = await supabase
+          .from("equipments")
+          .update({ stock: restoredStock })
+          .eq("id", item.equipment_id)
+          .eq("company_id", companyId);
+
+        if (updateError) {
+          throw new Error("Erro ao restaurar estoque anterior dos equipamentos.");
+        }
+      }
+
+      const { error: deleteError } = await supabase
+        .from("financial_equipments")
+        .delete()
+        .eq("financial_record_id", existingRecord.id)
+        .eq("company_id", companyId);
+
+      if (deleteError) {
+        throw new Error("Erro ao limpar equipamentos antigos da nota.");
+      }
+    }
+  }
+
+  async function applyNewStockAndItems(updatedId: string) {
+    if (!companyId) return;
+
+    if (selectedCategory === "compra_produto") {
+      for (const entry of productEntries) {
+        if (!entry.productId || entry.quantity <= 0) continue;
+
+        const { data: productData, error: productError } = await supabase
+          .from("products")
+          .select("stock")
+          .eq("id", entry.productId)
+          .eq("company_id", companyId)
+          .maybeSingle();
+
+        if (productError || !productData) {
+          throw new Error("Erro ao buscar produto para atualizar estoque.");
+        }
+
+        const currentStock = Number(productData.stock ?? 0);
+
+        const { error: updateError } = await supabase
+          .from("products")
+          .update({ stock: currentStock + entry.quantity })
+          .eq("id", entry.productId)
+          .eq("company_id", companyId);
+
+        if (updateError) {
+          throw new Error("Erro ao atualizar estoque de produto.");
+        }
+      }
+
+      const entriesToSave = productEntries
+        .filter((entry) => entry.productId && entry.quantity > 0)
+        .map((entry) => ({
+          company_id: companyId,
+          note_id: updatedId,
+          product_id: entry.productId,
+          quantity: entry.quantity,
+          unit_price: entry.unitPrice,
+        }));
+
+      if (entriesToSave.length > 0) {
+        const { error: insertError } = await supabase
+          .from("financial_products")
+          .insert(entriesToSave);
+
+        if (insertError) {
+          throw new Error("Erro ao salvar produtos da nota.");
+        }
+      }
+    }
+
+    if (selectedCategory === "compra_equipamento") {
+      for (const entry of productEntries) {
+        if (!entry.productId || entry.quantity <= 0) continue;
+
+        const { data: equipmentData, error: equipmentError } = await supabase
+          .from("equipments")
+          .select("stock")
+          .eq("id", entry.productId)
+          .eq("company_id", companyId)
+          .maybeSingle();
+
+        if (equipmentError || !equipmentData) {
+          throw new Error("Erro ao buscar equipamento para atualizar estoque.");
+        }
+
+        const currentStock = Number(equipmentData.stock ?? 0);
+
+        const { error: updateError } = await supabase
+          .from("equipments")
+          .update({ stock: currentStock + entry.quantity })
+          .eq("id", entry.productId)
+          .eq("company_id", companyId);
+
+        if (updateError) {
+          throw new Error("Erro ao atualizar estoque de equipamento.");
+        }
+      }
+
+      const entriesToSave = productEntries
+        .filter((entry) => entry.productId && entry.quantity > 0)
+        .map((entry) => ({
+          company_id: companyId,
+          financial_record_id: updatedId,
+          equipment_id: entry.productId,
+          quantity: entry.quantity,
+          unit_price: entry.unitPrice,
+        }));
+
+      if (entriesToSave.length > 0) {
+        const { error: insertError } = await supabase
+          .from("financial_equipments")
+          .insert(entriesToSave);
+
+        if (insertError) {
+          throw new Error("Erro ao salvar equipamentos da nota.");
+        }
+      }
+    }
+  }
+
   const handleSubmit = async () => {
+    if (!companyId) {
+      toast.error("Empresa não identificada.");
+      return;
+    }
+
     if (!issueDate || !dueDate || !paymentMethod) {
       toast.error("Por favor, preencha todos os campos obrigatórios.");
       return;
@@ -156,146 +408,67 @@ export default function EditFinancialRecord() {
         ? toISODate(issueDate)
         : new Date().toISOString().split("T")[0],
       due_date: dueDate ? toISODate(dueDate) : null,
-      invoice_number: invoiceNumber,
-      supplier: selectedSupplier,
-      description,
+      invoice_number: invoiceNumber || null,
+      supplier: selectedSupplier || null,
+      description: description || null,
       category: selectedCategory || customCategory || "others",
       amount: calculatedAmount,
-      notes,
-      status: "Unpaid",
-      created_at: new Date().toISOString(),
+      notes: notes || null,
       bank_account_id: selectedAccount || null,
       type: noteType,
       payment_method: paymentMethod,
+      days_ticket:
+        paymentMethod === "Boleto" || paymentMethod === "Cartao"
+          ? Number(paymentDays || 0)
+          : null,
     };
 
     setLoading(true);
 
-    const { data: updated, error } = await supabase
-      .from("financial_records")
-      .update(record)
-      .eq("id", id)
-      .select()
-      .maybeSingle();
+    try {
+      await restorePreviousStock();
 
-    if (error || !updated) {
-      toast.error("Erro ao salvar: " + (error?.message || "Erro desconhecido"));
+      const { data: updated, error } = await supabase
+        .from("financial_records")
+        .update(record)
+        .eq("id", id)
+        .eq("company_id", companyId)
+        .select("id")
+        .maybeSingle();
+
+      if (error || !updated) {
+        throw new Error(error?.message || "Erro desconhecido ao atualizar nota.");
+      }
+
+      await applyNewStockAndItems(updated.id);
+
+      toast.success("Nota atualizada com sucesso!");
+      router.push("/dashboard/financial");
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Erro ao salvar a nota.");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    if (selectedCategory === "compra_produto") {
-      for (const entry of productEntries) {
-        if (!entry.productId || entry.quantity <= 0) continue;
-
-        const { data: productData, error: productError } = await supabase
-          .from("products")
-          .select("stock")
-          .eq("id", entry.productId)
-          .maybeSingle();
-
-        if (productError || !productData) {
-          console.error("Erro buscando produto:", productError);
-          continue;
-        }
-
-        const currentStock = Number(productData.stock) || 0;
-
-        const { error: updateError } = await supabase
-          .from("products")
-          .update({ stock: currentStock + entry.quantity })
-          .eq("id", entry.productId);
-
-        if (updateError) {
-          console.error("Erro atualizando estoque de produto:", updateError);
-        }
-      }
-
-      const entriesToSave = productEntries.map((entry) => ({
-        company_id: companyId,
-        // note_id: inserted.id,
-        product_id: entry.productId,
-        quantity: entry.quantity,
-        unit_price: entry.unitPrice,
-      }));
-
-      const { error: insertError } = await supabase
-        .from("financial_products")
-        .insert(entriesToSave);
-
-      if (insertError) {
-        console.error("Erro ao salvar produtos da nota:", insertError);
-      }
-    }
-
-    if (selectedCategory === "compra_equipamento") {
-      for (const entry of productEntries) {
-        if (!entry.productId || entry.quantity <= 0) continue;
-
-        const { data: equipmentData, error: equipmentError } = await supabase
-          .from("equipments")
-          .select("stock")
-          .eq("id", entry.productId)
-          .maybeSingle();
-
-        if (equipmentError || !equipmentData) {
-          console.error("Erro buscando equipamento:", equipmentError);
-          continue;
-        }
-
-        const currentStock = Number(equipmentData.stock) || 0;
-
-        const { error: updateError } = await supabase
-          .from("equipments")
-          .update({ stock: currentStock + entry.quantity })
-          .eq("id", entry.productId);
-
-        if (updateError) {
-          console.error(
-            "Erro atualizando estoque de equipamento:",
-            updateError,
-          );
-        }
-      }
-
-      const entriesToSave = productEntries.map((entry) => ({
-        financial_record_id: updated.id,
-        equipment_id: entry.productId,
-        quantity: entry.quantity,
-        unit_price: entry.unitPrice,
-      }));
-
-      const { error: insertError } = await supabase
-        .from("financial_equipments")
-        .insert(entriesToSave);
-
-      if (insertError) {
-        console.error("Erro ao salvar equipamentos da nota:", insertError);
-      }
-    }
-
-    toast.success("Nota salva com sucesso!");
-    setLoading(false);
-    router.push("/dashboard/financial");
   };
 
   useEffect(() => {
     const fetchEntities = async () => {
-      const { data: suppliersData } = await supabase
-        .from("suppliers")
-        .select("id, name");
-      const { data: customersData } = await supabase
-        .from("customers")
-        .select("id, name");
-      if (suppliersData && customersData) {
-        setEntities([
-          ...suppliersData.map((s) => ({ id: s.id, name: s.name })),
-          ...customersData.map((c) => ({ id: c.id, name: c.name })),
-        ]);
-      }
+      if (!companyId) return;
+
+      const [{ data: suppliersData }, { data: customersData }] = await Promise.all([
+        supabase.from("suppliers").select("id, name").eq("company_id", companyId),
+        supabase.from("customers").select("id, name").eq("company_id", companyId),
+      ]);
+
+      setEntities([
+        ...(suppliersData ?? []).map((s) => ({ id: s.id, name: s.name })),
+        ...(customersData ?? []).map((c) => ({ id: c.id, name: c.name })),
+      ]);
     };
+
     fetchEntities();
-  }, []);
+  }, [companyId, supabase]);
 
   useEffect(() => {
     const fetchItems = async () => {
@@ -304,14 +477,16 @@ export default function EditFinancialRecord() {
       if (selectedCategory === "compra_produto") {
         const { data, error } = await supabase
           .from("products")
-          .select("id, name, standard_price");
+          .select("id, name, standard_price")
+          .eq("company_id", companyId)
+          .order("name", { ascending: true });
 
         if (!error && data) {
           setProducts(
             data.map((p) => ({
-              id: p.id,
+              id: String(p.id),
               name: p.name,
-              price: p.standard_price,
+              price: Number(p.standard_price ?? 0),
             })),
           );
         }
@@ -320,14 +495,16 @@ export default function EditFinancialRecord() {
       if (selectedCategory === "compra_equipamento") {
         const { data, error } = await supabase
           .from("equipments")
-          .select("id, name, value");
+          .select("id, name, value")
+          .eq("company_id", companyId)
+          .order("name", { ascending: true });
 
         if (!error && data) {
           setProducts(
             data.map((e) => ({
-              id: e.id,
+              id: String(e.id),
               name: e.name,
-              price: e.value,
+              price: Number(e.value ?? 0),
             })),
           );
         }
@@ -335,90 +512,82 @@ export default function EditFinancialRecord() {
     };
 
     fetchItems();
-  }, [companyId, selectedCategory]);
+  }, [companyId, selectedCategory, supabase]);
 
   useEffect(() => {
     const fetchBankAccounts = async () => {
       if (!companyId) return;
+
       const { data, error } = await supabase
         .from("bank_accounts")
         .select("id, name, agency_name, account")
-        .eq("company_id", companyId);
+        .eq("company_id", companyId)
+        .order("name", { ascending: true });
+
       if (!error) setBankAccounts(data || []);
     };
+
     fetchBankAccounts();
-  }, [companyId]);
-
-  useEffect(() => {
-    const fetchCompanyId = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) return;
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("company_id")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      if (!error && data) {
-        setCompanyId(data.company_id);
-      } else {
-        console.error("Failed to load company ID:", error?.message);
-      }
-    };
-    fetchCompanyId();
-  }, []);
+  }, [companyId, supabase]);
 
   useEffect(() => {
     const fetchExistingRecord = async () => {
-      if (!id) return;
+      if (!id || !companyId) return;
+
+      setPageLoading(true);
+
       const { data, error } = await supabase
         .from("financial_records")
         .select("*")
         .eq("id", id)
+        .eq("company_id", companyId)
         .maybeSingle();
 
       if (error || !data) {
         toast.error("Erro ao carregar nota.");
+        setPageLoading(false);
         return;
       }
 
-      // Preencher estados com os dados da nota
-      setSelectedCategory(data.category);
-      setSelectedSupplier(data.supplier);
-      setPaymentMethod(data.payment_method);
-      setAmount(data.amount);
-      setDescription(data.description || "");
-      setDueDate(data.due_date ? formatDate(data.due_date) : "");
-      setIssueDate(data.issue_date ? formatDate(data.issue_date) : "");
-      setInvoiceNumber(data.invoice_number || "");
-      setNotes(data.notes || "");
-      setSelectedAccount(data.bank_account_id || "");
-      setNoteType(data.type);
-      setPaymentDays(data.days_ticket || "");
+      const parsed = data as ExistingFinancialRecord;
+
+      setExistingRecord(parsed);
+      setSelectedCategory((parsed.category as CategoryType) || "");
+      setSelectedSupplier(parsed.supplier || "");
+      setPaymentMethod(parsed.payment_method || "Pix");
+      setAmount(Number(parsed.amount ?? 0));
+      setDescription(parsed.description || "");
+      setDueDate(parsed.due_date ? formatDate(parsed.due_date) : "");
+      setIssueDate(parsed.issue_date ? formatDate(parsed.issue_date) : "");
+      setInvoiceNumber(parsed.invoice_number || "");
+      setNotes(parsed.notes || "");
+      setSelectedAccount(parsed.bank_account_id || "");
+      setNoteType(parsed.type || "input");
+      setPaymentDays(parsed.days_ticket || "");
+
+      setPageLoading(false);
     };
 
     fetchExistingRecord();
-  }, [id]);
+  }, [id, companyId, supabase]);
 
   useEffect(() => {
     const fetchProductEntries = async () => {
-      if (!id || !selectedCategory) return;
+      if (!id || !companyId || !selectedCategory) return;
 
       if (selectedCategory === "compra_produto") {
         const { data, error } = await supabase
           .from("financial_products")
           .select("product_id, quantity, unit_price")
-          .eq("note_id", id);
+          .eq("note_id", id)
+          .eq("company_id", companyId);
 
         if (!error && data) {
           setProductEntries(
             data.map((item) => ({
-              productId: item.product_id,
-              quantity: item.quantity,
-              unitPrice: item.unit_price,
+              productId: String(item.product_id),
+              quantity: Number(item.quantity ?? 0),
+              unitPrice: Number(item.unit_price ?? 0),
             })),
           );
         }
@@ -428,14 +597,15 @@ export default function EditFinancialRecord() {
         const { data, error } = await supabase
           .from("financial_equipments")
           .select("equipment_id, quantity, unit_price")
-          .eq("financial_record_id", id);
+          .eq("financial_record_id", id)
+          .eq("company_id", companyId);
 
         if (!error && data) {
           setProductEntries(
             data.map((item) => ({
-              productId: item.equipment_id,
-              quantity: item.quantity,
-              unitPrice: item.unit_price,
+              productId: String(item.equipment_id),
+              quantity: Number(item.quantity ?? 0),
+              unitPrice: Number(item.unit_price ?? 0),
             })),
           );
         }
@@ -443,35 +613,17 @@ export default function EditFinancialRecord() {
     };
 
     fetchProductEntries();
-  }, [id, selectedCategory]);
+  }, [id, companyId, selectedCategory, supabase]);
 
-  const formatDate = (value: string) => {
-    if (!value) return "";
-
-    // Verifica se está no formato ISO (yyyy-mm-dd)
-    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-      const [yyyy, mm, dd] = value.split("-");
-      return `${dd}/${mm}/${yyyy}`;
-    }
-
-    // Caso seja valor digitado manualmente
-    const cleaned = value.replace(/\D/g, "").slice(0, 8);
-    const parts = [];
-
-    if (cleaned.length >= 2) {
-      parts.push(cleaned.slice(0, 2));
-      if (cleaned.length >= 4) {
-        parts.push(cleaned.slice(2, 4));
-        parts.push(cleaned.slice(4, 8));
-      } else {
-        parts.push(cleaned.slice(2));
-      }
-    } else {
-      parts.push(cleaned);
-    }
-
-    return parts.join("/");
-  };
+  if (authLoading || pageLoading) {
+    return (
+      <div className="max-w-3xl mx-auto p-6 rounded-lg shadow-md">
+        <div className="flex items-center justify-center py-10">
+          <Loader2 className="h-5 w-5 animate-spin" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-3xl mx-auto p-6 rounded-lg shadow-md">
@@ -480,7 +632,7 @@ export default function EditFinancialRecord() {
       <div className="grid grid-cols-2 gap-4 mt-4">
         <Select
           value={noteType}
-          onValueChange={(val) => setNoteType(val as "input" | "output")}
+          onValueChange={(val) => setNoteType(val as NoteType)}
         >
           <SelectTrigger className="w-full">
             <SelectValue placeholder="Tipo de Nota" />
@@ -494,7 +646,7 @@ export default function EditFinancialRecord() {
         <Select
           disabled
           value={selectedCategory}
-          onValueChange={setSelectedCategory}
+          onValueChange={(val) => setSelectedCategory(val as CategoryType)}
         >
           <SelectTrigger className="w-full">
             <SelectValue placeholder="Selecione a categoria" />
@@ -518,7 +670,6 @@ export default function EditFinancialRecord() {
         </Select>
       </div>
 
-      {/* Banco + Datas + Número da nota */}
       <div className="grid grid-cols-4 gap-4 mt-4">
         <Select value={selectedAccount} onValueChange={setSelectedAccount}>
           <SelectTrigger className="w-full">
@@ -532,16 +683,19 @@ export default function EditFinancialRecord() {
             ))}
           </SelectContent>
         </Select>
+
         <Input
           placeholder="Numero da Nota (opcional)"
           value={invoiceNumber}
           onChange={(e) => setInvoiceNumber(e.target.value)}
         />
+
         <Input
           placeholder="Data de Emissão"
           value={issueDate}
           onChange={(e) => setIssueDate(formatDate(e.target.value))}
         />
+
         <Input
           placeholder="Data de Vencimento"
           value={dueDate}
@@ -549,9 +703,7 @@ export default function EditFinancialRecord() {
         />
       </div>
 
-      {/* Categoria + Fornecedor */}
       <div className="grid grid-cols-4 gap-4 mt-4">
-        {/* Fornecedor (metade da linha) */}
         <div className="col-span-2">
           <div className="relative">
             <Input
@@ -559,10 +711,11 @@ export default function EditFinancialRecord() {
               value={selectedSupplier}
               onChange={(e) => {
                 setSelectedSupplier(e.target.value);
-                setShowEntityDropdown(true); // 🔥 Abre o dropdown enquanto digita
+                setShowEntityDropdown(true);
               }}
               className="w-full"
             />
+
             {showEntityDropdown && selectedSupplier.length > 0 && (
               <div className="absolute z-10 mt-1 w-full border rounded-md shadow-md max-h-40 overflow-y-auto bg-muted">
                 {entities
@@ -588,7 +741,6 @@ export default function EditFinancialRecord() {
           </div>
         </div>
 
-        {/* Método de Pagamento (1/4) */}
         <div className="col-span-1">
           <Select value={paymentMethod} onValueChange={setPaymentMethod}>
             <SelectTrigger className="w-full">
@@ -603,7 +755,6 @@ export default function EditFinancialRecord() {
           </Select>
         </div>
 
-        {/* Dias para Pagar (1/4) – sempre visível, só habilitado com boleto */}
         <div className="col-span-1">
           <Input
             type="number"
@@ -624,7 +775,6 @@ export default function EditFinancialRecord() {
         />
       )}
 
-      {/* Tabela de Produtos */}
       {(selectedCategory === "compra_produto" ||
         selectedCategory === "compra_equipamento") && (
         <div className="mb-4 w-full">
@@ -633,6 +783,7 @@ export default function EditFinancialRecord() {
               ? "Produtos"
               : "Equipamentos"}
           </h4>
+
           {productEntries.map((entry, index) => (
             <div
               key={index}
@@ -664,6 +815,7 @@ export default function EditFinancialRecord() {
                   handleProductChange(index, "quantity", e.target.value)
                 }
               />
+
               <Input
                 type="number"
                 placeholder="Valor Unitário"
@@ -673,7 +825,6 @@ export default function EditFinancialRecord() {
                 }
               />
 
-              {/* Botão de remover */}
               <Button
                 variant="destructive"
                 size="icon"
@@ -683,13 +834,13 @@ export default function EditFinancialRecord() {
               </Button>
             </div>
           ))}
+
           <Button variant="outline" onClick={handleAddProduct} className="mt-2">
             <Plus className="h-4 w-4 mr-2" /> Adicionar
           </Button>
         </div>
       )}
 
-      {/* Pagamento + Valor */}
       <div className="grid grid-cols-2 gap-4 mt-4">
         <Input
           placeholder="Descrição"
@@ -700,15 +851,7 @@ export default function EditFinancialRecord() {
         <Input
           placeholder="Valor Total"
           type="number"
-          value={
-            selectedCategory === "compra_produto" ||
-            selectedCategory === "compra_equipamento"
-              ? productEntries.reduce(
-                  (sum, item) => sum + item.quantity * item.unitPrice,
-                  0,
-                )
-              : amount
-          }
+          value={totalAmount}
           onChange={(e) => {
             if (
               selectedCategory !== "compra_produto" &&
@@ -724,15 +867,13 @@ export default function EditFinancialRecord() {
         />
       </div>
 
-      {/* Notas */}
       <textarea
         placeholder="Notas (opcional)"
         value={notes}
         onChange={(e) => setNotes(e.target.value)}
         className="mt-4 w-full h-32 p-2 border rounded-md resize-none"
-      ></textarea>
+      />
 
-      {/* Botão */}
       <Button className="mt-4 w-full" onClick={handleSubmit} disabled={loading}>
         {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
         {loading ? "Salvando..." : "Atualizar Nota"}

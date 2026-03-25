@@ -1,53 +1,67 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import { fetchOrderDetails } from "@/lib/fetchOrderDetails";
 import { toast } from "sonner";
 import { PDFDownloadLink } from "@react-pdf/renderer";
+import clsx from "clsx";
+import dayjs from "dayjs";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
+import { fetchOrderDetails } from "@/lib/fetchOrderDetails";
+import { getCompanyLogoAsDataUrl } from "@/components/pdf/CompanyLogoAsDataUrl";
+import { fetchEquipmentsForOrderProducts } from "@/lib/fetch-equipments-for-products";
+
 import { ItemRelationPDF } from "@/components/pdf/item-relation-pdf";
 import { Button } from "@/components/ui/button";
 import { GenerateBoletoButtons } from "@/components/generate-boleto-button";
 import { SignatureModal } from "@/components/signature-modal";
-import { supabase } from "@/lib/supabase";
-import type { OrderItem } from "@/components/types/orders";
-import { getCompanyLogoAsDataUrl } from "@/components/pdf/CompanyLogoAsDataUrl";
-import { fetchEquipmentsForOrderProducts } from "@/lib/fetch-equipments-for-products";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { OrderDetails } from "@/components/types/orderDetails";
 import { LoanEquipmentModal } from "@/components/equipment-loan/LoanEquipmentModal";
 import { ReturnEquipmentModal } from "@/components/equipment-loan/ReturnEquipmentModal";
-import clsx from "clsx";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
 import EmitNfeButton from "@/components/nf/EmitirNfeViewPage";
-import { useCanEmitNfe } from "@/hooks/useCanEmitNfe";
-import dayjs from "dayjs";
+import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
+
+import type { OrderItem } from "@/components/types/orders";
+import type { OrderDetails } from "@/components/types/orderDetails";
 
 // --------- helpers de estoque ----------
 async function parseProductsWithIds(
   supabaseClient: SupabaseClient,
   products: string,
+  companyId?: string | null,
 ): Promise<{ id: number; quantity: number }[]> {
-  if (!products) return [];
+  if (!products?.trim()) return [];
+
   const parsed = products.split(",").map((entry) => {
     const match = entry.trim().match(/^(.+?) \((\d+)x\)$/);
     if (!match) return { name: entry.trim(), quantity: 1 };
+
     const [, name, quantity] = match;
     return { name: name.trim(), quantity: Number(quantity) };
   });
 
-  const names = parsed.map((p) => p.name);
-  const { data, error } = await supabaseClient
-    .from("products")
-    .select("id, name")
-    .in("name", names);
+  const names = [...new Set(parsed.map((p) => p.name).filter(Boolean))];
+  if (!names.length) return [];
 
-  if (error || !data) return [];
+  let query = supabaseClient.from("products").select("id, name").in("name", names);
+
+  if (companyId) {
+    query = query.eq("company_id", companyId);
+  }
+
+  const { data, error } = await query;
+
+  if (error || !data) {
+    console.error("Erro ao buscar IDs dos produtos:", error);
+    return [];
+  }
 
   return parsed
     .map((p) => {
       const hit = data.find((d) => d.name === p.name);
-      return { id: hit?.id ?? 0, quantity: p.quantity };
+      return { id: Number(hit?.id ?? 0), quantity: p.quantity };
     })
     .filter((p) => p.id !== 0);
 }
@@ -56,11 +70,41 @@ async function updateStockBasedOnOrder(
   supabaseClient: SupabaseClient,
   order: OrderDetails,
 ) {
-  const items = await parseProductsWithIds(supabaseClient, order.products);
+  const companyId = order.company?.id ?? null;
+
+  const items = await parseProductsWithIds(
+    supabaseClient,
+    order.products ?? "",
+    companyId,
+  );
+
   for (const item of items) {
-    await supabaseClient.rpc("decrement_stock", {
+    const { data, error } = await supabaseClient.rpc("decrement_stock", {
+      product_id: Number(item.id),
+      quantity: Number(item.quantity),
+    });
+
+    if (error) {
+      console.error("Erro ao decrementar estoque:", {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+        rpc: "decrement_stock",
+        product_id: item.id,
+        quantity: item.quantity,
+        companyId,
+      });
+
+      throw new Error(
+        error.message || "Falha ao decrementar estoque no Supabase.",
+      );
+    }
+
+    console.log("Estoque decrementado com sucesso:", {
       product_id: item.id,
       quantity: item.quantity,
+      result: data,
     });
   }
 }
@@ -68,35 +112,41 @@ async function updateStockBasedOnOrder(
 // --------- helpers de cliente/botão ----------
 async function resolveCustomer(
   supabaseClient: SupabaseClient,
-  ord: any,
+  ord: OrderDetails,
 ): Promise<{ id: string; name: string } | null> {
+  const companyId = ord.company?.id ?? null;
+
   if (ord?.customer?.id) {
-    const { data } = await supabaseClient
+    let query = supabaseClient
       .from("customers")
       .select("id, name")
-      .eq("id", ord.customer.id)
-      .maybeSingle();
+      .eq("id", ord.customer.id);
+
+    if (companyId) query = query.eq("company_id", companyId);
+
+    const { data } = await query.maybeSingle();
     if (data) return data;
   }
 
   const rawName =
     typeof ord.customer === "string" ? ord.customer : ord.customer?.name;
+
   if (!rawName) return null;
 
-  let q = supabaseClient.from("customers").select("id, name");
-  if (ord.company?.id || ord.company_id) {
-    q = q.eq("company_id", ord.company?.id ?? ord.company_id);
-  }
+  let exactQuery = supabaseClient.from("customers").select("id, name").eq("name", rawName);
+  if (companyId) exactQuery = exactQuery.eq("company_id", companyId);
 
-  const { data: exact } = await q.eq("name", rawName).limit(1);
+  const { data: exact } = await exactQuery.limit(1);
   if (exact?.length) return exact[0];
 
-  const { data: like } = await supabaseClient
+  let likeQuery = supabaseClient
     .from("customers")
     .select("id, name")
-    .ilike("name", `%${rawName}%`)
-    .limit(1);
+    .ilike("name", `%${rawName}%`);
 
+  if (companyId) likeQuery = likeQuery.eq("company_id", companyId);
+
+  const { data: like } = await likeQuery.limit(1);
   return like?.[0] ?? null;
 }
 
@@ -108,147 +158,166 @@ function getDeliveryButtonLabel(status?: string) {
 }
 
 export default function ViewOrderPage() {
+  const { companyId, loading: companyLoading } = useAuthenticatedCompany();
   const { id } = useParams();
+  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
+
   const [order, setOrder] = useState<OrderDetails | null>(null);
   const [openSignature, setOpenSignature] = useState(false);
   const [signatureData, setSignatureData] = useState<string | null>(null);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  // 🟡 Modal de comodato (empréstimo)
+
   const [isLoanModalOpen, setIsLoanModalOpen] = useState(false);
   const [initialLoanCustomer, setInitialLoanCustomer] = useState<{
     id: string;
     name: string;
   }>();
-  const [initialLoanItems, setInitialLoanItems] =
-    useState<{ equipment_id: string; name: string; quantity: number }[]>();
+  const [initialLoanItems, setInitialLoanItems] = useState<
+    { equipment_id: string; name: string; quantity: number }[]
+  >();
 
   const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
-  const [returnModalCustomerId, setReturnModalCustomerId] = useState<
-    string | null
-  >(null);
+  const [returnModalCustomerId, setReturnModalCustomerId] = useState<string | null>(null);
   const [returnEquipmentItems, setReturnEquipmentItems] = useState<
     { loanId: string; equipmentName: string; quantity: number }[]
   >([]);
 
-  const fetchReturnedProducts = async (orderId: string, customerId: string) => {
-    const { data: customerData, error: customerError } = await supabase
-      .from("customers")
-      .select("price_table_id")
-      .eq("id", customerId)
-      .single();
-
-    if (customerError || !customerData) {
-      console.error("Erro ao buscar price_table_id:", customerError);
-      return [];
-    }
-
-    const { data: stockMovements, error: stockError } = await supabase
-      .from("stock_movements")
-      .select(
-        `
-        quantity,
-        product_id,
-        product:products ( name, code )
-      `,
-      )
-      .eq("note_id", orderId)
-      .eq("type", "return");
-
-    if (stockError || !stockMovements) {
-      console.error("Erro ao buscar stock_movements:", stockError);
-      return [];
-    }
-
-    const devolucaoComPreco = await Promise.all(
-      stockMovements.map(async (item) => {
-        const { data: priceTableItem, error: priceError } = await supabase
-          .from("price_table_products")
-          .select("price")
-          .eq("price_table_id", customerData.price_table_id)
-          .eq("product_id", item.product_id)
-          .single();
-
-        if (priceError) {
-          console.error(
-            `Erro ao buscar preço (product_id: ${item.product_id}, price_table_id: ${customerData.price_table_id}):`,
-            priceError,
-          );
-        }
-
-        return {
-          ...item,
-          unitPrice: priceTableItem?.price ?? 0,
-        };
-      }),
-    );
-
-    return devolucaoComPreco;
-  };
-
   const [returnedProducts, setReturnedProducts] = useState<any[]>([]);
 
-  useEffect(() => {
-    const fetch = async () => {
-      try {
-        const data = await fetchOrderDetails(id as string);
-        if (!data || !data.customer) return;
-        setOrder(data);
+const fetchReturnedProducts = async (
+  orderId: string,
+  customerId: string,
+  companyId: string,
+) => {
+  const { data: customerData, error: customerError } = await supabase
+    .from("customers")
+    .select("price_table_id")
+    .eq("id", customerId)
+    .eq("company_id", companyId)
+    .single();
 
-        const { data: customerEmit, error: emitError } = await supabase
-          .from("customers")
-          .select("emit_nf")
-          .eq("id", data.customer.id)
-          .single();
-
-        if (!emitError && customerEmit) {
-          setOrder((prev: any) =>
-            prev
-              ? {
-                  ...prev,
-                  customer: { ...prev.customer, emit_nf: customerEmit.emit_nf },
-                }
-              : prev,
-          );
-        }
-
-        if (data?.customer_signature) {
-          setSignatureData(data.customer_signature);
-        }
-
-        const devolucoes = await fetchReturnedProducts(
-          id as string,
-          data.customer.id,
-        );
-        setReturnedProducts(devolucoes);
-
-        const logo = await getCompanyLogoAsDataUrl(data.company?.id ?? null);
-        setLogoUrl(logo);
-      } catch (err) {
-        console.error("Erro ao carregar espelho da venda:", err);
-        toast.error("Erro ao carregar espelho da venda.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (id) fetch();
-  }, [id]);
-
-  // chama o hook sempre — passa nulls enquanto order não existe
-  const {
-    canEmit,
-    loading: canEmitLoading,
-    error: canEmitError,
-  } = useCanEmitNfe({
-    customerId: order?.customer?.id ?? null,
-    emitNfFromOrder: order?.emit_nf ?? null,
-    emitNfFromCustomer: order?.customer?.emit_nf ?? null,
-  });
-
-  if (loading || !order) {
-    return <TableSkeleton />;
+  if (customerError || !customerData) {
+    console.error("Erro ao buscar price_table_id:", customerError);
+    return [];
   }
+
+  const { data: stockMovements, error: stockError } = await supabase
+    .from("stock_movements")
+    .select(
+      `
+      quantity,
+      product_id,
+      product:products ( name, code )
+    `,
+    )
+    .eq("note_id", orderId)
+    .eq("type", "return")
+    .eq("company_id", companyId);
+
+  if (stockError || !stockMovements) {
+    console.error("Erro ao buscar stock_movements:", stockError);
+    return [];
+  }
+
+  const devolucaoComPreco = await Promise.all(
+    stockMovements.map(async (item: any) => {
+      const { data: priceTableItem, error: priceError } = await supabase
+        .from("price_table_products")
+        .select("price")
+        .eq("price_table_id", customerData.price_table_id)
+        .eq("product_id", item.product_id)
+        .single();
+
+      if (priceError) {
+        console.error(
+          `Erro ao buscar preço (product_id: ${item.product_id}, price_table_id: ${customerData.price_table_id}):`,
+          priceError,
+        );
+      }
+
+      return {
+        ...item,
+        unitPrice: priceTableItem?.price ?? 0,
+      };
+    }),
+  );
+
+  return devolucaoComPreco;
+};
+
+  useEffect(() => {
+    let isMounted = true;
+
+const fetchData = async () => {
+  if (!id || !companyId) return;
+  const currentCompanyId = companyId;
+
+  try {
+    const data = await fetchOrderDetails(String(id), currentCompanyId);
+    if (!data || !data.customer) return;
+
+    if (!isMounted) return;
+    setOrder(data);
+
+    if (data?.customer_signature) {
+      setSignatureData(data.customer_signature);
+    }
+
+    if (data.customer?.id) {
+      const { data: customerEmit, error: emitError } = await supabase
+        .from("customers")
+        .select("emit_nf")
+        .eq("id", data.customer.id)
+        .eq("company_id", data.company?.id ?? "")
+        .single();
+
+      if (!emitError && customerEmit && isMounted) {
+        setOrder((prev: any) =>
+          prev
+            ? {
+                ...prev,
+                customer: { ...prev.customer, emit_nf: customerEmit.emit_nf },
+              }
+            : prev,
+        );
+      }
+
+      const devolucoes = await fetchReturnedProducts(
+        String(id),
+        data.customer.id,
+        currentCompanyId,
+      );
+
+      if (isMounted) {
+        setReturnedProducts(devolucoes);
+      }
+    }
+
+    const logo = await getCompanyLogoAsDataUrl(data.company?.id ?? "");
+    if (isMounted) {
+      setLogoUrl(logo);
+    }
+  } catch (err) {
+    console.error("Erro ao carregar espelho da venda:", err);
+    toast.error("Erro ao carregar espelho da venda.");
+  } finally {
+    if (isMounted) setLoading(false);
+  }
+};
+
+    if (id && companyId) {
+      fetchData();
+    }
+
+    return () => {
+      isMounted = false;
+    };
+}, [id, supabase, companyId]);
+
+if (loading || companyLoading || !order) {
+  return <TableSkeleton />;
+}
 
   const customer = order.customer;
   const items: OrderItem[] = (order.items ?? []).map((item: any) => ({
@@ -285,22 +354,22 @@ export default function ViewOrderPage() {
     if (!dataUrl) return;
 
     if (signatureData) {
-      const confirmReplace = confirm(
-        "Deseja substituir a assinatura existente?",
-      );
+      const confirmReplace = confirm("Deseja substituir a assinatura existente?");
       if (!confirmReplace) return;
     }
 
     const { error: saveError } = await supabase
       .from("orders")
       .update({ customer_signature: dataUrl })
-      .eq("id", id);
+      .eq("id", id)
+      .eq("company_id", order.company?.id ?? "");
 
     if (saveError) {
       toast.error("Erro ao salvar assinatura no banco.");
       console.error("Erro ao atualizar assinatura:", saveError);
       return;
     }
+
     toast.success("Assinatura salva com sucesso!");
     setOrder((prev: any) =>
       prev ? { ...prev, customer_signature: dataUrl } : prev,
@@ -308,7 +377,7 @@ export default function ViewOrderPage() {
     setSignatureData(dataUrl);
     setOpenSignature(false);
 
-    const { data: items, error: itemsError } = await supabase
+    const { data: orderItems, error: itemsError } = await supabase
       .from("order_items")
       .select("product_id, quantity")
       .eq("order_id", id);
@@ -319,11 +388,12 @@ export default function ViewOrderPage() {
       return;
     }
 
-    for (const item of items ?? []) {
+    for (const item of orderItems ?? []) {
       const { data: product, error: productError } = await supabase
         .from("products")
         .select("stock")
         .eq("id", item.product_id)
+        .eq("company_id", order.company?.id ?? "")
         .single();
 
       if (productError || product?.stock == null) {
@@ -331,26 +401,32 @@ export default function ViewOrderPage() {
         continue;
       }
 
-      const novoEstoque = (product.stock ?? 0) - item.quantity;
+      const novoEstoque = Number(product.stock ?? 0) - Number(item.quantity ?? 0);
 
       const { error: updateError } = await supabase
         .from("products")
         .update({ stock: novoEstoque })
-        .eq("id", item.product_id);
+        .eq("id", item.product_id)
+        .eq("company_id", order.company?.id ?? "");
 
       if (updateError) {
         console.error("Erro ao atualizar estoque:", updateError);
       }
     }
-    await supabase.from("orders").update({ stock_updated: true }).eq("id", id);
-    setOpenSignature(false);
+
+    await supabase
+      .from("orders")
+      .update({ stock_updated: true })
+      .eq("id", id)
+      .eq("company_id", order.company?.id ?? "");
   };
 
   const markOrderStatus = async (next: "Coletar" | "Coletado") => {
     const { error } = await supabase
       .from("orders")
       .update({ delivery_status: next })
-      .eq("id", order.id);
+      .eq("id", order.id)
+      .eq("company_id", order.company?.id ?? "");
 
     if (error) {
       toast.error("Erro ao atualizar status.");
@@ -375,41 +451,40 @@ export default function ViewOrderPage() {
     if (order.delivery_status === "Coletado") return;
 
     if (!order.customer_signature) {
-      toast.warning(
-        "⚠️ O cliente precisa assinar antes de marcar como entregue.",
-      );
+      toast.warning("⚠️ O cliente precisa assinar antes de marcar como entregue.");
       return;
     }
+
     try {
-      // ENTREGAR -> abrir modal com itens vinculados
       if (order.delivery_status === "Entregar") {
         const productsStr =
           (order.items ?? [])
             .map(
               (it: any) => `${it.product?.name ?? "Produto"} (${it.quantity}x)`,
             )
-            .join(", ") ||
-          order.products ||
-          "";
+            .join(", ") || order.products || "";
 
         const equipmentItems =
-          await fetchEquipmentsForOrderProducts(productsStr);
+          await fetchEquipmentsForOrderProducts(productsStr, order.company?.id ?? "");
 
-        const customer = await resolveCustomer(supabase, order);
-        if (!customer) {
+        const customerResolved = await resolveCustomer(supabase, order);
+        if (!customerResolved) {
           toast.error("Cliente não encontrado na tabela de clientes.");
           return;
         }
 
-        setInitialLoanCustomer({ id: customer.id, name: customer.name });
+        setInitialLoanCustomer({
+          id: customerResolved.id,
+          name: customerResolved.name,
+        });
         setInitialLoanItems(equipmentItems);
         setIsLoanModalOpen(true);
         return;
       }
 
       if (order.delivery_status === "Coletar") {
-        const customer = await resolveCustomer(supabase, order);
-        if (!customer) {
+        const customerResolved = await resolveCustomer(supabase, order);
+        if (!customerResolved) {
           toast.error("Cliente não encontrado na tabela de clientes.");
           return;
         }
@@ -417,7 +492,8 @@ export default function ViewOrderPage() {
         const { data: loans, error } = await supabase
           .from("equipment_loans")
           .select("id, quantity, equipment:equipment_id(name)")
-          .eq("customer_id", customer.id)
+          .eq("customer_id", customerResolved.id)
+          .eq("company_id", order.company?.id ?? "")
           .eq("status", "active");
 
         if (error || !loans) {
@@ -436,19 +512,19 @@ export default function ViewOrderPage() {
           return;
         }
 
-        setReturnModalCustomerId(customer.id);
+        setReturnModalCustomerId(customerResolved.id);
         setReturnEquipmentItems(formatted);
         setIsReturnModalOpen(true);
         return;
       }
 
-      const next =
-        order.delivery_status === "Entregar" ? "Coletar" : "Coletado";
+      const next = order.delivery_status === "Entregar" ? "Coletar" : "Coletado";
 
       const { error } = await supabase
         .from("orders")
         .update({ delivery_status: next })
-        .eq("id", order.id);
+        .eq("id", order.id)
+        .eq("company_id", order.company?.id ?? "");
 
       if (error) {
         toast.error("Erro ao atualizar status.");
@@ -462,7 +538,6 @@ export default function ViewOrderPage() {
       setOrder((prev: any) =>
         prev ? { ...prev, delivery_status: next } : prev,
       );
-      // toast.success(`Status atualizado para ${next}.`);
     } catch (err) {
       console.error(err);
       toast.error("Erro ao processar ação.");
@@ -475,9 +550,7 @@ export default function ViewOrderPage() {
         <h1 className="text-2xl font-bold">Espelho da Venda</h1>
       </div>
 
-      {/* Cliente */}
-      <section className=" p-4 space-y-4 text-sm">
-        {/* Linha 1: Pedido */}
+      <section className="p-4 space-y-4 text-sm">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
           <p>
             <span className="font-semibold">Nota:</span>{" "}
@@ -502,7 +575,6 @@ export default function ViewOrderPage() {
           </p>
         </div>
 
-        {/* Linha 2: Cliente (grid) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1">
             <p className="font-semibold">Cliente</p>
@@ -529,7 +601,6 @@ export default function ViewOrderPage() {
           </div>
         </div>
 
-        {/* Observações */}
         <div className="pt-1">
           <p className="font-semibold">Observações:</p>
           <p className="text-muted-foreground">
@@ -544,7 +615,6 @@ export default function ViewOrderPage() {
           </p>
         </div>
 
-        {/* Tabela Itens */}
         <div className="rounded-md border overflow-hidden">
           <div className="w-full overflow-x-auto">
             <table className="w-full">
@@ -574,13 +644,11 @@ export default function ViewOrderPage() {
                       key={item.id ?? `fallback-${index}`}
                       className="border-t hover:bg-muted/30"
                     >
-                      {/* Produto */}
                       <td className="p-2 align-top">
                         <p className="font-medium leading-snug break-words">
                           {item.product?.name}
                         </p>
 
-                        {/* MOBILE: layout legível (2 colunas + total em linha inteira) */}
                         <div className="mt-2 sm:hidden">
                           <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground">
                             <span>Qtd: {qty}</span>
@@ -598,13 +666,10 @@ export default function ViewOrderPage() {
                         </div>
                       </td>
 
-                      {/* DESKTOP */}
                       <td className="p-2 hidden sm:table-cell">{qty}</td>
-
                       <td className="p-2 text-right hidden sm:table-cell">
                         R$ {unit.toFixed(2)}
                       </td>
-
                       <td className="p-2 text-right font-semibold hidden sm:table-cell">
                         R$ {lineTotal.toFixed(2)}
                       </td>
@@ -616,7 +681,6 @@ export default function ViewOrderPage() {
           </div>
         </div>
 
-        {/* Produtos devolvidos */}
         {returnedProducts.length > 0 && (
           <div className="pt-2 space-y-2">
             <div className="flex items-center justify-between">
@@ -657,13 +721,11 @@ export default function ViewOrderPage() {
                           key={index}
                           className="border-t text-destructive hover:bg-destructive/5"
                         >
-                          {/* Produto */}
                           <td className="p-2 align-top">
                             <p className="font-medium leading-snug break-words">
                               {productName}
                             </p>
 
-                            {/* MOBILE: mesmo padrão do bloco de itens */}
                             <div className="mt-2 sm:hidden">
                               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
                                 <span>Qtd: {qty}</span>
@@ -681,13 +743,10 @@ export default function ViewOrderPage() {
                             </div>
                           </td>
 
-                          {/* DESKTOP */}
                           <td className="p-2 hidden sm:table-cell">{qty}</td>
-
                           <td className="p-2 text-right hidden sm:table-cell">
                             R$ {unit.toFixed(2)}
                           </td>
-
                           <td className="p-2 text-right font-semibold hidden sm:table-cell">
                             R$ {lineTotal.toFixed(2)}
                           </td>
@@ -701,12 +760,10 @@ export default function ViewOrderPage() {
           </div>
         )}
 
-        {/* Totais */}
         <div className="border-t pt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="text-muted-foreground space-y-1">
             <p>
-              <span className="font-semibold text-foreground">Frete:</span> R${" "}
-              {freight.toFixed(2)}
+              <span className="font-semibold text-foreground">Frete:</span> R$ {freight.toFixed(2)}
             </p>
           </div>
 
@@ -719,7 +776,7 @@ export default function ViewOrderPage() {
                   totalFinal -
                   returnedProducts.reduce(
                     (sum: number, item: any) =>
-                      sum + item.unitPrice * item.quantity,
+                      sum + Number(item.unitPrice ?? 0) * Number(item.quantity ?? 0),
                     0,
                   )
                 ).toFixed(2)}
@@ -733,13 +790,11 @@ export default function ViewOrderPage() {
           </div>
         </div>
 
-        {/* Botão Assinar */}
         <div className="pt-2">
           <Button className="w-full" onClick={() => setOpenSignature(true)}>
             {signatureData ? "Refazer Assinatura" : "Assinar"}
           </Button>
 
-          {/* Imagem da Assinatura */}
           {signatureData && (
             <div className="mt-4 rounded-md border p-3 flex flex-col items-center gap-2">
               <p className="text-xs text-muted-foreground">
@@ -755,14 +810,12 @@ export default function ViewOrderPage() {
         </div>
       </section>
 
-      {/* Modal de Assinatura */}
       <SignatureModal
         open={openSignature}
         onClose={() => setOpenSignature(false)}
         onSave={handleSaveSignature}
       />
 
-      {/* Ações pós-assinatura */}
       {signatureData && (
         <div className="flex flex-col gap-4 mb-4">
           {logoUrl && (
@@ -775,7 +828,7 @@ export default function ViewOrderPage() {
                   items={itemsForPdf}
                   note={{
                     note_number: order.note_number,
-                    appointment_date: order.appointment_date, // ✅ aqui
+                    appointment_date: order.appointment_date,
                   }}
                   logoUrl={logoUrl}
                   signature={order.customer_signature}
@@ -803,7 +856,7 @@ export default function ViewOrderPage() {
               signatureData={signatureData}
             />
           )}
-          {/* Botão de Entregar/Coletar/Coletado */}
+
           <Button
             className={clsx("w-full", {
               "bg-muted text-muted-foreground cursor-not-allowed opacity-60":
@@ -815,17 +868,15 @@ export default function ViewOrderPage() {
             {deliveryLabel}
           </Button>
 
-          {/* Botao nfe */}
           <EmitNfeButton
             orderId={order?.id ?? ""}
             customerId={order?.customer?.id ?? ""}
-            emitNfFromOrder={order?.emit_nf ?? null}
+            emitNfFromOrder={(order as any)?.emit_nf ?? null}
             emitNfFromCustomer={order?.customer?.emit_nf ?? null}
           />
         </div>
       )}
 
-      {/* Modais */}
       <LoanEquipmentModal
         open={isLoanModalOpen}
         onOpenChange={setIsLoanModalOpen}
@@ -837,20 +888,29 @@ export default function ViewOrderPage() {
         }}
       />
 
-      <ReturnEquipmentModal
-        open={isReturnModalOpen}
-        onOpenChange={setIsReturnModalOpen}
-        customerId={returnModalCustomerId}
-        items={returnEquipmentItems}
-        order={order}
-        user={{ id: order?.created_by }}
-        onReturnSuccess={async () => {
-          setIsReturnModalOpen(false);
-          await updateStockBasedOnOrder(supabase, order);
-          await markOrderStatus("Coletado");
-        }}
-        onOpenProductReturnModal={() => {}}
-      />
+      {companyId && (
+        <ReturnEquipmentModal
+          open={isReturnModalOpen}
+          onOpenChange={setIsReturnModalOpen}
+          companyId={companyId}
+          customerId={returnModalCustomerId}
+          items={returnEquipmentItems}
+          order={order}
+          user={{ id: order?.created_by }}
+          onReturnSuccess={async () => {
+            try {
+              setIsReturnModalOpen(false);
+              await updateStockBasedOnOrder(supabase, order);
+              await markOrderStatus("Coletado");
+              toast.success("Estoque atualizado com sucesso.");
+            } catch (err) {
+              console.error("Erro ao atualizar estoque no retorno:", err);
+              toast.error("Não foi possível atualizar o estoque.");
+            }
+          }}
+          onOpenProductReturnModal={() => {}}
+        />
+      )}
     </div>
   );
 }

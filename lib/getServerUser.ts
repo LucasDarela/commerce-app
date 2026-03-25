@@ -1,22 +1,22 @@
-import { cookies } from "next/headers";
-import { createServerComponentClient } from "@supabase/auth-helpers-nextjs";
-import type { User } from "@supabase/auth-helpers-nextjs";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 type ServerSession = {
-  user: User;
+  user: {
+    id: string;
+    email?: string | null;
+  };
   companyId: string;
   isAdmin: boolean;
   profile: {
     name: string;
-    avatar?: string;
-    email: string;
+    avatar?: string | null;
+    email: string | null;
   };
 };
 
 export async function getServerUser(): Promise<ServerSession | null> {
-  const supabase = createServerComponentClient({ cookies });
+  const supabase = await createServerSupabaseClient();
 
-  // 1. Get user
   const {
     data: { user },
     error: userError,
@@ -26,29 +26,29 @@ export async function getServerUser(): Promise<ServerSession | null> {
 
   const userId = user.id;
 
-  // 2. Get company info
   const { data: companyData, error: companyError } = await supabase
     .from("company_users")
-    .select("company_id, is_admin")
+    .select("company_id, role")
     .eq("user_id", userId)
-    .single();
+    .maybeSingle();
 
   if (!companyData || companyError) return null;
 
-  // 3. Get profile info
   const { data: profileData, error: profileError } = await supabase
     .from("profiles")
     .select("name, avatar, email")
     .eq("id", userId)
-    .single();
+    .maybeSingle();
 
   if (!profileData || profileError) return null;
 
-  // 4. Return all combined
   return {
-    user,
+    user: {
+      id: user.id,
+      email: user.email,
+    },
     companyId: companyData.company_id,
-    isAdmin: companyData.is_admin,
+    isAdmin: companyData.role === "admin",
     profile: {
       name: profileData.name,
       avatar: profileData.avatar,

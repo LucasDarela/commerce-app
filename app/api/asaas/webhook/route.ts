@@ -139,8 +139,8 @@ const orderNumber = order?.note_number ?? order?.id ?? null;
 
   const title = "Pagamento recebido";
   const header =
-    `Cobrança ` +
-    `(${customerName ?? "Cliente desconhecido"})` +
+    `Cobrança de ` +
+    `${customerName ?? "Cliente desconhecido"}` +
     (orderNumber ? ` - Pedido #${orderNumber}` : "") +
     ` - marcada como Paga`;
   const valueLine = `Valor líquido: R$ ${totalPayed != null ? Number(totalPayed).toFixed(2) : "—"}`;

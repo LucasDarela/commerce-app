@@ -3,12 +3,12 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { Loader2 } from "lucide-react";
 
 export function RedirectIfAuthenticated() {
   const router = useRouter();
-  const supabase = createClientComponentClient();
+  const supabase = createBrowserSupabaseClient();
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {

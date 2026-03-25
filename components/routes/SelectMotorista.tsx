@@ -8,7 +8,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { supabase } from "@/lib/supabase";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
+import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 
 interface Driver {
   id: string;
@@ -16,71 +17,63 @@ interface Driver {
 }
 
 export default function DriverSelect() {
-  const [companyId, setCompanyId] = useState<string | null>(null);
+  const supabase = createBrowserSupabaseClient(); 
+  const { companyId, loading: authLoading } = useAuthenticatedCompany();
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [selectedDriver, setSelectedDriver] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    async function fetchCompanyId() {
-      setLoading(true);
+    if (authLoading) return;
 
-      // 1️⃣ pegar usuário logado
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
-
-      if (userError || !user) {
-        console.error("Erro ao pegar usuário:", userError);
-        setLoading(false);
-        return;
-      }
-
-      // 2️⃣ buscar o profile para pegar company_id
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("company_id")
-        .eq("id", user.id)
-        .single();
-
-      if (profileError || !profile?.company_id) {
-        console.error("Erro ao pegar company_id:", profileError);
-        setLoading(false);
-        return;
-      }
-
-      setCompanyId(profile.company_id);
+    if (!companyId) {
+      setDrivers([]);
+      setLoading(false);
+      return;
     }
-
-    fetchCompanyId();
-  }, []);
-
-  useEffect(() => {
-    if (!companyId) return;
 
     async function fetchDrivers() {
-      const { data, error } = await supabase
+      setLoading(true);
+
+      const { data: companyUsers, error: companyUsersError } = await supabase
+        .from("company_users")
+        .select("user_id")
+        .eq("company_id", companyId)
+        .eq("role", "driver");
+
+      if (companyUsersError) {
+        console.error("Erro ao buscar drivers da empresa:", companyUsersError);
+        setDrivers([]);
+        setLoading(false);
+        return;
+      }
+
+      const userIds = (companyUsers ?? []).map((item) => item.user_id);
+
+      if (userIds.length === 0) {
+        setDrivers([]);
+        setLoading(false);
+        return;
+      }
+
+      const { data: profiles, error: profilesError } = await supabase
         .from("profiles")
         .select("id, username")
-        .eq("company_id", companyId);
+        .in("id", userIds);
 
-      if (error) {
-        console.error("Erro ao buscar motoristas:", error);
-        return;
-      }
-
-      if (!data || data.length === 0) {
-        console.log("Nenhum motorista encontrado");
+      if (profilesError) {
+        console.error("Erro ao buscar profiles dos drivers:", profilesError);
         setDrivers([]);
+        setLoading(false);
         return;
       }
 
-      setDrivers(data);
+      setDrivers(profiles ?? []);
+      setLoading(false);
     }
 
-    fetchDrivers().finally(() => setLoading(false));
-  }, [companyId]);
+    fetchDrivers();
+  }, [companyId, authLoading]);
 
   if (loading) {
     return <p>Carregando motoristas...</p>;
@@ -92,11 +85,17 @@ export default function DriverSelect() {
         <SelectValue placeholder="Selecione o motorista" />
       </SelectTrigger>
       <SelectContent>
-        {drivers.map((driver) => (
-          <SelectItem key={driver.id} value={driver.id}>
-            {driver.username}
+        {drivers.length > 0 ? (
+          drivers.map((driver) => (
+            <SelectItem key={driver.id} value={driver.id}>
+              {driver.username}
+            </SelectItem>
+          ))
+        ) : (
+          <SelectItem value="no-drivers" disabled>
+            Nenhum motorista encontrado
           </SelectItem>
-        ))}
+        )}
       </SelectContent>
     </Select>
   );

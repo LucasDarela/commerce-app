@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useRouter } from "next/navigation";
@@ -12,9 +12,10 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import { supabase } from "@/lib/supabase";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { toast } from "sonner";
 import { Label } from "@radix-ui/react-label";
+import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 
 interface BankAccount {
   id: string;
@@ -23,7 +24,7 @@ interface BankAccount {
   account: string;
 }
 
-interface Supplier {
+interface Entity {
   id: string;
   name: string;
 }
@@ -45,33 +46,22 @@ function toISODate(dateStr: string): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-type Entry = {
-  quantity?: number;
-  unitPrice?: number;
-  [key: string]: number | string | undefined;
-};
-
 function isValidBrazilianDate(dateStr: string): boolean {
   if (!dateStr || typeof dateStr !== "string") return false;
 
   const parts = dateStr.split("/");
-
   if (parts.length !== 3) return false;
 
   const [dd, mm, yyyy] = parts;
-
   const day = parseInt(dd, 10);
   const month = parseInt(mm, 10);
   const year = parseInt(yyyy, 10);
 
   if (isNaN(day) || isNaN(month) || isNaN(year)) return false;
-
   if (month < 1 || month > 12) return false;
 
-  // Cria a data
   const dateObj = new Date(year, month - 1, day);
 
-  // Confirma se o dia e o mês batem (ex: 30/02 inválido)
   return (
     dateObj.getFullYear() === year &&
     dateObj.getMonth() === month - 1 &&
@@ -80,8 +70,11 @@ function isValidBrazilianDate(dateStr: string): boolean {
 }
 
 export default function AddFinancialRecord() {
+  const router = useRouter();
+  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
+  const { companyId, loading: companyLoading } = useAuthenticatedCompany();
+
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<string>("");
   const [selectedCategory, setSelectedCategory] = useState<string>("");
@@ -95,13 +88,11 @@ export default function AddFinancialRecord() {
   const [invoiceNumber, setInvoiceNumber] = useState<string>("");
   const [issueDate, setIssueDate] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
-  const [companyId, setCompanyId] = useState<string | null>(null);
   const [productEntries, setProductEntries] = useState<ProductEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [noteType, setNoteType] = useState<"input" | "output">("input");
-  const [entities, setEntities] = useState<{ id: string; name: string }[]>([]);
+  const [entities, setEntities] = useState<Entity[]>([]);
   const [showEntityDropdown, setShowEntityDropdown] = useState(false);
-  const router = useRouter();
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurrenceType, setRecurrenceType] = useState<
     "daily" | "weekly" | "monthly" | "biweekly"
@@ -109,8 +100,8 @@ export default function AddFinancialRecord() {
   const [recurrenceCount, setRecurrenceCount] = useState<number>(1);
 
   const handleAddProduct = () => {
-    setProductEntries([
-      ...productEntries,
+    setProductEntries((prev) => [
+      ...prev,
       { productId: "", quantity: 1, unitPrice: 0 },
     ]);
   };
@@ -128,17 +119,15 @@ export default function AddFinancialRecord() {
       prev.map((entry, i) => {
         if (i !== index) return entry;
 
-        // Quando mudar o produto selecionado
         if (field === "productId") {
           const selectedProduct = products.find((p) => p.id === value);
           return {
             ...entry,
             productId: value as string,
-            unitPrice: selectedProduct?.price || 0, // aqui já puxa o preço
+            unitPrice: selectedProduct?.price || 0,
           };
         }
 
-        // Atualiza normalmente se mudar quantidade ou unitPrice
         return {
           ...entry,
           [field]:
@@ -150,19 +139,9 @@ export default function AddFinancialRecord() {
     );
   };
 
-  const totalAmount =
-    selectedCategory === "product_purchase"
-      ? productEntries.reduce(
-          (sum, item) => sum + item.quantity * item.unitPrice,
-          0,
-        )
-      : amount;
-
   const handleSubmit = async () => {
     if (!companyId) {
-      toast.error(
-        "Empresa não encontrada. Tente novamente em alguns segundos.",
-      );
+      toast.error("Empresa não encontrada. Tente novamente em alguns segundos.");
       return;
     }
 
@@ -171,7 +150,7 @@ export default function AddFinancialRecord() {
       return;
     }
 
-    if (!paymentMethod || paymentMethod === "") {
+    if (!paymentMethod) {
       toast.error("Selecione um método de pagamento antes de salvar.");
       return;
     }
@@ -205,17 +184,17 @@ export default function AddFinancialRecord() {
     }
 
     const record = {
-      company_id: companyId!,
+      company_id: companyId,
       issue_date: issueDate
         ? toISODate(issueDate)
         : new Date().toISOString().split("T")[0],
       due_date: dueDate ? toISODate(dueDate) : null,
-      invoice_number: invoiceNumber,
-      supplier: selectedSupplier,
-      description,
+      invoice_number: invoiceNumber || null,
+      supplier: selectedSupplier || null,
+      description: description || null,
       category: selectedCategory || customCategory || "others",
       amount: Number(calculatedAmount || 0),
-      notes,
+      notes: notes || null,
       status: "Unpaid",
       created_at: new Date().toISOString(),
       bank_account_id: selectedAccount || null,
@@ -231,7 +210,7 @@ export default function AddFinancialRecord() {
       .select()
       .maybeSingle();
 
-    if (error) {
+    if (error || !inserted) {
       console.error("Erro ao salvar nota principal:", error);
       toast.error("Erro ao salvar nota. Verifique os dados e tente novamente.");
       setLoading(false);
@@ -240,23 +219,16 @@ export default function AddFinancialRecord() {
 
     if (isRecurring && recurrenceCount > 1) {
       const entriesToInsert = [];
-
-      // Converte a data de vencimento (dd/mm/yyyy) para objeto Date corretamente
       const [dd, mm, yyyy] = dueDate.split("/").map(Number);
-      const baseDate = new Date(yyyy, mm - 1, dd); // cuidado: mês é 0-based
+      const baseDate = new Date(yyyy, mm - 1, dd);
 
       for (let i = 1; i < recurrenceCount; i++) {
         const newDate = new Date(baseDate);
 
-        if (recurrenceType === "monthly") {
-          newDate.setMonth(baseDate.getMonth() + i);
-        } else if (recurrenceType === "weekly") {
-          newDate.setDate(baseDate.getDate() + i * 7);
-        } else if (recurrenceType === "biweekly") {
-          newDate.setDate(baseDate.getDate() + i * 14);
-        } else if (recurrenceType === "daily") {
-          newDate.setDate(baseDate.getDate() + i);
-        }
+        if (recurrenceType === "monthly") newDate.setMonth(baseDate.getMonth() + i);
+        if (recurrenceType === "weekly") newDate.setDate(baseDate.getDate() + i * 7);
+        if (recurrenceType === "biweekly") newDate.setDate(baseDate.getDate() + i * 14);
+        if (recurrenceType === "daily") newDate.setDate(baseDate.getDate() + i);
 
         entriesToInsert.push({
           ...record,
@@ -283,6 +255,7 @@ export default function AddFinancialRecord() {
           .from("products")
           .select("stock")
           .eq("id", entry.productId)
+          .eq("company_id", companyId)
           .maybeSingle();
 
         if (productError || !productData) {
@@ -295,7 +268,8 @@ export default function AddFinancialRecord() {
         const { error: updateError } = await supabase
           .from("products")
           .update({ stock: currentStock + entry.quantity })
-          .eq("id", entry.productId);
+          .eq("id", entry.productId)
+          .eq("company_id", companyId);
 
         if (updateError) {
           console.error("Erro atualizando estoque de produto:", updateError);
@@ -327,6 +301,7 @@ export default function AddFinancialRecord() {
           .from("equipments")
           .select("stock")
           .eq("id", entry.productId)
+          .eq("company_id", companyId)
           .maybeSingle();
 
         if (equipmentError || !equipmentData) {
@@ -339,13 +314,11 @@ export default function AddFinancialRecord() {
         const { error: updateError } = await supabase
           .from("equipments")
           .update({ stock: currentStock + entry.quantity })
-          .eq("id", entry.productId);
+          .eq("id", entry.productId)
+          .eq("company_id", companyId);
 
         if (updateError) {
-          console.error(
-            "Erro atualizando estoque de equipamento:",
-            updateError,
-          );
+          console.error("Erro atualizando estoque de equipamento:", updateError);
         }
       }
 
@@ -371,38 +344,45 @@ export default function AddFinancialRecord() {
   };
 
   useEffect(() => {
+    if (!companyId) return;
+
     const fetchEntities = async () => {
-      const { data: suppliersData } = await supabase
-        .from("suppliers")
-        .select("id, name");
-      const { data: customersData } = await supabase
-        .from("customers")
-        .select("id, name");
-      if (suppliersData && customersData) {
-        setEntities([
-          ...suppliersData.map((s) => ({ id: s.id, name: s.name })),
-          ...customersData.map((c) => ({ id: c.id, name: c.name })),
-        ]);
-      }
+      const [{ data: suppliersData }, { data: customersData }] = await Promise.all([
+        supabase
+          .from("suppliers")
+          .select("id, name")
+          .eq("company_id", companyId),
+        supabase
+          .from("customers")
+          .select("id, name")
+          .eq("company_id", companyId),
+      ]);
+
+      setEntities([
+        ...((suppliersData ?? []) as Entity[]),
+        ...((customersData ?? []) as Entity[]),
+      ]);
     };
+
     fetchEntities();
-  }, []);
+  }, [companyId, supabase]);
 
   useEffect(() => {
-    const fetchItems = async () => {
-      if (!companyId || !selectedCategory) return;
+    if (!companyId || !selectedCategory) return;
 
+    const fetchItems = async () => {
       if (selectedCategory === "compra_produto") {
         const { data, error } = await supabase
           .from("products")
-          .select("id, name, standard_price");
+          .select("id, name, standard_price")
+          .eq("company_id", companyId);
 
         if (!error && data) {
           setProducts(
-            data.map((p) => ({
-              id: p.id,
+            data.map((p: any) => ({
+              id: String(p.id),
               name: p.name,
-              price: p.standard_price,
+              price: Number(p.standard_price || 0),
             })),
           );
         }
@@ -411,14 +391,15 @@ export default function AddFinancialRecord() {
       if (selectedCategory === "compra_equipamento") {
         const { data, error } = await supabase
           .from("equipments")
-          .select("id, name, value");
+          .select("id, name, value")
+          .eq("company_id", companyId);
 
         if (!error && data) {
           setProducts(
-            data.map((e) => ({
-              id: e.id,
+            data.map((e: any) => ({
+              id: String(e.id),
               name: e.name,
-              price: e.value,
+              price: Number(e.value || 0),
             })),
           );
         }
@@ -426,44 +407,27 @@ export default function AddFinancialRecord() {
     };
 
     fetchItems();
-  }, [companyId, selectedCategory]);
+  }, [companyId, selectedCategory, supabase]);
 
   useEffect(() => {
+    if (!companyId) return;
+
     const fetchBankAccounts = async () => {
-      if (!companyId) return;
       const { data, error } = await supabase
         .from("bank_accounts")
         .select("id, name, agency_name, account")
         .eq("company_id", companyId);
-      if (!error) setBankAccounts(data || []);
-    };
-    fetchBankAccounts();
-  }, [companyId]);
 
-  useEffect(() => {
-    const fetchCompanyId = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) return;
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("company_id")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      if (!error && data) {
-        setCompanyId(data.company_id);
-      } else {
-        console.error("Failed to load company ID:", error?.message);
+      if (!error) {
+        setBankAccounts((data as BankAccount[]) || []);
       }
     };
-    fetchCompanyId();
-  }, []);
+
+    fetchBankAccounts();
+  }, [companyId, supabase]);
 
   const formatDate = (value: string) => {
-    const cleaned = value.replace(/\D/g, "").slice(0, 8); // remove tudo que não for número
+    const cleaned = value.replace(/\D/g, "").slice(0, 8);
     const parts = [];
 
     if (cleaned.length > 2) {
@@ -522,7 +486,6 @@ export default function AddFinancialRecord() {
         </Select>
       </div>
 
-      {/* Banco + Datas + Número da nota */}
       <div className="grid grid-cols-4 gap-4 mt-4">
         <Select value={selectedAccount} onValueChange={setSelectedAccount}>
           <SelectTrigger className="w-full">
@@ -536,16 +499,19 @@ export default function AddFinancialRecord() {
             ))}
           </SelectContent>
         </Select>
+
         <Input
           placeholder="Numero da Nota (opcional)"
           value={invoiceNumber}
           onChange={(e) => setInvoiceNumber(e.target.value)}
         />
+
         <Input
           placeholder="Data de Emissão"
           value={issueDate}
           onChange={(e) => setIssueDate(formatDate(e.target.value))}
         />
+
         <Input
           placeholder="Data de Vencimento"
           value={dueDate}
@@ -553,9 +519,7 @@ export default function AddFinancialRecord() {
         />
       </div>
 
-      {/* Categoria + Fornecedor */}
       <div className="grid grid-cols-4 gap-4 mt-4">
-        {/* Fornecedor (metade da linha) */}
         <div className="col-span-2">
           <div className="relative">
             <Input
@@ -563,10 +527,11 @@ export default function AddFinancialRecord() {
               value={selectedSupplier}
               onChange={(e) => {
                 setSelectedSupplier(e.target.value);
-                setShowEntityDropdown(true); // 🔥 Abre o dropdown enquanto digita
+                setShowEntityDropdown(true);
               }}
               className="w-full"
             />
+
             {showEntityDropdown && selectedSupplier.length > 0 && (
               <div className="absolute z-10 mt-1 w-full border rounded-md shadow-md max-h-40 overflow-y-auto bg-muted">
                 {entities
@@ -581,7 +546,7 @@ export default function AddFinancialRecord() {
                       className="p-2 cursor-pointer"
                       onClick={() => {
                         setSelectedSupplier(entity.name);
-                        setShowEntityDropdown(false); // 🔥 Fecha o dropdown ao selecionar
+                        setShowEntityDropdown(false);
                       }}
                     >
                       {entity.name}
@@ -592,7 +557,6 @@ export default function AddFinancialRecord() {
           </div>
         </div>
 
-        {/* Método de Pagamento (1/4) */}
         <div className="col-span-1">
           <Select value={paymentMethod} onValueChange={setPaymentMethod}>
             <SelectTrigger className="w-full">
@@ -607,7 +571,6 @@ export default function AddFinancialRecord() {
           </Select>
         </div>
 
-        {/* Dias para Pagar (1/4) – sempre visível, só habilitado com boleto */}
         <div className="col-span-1">
           <Input
             type="number"
@@ -628,7 +591,6 @@ export default function AddFinancialRecord() {
         />
       )}
 
-      {/* Tabela de Produtos */}
       {(selectedCategory === "compra_produto" ||
         selectedCategory === "compra_equipamento") && (
         <div className="mb-4 w-full">
@@ -637,6 +599,7 @@ export default function AddFinancialRecord() {
               ? "Produtos"
               : "Equipamentos"}
           </h4>
+
           {productEntries.map((entry, index) => (
             <div
               key={index}
@@ -695,13 +658,13 @@ export default function AddFinancialRecord() {
               </div>
             </div>
           ))}
+
           <Button variant="outline" onClick={handleAddProduct} className="mt-2">
             <Plus className="h-4 w-4 mr-2" /> Adicionar
           </Button>
         </div>
       )}
 
-      {/* Pagamento + Valor */}
       <div className="grid grid-cols-2 gap-4 mt-4">
         <Input
           placeholder="Descrição"
@@ -736,7 +699,6 @@ export default function AddFinancialRecord() {
         />
       </div>
 
-      {/* recorrencia */}
       <div className="mt-4">
         <label className="flex items-center gap-2">
           <input
@@ -750,12 +712,14 @@ export default function AddFinancialRecord() {
           />
           Adicionar recorrência
         </label>
+
         {(selectedCategory === "compra_produto" ||
           selectedCategory === "compra_equipamento") && (
           <p className="text-sm text-muted-foreground italic ml-1">
             Recorrência não disponível para compras de produto ou equipamento.
           </p>
         )}
+
         {isRecurring && (
           <div className="flex gap-4 mt-2">
             <Select
@@ -786,19 +750,17 @@ export default function AddFinancialRecord() {
         )}
       </div>
 
-      {/* Notas */}
       <textarea
         placeholder="Notas (opcional)"
         value={notes}
         onChange={(e) => setNotes(e.target.value)}
         className="mt-4 w-full h-32 p-2 border rounded-md resize-none"
-      ></textarea>
+      />
 
-      {/* Botão */}
       <Button
         className="mt-4 w-full"
         onClick={handleSubmit}
-        disabled={loading || !companyId}
+        disabled={loading || companyLoading || !companyId}
       >
         {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
         {loading ? "Salvando..." : "Salvar Nota"}

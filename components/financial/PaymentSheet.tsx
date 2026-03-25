@@ -7,7 +7,7 @@ import { YourFinancialRecords } from "@/components/your-financial-modal";
 import { Order } from "@/components/types/orders";
 import { FinancialRecord } from "@/components/types/financial";
 import { useState } from "react";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { CombinedRecord } from "./DataFinancialTable";
 import { isOrder } from "./utils";
 
@@ -36,7 +36,7 @@ export function PaymentSheet({
   refreshOrders,
   fetchAll,
 }: PaymentSheetProps) {
-  const supabase = createClientComponentClient();
+  const supabase = createBrowserSupabaseClient();
 
   return (
     <>

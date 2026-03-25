@@ -11,11 +11,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { supabase } from "@/lib/supabase/client";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import { format } from "date-fns";
 
 export function SectionCards() {
+  const supabase = createBrowserSupabaseClient();     
   const [receitaLiquida, setReceitaLiquida] = useState(0);
   const [aReceber, setAReceber] = useState(0);
   const [aPagar, setAPagar] = useState(0);

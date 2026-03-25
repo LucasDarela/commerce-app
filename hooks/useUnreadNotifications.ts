@@ -2,11 +2,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
-import { Database } from "@/components/types/supabase";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
 export function useUnreadNotifications() {
-  const supabase = createClientComponentClient<Database>();
+  const supabase = createBrowserSupabaseClient();
   const [count, setCount] = useState(0);
 
   const fetchUnread = async () => {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,7 +35,7 @@ type TeamMember = {
 };
 
 export default function TeamManagementPage() {
-  const supabase = createClientComponentClient();
+  const supabase = createBrowserSupabaseClient();
   const { user, companyId, loading } = useAuthenticatedCompany();
 
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);

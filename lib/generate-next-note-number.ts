@@ -1,25 +1,33 @@
-// lib/generate-next-note-number.ts
-import { supabase } from "@/lib/supabase";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
-export async function generateNextNoteNumber(
-  companyId: string,
-): Promise<string> {
+export async function generateNextNoteNumber(companyId: string) {
+  const supabase = createBrowserSupabaseClient();
+
   const { data, error } = await supabase
     .from("orders")
     .select("note_number")
     .eq("company_id", companyId)
     .eq("document_type", "internal")
-    .order("note_number", { ascending: false })
-    .limit(1);
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
   if (error) {
-    console.error("Erro ao buscar último número de nota:", error);
+    console.error("Erro ao gerar próximo número de nota:", {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+      companyId,
+    });
     return "000001";
   }
 
-  const last = data?.[0]?.note_number;
-  const lastNumber = Number(last) || 0;
-  const nextNumber = lastNumber + 1;
+  const lastNumber = Number(data?.note_number ?? 0);
 
-  return nextNumber.toString().padStart(6, "0");
+  if (!Number.isFinite(lastNumber) || lastNumber <= 0) {
+    return "000001";
+  }
+
+  return String(lastNumber + 1).padStart(6, "0");
 }

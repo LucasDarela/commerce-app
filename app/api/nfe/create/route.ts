@@ -1,58 +1,65 @@
 // app/api/nfe/create/route.ts
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { emitInvoice } from "@/lib/focus-nfe/emitInvoice";
 import { invoiceSchema } from "@/lib/focus-nfe/invoiceSchema";
 import { fetchInvoiceStatus } from "@/lib/focus-nfe/fetchInvoiceStatus";
 
 export async function POST(req: Request) {
-  const supabase = createRouteHandlerClient({ cookies });
-
   try {
-    const body = await req.json();
-    let { companyId, invoiceData } = body;
+    const supabase = await createServerSupabaseClient();
 
-    if (!companyId) {
-      const {
-        data: { user },
-        error: userErr,
-      } = await supabase.auth.getUser();
-      if (userErr || !user)
-        return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
 
-      const { data: row, error: compErr } = await supabase
-        .from("company_users")
-        .select("company_id")
-        .eq("user_id", user.id)
-        .single();
-
-      if (compErr || !row?.company_id)
-        return NextResponse.json(
-          { error: "company_id não encontrado para o usuário" },
-          { status: 400 },
-        );
-
-      companyId = row.company_id;
+    if (userError || !user) {
+      return NextResponse.json(
+        { error: "Não autenticado" },
+        { status: 401 },
+      );
     }
 
-    if (!companyId || !invoiceData)
+    const body = await req.json();
+    const { invoiceData } = body;
+
+    if (!invoiceData) {
       return NextResponse.json(
-        { error: "companyId e invoiceData são obrigatórios" },
+        { error: "invoiceData é obrigatório" },
         { status: 400 },
       );
+    }
+
+    const { data: companyRow, error: compErr } = await supabase
+      .from("company_users")
+      .select("company_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (compErr || !companyRow?.company_id) {
+      return NextResponse.json(
+        { error: "company_id não encontrado para o usuário" },
+        { status: 403 },
+      );
+    }
+
+    const companyId = companyRow.company_id;
 
     const parse = invoiceSchema.safeParse(invoiceData);
-    if (!parse.success)
+    if (!parse.success) {
       return NextResponse.json(
         { error: "Dados da nota inválidos", details: parse.error.format() },
         { status: 422 },
       );
+    }
 
     const toIso = (s?: string | null) => {
       if (!s) return new Date().toISOString();
       const d = new Date(s);
-      return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+      return Number.isNaN(d.getTime())
+        ? new Date().toISOString()
+        : d.toISOString();
     };
 
     const dataEmissaoDb = toIso(invoiceData.data_emissao);
@@ -65,7 +72,6 @@ export async function POST(req: Request) {
       "cancelada",
     ];
 
-    // 1) mesma ordem (como já estava)
     const { data: ativa } = await supabase
       .from("invoices")
       .select("id, status, ref, numero, serie")
@@ -81,77 +87,75 @@ export async function POST(req: Request) {
       );
     }
 
-const { data: previous } = await supabase
-  .from("invoices")
-  .select("id, numero, serie, ref, status, created_at")
-  .eq("company_id", companyId)
-  .eq("order_id", invoiceData.order_id)
-  .order("created_at", { ascending: false })
-  .limit(1);
+    const { data: previous } = await supabase
+      .from("invoices")
+      .select("id, numero, serie, ref, status, created_at")
+      .eq("company_id", companyId)
+      .eq("order_id", invoiceData.order_id)
+      .order("created_at", { ascending: false })
+      .limit(1);
 
-const prev = previous?.[0];
-const isRetry =
-  prev?.status === "nota_rejeitada" || prev?.status === "erro_autorizacao";
+    const prev = previous?.[0];
+    const isRetry =
+      prev?.status === "nota_rejeitada" || prev?.status === "erro_autorizacao";
 
-// garanta série antes de validar duplicidade por série
-invoiceData.serie = invoiceData.serie || prev?.serie || "1";
+    invoiceData.serie = invoiceData.serie || prev?.serie || "1";
 
-// garanta note_number antes de validar duplicidade
-if (!invoiceData.note_number && invoiceData.order_id) {
-  const { data: o } = await supabase
-    .from("orders")
-    .select("note_number")
-    .eq("id", invoiceData.order_id)
-    .maybeSingle();
+    if (!invoiceData.note_number && invoiceData.order_id) {
+      const { data: orderRow } = await supabase
+        .from("orders")
+        .select("note_number")
+        .eq("id", invoiceData.order_id)
+        .eq("company_id", companyId)
+        .maybeSingle();
 
-  if (o?.note_number) {
-    invoiceData.note_number = o.note_number;
-  }
-}
+      if (orderRow?.note_number) {
+        invoiceData.note_number = orderRow.note_number;
+      }
+    }
 
-if (!invoiceData.note_number) {
-  return NextResponse.json(
-    { error: "note_number é obrigatório para emissão idempotente" },
-    { status: 400 },
-  );
-}
+    if (!invoiceData.note_number) {
+      return NextResponse.json(
+        { error: "note_number é obrigatório para emissão idempotente" },
+        { status: 400 },
+      );
+    }
 
-// 2) MESMO note_number + série
-const { data: dup } = await supabase
-  .from("invoices")
-  .select("id, status, ref, numero")
-  .eq("company_id", companyId)
-  .eq("serie", invoiceData.serie)
-  .eq("note_number", invoiceData.note_number)
-  .in("status", ATIVOS)
-  .maybeSingle();
+    const { data: dup } = await supabase
+      .from("invoices")
+      .select("id, status, ref, numero")
+      .eq("company_id", companyId)
+      .eq("serie", invoiceData.serie)
+      .eq("note_number", invoiceData.note_number)
+      .in("status", ATIVOS)
+      .maybeSingle();
 
-if (dup) {
-  return NextResponse.json(
-    { error: "NF-e já emitida para este número/série.", ref: dup.ref },
-    { status: 409 },
-  );
-}
+    if (dup) {
+      return NextResponse.json(
+        { error: "NF-e já emitida para este número/série.", ref: dup.ref },
+        { status: 409 },
+      );
+    }
 
-// baseRef determinística por note_number ou order_id
-const baseRef = `${invoiceData.note_number}`;
+    const baseRef = `${invoiceData.note_number}`;
 
-// ref: se for retry, reutiliza a anterior; senão, gera fixa por base + série
-invoiceData.ref =
-  isRetry && prev?.ref ? prev.ref : `${baseRef}_s${invoiceData.serie}`;
+    invoiceData.ref =
+      isRetry && prev?.ref ? prev.ref : `${baseRef}_s${invoiceData.serie}`;
 
     console.log("[NFe create] ref gerada:", invoiceData.ref, {
       isRetry,
       order_id: invoiceData.order_id,
       note_number: invoiceData.note_number,
+      companyId,
+      userId: user.id,
     });
 
-    // número: em retry reaproveita; no primeiro envio não manda `numero`
     if (isRetry && prev?.numero && Number(prev.numero) > 0) {
       invoiceData.numero = Number(prev.numero);
     } else if ("numero" in invoiceData) {
       delete invoiceData.numero;
     }
+
     const numeroParaBanco =
       isRetry && prev?.numero && Number(prev.numero) > 0
         ? Number(prev.numero)
@@ -180,7 +184,8 @@ invoiceData.ref =
           customer_name: invoiceData.nome_destinatario,
           ref: invoiceData.ref,
         })
-        .eq("id", prev.id);
+        .eq("id", prev.id)
+        .eq("company_id", companyId);
 
       if (updateErr) {
         console.error("❌ Erro ao atualizar nota rejeitada:", updateErr);
@@ -208,6 +213,7 @@ invoiceData.ref =
           customer_name: invoiceData.nome_destinatario,
         },
       ]);
+
       if (insertErr) {
         console.error("⚠️ Erro ao inserir invoice:", insertErr);
         return NextResponse.json(
@@ -222,6 +228,7 @@ invoiceData.ref =
     }
 
     const isAuth = (result.status || "").toLowerCase().includes("autorizad");
+
     if (isAuth && (!result.xml_url || !result.danfe_url)) {
       const res = await fetchInvoiceStatus({
         supabase,
@@ -245,7 +252,8 @@ invoiceData.ref =
               : dataEmissaoDb,
             status: res.data.status ?? result.status,
           })
-          .eq("ref", result.ref);
+          .eq("ref", result.ref)
+          .eq("company_id", companyId);
 
         result.xml_url = res.data.xml_url ?? result.xml_url;
         result.danfe_url = res.data.danfe_url ?? result.danfe_url;

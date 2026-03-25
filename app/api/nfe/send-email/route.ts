@@ -1,21 +1,50 @@
-import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import { cookies } from "next/headers";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import sgMail from "@sendgrid/mail";
+
+async function createSupabaseRouteClient() {
+  const cookieStore = await cookies();
+
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(
+          cookiesToSet: { name: string; value: string; options?: CookieOptions }[],
+        ) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              cookieStore.set(name, value, options);
+            });
+          } catch {
+            // sem alterar comportamento
+          }
+        },
+      },
+    },
+  );
+}
 
 export async function POST(req: Request) {
   try {
-    const supabase = createRouteHandlerClient({ cookies });
+    const supabase = await createSupabaseRouteClient();
     const { refId, toEmail, subject, body } = await req.json();
 
     // 1️⃣ Usuário autenticado
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user)
+
+    if (!user) {
       return Response.json(
         { error: "Usuário não autenticado" },
         { status: 401 },
       );
+    }
 
     // 2️⃣ Pega company_id do usuário
     const { data: companyUser } = await supabase
@@ -23,11 +52,13 @@ export async function POST(req: Request) {
       .select("company_id")
       .eq("user_id", user.id)
       .maybeSingle();
-    if (!companyUser?.company_id)
+
+    if (!companyUser?.company_id) {
       return Response.json(
         { error: "Empresa não encontrada" },
         { status: 401 },
       );
+    }
 
     const companyId = companyUser.company_id;
 
@@ -37,11 +68,13 @@ export async function POST(req: Request) {
       .select("sendgrid_api_key, sender_email, sender_name")
       .eq("company_id", companyId)
       .maybeSingle();
-    if (!creds?.sendgrid_api_key)
+
+    if (!creds?.sendgrid_api_key) {
       return Response.json(
         { error: "Credenciais SendGrid não encontradas" },
         { status: 401 },
       );
+    }
 
     sgMail.setApiKey(creds.sendgrid_api_key);
 

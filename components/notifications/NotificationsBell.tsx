@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { Bell, Check, Trash2 } from "lucide-react";
-import { supabase } from "@/lib/supabase/client";
+import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import {
   Popover,
   PopoverContent,
@@ -21,6 +21,7 @@ type Notification = {
 };
 
 export default function NotificationBell() {
+  const supabase = React.useMemo(() => createBrowserSupabaseClient(), []);
   const [open, setOpen] = React.useState(false);
   const [items, setItems] = React.useState<Notification[]>([]);
   const [loading, setLoading] = React.useState(true);

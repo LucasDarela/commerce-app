@@ -1,10 +1,9 @@
 // app/api/nfe/order/route.ts
 import { NextResponse } from "next/server";
-import { createServerComponentClient } from "@supabase/auth-helpers-nextjs";
-import { cookies } from "next/headers";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export async function GET(req: Request) {
-  const supabase = createServerComponentClient({ cookies });
+  const supabase = await createServerSupabaseClient();
   const { searchParams } = new URL(req.url);
   const orderId = searchParams.get("order_id");
   const companyId = searchParams.get("company_id");
