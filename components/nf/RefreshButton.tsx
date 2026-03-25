@@ -8,13 +8,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 type Props = {
   refId: string;
   companyId: string;
-  customerId: string;
   setInvoices: React.Dispatch<React.SetStateAction<any[]>>;
 };
 
 export default function RefreshButton({
   refId,
-  customerId,
   companyId,
   setInvoices,
 }: Props) {
