@@ -20,7 +20,23 @@ if (!SEND_EMAIL_HOOK_SECRET) {
 }
 
 const resend = new Resend(RESEND_API_KEY);
-const hookSecret = SEND_EMAIL_HOOK_SECRET.replace("v1,whsec_", "");
+const hookSecret = SEND_EMAIL_HOOK_SECRET;
+
+function buildActionUrl({
+  tokenHash,
+  type,
+  next,
+}: {
+  tokenHash: string;
+  type: string;
+  next: string;
+}) {
+  const url = new URL("/auth/callback", SITE_URL);
+  url.searchParams.set("token_hash", tokenHash);
+  url.searchParams.set("type", type);
+  url.searchParams.set("next", next);
+  return url.toString();
+}
 
 Deno.serve(async (req) => {
   console.log("[send-email] request received");
@@ -35,12 +51,19 @@ Deno.serve(async (req) => {
     };
 
     console.log("[send-email] verifying webhook");
+    console.log("[send-email] has webhook-id:", !!headers["webhook-id"]);
+    console.log(
+      "[send-email] has webhook-timestamp:",
+      !!headers["webhook-timestamp"],
+    );
+    console.log(
+      "[send-email] has webhook-signature:",
+      !!headers["webhook-signature"],
+    );
 
     const wh = new Webhook(hookSecret);
-    const {
-      user,
-      email_data: { token_hash, redirect_to, email_action_type },
-    } = wh.verify(payload, headers) as {
+
+    const verified = wh.verify(payload, headers) as {
       user: {
         email?: string;
         user_metadata?: { name?: string };
@@ -53,57 +76,76 @@ Deno.serve(async (req) => {
     };
 
     console.log("[send-email] webhook verified");
-    console.log("[send-email] action:", email_action_type);
-    console.log("[send-email] redirect_to:", redirect_to ?? null);
+
+    const user = verified.user;
+    const emailData = verified.email_data;
 
     const email = user?.email;
+    const tokenHash = emailData?.token_hash;
+    const actionType = emailData?.email_action_type;
+
+    console.log("[send-email] actionType:", actionType ?? null);
+    console.log("[send-email] recipient:", email ?? null);
+
     if (!email) {
-      console.error("[send-email] missing email in payload");
-      return new Response(JSON.stringify({ error: "Missing email" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
+      throw new Error("Missing email in webhook payload");
     }
 
-    console.log("[send-email] recipient:", email);
+    if (!tokenHash) {
+      throw new Error("Missing token_hash in webhook payload");
+    }
 
-    const baseUrl = redirect_to || SITE_URL;
+    if (!actionType) {
+      throw new Error("Missing email_action_type in webhook payload");
+    }
 
     let subject = "Chopp Hub";
     let html = "";
 
-    if (email_action_type === "signup") {
-      const confirmUrl = `${baseUrl}/auth/callback?token_hash=${token_hash}&type=signup&next=/marketing/registration-confirmed`;
+    if (actionType === "signup") {
+      const confirmUrl = buildActionUrl({
+        tokenHash,
+        type: "signup",
+        next: "/marketing/registration-confirmed",
+      });
 
       subject = "Confirme seu cadastro";
       html = await render(
         React.createElement(ConfirmSignupEmail, {
           userName: user?.user_metadata?.name,
           confirmUrl,
-        })
+        }),
       );
-    } else if (email_action_type === "invite") {
-      const inviteUrl = `${baseUrl}/auth/callback?token_hash=${token_hash}&type=invite&next=/set-password`;
+    } else if (actionType === "invite") {
+      const inviteUrl = buildActionUrl({
+        tokenHash,
+        type: "invite",
+        next: "/set-password",
+      });
 
       subject = "Você foi convidado para acessar o Chopp Hub";
       html = await render(
         React.createElement(ConfirmSignupEmail, {
           userName: user?.user_metadata?.name,
           confirmUrl: inviteUrl,
-        })
+        }),
       );
-    } else if (email_action_type === "recovery") {
-      const recoveryUrl = `${baseUrl}/auth/callback?token_hash=${token_hash}&type=recovery&next=/set-password`;
+    } else if (actionType === "recovery") {
+      const recoveryUrl = buildActionUrl({
+        tokenHash,
+        type: "recovery",
+        next: "/set-password",
+      });
 
       subject = "Redefina sua senha";
       html = await render(
         React.createElement(ConfirmSignupEmail, {
           userName: user?.user_metadata?.name,
           confirmUrl: recoveryUrl,
-        })
+        }),
       );
     } else {
-      console.log("[send-email] fallback template for action:", email_action_type);
+      console.log("[send-email] unknown actionType:", actionType);
       html = `
         <div style="font-family: Arial, sans-serif; padding: 24px;">
           <h1>Chopp Hub</h1>
@@ -112,9 +154,8 @@ Deno.serve(async (req) => {
       `;
     }
 
-    console.log("[send-email] sending email");
-    console.log("[send-email] from:", EMAIL_FROM);
-    console.log("[send-email] subject:", subject);
+    console.log("[send-email] rendering done");
+    console.log("[send-email] EMAIL_FROM:", EMAIL_FROM);
 
     const { data, error } = await resend.emails.send({
       from: EMAIL_FROM,
@@ -125,13 +166,12 @@ Deno.serve(async (req) => {
 
     if (error) {
       console.error("[send-email] resend error:", JSON.stringify(error, null, 2));
-      return new Response(JSON.stringify({ error }), {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      });
+      throw new Error(
+        typeof error === "object" ? JSON.stringify(error) : String(error),
+      );
     }
 
-    console.log("[send-email] email sent successfully:", JSON.stringify(data));
+    console.log("[send-email] resend success:", JSON.stringify(data));
 
     return new Response(JSON.stringify({ success: true, data }), {
       status: 200,
@@ -142,12 +182,12 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: error instanceof Error ? error.message : String(error),
       }),
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
-      }
+      },
     );
   }
 });
