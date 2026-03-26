@@ -85,13 +85,30 @@ Deno.serve(async (req) => {
         next: "/marketing/registration-confirmed",
       });
 
-      subject = "Confirme seu cadastro";
-      html = await render(
-        React.createElement(ConfirmSignupEmail, {
-          userName: user?.user_metadata?.name,
-          confirmUrl,
-        }),
-      );
+subject = "Confirme seu cadastro";
+html = `
+  <div style="font-family: Arial, sans-serif; padding: 24px;">
+    <h1>Bem-vindo ao Chopp Hub</h1>
+    <p>Olá${user?.user_metadata?.name ? `, ${user.user_metadata.name}` : ""}!</p>
+    <p>Clique no botão abaixo para confirmar seu cadastro:</p>
+    <p>
+      <a
+        href="${confirmUrl}"
+        style="
+          display:inline-block;
+          background:#2563eb;
+          color:#ffffff;
+          padding:12px 20px;
+          border-radius:8px;
+          text-decoration:none;
+          font-weight:bold;
+        "
+      >
+        Confirmar cadastro
+      </a>
+    </p>
+  </div>
+`;
     } else if (actionType === "invite") {
       const inviteUrl = buildActionUrl({
         tokenHash,
@@ -99,13 +116,46 @@ Deno.serve(async (req) => {
         next: "/set-password",
       });
 
-      subject = "Você foi convidado para acessar o Chopp Hub";
-      html = await render(
-        React.createElement(ConfirmSignupEmail, {
-          userName: user?.user_metadata?.name,
-          confirmUrl: inviteUrl,
-        }),
-      );
+subject = "Você foi convidado para acessar o Chopp Hub";
+
+html = `
+  <div style="font-family: Arial, sans-serif; padding: 24px;">
+    <h1>Você foi convidado 🎉</h1>
+
+    <p>
+      Olá${user?.user_metadata?.name ? `, ${user.user_metadata.name}` : ""}!
+    </p>
+
+    <p>
+      Você foi convidado para acessar o <strong>Chopp Hub</strong>.
+    </p>
+
+    <p>
+      Para continuar, clique no botão abaixo e defina sua senha:
+    </p>
+
+    <p style="margin-top: 24px;">
+      <a
+        href="${inviteUrl}"
+        style="
+          display: inline-block;
+          background: #2563eb;
+          color: #ffffff;
+          padding: 12px 20px;
+          border-radius: 8px;
+          text-decoration: none;
+          font-weight: bold;
+        "
+      >
+        Aceitar convite
+      </a>
+    </p>
+
+    <p style="margin-top: 24px; font-size: 12px; color: #666;">
+      Se você não esperava esse convite, pode ignorar este e-mail.
+    </p>
+  </div>
+`;
     } else if (actionType === "recovery") {
       const recoveryUrl = buildActionUrl({
         tokenHash,
@@ -113,13 +163,46 @@ Deno.serve(async (req) => {
         next: "/set-password",
       });
 
-      subject = "Redefina sua senha";
-      html = await render(
-        React.createElement(ConfirmSignupEmail, {
-          userName: user?.user_metadata?.name,
-          confirmUrl: recoveryUrl,
-        }),
-      );
+subject = "Redefina sua senha";
+
+html = `
+  <div style="font-family: Arial, sans-serif; padding: 24px;">
+    <h1>Redefinição de senha 🔐</h1>
+
+    <p>
+      Olá${user?.user_metadata?.name ? `, ${user.user_metadata.name}` : ""}!
+    </p>
+
+    <p>
+      Recebemos uma solicitação para redefinir sua senha no <strong>Chopp Hub</strong>.
+    </p>
+
+    <p>
+      Clique no botão abaixo para criar uma nova senha:
+    </p>
+
+    <p style="margin-top: 24px;">
+      <a
+        href="${recoveryUrl}"
+        style="
+          display: inline-block;
+          background: #dc2626;
+          color: #ffffff;
+          padding: 12px 20px;
+          border-radius: 8px;
+          text-decoration: none;
+          font-weight: bold;
+        "
+      >
+        Redefinir senha
+      </a>
+    </p>
+
+    <p style="margin-top: 24px; font-size: 12px; color: #666;">
+      Se você não solicitou a redefinição de senha, ignore este e-mail.
+    </p>
+  </div>
+`;
     } else {
       console.log("[send-email] unknown actionType:", actionType);
 
