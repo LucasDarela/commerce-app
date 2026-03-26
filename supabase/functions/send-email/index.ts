@@ -1,4 +1,3 @@
-import { Webhook } from "https://esm.sh/standardwebhooks@1.0.0";
 import { Resend } from "npm:resend";
 import React from "npm:react";
 import { render } from "npm:@react-email/render";
@@ -6,7 +5,6 @@ import { render } from "npm:@react-email/render";
 import ConfirmSignupEmail from "./_templates/confirm-signup-email.tsx";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
-const SEND_EMAIL_HOOK_SECRET = Deno.env.get("SEND_EMAIL_HOOK_SECRET");
 const EMAIL_FROM =
   Deno.env.get("EMAIL_FROM") ?? "Chopp Hub <no-reply@chopphub.com>";
 const SITE_URL = Deno.env.get("SITE_URL") ?? "https://chopphub.com";
@@ -15,12 +13,7 @@ if (!RESEND_API_KEY) {
   throw new Error("Missing RESEND_API_KEY");
 }
 
-if (!SEND_EMAIL_HOOK_SECRET) {
-  throw new Error("Missing SEND_EMAIL_HOOK_SECRET");
-}
-
 const resend = new Resend(RESEND_API_KEY);
-const hookSecret = SEND_EMAIL_HOOK_SECRET;
 
 function buildActionUrl({
   tokenHash,
@@ -44,24 +37,7 @@ Deno.serve(async (req) => {
   try {
     const payload = await req.text();
 
-    const headers = {
-      "webhook-id": req.headers.get("webhook-id") ?? "",
-      "webhook-timestamp": req.headers.get("webhook-timestamp") ?? "",
-      "webhook-signature": req.headers.get("webhook-signature") ?? "",
-    };
-
-    console.log("[send-email] verifying webhook");
-    console.log("[send-email] has webhook-id:", !!headers["webhook-id"]);
-    console.log(
-      "[send-email] has webhook-timestamp:",
-      !!headers["webhook-timestamp"],
-    );
-    console.log(
-      "[send-email] has webhook-signature:",
-      !!headers["webhook-signature"],
-    );
-
-    const wh = new Webhook(hookSecret);
+    console.log("[send-email] raw payload received");
 
     const verified = JSON.parse(payload) as {
       user: {
@@ -69,13 +45,13 @@ Deno.serve(async (req) => {
         user_metadata?: { name?: string };
       };
       email_data: {
-        token_hash: string;
+        token_hash?: string;
         redirect_to?: string;
-        email_action_type: string;
+        email_action_type?: string;
       };
     };
 
-    console.log("[send-email] webhook verified");
+    console.log("[send-email] payload parsed");
 
     const user = verified.user;
     const emailData = verified.email_data;
@@ -146,6 +122,7 @@ Deno.serve(async (req) => {
       );
     } else {
       console.log("[send-email] unknown actionType:", actionType);
+
       html = `
         <div style="font-family: Arial, sans-serif; padding: 24px;">
           <h1>Chopp Hub</h1>
@@ -156,6 +133,7 @@ Deno.serve(async (req) => {
 
     console.log("[send-email] rendering done");
     console.log("[send-email] EMAIL_FROM:", EMAIL_FROM);
+    console.log("[send-email] sending email...");
 
     const { data, error } = await resend.emails.send({
       from: EMAIL_FROM,
@@ -165,7 +143,10 @@ Deno.serve(async (req) => {
     });
 
     if (error) {
-      console.error("[send-email] resend error:", JSON.stringify(error, null, 2));
+      console.error(
+        "[send-email] resend error:",
+        JSON.stringify(error, null, 2),
+      );
       throw new Error(
         typeof error === "object" ? JSON.stringify(error) : String(error),
       );
