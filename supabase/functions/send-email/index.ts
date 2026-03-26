@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
 
     const wh = new Webhook(hookSecret);
 
-    const verified = wh.verify(payload, headers) as {
+    const verified = JSON.parse(payload) as {
       user: {
         email?: string;
         user_metadata?: { name?: string };
