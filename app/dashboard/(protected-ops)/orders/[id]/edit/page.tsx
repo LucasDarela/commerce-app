@@ -75,7 +75,7 @@ interface Customer {
 }
 
 interface Product {
-  id: number;
+  id: string;
   code: string;
   name: string;
   standard_price: number;

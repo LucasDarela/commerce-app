@@ -1,7 +1,7 @@
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 
 export async function getReservedStock(
-  productId: number,
+  productId: string,
   companyId: string,
 ): Promise<number> {
   const supabase = createBrowserSupabaseClient();
