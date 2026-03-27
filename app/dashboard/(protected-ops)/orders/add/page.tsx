@@ -74,7 +74,7 @@ interface Customer {
 }
 
 interface Product {
-  id: number;
+  id: string;
   code: string;
   name: string;
   standard_price: number;
@@ -82,7 +82,7 @@ interface Product {
 }
 
 type LineItem = {
-  id: number | string;
+  id: string;
   name: string;
   quantity: number;
   standard_price: number;
@@ -282,25 +282,27 @@ useEffect(() => {
     }
   };
 
-  const addItem = () => {
-    if (selectedProduct && standardPrice !== "") {
-      setOrderItems((prev) => [
-        ...prev,
-        {
-          id: selectedProduct.id,
-          name: selectedProduct.name,
-          quantity,
-          standard_price: Number(standardPrice),
-        },
-      ]);
-      setSelectedProduct(null);
-      setQuantity(1);
-      setStandardPrice("");
-    } else {
-      toast.error("Selecione um produto e defina o preço.");
-    }
-  };
+const addItem = () => {
+  if (selectedProduct && standardPrice !== "") {
+    console.log("selectedProduct before add:", selectedProduct);
 
+    const newItem = {
+      id: selectedProduct.id,
+      name: selectedProduct.name,
+      quantity,
+      standard_price: Number(standardPrice),
+    };
+
+    console.log("newItem being added:", newItem);
+
+    setOrderItems((prev) => [...prev, newItem]);
+    setSelectedProduct(null);
+    setQuantity(1);
+    setStandardPrice("");
+  } else {
+    toast.error("Selecione um produto e defina o preço.");
+  }
+};
   const removeItem = (index: number) => {
     setOrderItems((prev) => prev.filter((_, i) => i !== index));
   };
@@ -436,18 +438,23 @@ useEffect(() => {
         return;
       }
 
-      console.log("Items antes de salvar order_items:", orderItems);
+      console.log("orderItems before insert:", orderItems);
 
       const itemsPayload = orderItems.map((item) => ({
         order_id: insertedOrder.id,
-        product_id: item.id,
+        product_id: item.id ?? null,
         quantity: item.quantity,
         price: item.standard_price,
       }));
 
-      const { error: itemError } = await supabase
-        .from("order_items")
-        .insert(itemsPayload);
+      console.log("itemsPayload before insert:", itemsPayload);
+
+        const { data: insertedItems, error: itemError } = await supabase
+          .from("order_items")
+          .insert(itemsPayload)
+          .select();  
+
+        console.log("insertedItems:", insertedItems);
 
       if (itemError) {
         toast.error("❌ Ordem criada mas ERRO ao inserir itens.");
@@ -856,61 +863,12 @@ useEffect(() => {
     </PopoverContent>
   </Popover>
 </div>
-            {/* <Select
-              onValueChange={(value) => {
-                const product = products.find((p) => p.id.toString() === value);
-                if (product) {
-                  setSelectedProduct(product);
-                  const catalogPrice = catalogPrices[String(product.id)];
-                  setStandardPrice(
-                    typeof catalogPrice === "number"
-                      ? catalogPrice
-                      : product.standard_price,
-                  );
-                }
-              }}
-            >
-              <SelectTrigger className="border rounded-md shadow-sm w-full col-span-3 truncate ">
-                <SelectValue placeholder="Selecionar Produto" />
-              </SelectTrigger>
-              <SelectContent className="shadow-md rounded-md z-50">
-                {products
-                  .slice()
-                  .sort((a, b) => Number(a.code) - Number(b.code))
-                  .map((product) => (
-                    <SelectItem
-                      key={product.id}
-                      value={product.id.toString()}
-                      className="cursor-pointer"
-                    >
-                      {product.code} - {product.name}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select> */}
             <Button
               className="col-span-2 w-full cursor-pointer"
-              onClick={() => {
-                if (selectedProduct && standardPrice !== "") {
-                  setOrderItems((prev) => [
-                    ...prev,
-                    {
-                      id: selectedProduct.id,
-                      name: selectedProduct.name,
-                      quantity,
-                      standard_price: Number(standardPrice),
-                    },
-                  ]);
-                  setSelectedProduct(null);
-                  setQuantity(1);
-                  setStandardPrice("");
-                } else {
-                  toast.error("Selecione um produto e defina o preço.");
-                }
-              }}
+              onClick={addItem}
             >
               Adicionar
-            </Button>
+            </Button> 
           </div>
           <div className="flex w-full">
             {selectedProduct && (

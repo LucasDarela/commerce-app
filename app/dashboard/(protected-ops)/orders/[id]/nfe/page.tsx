@@ -164,20 +164,20 @@ const { data: items, error: itemsErr } = await supabase
       }
 
 const uiProducts: UiProduct[] = (items ?? []).map((i: any) => {
-  const pid = String(i.product_id);
+  const pid = i.product_id ? String(i.product_id) : "";
   const soldQty = Number(i.quantity ?? 0);
   const returnedQty = Number(returnedByProduct.get(pid) ?? 0);
   const netQty = Math.max(soldQty - returnedQty, 0);
 
   const product = Array.isArray(i.products)
-  ? i.products[0] ?? null
-  : i.products ?? null;
+    ? i.products[0] ?? null
+    : i.products ?? null;
 
   return {
     item_id: String(i.id),
     product_id: pid,
-    code: String(product?.code ?? pid),
-    name: String(product?.name ?? "Produto"),
+    code: String(product?.code ?? ""),
+    name: String(product?.name ?? "Produto sem vínculo"),
     unit: String(product?.unit ?? "UN"),
     soldQty,
     returnedQty,
@@ -231,6 +231,17 @@ console.log("order items raw:", items);
     if (!emissor) return toast.error("Emissor não definido");
 
     const produtosParaNfe = products.filter((p) => p.netQty > 0);
+    const invalidLinkedProduct = produtosParaNfe.find(
+      (p) => !p.product_id || p.product_id === "null"
+    );
+
+    if (invalidLinkedProduct) {
+      toast.error(
+        "Existe item da venda sem vínculo com produto cadastrado. Edite ou recrie a venda."
+      );
+      return;
+    }
+    console.log("produtosParaNfe:", produtosParaNfe);
     if (produtosParaNfe.length === 0) {
       return toast.error(
         "Todos os itens estão devolvidos. Não há itens para emitir na NF-e.",

@@ -16,9 +16,6 @@ export default async function ProtectedAdminLayout({
     error: userError,
   } = await supabase.auth.getUser();
 
-  console.log("[dashboard layout] user:", user?.email ?? null);
-console.log("[dashboard layout] userError:", userError ?? null);
-
   if (userError || !user) {
     redirect("/login-signin");
   }
