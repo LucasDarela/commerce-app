@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { PaymentModal } from "@/components/payment-modal";
 import { YourFinancialRecords } from "@/components/your-financial-modal";
 import { Order } from "@/components/types/orders";
-import { FinancialRecord } from "@/components/types/financial";
+import type { FinancialRecord } from "@/components/financial/schema";
 import { useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { CombinedRecord } from "./DataFinancialTable";

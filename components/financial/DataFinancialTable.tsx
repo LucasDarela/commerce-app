@@ -34,7 +34,6 @@ import { Button } from "../ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../ui/tabs";
 import { MonthlyFinancialTable } from "./MonthlyFinancialTable";
 import { orderSchema, type Order } from "@/components/types/orderSchema";
-import { FinancialRecord as FinancialRecordType } from "@/components/types/financial";
 import { financialSchema, type FinancialRecord } from "./schema";
 
 type PersistedState = {
@@ -197,24 +196,34 @@ const fetchAll = async () => {
     setOrders([]);
   }
 
-  const parsedFinancials = financialSchema
-    .array()
-    .safeParse(
-      (financialRes.data ?? []).map((f) => ({
-        ...f,
-        source: "financial" as const,
-      })),
-    );
+const mappedFinancials = (financialRes.data ?? []).map((f) => ({
+  ...f,
+  payment_method:
+    f.payment_method === "Cash"
+      ? "Dinheiro"
+      : f.payment_method === "Card"
+        ? "Cartao"
+        : f.payment_method === "Ticket"
+          ? "Boleto"
+          : f.payment_method ?? undefined,
+  total_payed: Number(f.total_payed ?? 0),
+  source: "financial" as const,
+}));
 
-  if (parsedFinancials.success) {
-    setFinancialRecords(parsedFinancials.data);
+const validFinancials: FinancialRecord[] = [];
+
+for (const item of mappedFinancials) {
+  const parsed = financialSchema.safeParse(item);
+
+  if (parsed.success) {
+    validFinancials.push(parsed.data);
   } else {
-    console.error(
-      "Erro ao validar financial records:",
-      parsedFinancials.error,
-    );
-    setFinancialRecords([]);
+    console.error("Registro financeiro inválido:", item);
+    console.error(parsed.error.flatten());
   }
+}
+
+setFinancialRecords(validFinancials);
 
   setSuppliers(suppliersRes.data || []);
   setLoading(false);

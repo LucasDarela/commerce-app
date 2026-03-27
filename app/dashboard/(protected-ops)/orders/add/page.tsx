@@ -728,7 +728,7 @@ useEffect(() => {
             <div className="col-span-2">
               <Link href={addCustomerUrl} className="w-full">
                 <Button variant="default" className="w-full">
-                  Adicionar
+                  Criar
                 </Button>
               </Link>
             </div>
@@ -909,7 +909,7 @@ useEffect(() => {
                 }
               }}
             >
-              Criar
+              Adicionar
             </Button>
           </div>
           <div className="flex w-full">

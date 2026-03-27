@@ -9,7 +9,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -19,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import type { FinancialRecord } from "@/components/financial/schema";
 
 interface PaymentModalProps {
   open: boolean;
@@ -27,12 +27,7 @@ interface PaymentModalProps {
   onSuccess: () => void;
 }
 
-interface FinancialRecord {
-  id: string;
-  amount: number;
-  status: "Unpaid" | "Paid" | "Partial";
-  payment_method: "Pix" | "Cartao" | "Dinheiro" | "Boleto";
-}
+type PaymentMethod = "Pix" | "Dinheiro" | "Boleto" | "Cartao";
 
 export function YourFinancialRecords({
   open,
@@ -40,79 +35,38 @@ export function YourFinancialRecords({
   financial,
   onSuccess,
 }: PaymentModalProps) {
-  const [partialValue, setPartialValue] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<
-    "Pix" | "Dinheiro" | "Boleto" | "Cartao" | ""
-  >("");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | "">("");
   const [loading, setLoading] = useState(false);
-
-  const mapPaymentMethod = (
-    value: "Pix" | "Dinheiro" | "Boleto" | "Cartao",
-  ): "Pix" | "Dinheiro" | "Boleto" | "Cartao" => value;
 
   useEffect(() => {
     if (financial?.payment_method) {
-      setPaymentMethod(mapPaymentMethod(financial.payment_method));
+      setPaymentMethod(financial.payment_method);
+    } else {
+      setPaymentMethod("Pix");
     }
-  }, [financial?.payment_method]);
+  }, [financial]);
 
   if (!financial) return null;
 
-  // ✅ Função para pagamento integral
   async function handleFullPayment() {
     setLoading(true);
+
     try {
       const res = await fetch("/api/update-financial-payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           financial_id: financial.id,
-          payment_method: paymentMethod,
-          total_payed: financial.amount, // não precisa salvar esse campo no banco se for só "status"
+          payment_method: paymentMethod || "Pix",
+          total_payed: financial.amount,
         }),
       });
 
-      if (!res.ok) throw new Error("Erro ao pagar nota.");
+      if (!res.ok) {
+        throw new Error("Erro ao pagar nota.");
+      }
+
       toast.success("Pagamento registrado.");
-      onSuccess();
-      onClose();
-    } catch (err) {
-      toast.error("Erro ao pagar nota");
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // ✅ Função para pagamento parcial
-  async function handlePartialPayment() {
-    const parsedValue = parseFloat(partialValue.replace(",", "."));
-
-    console.log("Enviando:", {
-      financial_id: financial.id,
-      payment_method: paymentMethod,
-      total_payed: parsedValue,
-    });
-
-    if (!partialValue || isNaN(parsedValue)) {
-      toast.error("Informe um valor válido.");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const res = await fetch("/api/update-payment/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          financial_id: financial.id,
-          payment_method: paymentMethod,
-          total_payed: parsedValue,
-        }),
-      });
-
-      if (!res.ok) throw new Error("Erro ao registrar pagamento parcial.");
-      toast.success("Pagamento parcial registrado.");
       onSuccess();
       onClose();
     } catch (err) {
@@ -130,20 +84,15 @@ export function YourFinancialRecords({
           <DialogTitle>Pagamento da Nota</DialogTitle>
           <DialogDescription>
             Total da nota:{" "}
-            <strong>R$ {financial.amount?.toFixed(2) ?? "0,00"}</strong>
+            <strong>R$ {Number(financial.amount ?? 0).toFixed(2)}</strong>
           </DialogDescription>
         </DialogHeader>
 
-        {/* ✅ Seletor de método de pagamento */}
         <div className="space-y-2">
           <Label className="mb-2">Método de Pagamento</Label>
           <Select
             value={paymentMethod}
-            onValueChange={(val) =>
-              setPaymentMethod(
-                val as "Pix" | "Dinheiro" | "Boleto" | "Cartao" | "",
-              )
-            }
+            onValueChange={(val) => setPaymentMethod(val as PaymentMethod)}
           >
             <SelectTrigger>
               <SelectValue placeholder="Selecionar método" />

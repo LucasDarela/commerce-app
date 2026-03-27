@@ -183,24 +183,27 @@ export default function AddFinancialRecord() {
       calculatedAmount = Number(amount) || 0;
     }
 
-    const record = {
-      company_id: companyId,
-      issue_date: issueDate
-        ? toISODate(issueDate)
-        : new Date().toISOString().split("T")[0],
-      due_date: dueDate ? toISODate(dueDate) : null,
-      invoice_number: invoiceNumber || null,
-      supplier: selectedSupplier || null,
-      description: description || null,
-      category: selectedCategory || customCategory || "others",
-      amount: Number(calculatedAmount || 0),
-      notes: notes || null,
-      status: "Unpaid",
-      created_at: new Date().toISOString(),
-      bank_account_id: selectedAccount || null,
-      type: noteType,
-      payment_method: paymentMethod,
-    };
+if (!selectedSupplier.trim()) {
+  toast.error("Informe o fornecedor ou cliente.");
+  return;
+}
+
+const record = {
+  company_id: companyId,
+  issue_date: issueDate
+    ? toISODate(issueDate)
+    : new Date().toISOString().split("T")[0],
+  due_date: dueDate ? toISODate(dueDate) : null,
+  invoice_number: invoiceNumber || null,
+  supplier: selectedSupplier.trim(),
+  description: description || null,
+  category: selectedCategory || customCategory || "others",
+  amount: calculatedAmount,
+  notes: notes || null,
+  bank_account_id: selectedAccount || null,
+  type: noteType,
+  payment_method: paymentMethod || null,
+};
 
     setLoading(true);
 

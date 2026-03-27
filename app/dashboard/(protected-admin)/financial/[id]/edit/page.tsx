@@ -63,7 +63,9 @@ type ExistingFinancialRecord = {
   notes: string | null;
   bank_account_id: string | null;
   type: NoteType;
-  days_ticket?: number | null;
+  supplier_id?: string | null;
+  total_payed?: number | null;
+  status?: "Paid" | "Unpaid" | null;
 };
 
 function toISODate(dateStr: string): string {
@@ -402,26 +404,22 @@ export default function EditFinancialRecord() {
       calculatedAmount = Number(amount) || 0;
     }
 
-    const record = {
-      company_id: companyId,
-      issue_date: issueDate
-        ? toISODate(issueDate)
-        : new Date().toISOString().split("T")[0],
-      due_date: dueDate ? toISODate(dueDate) : null,
-      invoice_number: invoiceNumber || null,
-      supplier: selectedSupplier || null,
-      description: description || null,
-      category: selectedCategory || customCategory || "others",
-      amount: calculatedAmount,
-      notes: notes || null,
-      bank_account_id: selectedAccount || null,
-      type: noteType,
-      payment_method: paymentMethod,
-      days_ticket:
-        paymentMethod === "Boleto" || paymentMethod === "Cartao"
-          ? Number(paymentDays || 0)
-          : null,
-    };
+const record = {
+  company_id: companyId,
+  issue_date: issueDate
+    ? toISODate(issueDate)
+    : new Date().toISOString().split("T")[0],
+  due_date: dueDate ? toISODate(dueDate) : null,
+  invoice_number: invoiceNumber || null,
+  supplier: selectedSupplier || "",
+  description: description || null,
+  category: selectedCategory || customCategory || "others",
+  amount: calculatedAmount,
+  notes: notes || null,
+  bank_account_id: selectedAccount || null,
+  type: noteType,
+  payment_method: paymentMethod || null,
+};
 
     setLoading(true);
 
@@ -563,7 +561,7 @@ export default function EditFinancialRecord() {
       setNotes(parsed.notes || "");
       setSelectedAccount(parsed.bank_account_id || "");
       setNoteType(parsed.type || "input");
-      setPaymentDays(parsed.days_ticket || "");
+      setPaymentDays("");
 
       setPageLoading(false);
     };

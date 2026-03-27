@@ -6,7 +6,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { FinancialRecord } from "@/components/types/financial";
+import type { FinancialRecord } from "@/components/financial/schema";
 import { Order as OrderBasic } from "@/components/types/order";
 import { isOrder, isFinancial } from "./utils";
 import { ActionsCell } from "../actions-cell";
@@ -222,27 +222,37 @@ export function financialColumns({
       id: "payment_status",
       header: "Pagamento",
       accessorFn: (row) => {
-        const status = isFinancial(row) ? row.status : row.payment_status;
-        return status === "Paid"
-          ? "Paid"
-          : status === "Partial"
-            ? "Partial"
-            : "Unpaid";
-      },
+        if (isFinancial(row)) {
+          const total = Number(row.amount ?? 0);
+          const paid = Number(row.total_payed ?? 0);
+
+          if (paid > 0 && paid < total) return "Partial";
+          return row.status === "Paid" ? "Paid" : "Unpaid";
+        }
+
+        return row.payment_status === "Paid" ? "Paid" : "Unpaid";
+},
       filterFn: (row, columnId, filterValue) => {
         const value = row.getValue(columnId);
         return value === filterValue;
       },
       cell: ({ row }) => {
-        const status = isFinancial(row.original)
-          ? row.original.status
-          : row.original.payment_status;
+const record = row.original;
 
-        return status === "Paid"
-          ? "Pago"
-          : status === "Partial"
-            ? "Parcial"
-            : "Pendente";
+if (isFinancial(record)) {
+  const total = Number(record.amount ?? 0);
+  const paid = Number(record.total_payed ?? 0);
+
+  if (paid > 0 && paid < total) {
+    return "Parcial";
+  }
+
+  return record.status === "Paid" ? "Pago" : "Pendente";
+}
+
+const status = record.payment_status;
+
+return status === "Paid" ? "Pago" : "Pendente";
       },
     },
     {

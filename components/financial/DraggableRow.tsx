@@ -4,7 +4,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { DragHandle } from "./DragHandle";
 import { CustomColumnDef } from "./columns";
-import { FinancialRecord } from "@/components/types/financial";
+import type { FinancialRecord } from "@/components/financial/schema";
 import { flexRender } from "@tanstack/react-table";
 
 type DraggableRowProps<T extends { id: string }> = {
