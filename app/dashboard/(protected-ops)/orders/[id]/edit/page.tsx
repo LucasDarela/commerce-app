@@ -516,7 +516,7 @@ export default function EditOrderPage() {
 
       const newItems = orderItems.map((item) => ({
         order_id: orderId,
-        product_id: Number(item.id),
+        product_id: item.id,
         quantity: Number(item.quantity),
         price: Number(item.standard_price),
       }));

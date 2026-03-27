@@ -80,7 +80,7 @@ async function updateStockBasedOnOrder(
 
   for (const item of items) {
     const { data, error } = await supabaseClient.rpc("decrement_stock", {
-      product_id: Number(item.id),
+      product_id: item.id,
       quantity: Number(item.quantity),
     });
 
