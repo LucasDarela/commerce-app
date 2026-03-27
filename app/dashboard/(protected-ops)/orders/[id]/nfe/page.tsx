@@ -81,7 +81,7 @@ const { data: items, error: itemsErr } = await supabase
     product_id,
     quantity,
     price,
-    products (
+    products:products!order_items_product_id_fkey (
       id,
       name,
       code,
@@ -169,30 +169,38 @@ const uiProducts: UiProduct[] = (items ?? []).map((i: any) => {
   const returnedQty = Number(returnedByProduct.get(pid) ?? 0);
   const netQty = Math.max(soldQty - returnedQty, 0);
 
+  const product = Array.isArray(i.products)
+  ? i.products[0] ?? null
+  : i.products ?? null;
+
   return {
     item_id: String(i.id),
     product_id: pid,
-    code: String(i.products?.code ?? pid),
-    name: String(i.products?.name ?? "Produto"),
-    unit: String(i.products?.unit ?? "UN"),
+    code: String(product?.code ?? pid),
+    name: String(product?.name ?? "Produto"),
+    unit: String(product?.unit ?? "UN"),
     soldQty,
     returnedQty,
     netQty,
     price: Number(i.price ?? 0),
 
-    ncm: i.products?.ncm ?? null,
-    cest: i.products?.cest ?? null,
-    cfop: i.products?.cfop ?? null,
-    icms_origem: i.products?.icms_origem ?? null,
-    cst_icms: i.products?.cst_icms ?? null,
-    csosn_icms: i.products?.csosn_icms ?? null,
-    icms_situacao_tributaria: i.products?.icms_situacao_tributaria ?? null,
-    pis: i.products?.pis ?? null,
-    cofins: i.products?.cofins ?? null,
-    ipi: i.products?.ipi ?? null,
+    ncm: product?.ncm ?? null,
+    cest: product?.cest ?? null,
+    cfop: product?.cfop ?? null,
+    icms_origem: product?.icms_origem ?? null,
+    cst_icms: product?.cst_icms ?? null,
+    csosn_icms: product?.csosn_icms ?? null,
+    icms_situacao_tributaria: product?.icms_situacao_tributaria ?? null,
+    pis: product?.pis ?? null,
+    cofins: product?.cofins ?? null,
+    ipi: product?.ipi ?? null,
   };
 });
-
+console.log("uiProducts:", uiProducts);
+console.log("order items raw:", items);
+(items ?? []).forEach((i: any) => {
+  console.log("item product raw:", i.products);
+});
       setProducts(uiProducts);
     };
 
@@ -236,7 +244,7 @@ const invalidProductNcm = produtosParaNfe.find((p) => {
 });
 
 if (invalidProductNcm) {
-  toast.error(`O produto ${invalidProductNcm.name} está sem NCM cadastrado.`);
+  toast.error(`O produto ${invalidProductNcm.name} está com NCM ausente ou inválido.`);
   return;
 }
 
