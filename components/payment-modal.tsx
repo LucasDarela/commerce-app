@@ -1,5 +1,3 @@
-// ✅ Modal de Pagamento (com melhorias e integração completa)
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -22,7 +20,6 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 
-// ✅ Tipagem da venda
 interface Order {
   id: string;
   total: number;
@@ -44,27 +41,50 @@ export function PaymentModal({
   order,
   onSuccess,
 }: PaymentModalProps) {
-  const [partialValue, setPartialValue] = useState("");
+  const [editValue, setEditValue] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<
     "Pix" | "Dinheiro" | "Boleto" | "Cartao" | ""
   >("");
   const [loading, setLoading] = useState(false);
+  const [isEditingPaidValue, setIsEditingPaidValue] = useState(false);
 
-  // ✅ Atualiza o método de pagamento quando a venda é carregada
+  if (!order) return null;
+
   useEffect(() => {
     if (order?.payment_method) {
       setPaymentMethod(order.payment_method);
     }
-  }, [order]);
 
-  // ✅ Garante que só renderiza se o pedido estiver disponível
-  if (!order) return null;
+    setEditValue(
+      typeof order.total_payed === "number"
+        ? order.total_payed.toFixed(2).replace(".", ",")
+        : "0,00",
+    );
 
-  // ✅ Função para pagamento integral
+    setIsEditingPaidValue(false);
+  }, [order, open]);
+
+  function formatCurrencyBRL(value: number) {
+    return value.toFixed(2).replace(".", ",");
+  }
+
+  function parseCurrencyToNumber(value: string) {
+    if (!value) return NaN;
+
+    const sanitized = value.trim();
+
+    if (sanitized.includes(",")) {
+      return Number(sanitized.replace(/\./g, "").replace(",", "."));
+    }
+
+    return Number(sanitized);
+  }
+
   async function handleFullPayment() {
     setLoading(true);
+
     try {
-      const res = await fetch("/api/update-payment/", {
+      const res = await fetch("/api/update-payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -74,132 +94,47 @@ export function PaymentModal({
         }),
       });
 
-      if (!res.ok) throw new Error("Erro ao pagar nota.");
+      const json = await res.json();
+
+      if (!res.ok) {
+        toast.error(json?.error || "Erro ao pagar nota.");
+        return;
+      }
+
       toast.success("Pagamento integral registrado.");
       onSuccess();
       onClose();
     } catch (err) {
-      toast.error("Erro ao pagar nota");
       console.error(err);
+      toast.error("Erro ao pagar nota.");
     } finally {
       setLoading(false);
     }
   }
 
-  // ✅ Função para pagamento parcial
-  // async function handlePartialPayment() {
-  //   const parsedValue = parseFloat(partialValue.replace(",", "."));
-
-  //   if (!partialValue || isNaN(parsedValue)) {
-  //     toast.error("Informe um valor válido.");
-  //     return;
-  //   }
-
-  //   setLoading(true);
-  //   try {
-  //     const res = await fetch("/api/update-payment/", {
-  //       method: "POST",
-  //       headers: { "Content-Type": "application/json" },
-  //       body: JSON.stringify({
-  //         order_id: order.id,
-  //         payment_method: paymentMethod,
-  //         total_payed: parsedValue,
-  //       }),
-  //     });
-
-  //     if (!res.ok) throw new Error("Erro ao registrar pagamento parcial.");
-  //     toast.success("Pagamento parcial registrado.");
-  //     onSuccess();
-  //     onClose();
-  //   } catch (err) {
-  //     toast.error("Erro ao pagar nota");
-  //     console.error(err);
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // }
-
-  // async function handlePartialPayment() {
-  //   const parsedValue = parseFloat(partialValue.replace(",", "."));
-
-  //   if (!partialValue || isNaN(parsedValue)) {
-  //     toast.error("Informe um valor válido.");
-  //     return;
-  //   }
-
-  //   setLoading(true);
-  //   try {
-  //     const res = await fetch("/api/update-payment/", {
-  //       method: "POST",
-  //       headers: { "Content-Type": "application/json" },
-  //       body: JSON.stringify({
-  //         order_id: order.id,
-  //         payment_method: paymentMethod,
-  //         total_payed: parsedValue, // <-- atualiza diretamente o campo
-  //       }),
-  //     });
-
-  //     if (!res.ok) throw new Error("Erro ao registrar pagamento.");
-  //     toast.success("Pagamento atualizado com sucesso.");
-  //     onSuccess();
-  //     onClose();
-  //   } catch (err) {
-  //     toast.error("Erro ao atualizar pagamento");
-  //     console.error(err);
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // }
-
-  // dentro do seu PaymentModal, substitua/adicione:
-
-  useEffect(() => {
-    if (order?.payment_method) {
-      setPaymentMethod(order.payment_method);
-    }
-    // inicializa o input com o valor já pago (ou 0)
-    setPartialValue(
-      typeof order.total_payed === "number"
-        ? order.total_payed.toFixed(2).replace(".", ",")
-        : "0,00",
-    );
-  }, [order]);
-
-  // utilitário para normalizar string -> number
-  function parseCurrencyToNumber(value: string) {
-    if (!value) return NaN;
-    // aceita "1.234,56" ou "1234.56"
-    const normalized = value.replace(/\./g, "").replace(",", ".");
-    return Number(normalized);
-  }
-
-  async function handleUpdatePayment() {
-    const parsedValue = parseCurrencyToNumber(partialValue);
+  async function handleEditPaidValue() {
+    const parsedValue = parseCurrencyToNumber(editValue);
 
     if (isNaN(parsedValue) || parsedValue < 0) {
       toast.error("Informe um valor válido.");
       return;
     }
 
-    // confirmação se diminuir
     const already = order.total_payed ?? 0;
+
     if (parsedValue < already) {
       const ok = confirm(
-        `Você está reduzindo o valor já recebido de R$ ${already.toFixed(
-          2,
-        )} para R$ ${parsedValue.toFixed(2)}. Deseja continuar?`,
+        `Você está reduzindo o valor já recebido de R$ ${formatCurrencyBRL(
+          already,
+        )} para R$ ${formatCurrencyBRL(parsedValue)}. Deseja continuar?`,
       );
+
       if (!ok) return;
     }
 
     setLoading(true);
-    try {
-      console.log("payload update-payment", {
-        order_id: order.id,
-        payment_method: paymentMethod,
-        total_payed: parsedValue,
-      });
 
+    try {
       const res = await fetch("/api/update-payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -211,14 +146,15 @@ export function PaymentModal({
       });
 
       const json = await res.json();
+
       if (!res.ok) {
         console.error("update-payment error:", json);
         toast.error(json?.error || "Erro ao atualizar pagamento.");
         return;
       }
 
-      toast.success("Pagamento atualizado com sucesso.");
-      onSuccess(); // -> seu parent deve refazer o fetch do pedido
+      toast.success("Valor pago atualizado com sucesso.");
+      onSuccess();
       onClose();
     } catch (err) {
       console.error(err);
@@ -236,58 +172,78 @@ export function PaymentModal({
           <DialogDescription>
             Total da nota:{" "}
             <strong className="font-black">
-              R$ {order.total?.toFixed(2) ?? "0,00"}
-            </strong>
-            <br />
-            Já pago:{" "}
-            <strong className="font-black text-green-600">
-              R$ {order.total_payed?.toFixed(2) ?? "0,00"}
+              R$ {formatCurrencyBRL(Number(order.total ?? 0))}
             </strong>
           </DialogDescription>
-          {/* <DialogDescription>
-            Total da nota:{" "}
-            <strong className="font-black">
-              R$ {order.total?.toFixed(2) ?? "0,00"}
-            </strong>
-          </DialogDescription> */}
         </DialogHeader>
-        <div className="flex gap-4 space-y-2">
-          <Label className="mb-2 text-muted-foreground">
-            Método de Pagamento:
-          </Label>
-          <Select
-            value={paymentMethod}
-            onValueChange={(val) =>
-              setPaymentMethod(
-                val as "Pix" | "Dinheiro" | "Boleto" | "Cartao" | "",
-              )
-            }
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Selecionar método" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Pix">Pix</SelectItem>
-              <SelectItem value="Dinheiro">Dinheiro</SelectItem>
-              <SelectItem value="Boleto">Boleto</SelectItem>
-              <SelectItem value="Cartao">Cartão</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
 
-        <div className="flex flex-col gap-4">
-          <div className="flex gap-4">
-            <Input
-              type="number"
-              placeholder="Valor pago"
-              value={partialValue}
-              onChange={(e) => setPartialValue(e.target.value)}
-            />
+                  <div className="flex gap-4 items-center">
+            <Label className="text-muted-foreground whitespace-nowrap">
+              Método de Pagamento:
+            </Label>
 
-            <Button disabled={loading} onClick={handleUpdatePayment}>
-              Atualizar Pagamento
+            <Select
+              value={paymentMethod}
+              onValueChange={(val) =>
+                setPaymentMethod(
+                  val as "Pix" | "Dinheiro" | "Boleto" | "Cartao" | "",
+                )
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecionar método" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Pix">Pix</SelectItem>
+                <SelectItem value="Dinheiro">Dinheiro</SelectItem>
+                <SelectItem value="Boleto">Boleto</SelectItem>
+                <SelectItem value="Cartao">Cartão</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-3 rounded-md border p-3">
+            <div className="flex flex-col">
+              <span className="text-sm text-muted-foreground">Já pago</span>
+              <strong className="font-black text-green-600">
+                R$ {formatCurrencyBRL(Number(order.total_payed ?? 0))}
+              </strong>
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsEditingPaidValue((prev) => !prev)}
+              disabled={loading}
+            >
+              {isEditingPaidValue ? "Cancelar" : "Editar"}
             </Button>
           </div>
+
+          {isEditingPaidValue && (
+            <div className="flex flex-col gap-3 rounded-md border p-3">
+              <Label className="text-muted-foreground">
+                Corrigir valor já pago
+              </Label>
+
+              <div className="flex gap-3">
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="Valor pago"
+                  value={editValue}
+                  onChange={(e) =>
+                    setEditValue(e.target.value.replace(/[^\d.,]/g, ""))
+                  }
+                />
+
+                <Button disabled={loading} onClick={handleEditPaidValue}>
+                  Salvar Edição
+                </Button>
+              </div>
+            </div>
+          )}
 
           <div className="flex text-center justify-center">
             <p className="text-muted-foreground">ou</p>
@@ -297,7 +253,7 @@ export function PaymentModal({
             <Button
               disabled={loading}
               onClick={handleFullPayment}
-              className="w-full"
+              className="w-full bg-green-600 hover:bg-green-700 font-bold text-white"
             >
               Receber Pagamento Integral
             </Button>
