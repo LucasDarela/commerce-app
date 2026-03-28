@@ -818,36 +818,34 @@ if (loading || companyLoading || !order) {
 
       {signatureData && (
         <div className="flex flex-col gap-4 mb-4">
-          {logoUrl && (
-            <PDFDownloadLink
-              key={JSON.stringify({ signatureData, returnedProducts, items })}
-              document={
-                <ItemRelationPDF
-                  company={order.company}
-                  customer={order.customer}
-                  items={itemsForPdf}
-                  note={{
-                    note_number: order.note_number,
-                    appointment_date: order.appointment_date,
-                  }}
-                  logoUrl={logoUrl}
-                  signature={order.customer_signature}
-                  freight={Number(order.freight ?? 0)}
-                  returnedProducts={returnedItemsForPdf}
-                />
-              }
-              fileName={`${order.note_number} - ${customer.name}.pdf`.replace(
-                /[\/\\:*?"<>|]/g,
-                "",
-              )}
-            >
-              {({ loading }) => (
-                <Button variant="default" className="w-full">
-                  {loading ? "Gerando PDF..." : "Download PDF"}
-                </Button>
-              )}
-            </PDFDownloadLink>
-          )}
+          <PDFDownloadLink
+            key={JSON.stringify({ signatureData, returnedProducts, items })}
+            document={
+              <ItemRelationPDF
+                company={order.company}
+                customer={order.customer}
+                items={itemsForPdf}
+                note={{
+                  note_number: order.note_number,
+                  appointment_date: order.appointment_date,
+                }}
+                logoUrl={logoUrl ?? undefined}
+                signature={signatureData}
+                freight={Number(order.freight ?? 0)}
+                returnedProducts={returnedItemsForPdf}
+              />
+            }
+            fileName={`${order.note_number} - ${customer.name}.pdf`.replace(
+              /[\/\\:*?"<>|]/g,
+              "",
+            )}
+          >
+            {({ loading }) => (
+              <Button variant="default" className="w-full">
+                {loading ? "Gerando PDF..." : "Download PDF"}
+              </Button>
+            )}
+          </PDFDownloadLink>
 
           {order.payment_method?.toLowerCase() === "boleto" && (
             <GenerateBoletoButtons

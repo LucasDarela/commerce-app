@@ -11,18 +11,35 @@ function blobToDataURL(blob: Blob): Promise<string> {
   });
 }
 
-export async function getCompanyLogoAsDataUrl(logoPath: string) {
-  if (!logoPath) return null;
+export async function getCompanyLogoAsDataUrl(companyId: string) {
+  try {
+    if (!companyId) return null;
 
-  const { data, error } = await supabase.storage
-    .from("companylogos")
-    .createSignedUrl(logoPath, 60);
+    const { data: company, error: companyError } = await supabase
+      .from("companies")
+      .select("logo_url")
+      .eq("id", companyId)
+      .single();
 
-  if (error || !data?.signedUrl) return null;
+    if (companyError) {
+      console.error("Erro ao buscar empresa:", companyError);
+      return null;
+    }
 
-  const res = await fetch(data.signedUrl);
-  if (!res.ok) return null;
+    const logoUrl = company?.logo_url;
 
-  const blob = await res.blob();
-  return blobToDataURL(blob);
+    if (!logoUrl) return null;
+
+    const res = await fetch(logoUrl);
+    if (!res.ok) {
+      console.error("Erro ao baixar logo:", res.status);
+      return null;
+    }
+
+    const blob = await res.blob();
+    return await blobToDataURL(blob);
+  } catch (error) {
+    console.error("Erro em getCompanyLogoAsDataUrl:", error);
+    return null;
+  }
 }
