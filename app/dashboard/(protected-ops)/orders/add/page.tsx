@@ -126,17 +126,19 @@ const [productSearch, setProductSearch] = useState("");
     hour: "00:00",
     location: "",
   });
-  const [order, setOrder] = useState<Partial<Order>>({
-    issue_date: new Date().toISOString().split("T")[0],
-    document_type: "internal",
-  });
+const getLocalDateString = () => format(new Date(), "yyyy-MM-dd");
+
+const [order, setOrder] = useState<Partial<Order>>({
+  issue_date: getLocalDateString(),
+  document_type: "internal",
+});
 
   const [first_name, ...rest] = selectedCustomer?.name?.split(" ") || [
     "Cliente",
   ];
   const last_name = rest.length > 0 ? rest.join(" ") : "Sobrenome";
 
-  const issueDate = order?.issue_date ?? new Date().toISOString().split("T")[0];
+const issueDate = order?.issue_date ?? getLocalDateString();
   const daysTicket = Number(order?.days_ticket ?? 0);
 
   const dueDate = order?.due_date
@@ -404,7 +406,7 @@ const addItem = () => {
         appointment_local: appointment.location,
         company_id: companyId,
         created_at: new Date().toISOString(),
-        issue_date: new Date().toISOString().split("T")[0],
+        issue_date: getLocalDateString(),
         due_date:
           ["Pix", "Dinheiro", "Cartao"].includes(
             capitalize(order?.payment_method || ""),
@@ -566,56 +568,33 @@ useEffect(() => {
       <Card className="mb-6">
         <CardContent className="space-y-4">
           <h2 className="text-xl font-bold mb-4">Informações do Documento</h2>
-          <div className="flex gap-4 w-full">
-            <Select
-              value={order.document_type}
-              disabled
-              onValueChange={async (value) => {
-                let generatedNoteNumber = order.note_number;
-                if (value === "internal" && companyId) {
-                  generatedNoteNumber = await generateNextNoteNumber(companyId);
-                }
-                setOrder((prev) => ({
-                  ...prev,
-                  document_type: value,
-                  note_number: generatedNoteNumber,
-                }));
-              }}
-            >
-              <SelectTrigger className="w-full border rounded-md shadow-sm">
-                <SelectValue placeholder="Tipo de Documento" />
-              </SelectTrigger>
-              <SelectContent className="shadow-md rounded-md">
-                <SelectItem value="internal">Interno</SelectItem>
-                <SelectItem value="invoice">Fiscal</SelectItem>
-              </SelectContent>
-            </Select>
-            <Input
-              type="text"
-              placeholder="Número da Nota"
-              value={order?.note_number || ""}
-              onChange={(e) =>
-                setOrder((prev) => ({ ...prev, note_number: e.target.value }))
-              }
-              className="w-full"
-            />
+<div className="grid grid-cols-2 gap-3 w-full">
+  <Input
+    type="text"
+    placeholder="Número da Nota"
+    value={order?.note_number || ""}
+    onChange={(e) =>
+      setOrder((prev) => ({ ...prev, note_number: e.target.value }))
+    }
+    className="w-full"
+  />
 
-            <div className="flex items-center gap-2 w-full">
-              <span className="text-sm text-muted-foreground font-medium hidden sm:inline">
-                Emissão:
-              </span>
-              <Input
-                id="issue_date"
-                value={
-                  order?.issue_date
-                    ? format(new Date(order.issue_date), "dd/MM/yyyy")
-                    : ""
-                }
-                readOnly
-                className="cursor-not-allowed bg-muted w-full"
-              />
-            </div>
-          </div>
+  <div className="flex items-center gap-2 w-full">
+    <span className="text-sm text-muted-foreground font-medium hidden sm:inline">
+      Emissão:
+    </span>
+    <Input
+      id="issue_date"
+      value={
+        order?.issue_date
+          ? format(new Date(`${order.issue_date}T12:00:00`), "dd/MM/yyyy")
+          : ""
+      }
+      readOnly
+      className="cursor-not-allowed bg-muted w-full"
+    />
+  </div>
+</div>
           {/* Seção Forma de Pagamento */}
           <div className="flex gap-4 items-center w-full mt-6">
             <Select
@@ -687,50 +666,51 @@ useEffect(() => {
       <Card className="mb-6">
         <CardContent>
           <h2 className="text-xl font-bold mb-4">Informações do Cliente</h2>
-          <div className="grid grid-cols-5 gap-4 mb-4">
-<div ref={dropdownRef} className="col-span-3 relative">
-  <Input
-    type="text"
-    placeholder="Procurar Cliente..."
-    value={searchCustomer}
-    onFocus={() => setShowCustomers(true)}
-    onChange={(e) => {
-      setSearchCustomer(e.target.value);
-      setShowCustomers(true);
-    }}
-  />
+<div className="grid grid-cols-1 sm:grid-cols-5 gap-4 mb-4">
+  <div ref={dropdownRef} className="sm:col-span-3 relative w-full min-w-0">
+    <Input
+      type="text"
+      placeholder="Procurar Cliente..."
+      value={searchCustomer}
+      onFocus={() => setShowCustomers(true)}
+      onChange={(e) => {
+        setSearchCustomer(e.target.value);
+        setShowCustomers(true);
+      }}
+    />
 
-  {showCustomers && (
-    <div className="absolute top-full left-0 z-50 mt-1 w-full border rounded-md shadow-md max-h-60 overflow-y-auto bg-background">
-      {customersFiltered.length > 0 ? (
-        customersFiltered.map((customer) => (
-          <div
-            key={customer.id}
-            className="p-2 hover:bg-accent/60 transition-colors cursor-pointer"
-            onMouseDown={(e) => {
-              e.preventDefault();
-              handleSelectCustomer(customer);
-            }}
-          >
-            {customer.fantasy_name || customer.name} - {customer.document}
-          </div>
-        ))
-      ) : (
-        <div className="p-2 text-sm text-muted-foreground">
-          Nenhum cliente encontrado
-        </div>
-      )}
-    </div>
-  )}
-</div>
-            <div className="col-span-2">
-              <Link href={addCustomerUrl} className="w-full">
-                <Button variant="default" className="w-full">
-                  Criar
-                </Button>
-              </Link>
+    {showCustomers && (
+      <div className="absolute top-full left-0 z-50 mt-1 w-full border rounded-md shadow-md max-h-60 overflow-y-auto bg-background">
+        {customersFiltered.length > 0 ? (
+          customersFiltered.map((customer) => (
+            <div
+              key={customer.id}
+              className="p-2 hover:bg-accent/60 transition-colors cursor-pointer"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                handleSelectCustomer(customer);
+              }}
+            >
+              {customer.fantasy_name || customer.name} - {customer.document}
             </div>
+          ))
+        ) : (
+          <div className="p-2 text-sm text-muted-foreground">
+            Nenhum cliente encontrado
           </div>
+        )}
+      </div>
+    )}
+  </div>
+
+  <div className="sm:col-span-2 w-full">
+    <Link href={addCustomerUrl} className="block w-full">
+      <Button variant="default" className="w-full">
+        ou Criar
+      </Button>
+    </Link>
+  </div>
+</div>
 
           {/* Display selected customer fields */}
           <div className="grid grid-cols-2 gap-4">
@@ -792,75 +772,84 @@ useEffect(() => {
           <h2 className="text-xl font-bold mb-4">Selecione os Produtos</h2>
 
           {/* Seção para Adicionar Novo Produto */}
-          <div className="grid grid-cols-5 gap-4 items-center">
-            <div className="col-span-3">
-  <Popover open={productOpen} onOpenChange={setProductOpen}>
-    <PopoverTrigger asChild>
-      <Button
-        variant="outline"
-        role="combobox"
-        aria-expanded={productOpen}
-        className="w-full justify-between border rounded-md shadow-sm"
+<div className="grid grid-cols-1 sm:grid-cols-5 gap-4 items-start">
+  <div className="sm:col-span-3 w-full min-w-0">
+    <Popover open={productOpen} onOpenChange={setProductOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={productOpen}
+          className="w-full justify-between border rounded-md shadow-sm min-w-0"
+        >
+          <span className="truncate">
+            {selectedProduct
+              ? `${selectedProduct.code} - ${selectedProduct.name}`
+              : "Selecionar Produto"}
+          </span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+
+      <PopoverContent
+        align="start"
+        className="w-[calc(100vw-3rem)] sm:w-[var(--radix-popover-trigger-width)] max-w-full p-0"
       >
-        {selectedProduct
-          ? `${selectedProduct.code} - ${selectedProduct.name}`
-          : "Selecionar Produto"}
-        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-      </Button>
-    </PopoverTrigger>
+        <Command shouldFilter={false}>
+          <CommandInput
+            placeholder="Buscar produto..."
+            value={productSearch}
+            onValueChange={setProductSearch}
+          />
+          <CommandList>
+            <CommandEmpty>Nenhum produto encontrado.</CommandEmpty>
+            <CommandGroup>
+              {filteredProducts.map((product) => (
+                <CommandItem
+                  key={product.id}
+                  value={`${product.code} ${product.name}`}
+                  onSelect={() => {
+                    setSelectedProduct(product);
 
-    <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
-      <Command shouldFilter={false}>
-        <CommandInput
-          placeholder="Buscar produto..."
-          value={productSearch}
-          onValueChange={setProductSearch}
-        />
-        <CommandList>
-          <CommandEmpty>Nenhum produto encontrado.</CommandEmpty>
-          <CommandGroup>
-            {filteredProducts.map((product) => (
-              <CommandItem
-                key={product.id}
-                value={`${product.code} ${product.name}`}
-                onSelect={() => {
-                  setSelectedProduct(product);
+                    const catalogPrice = catalogPrices[String(product.id)];
+                    setStandardPrice(
+                      typeof catalogPrice === "number"
+                        ? catalogPrice
+                        : product.standard_price,
+                    );
 
-                  const catalogPrice = catalogPrices[String(product.id)];
-                  setStandardPrice(
-                    typeof catalogPrice === "number"
-                      ? catalogPrice
-                      : product.standard_price,
-                  );
+                    setProductOpen(false);
+                    setProductSearch("");
+                  }}
+                  className="flex items-center"
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4 shrink-0",
+                      selectedProduct?.id === product.id
+                        ? "opacity-100"
+                        : "opacity-0",
+                    )}
+                  />
+                  <span className="truncate">
+                    {product.code} - {product.name}
+                  </span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  </div>
 
-                  setProductOpen(false);
-                  setProductSearch("");
-                }}
-              >
-                <Check
-                  className={cn(
-                    "mr-2 h-4 w-4",
-                    selectedProduct?.id === product.id
-                      ? "opacity-100"
-                      : "opacity-0",
-                  )}
-                />
-                {product.code} - {product.name}
-              </CommandItem>
-            ))}
-          </CommandGroup>
-        </CommandList>
-      </Command>
-    </PopoverContent>
-  </Popover>
+  <Button
+    className="sm:col-span-2 w-full cursor-pointer"
+    onClick={addItem}
+  >
+    Adicionar
+  </Button>
 </div>
-            <Button
-              className="col-span-2 w-full cursor-pointer"
-              onClick={addItem}
-            >
-              Adicionar
-            </Button> 
-          </div>
           <div className="flex w-full">
             {selectedProduct && (
               <p className="text-sm text-muted-foreground">
@@ -872,7 +861,7 @@ useEffect(() => {
 
           {/* Seção da Tabela Editável */}
           <div className="w-full overflow-x-auto">
-            <Table className="table-fixed w-full min-w-[600px] mt-4">
+            <Table className="table-fixed w-full min-w-[720px] mt-4">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[300px]">Produto</TableHead>
