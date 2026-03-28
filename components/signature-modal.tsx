@@ -7,6 +7,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -71,6 +72,9 @@ export function SignatureModal({ open, onSave, onClose }: SignatureModalProps) {
       <DialogContent className={isMobile ? "w-full h-full p-4" : "max-w-lg"}>
         <DialogHeader>
           <DialogTitle>Assinar Pedido</DialogTitle>
+          <DialogDescription>
+            Solicite a assinatura do cliente para confirmar a entrega.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col items-center gap-4 mt-4">

@@ -5,6 +5,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
@@ -328,6 +329,9 @@ export function LoanEquipmentModal({
           <DialogTitle className="mt-2 font-bold text-xl">
             Registre o Empréstimo de Equipamento
           </DialogTitle>
+          <DialogDescription>
+            Preencha os campos abaixo para registrar o empréstimo de equipamento.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">

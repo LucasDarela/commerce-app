@@ -7,6 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -102,6 +103,9 @@ export function CancelNfeModal({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Cancelar NF-e</DialogTitle>
+          <DialogDescription>
+            Informe o motivo do cancelamento da NF-e.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">

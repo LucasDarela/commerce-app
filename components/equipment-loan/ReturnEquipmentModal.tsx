@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -28,7 +28,7 @@ type Props = {
   items: EquipmentItem[];
   order?: unknown;
   user?: { id?: string } | null;
-  onReturnSuccess: () => void;
+  onReturnSuccess: (shouldOpenProductReturnModal: boolean) => void;
   onOpenProductReturnModal: () => void;
 };
 
@@ -44,10 +44,17 @@ export function ReturnEquipmentModal({
   onReturnSuccess,
   onOpenProductReturnModal,
 }: Props) {
-  const supabase = createBrowserSupabaseClient();       
+  const supabase = createBrowserSupabaseClient();
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      setSelectedItems([]);
+      setQuantities({});
+    }
+  }, [open]);
 
   const handleConfirmReturn = async () => {
     if (loading) return;
@@ -67,18 +74,19 @@ export function ReturnEquipmentModal({
       return;
     }
 
-    if (selectedItems.length === 0) {
-      const confirmed = window.confirm(
-        "Você não realizou coletas nessa viagem, confirma?",
-      );
+    // fluxo sem coleta
+      if (selectedItems.length === 0) {
+        const confirmed = window.confirm(
+          "Você não realizou coletas nessa viagem, confirma?",
+        );
 
-      if (!confirmed) return;
+        if (!confirmed) return;
 
-      toast.success("Viagem registrada sem coletas.");
-      onReturnSuccess();
-      onOpenProductReturnModal();
-      return;
-    }
+        toast.success("Viagem registrada sem coletas.");
+        onOpenChange(false);
+        onReturnSuccess(true);
+        return;
+      }
 
     setLoading(true);
 
@@ -98,6 +106,7 @@ export function ReturnEquipmentModal({
           1,
           Math.min(original.quantity, requestedQty),
         );
+
         const remaining = Math.max(0, original.quantity - returnedQty);
 
         const payload =
@@ -128,8 +137,8 @@ export function ReturnEquipmentModal({
       await Promise.all(updates);
 
       toast.success("Retorno registrado com sucesso!");
-      onReturnSuccess();
-      onOpenProductReturnModal();
+      onOpenChange(false);
+      onReturnSuccess(true);
     } catch (error) {
       console.error("Erro ao registrar retorno:", error);
       toast.error("Erro ao registrar retorno de um ou mais itens.");
@@ -185,7 +194,7 @@ export function ReturnEquipmentModal({
                   min={1}
                   max={item.quantity}
                   disabled={!isSelected || loading}
-                  value={quantities[item.loanId] ?? ""}
+                  value={isSelected ? (quantities[item.loanId] ?? item.quantity) : ""}
                   onChange={(e) => {
                     const parsed = parseInt(e.target.value, 10);
                     const safeValue = Number.isNaN(parsed)

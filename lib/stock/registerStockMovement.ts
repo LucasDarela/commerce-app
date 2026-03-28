@@ -12,7 +12,7 @@ interface StockMovementParams {
   quantity: number;
   reason?: string;
   noteId?: string;
-  createdBy: string;
+  createdBy: string | null;
 }
 
 export async function registerStockMovement(params: StockMovementParams) {

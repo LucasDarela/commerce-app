@@ -21,6 +21,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import Link from "next/link";
@@ -268,6 +269,9 @@ export default function ListProduct() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Detalhes do Produto</DialogTitle>
+                <DialogDescription>
+                  Informações detalhadas do produto selecionado.
+                </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-2">

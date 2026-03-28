@@ -100,7 +100,7 @@ import { useRouter } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { PaymentModal } from "@/components/payment-modal";
 import { LoanEquipmentModal } from "@/components/equipment-loan/LoanEquipmentModal";
-import { fetchEquipmentsForOrderProducts } from "@/lib/fetch-equipments-for-products";
+import { fetchEquipmentsForOrder } from "@/lib/fetch-equipments-for-order";
 import { ReturnEquipmentModal } from "@/components/equipment-loan/ReturnEquipmentModal";
 import { getTranslatedStatus } from "@/utils/getTranslatedStatus";
 import DatePicker from "react-datepicker";
@@ -1363,47 +1363,43 @@ function clearAllFilters() {
     });
   }, [orders]);
 
-  async function handleDeliveryStatusUpdate() {
-    if (!selectedCustomer) return;
+async function handleDeliveryStatusUpdate() {
+  if (!selectedCustomer) return;
 
-    let nextStatus: "Coletar" | "Coletado" | null = null;
+  let nextStatus: "Coletar" | "Coletado" | null = null;
 
-    if (selectedCustomer.delivery_status === "Entregar") {
-      nextStatus = "Coletar";
-    } else if (selectedCustomer.delivery_status === "Coletar") {
-      nextStatus = "Coletado";
-    }
+  if (selectedCustomer.delivery_status === "Entregar") {
+    nextStatus = "Coletar";
+  } else if (selectedCustomer.delivery_status === "Coletar") {
+    nextStatus = "Coletado";
+  }
 
-    if (nextStatus) {
-      const { error } = await supabase
-        .from("orders")
-        .update({ delivery_status: nextStatus })
-        .eq("id", selectedCustomer.id)
-        .eq("company_id", companyId);
+  if (nextStatus) {
+    const { error } = await supabase
+      .from("orders")
+      .update({ delivery_status: nextStatus })
+      .eq("id", selectedCustomer.id)
+      .eq("company_id", companyId);
 
-      if (!error) {
-        setSelectedCustomer({
-          ...selectedCustomer,
-          delivery_status: nextStatus,
-        });
+    if (!error) {
+      setSelectedCustomer({
+        ...selectedCustomer,
+        delivery_status: nextStatus,
+      });
 
-        setOrders((prev) =>
-          prev.map((order) =>
-            order.id === selectedCustomer.id
-              ? { ...order, delivery_status: nextStatus! }
-              : order,
-          ),
-        );
-
-        if (nextStatus === "Coletado") {
-          await updateStockBasedOnOrder(supabase, selectedCustomer, companyId);
-        }
-      } else {
-        toast.error("Erro ao atualizar status.");
-        console.error(error);
-      }
+      setOrders((prev) =>
+        prev.map((order) =>
+          order.id === selectedCustomer.id
+            ? { ...order, delivery_status: nextStatus! }
+            : order,
+        ),
+      );
+    } else {
+      toast.error("Erro ao atualizar status.");
+      console.error(error);
     }
   }
+}
 
   async function fetchOrderProductsForReturnModal(orderId: string) {
     const { data, error } = await supabase
@@ -2090,11 +2086,10 @@ const clearFilter = () => {
                             if (
                               selectedCustomer.delivery_status === "Entregar"
                             ) {
-                              const equipmentItems =
-                                await fetchEquipmentsForOrderProducts(
-                                  selectedCustomer.products,
-                                  companyId,
-                                );  
+                              const equipmentItems = await fetchEquipmentsForOrder(
+                                selectedCustomer.id,
+                                companyId,
+                              ); 
                               const {
                                 data: matchingCustomer,
                                 error: customerError,
@@ -2306,16 +2301,17 @@ const clearFilter = () => {
           items={returnEquipmentItems}
           order={selectedCustomer}
           user={user}
-          onReturnSuccess={() => {
+          onReturnSuccess={async (shouldOpenProductReturnModal) => {
             setIsReturnModalOpen(false);
-            handleDeliveryStatusUpdate();
-            refreshOrders();
-          }}
-          onOpenProductReturnModal={() => {
-            if (selectedCustomer?.id) {
-              fetchOrderProductsForReturnModal(selectedCustomer.id);
+
+            await handleDeliveryStatusUpdate();
+            await refreshOrders();
+
+            if (shouldOpenProductReturnModal && selectedCustomer?.id) {
+              await fetchOrderProductsForReturnModal(selectedCustomer.id);
             }
           }}
+          onOpenProductReturnModal={() => {}}
         />
       )}
       {isProductReturnModalOpen && selectedCustomer && (

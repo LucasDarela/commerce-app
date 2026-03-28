@@ -21,6 +21,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import {
@@ -295,6 +296,9 @@ export default function ListCustomers() {
           >
             <DialogHeader>
               <DialogTitle>Detalhes do Cliente</DialogTitle>
+                <DialogDescription> 
+                  Informações detalhadas do cliente selecionado.
+                </DialogDescription>
             </DialogHeader>
             {/* 🔹 Descrição acessível */}
             <p id="cliente-modal-description" className="sr-only">

@@ -21,7 +21,7 @@ interface ReturnProductModalProps {
   items: ProductItem[] | null;
   orderId: string;
   companyId: string;
-  createdBy: string;
+  createdBy: string | null;
   onSuccess: () => void;
 }
 
@@ -103,7 +103,7 @@ export function ReturnProductModal({
             type: "return",
             reason: "Product return after delivery",
             noteId: orderId,
-            createdBy,
+            createdBy: createdBy ?? null,
           }),
         });
 

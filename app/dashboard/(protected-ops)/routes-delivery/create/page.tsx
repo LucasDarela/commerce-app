@@ -104,7 +104,7 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { PaymentModal } from "@/components/payment-modal";
 import { LoanEquipmentModal } from "@/components/equipment-loan/LoanEquipmentModal";
-import { fetchEquipmentsForOrderProducts } from "@/lib/fetch-equipments-for-products";
+import { fetchEquipmentsForOrder } from "@/lib/fetch-equipments-for-order";
 import { ReturnEquipmentModal } from "@/components/equipment-loan/ReturnEquipmentModal";
 import { getTranslatedStatus } from "@/utils/getTranslatedStatus";
 import DatePicker from "react-datepicker";
@@ -822,7 +822,7 @@ export default function RoutesTable({
 
 if (selectedCustomer.delivery_status === "Entregar") {
   const equipmentItems =
-    await fetchEquipmentsForOrderProducts(
+    await fetchEquipmentsForOrder(
       selectedCustomer.products,
       companyId,
     );
@@ -1452,7 +1452,7 @@ if (selectedCustomer.delivery_status === "Entregar") {
                               selectedCustomer.delivery_status === "Entregar"
                             ) {
                               const equipmentItems =
-                                await fetchEquipmentsForOrderProducts(
+                                await fetchEquipmentsForOrder(
                                   selectedCustomer.products,
                                   companyId,
                                 );

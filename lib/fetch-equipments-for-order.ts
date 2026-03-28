@@ -6,8 +6,8 @@ type EquipmentItem = {
   quantity: number;
 };
 
-type ParsedProduct = {
-  name: string;
+type OrderItemRow = {
+  product_id: number;
   quantity: number;
 };
 
@@ -18,45 +18,29 @@ type LinkedEquipmentRow = {
   equipment: { name: string } | { name: string }[] | null;
 };
 
-export async function fetchEquipmentsForOrderProducts(
-  productsText: string,
+export async function fetchEquipmentsForOrder(
+  orderId: string,
   companyId: string,
 ): Promise<EquipmentItem[]> {
-  const supabase = createBrowserSupabaseClient(); 
-  if (!productsText || !companyId) return [];
+  const supabase = createBrowserSupabaseClient();
 
-  const parsed: ParsedProduct[] = productsText
-    .split(",")
-    .map((entry) => {
-      const match = entry.trim().match(/^(.+?) \((\d+)x\)$/);
-      if (!match) return null;
+  if (!orderId || !companyId) return [];
 
-      const [, name, quantity] = match;
-      return {
-        name: name.trim(),
-        quantity: Number(quantity),
-      };
-    })
-    .filter(Boolean) as ParsedProduct[];
+  const { data: orderItemsRaw, error: orderItemsError } = await supabase
+    .from("order_items")
+    .select("product_id, quantity")
+    .eq("order_id", orderId);
 
-  if (parsed.length === 0) return [];
-
-  const productNames = parsed.map((p) => p.name);
-
-  const { data: productsData, error: productsError } = await supabase
-    .from("products")
-    .select("id, name")
-    .in("name", productNames)
-    .eq("company_id", companyId);
-
-  if (productsError || !productsData) {
-    console.error("Erro ao buscar produtos:", productsError);
+  if (orderItemsError || !orderItemsRaw) {
+    console.error("Erro ao buscar order_items:", orderItemsError);
     return [];
   }
 
-  if (productsData.length === 0) return [];
+  const orderItems = orderItemsRaw as OrderItemRow[];
 
-  const productIds = productsData.map((p) => p.id);
+  if (orderItems.length === 0) return [];
+
+  const productIds = [...new Set(orderItems.map((item) => item.product_id))];
 
   const { data: linkedEquipmentsRaw, error: linkError } = await supabase
     .from("product_loans")
@@ -86,16 +70,13 @@ export async function fetchEquipmentsForOrderProducts(
 
   const resultMap = new Map<string, EquipmentItem>();
 
-  for (const parsedProduct of parsed) {
-    const product = productsData.find((p) => p.name === parsedProduct.name);
-    if (!product) continue;
-
+  for (const orderItem of orderItems) {
     const equipmentsForProduct = linkedEquipments.filter(
-      (item) => item.product_id === product.id,
+      (item) => item.product_id === orderItem.product_id,
     );
 
     for (const item of equipmentsForProduct) {
-      const totalQuantity = item.quantity * parsedProduct.quantity;
+      const totalQuantity = Number(item.quantity ?? 1) * Number(orderItem.quantity ?? 1);
       const existing = resultMap.get(item.equipment_id);
 
       if (existing) {

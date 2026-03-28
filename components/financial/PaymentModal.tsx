@@ -6,6 +6,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import type { FinancialRecord } from "@/components/types/financial";
@@ -72,6 +73,9 @@ export function FinancialPaymentModal({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Pagar Nota</DialogTitle>
+          <DialogDescription>
+            Confirme o pagamento da nota.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">

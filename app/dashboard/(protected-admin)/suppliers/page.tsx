@@ -21,6 +21,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import Link from "next/link";
@@ -239,6 +240,9 @@ export default function ListSuppliers() {
           <DialogContent className="max-w-lg w-full">
             <DialogHeader>
               <DialogTitle>Detalhes do Fornecedor</DialogTitle>
+                <DialogDescription>
+                  Informações detalhadas do fornecedor selecionado.
+                </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-2">

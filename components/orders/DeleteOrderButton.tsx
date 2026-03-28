@@ -42,16 +42,12 @@ export function DeleteOrderButton({
     try {
       setDeleting(true);
 
-      console.log("DELETE DEBUG", { companyId, orderId });
-
       const { data, error } = await supabase
         .from("orders")
         .delete()
         .eq("id", orderId)
         .eq("company_id", companyId)
         .select("id");
-
-      console.log("DELETE RESULT", { data, error });
 
       if (error) {
         throw error;

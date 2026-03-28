@@ -6,12 +6,11 @@ import { toast } from "sonner";
 import { PDFDownloadLink } from "@react-pdf/renderer";
 import clsx from "clsx";
 import dayjs from "dayjs";
-import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { fetchOrderDetails } from "@/lib/fetchOrderDetails";
 import { getCompanyLogoAsDataUrl } from "@/components/pdf/CompanyLogoAsDataUrl";
-import { fetchEquipmentsForOrderProducts } from "@/lib/fetch-equipments-for-products";
+import { fetchEquipmentsForOrder } from "@/lib/fetch-equipments-for-order";
 
 import { ItemRelationPDF } from "@/components/pdf/item-relation-pdf";
 import { Button } from "@/components/ui/button";
@@ -25,89 +24,8 @@ import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 
 import type { OrderItem } from "@/components/types/orders";
 import type { OrderDetails } from "@/components/types/orderDetails";
-
-// --------- helpers de estoque ----------
-async function parseProductsWithIds(
-  supabaseClient: SupabaseClient,
-  products: string,
-  companyId?: string | null,
-): Promise<{ id: number; quantity: number }[]> {
-  if (!products?.trim()) return [];
-
-  const parsed = products.split(",").map((entry) => {
-    const match = entry.trim().match(/^(.+?) \((\d+)x\)$/);
-    if (!match) return { name: entry.trim(), quantity: 1 };
-
-    const [, name, quantity] = match;
-    return { name: name.trim(), quantity: Number(quantity) };
-  });
-
-  const names = [...new Set(parsed.map((p) => p.name).filter(Boolean))];
-  if (!names.length) return [];
-
-  let query = supabaseClient.from("products").select("id, name").in("name", names);
-
-  if (companyId) {
-    query = query.eq("company_id", companyId);
-  }
-
-  const { data, error } = await query;
-
-  if (error || !data) {
-    console.error("Erro ao buscar IDs dos produtos:", error);
-    return [];
-  }
-
-  return parsed
-    .map((p) => {
-      const hit = data.find((d) => d.name === p.name);
-      return { id: Number(hit?.id ?? 0), quantity: p.quantity };
-    })
-    .filter((p) => p.id !== 0);
-}
-
-async function updateStockBasedOnOrder(
-  supabaseClient: SupabaseClient,
-  order: OrderDetails,
-) {
-  const companyId = order.company?.id ?? null;
-
-  const items = await parseProductsWithIds(
-    supabaseClient,
-    order.products ?? "",
-    companyId,
-  );
-
-  for (const item of items) {
-    const { data, error } = await supabaseClient.rpc("decrement_stock", {
-      product_id: item.id,
-      quantity: Number(item.quantity),
-    });
-
-    if (error) {
-      console.error("Erro ao decrementar estoque:", {
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code,
-        rpc: "decrement_stock",
-        product_id: item.id,
-        quantity: item.quantity,
-        companyId,
-      });
-
-      throw new Error(
-        error.message || "Falha ao decrementar estoque no Supabase.",
-      );
-    }
-
-    console.log("Estoque decrementado com sucesso:", {
-      product_id: item.id,
-      quantity: item.quantity,
-      result: data,
-    });
-  }
-}
+import { ReturnProductModal } from "@/components/products/ReturnProductModal";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 // --------- helpers de cliente/botão ----------
 async function resolveCustomer(
@@ -167,6 +85,7 @@ export default function ViewOrderPage() {
   const [signatureData, setSignatureData] = useState<string | null>(null);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   const [isLoanModalOpen, setIsLoanModalOpen] = useState(false);
   const [initialLoanCustomer, setInitialLoanCustomer] = useState<{
@@ -182,6 +101,11 @@ export default function ViewOrderPage() {
   const [returnEquipmentItems, setReturnEquipmentItems] = useState<
     { loanId: string; equipmentName: string; quantity: number }[]
   >([]);
+
+  const [isProductReturnModalOpen, setIsProductReturnModalOpen] = useState(false);
+  const [returnProductItems, setReturnProductItems] = useState<
+    { id: string; name: string; quantity: number }[]
+  >([]); 
 
   const [returnedProducts, setReturnedProducts] = useState<any[]>([]);
 
@@ -254,6 +178,19 @@ const fetchData = async () => {
   const currentCompanyId = companyId;
 
   try {
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError) {
+      console.error("Erro ao buscar usuário autenticado:", userError);
+    }
+
+    if (isMounted) {
+      setCurrentUserId(user?.id ?? null);
+    }
+
     const data = await fetchOrderDetails(String(id), currentCompanyId);
     if (!data || !data.customer) return;
 
@@ -318,6 +255,27 @@ const fetchData = async () => {
 if (loading || companyLoading || !order) {
   return <TableSkeleton />;
 }
+
+const fetchOrderProductsForReturnModal = async (orderId: string) => {
+  const { data, error } = await supabase
+    .from("order_items")
+    .select("product_id, quantity, products(name)")
+    .eq("order_id", orderId);
+
+  if (error || !data) {
+    toast.error("Erro ao buscar produtos da venda");
+    return;
+  }
+
+  const formatted = data.map((item: any) => ({
+    id: String(item.product_id),
+    name: item.products?.name || "Produto",
+    quantity: item.quantity,
+  }));
+
+  setReturnProductItems(formatted);
+  setIsProductReturnModalOpen(true);
+};
 
   const customer = order.customer;
   const items: OrderItem[] = (order.items ?? []).map((item: any) => ({
@@ -434,7 +392,6 @@ if (loading || companyLoading || !order) {
     }
 
     setOrder((prev: any) => (prev ? { ...prev, delivery_status: next } : prev));
-    toast.success(`Status atualizado para ${next}.`);
     return true;
   };
 
@@ -457,15 +414,10 @@ if (loading || companyLoading || !order) {
 
     try {
       if (order.delivery_status === "Entregar") {
-        const productsStr =
-          (order.items ?? [])
-            .map(
-              (it: any) => `${it.product?.name ?? "Produto"} (${it.quantity}x)`,
-            )
-            .join(", ") || order.products || "";
-
-        const equipmentItems =
-          await fetchEquipmentsForOrderProducts(productsStr, order.company?.id ?? "");
+        const equipmentItems = await fetchEquipmentsForOrder(
+          String(order.id),
+          order.company?.id ?? "",
+        );
 
         const customerResolved = await resolveCustomer(supabase, order);
         if (!customerResolved) {
@@ -529,10 +481,6 @@ if (loading || companyLoading || !order) {
       if (error) {
         toast.error("Erro ao atualizar status.");
         return;
-      }
-
-      if (next === "Coletado") {
-        await updateStockBasedOnOrder(supabase, order);
       }
 
       setOrder((prev: any) =>
@@ -886,29 +834,56 @@ if (loading || companyLoading || !order) {
         }}
       />
 
-      {companyId && (
-        <ReturnEquipmentModal
-          open={isReturnModalOpen}
-          onOpenChange={setIsReturnModalOpen}
-          companyId={companyId}
-          customerId={returnModalCustomerId}
-          items={returnEquipmentItems}
-          order={order}
-          user={{ id: order?.created_by }}
-          onReturnSuccess={async () => {
-            try {
-              setIsReturnModalOpen(false);
-              await updateStockBasedOnOrder(supabase, order);
-              await markOrderStatus("Coletado");
-              toast.success("Estoque atualizado com sucesso.");
-            } catch (err) {
-              console.error("Erro ao atualizar estoque no retorno:", err);
-              toast.error("Não foi possível atualizar o estoque.");
-            }
-          }}
-          onOpenProductReturnModal={() => {}}
-        />
-      )}
+{companyId && (
+  <ReturnEquipmentModal
+    open={isReturnModalOpen}
+    onOpenChange={setIsReturnModalOpen}
+    companyId={companyId}
+    customerId={returnModalCustomerId}
+    items={returnEquipmentItems}
+    order={order}
+    user={{ id: currentUserId ?? undefined }}
+    onReturnSuccess={async (shouldOpenProductReturnModal) => {
+      try {
+        setIsReturnModalOpen(false);
+        await markOrderStatus("Coletado");
+
+        if (shouldOpenProductReturnModal && order?.id) {
+          await fetchOrderProductsForReturnModal(String(order.id));
+        }
+
+        toast.success("Retorno registrado com sucesso.");
+      } catch (err) {
+        console.error("Erro ao finalizar retorno:", err);
+        toast.error("Não foi possível finalizar o retorno.");
+      }
+    }}
+    onOpenProductReturnModal={() => {}}
+  />
+)}
+
+{isProductReturnModalOpen && order && companyId && (
+  <ReturnProductModal
+    open={isProductReturnModalOpen}
+    onClose={() => setIsProductReturnModalOpen(false)}
+    items={returnProductItems}
+    orderId={String(order.id)}
+    companyId={companyId}
+    createdBy={currentUserId}
+    onSuccess={async () => {
+      if (order.customer?.id) {
+        const devolucoes = await fetchReturnedProducts(
+          String(order.id),
+          order.customer.id,
+          companyId,
+        );
+        setReturnedProducts(devolucoes);
+      }
+
+      setIsProductReturnModalOpen(false);
+    }}
+  />
+)}
     </div>
   );
 }

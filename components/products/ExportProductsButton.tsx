@@ -7,6 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
@@ -135,6 +136,9 @@ export function ExportProductsButton() {
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Escolha o formato</DialogTitle>
+          <DialogDescription>
+            Escolha o formato desejado para exportar os produtos.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="mt-4 flex justify-center gap-4">

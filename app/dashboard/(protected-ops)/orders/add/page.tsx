@@ -284,7 +284,6 @@ useEffect(() => {
 
 const addItem = () => {
   if (selectedProduct && standardPrice !== "") {
-    console.log("selectedProduct before add:", selectedProduct);
 
     const newItem = {
       id: selectedProduct.id,
@@ -292,8 +291,6 @@ const addItem = () => {
       quantity,
       standard_price: Number(standardPrice),
     };
-
-    console.log("newItem being added:", newItem);
 
     setOrderItems((prev) => [...prev, newItem]);
     setSelectedProduct(null);
@@ -438,8 +435,6 @@ const addItem = () => {
         return;
       }
 
-      console.log("orderItems before insert:", orderItems);
-
       const itemsPayload = orderItems.map((item) => ({
         order_id: insertedOrder.id,
         product_id: item.id ?? null,
@@ -447,14 +442,10 @@ const addItem = () => {
         price: item.standard_price,
       }));
 
-      console.log("itemsPayload before insert:", itemsPayload);
-
         const { data: insertedItems, error: itemError } = await supabase
           .from("order_items")
           .insert(itemsPayload)
           .select();  
-
-        console.log("insertedItems:", insertedItems);
 
       if (itemError) {
         toast.error("❌ Ordem criada mas ERRO ao inserir itens.");
