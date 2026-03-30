@@ -23,32 +23,41 @@ type Product = {
   name: string;
 };
 
+type CatalogProduct = {
+  product_id: string;
+  price: number;
+};
+
 type Catalog = {
   id?: string;
   name: string;
-  products: { product_id: string; price: number }[];
+  products: CatalogProduct[];
 };
 
 export function PriceTableManager() {
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
+  const { companyId, loading } = useAuthenticatedCompany();
 
   const [savedCatalogs, setSavedCatalogs] = useState<Catalog[]>([]);
   const [catalogs, setCatalogs] = useState<Catalog[]>([]);
   const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
-  const { companyId, loading } = useAuthenticatedCompany();
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
-  const [editingCatalogIndex, setEditingCatalogIndex] = useState<number | null>(
-    null,
-  );
+
+  const [editingCatalog, setEditingCatalog] = useState<Catalog | null>(null);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   // ================= PRODUCTS =================
   useEffect(() => {
     let cancelled = false;
 
     const fetchProducts = async () => {
+      if (!companyId) return;
+
       const { data, error } = await supabase
         .from("products")
-        .select("id, name");
+        .select("id, name")
+        .eq("company_id", companyId)
+        .order("name", { ascending: true });
 
       if (cancelled) return;
 
@@ -64,57 +73,67 @@ export function PriceTableManager() {
     return () => {
       cancelled = true;
     };
-  }, [supabase]);
+  }, [supabase, companyId]);
 
   // ================= CATALOGS =================
+  const fetchSavedCatalogs = async () => {
+    if (!companyId) return;
+
+    const { data: tables, error } = await supabase
+      .from("price_tables")
+      .select("id, name")
+      .eq("company_id", companyId)
+      .order("name", { ascending: true });
+
+    if (error) {
+      toast.error("Erro ao buscar catálogos.");
+      return;
+    }
+
+    const fullCatalogs: Catalog[] = [];
+
+    for (const table of tables || []) {
+      const { data: products, error: productsError } = await supabase
+        .from("price_table_products")
+        .select("product_id, price")
+        .eq("price_table_id", table.id);
+
+      if (productsError) {
+        toast.error(`Erro ao buscar produtos do catálogo "${table.name}"`);
+        continue;
+      }
+
+      fullCatalogs.push({
+        id: table.id,
+        name: table.name,
+        products: products || [],
+      });
+    }
+
+    setSavedCatalogs(fullCatalogs);
+  };
+
   useEffect(() => {
-    let cancelled = false;
-
-    const fetchSavedCatalogs = async () => {
-      if (!companyId) return;
-
-      const { data: tables, error } = await supabase
-        .from("price_tables")
-        .select("id, name")
-        .eq("company_id", companyId);
-
-      if (cancelled) return;
-
-      if (error) {
-        toast.error("Erro ao buscar catálogos.");
-        return;
-      }
-
-      const fullCatalogs: Catalog[] = [];
-
-      for (const table of tables || []) {
-        const { data: products } = await supabase
-          .from("price_table_products")
-          .select("product_id, price")
-          .eq("price_table_id", table.id);
-
-        fullCatalogs.push({
-          id: table.id,
-          name: table.name,
-          products: products || [],
-        });
-      }
-
-      if (!cancelled) {
-        setSavedCatalogs(fullCatalogs);
-      }
-    };
-
     fetchSavedCatalogs();
-
-    return () => {
-      cancelled = true;
-    };
   }, [companyId, supabase]);
 
-  // ================= ACTIONS =================
-  const handleAddCatalog = () => {
-    setCatalogs((prev) => [...prev, { name: "", products: [] }]);
+  // ================= HELPERS =================
+  const validateCatalog = (catalog: Catalog) => {
+    if (!catalog.name.trim()) {
+      toast.error("O catálogo precisa de um nome.");
+      return false;
+    }
+
+    const validProducts = catalog.products.filter(
+      (p) => !isNaN(p.price) && p.price > 0,
+    );
+
+    if (validProducts.length === 0) {
+      toast.error(`"${catalog.name}" precisa de pelo menos 1 preço.`);
+      return false;
+    }
+
+    return true;
   };
 
   const updateCatalog = (index: number, updatedCatalog: Catalog) => {
@@ -123,6 +142,42 @@ export function PriceTableManager() {
       updated[index] = updatedCatalog;
       return updated;
     });
+  };
+
+  const updateEditingCatalogProduct = (productId: string, value: string) => {
+    if (!editingCatalog) return;
+
+    const updatedProducts = [...editingCatalog.products];
+    const idx = updatedProducts.findIndex((p) => p.product_id === productId);
+
+    if (!value) {
+      setEditingCatalog({
+        ...editingCatalog,
+        products: updatedProducts.filter((p) => p.product_id !== productId),
+      });
+      return;
+    }
+
+    const price = parseFloat(value);
+
+    if (idx >= 0) {
+      updatedProducts[idx].price = price || 0;
+    } else {
+      updatedProducts.push({
+        product_id: productId,
+        price: price || 0,
+      });
+    }
+
+    setEditingCatalog({
+      ...editingCatalog,
+      products: updatedProducts,
+    });
+  };
+
+  // ================= CREATE =================
+  const handleAddCatalog = () => {
+    setCatalogs((prev) => [...prev, { name: "", products: [] }]);
   };
 
   const handleSaveCatalogs = async () => {
@@ -134,19 +189,11 @@ export function PriceTableManager() {
     const newSaved: Catalog[] = [];
 
     for (const catalog of catalogs) {
-      if (!catalog.name) {
-        toast.error("Todos os catálogos precisam de nome.");
-        return;
-      }
+      if (!validateCatalog(catalog)) return;
 
       const validProducts = catalog.products.filter(
         (p) => !isNaN(p.price) && p.price > 0,
       );
-
-      if (validProducts.length === 0) {
-        toast.error(`"${catalog.name}" precisa de pelo menos 1 preço.`);
-        continue;
-      }
 
       const { data: table, error } = await supabase
         .from("price_tables")
@@ -181,7 +228,7 @@ export function PriceTableManager() {
       newSaved.push({
         id: table.id,
         name: catalog.name,
-        products: payload,
+        products: validProducts,
       });
     }
 
@@ -192,6 +239,91 @@ export function PriceTableManager() {
     }
   };
 
+  // ================= EDIT =================
+  const handleStartEditCatalog = (index: number) => {
+    const catalog = savedCatalogs[index];
+
+    setEditingCatalog({
+      id: catalog.id,
+      name: catalog.name,
+      products: catalog.products.map((p) => ({
+        product_id: p.product_id,
+        price: p.price,
+      })),
+    });
+  };
+
+  const handleUpdateCatalog = async () => {
+    if (!editingCatalog?.id) {
+      toast.error("Catálogo inválido para edição.");
+      return;
+    }
+
+    if (!validateCatalog(editingCatalog)) return;
+
+    setIsSavingEdit(true);
+
+    try {
+      const validProducts = editingCatalog.products.filter(
+        (p) => !isNaN(p.price) && p.price > 0,
+      );
+
+      const { error: tableError } = await supabase
+        .from("price_tables")
+        .update({ name: editingCatalog.name })
+        .eq("id", editingCatalog.id)
+        .eq("company_id", companyId);
+
+      if (tableError) {
+        toast.error("Erro ao atualizar o nome do catálogo.");
+        return;
+      }
+
+      const { error: deleteItemsError } = await supabase
+        .from("price_table_products")
+        .delete()
+        .eq("price_table_id", editingCatalog.id);
+
+      if (deleteItemsError) {
+        toast.error("Erro ao atualizar os produtos do catálogo.");
+        return;
+      }
+
+      const payload = validProducts.map((p) => ({
+        price_table_id: editingCatalog.id!,
+        product_id: p.product_id,
+        price: p.price,
+      }));
+
+      const { error: insertItemsError } = await supabase
+        .from("price_table_products")
+        .insert(payload);
+
+      if (insertItemsError) {
+        toast.error("Erro ao salvar os novos preços.");
+        return;
+      }
+
+      setSavedCatalogs((prev) =>
+        prev.map((catalog) =>
+          catalog.id === editingCatalog.id
+            ? {
+                ...catalog,
+                name: editingCatalog.name,
+                products: validProducts,
+              }
+            : catalog,
+        ),
+      );
+
+      toast.success("Catálogo atualizado com sucesso!");
+      setEditingCatalog(null);
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  // ================= DELETE =================
   const handleDeleteCatalog = async (index: number) => {
     const catalog = savedCatalogs[index];
     if (!catalog.id) return;
@@ -199,7 +331,8 @@ export function PriceTableManager() {
     const { error } = await supabase
       .from("price_tables")
       .delete()
-      .eq("id", catalog.id);
+      .eq("id", catalog.id)
+      .eq("company_id", companyId);
 
     if (error) {
       toast.error("Erro ao deletar.");
@@ -207,6 +340,11 @@ export function PriceTableManager() {
     }
 
     setSavedCatalogs((prev) => prev.filter((_, i) => i !== index));
+
+    if (editingCatalog?.id === catalog.id) {
+      setEditingCatalog(null);
+    }
+
     toast.success("Deletado!");
   };
 
@@ -235,20 +373,20 @@ export function PriceTableManager() {
                 <TableCell>{catalog.name}</TableCell>
                 <TableCell>{catalog.products.length}</TableCell>
                 <TableCell className="flex gap-2">
-                  <Button size="sm" onClick={() => setEditingCatalogIndex(idx)}>
+                  <Button size="sm" onClick={() => handleStartEditCatalog(idx)}>
                     Editar
                   </Button>
+
                   <Button
                     size="sm"
                     variant="secondary"
                     onClick={() =>
-                      setExpandedIndex((prev) =>
-                        prev === idx ? null : idx,
-                      )
+                      setExpandedIndex((prev) => (prev === idx ? null : idx))
                     }
                   >
                     {expandedIndex === idx ? "Ocultar" : "Ver"}
                   </Button>
+
                   <Button
                     size="sm"
                     variant="destructive"
@@ -266,13 +404,14 @@ export function PriceTableManager() {
                       const info = availableProducts.find(
                         (ap) => ap.id === p.product_id,
                       );
+
                       return (
                         <div
                           key={p.product_id}
-                          className="flex justify-between"
+                          className="flex justify-between py-1"
                         >
                           <span>{info?.name || "Produto"}</span>
-                          <span>R$ {p.price.toFixed(2)}</span>
+                          <span>R$ {Number(p.price).toFixed(2)}</span>
                         </div>
                       );
                     })}
@@ -283,6 +422,61 @@ export function PriceTableManager() {
           ))}
         </TableBody>
       </Table>
+
+      {/* ================= EDIT ================= */}
+      {editingCatalog && (
+        <Card className="p-4 space-y-4 border-primary">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-lg">Editando catálogo</h3>
+            <Button
+              variant="outline"
+              onClick={() => setEditingCatalog(null)}
+              disabled={isSavingEdit}
+            >
+              Cancelar
+            </Button>
+          </div>
+
+          <Input
+            placeholder="Nome do catálogo"
+            value={editingCatalog.name}
+            onChange={(e) =>
+              setEditingCatalog({
+                ...editingCatalog,
+                name: e.target.value,
+              })
+            }
+          />
+
+          {availableProducts.map((product) => {
+            const selected = editingCatalog.products.find(
+              (p) => p.product_id === product.id,
+            );
+
+            return (
+              <div key={product.id} className="grid grid-cols-2 gap-4">
+                <span>{product.name}</span>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={selected?.price ?? ""}
+                  onChange={(e) =>
+                    updateEditingCatalogProduct(product.id, e.target.value)
+                  }
+                />
+              </div>
+            );
+          })}
+
+          <Button
+            onClick={handleUpdateCatalog}
+            className="w-full"
+            disabled={isSavingEdit}
+          >
+            {isSavingEdit ? "Salvando..." : "Salvar edição"}
+          </Button>
+        </Card>
+      )}
 
       {/* ================= CREATE ================= */}
       <Button onClick={handleAddCatalog}>+ Adicionar</Button>
@@ -307,6 +501,7 @@ export function PriceTableManager() {
                 <span>{product.name}</span>
                 <Input
                   type="number"
+                  step="0.01"
                   value={selected?.price ?? ""}
                   onChange={(e) => {
                     const price = parseFloat(e.target.value);
