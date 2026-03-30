@@ -1,3 +1,5 @@
+// components/types/products.ts
+
 export type ProductItem = {
   id: string;
   name: string;

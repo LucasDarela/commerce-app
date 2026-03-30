@@ -1,26 +1,66 @@
-import { createClient } from "@supabase/supabase-js";
+import { createRouteSupabaseClient } from "@/lib/supabase/server";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-);
-
-interface StockMovementParams {
+type RegisterStockMovementInput = {
   companyId: string;
-  productId: number;
-  type: "input" | "output" | "return" | "adjustment";
+  productId: string;
+  type: string;
   quantity: number;
   reason?: string;
   noteId?: string;
-  createdBy: string | null;
-}
+  createdBy: string;
+};
 
-export async function registerStockMovement(params: StockMovementParams) {
-  const { companyId, productId, type, quantity, reason, noteId, createdBy } =
-    params;
+export async function registerStockMovement({
+  companyId,
+  productId,
+  type,
+  quantity,
+  reason,
+  noteId,
+  createdBy,
+}: RegisterStockMovementInput) {
+  const supabase = await createRouteSupabaseClient();
 
-  const { error } = await supabase.from("stock_movements").insert([
-    {
+  const { data: product, error: productError } = await supabase
+    .from("products")
+    .select("id, stock, company_id")
+    .eq("id", productId)
+    .eq("company_id", companyId)
+    .maybeSingle();
+
+  if (productError || !product) {
+    throw new Error("Produto não encontrado.");
+  }
+
+  const currentStock = Number(product.stock ?? 0);
+
+  let newStock = currentStock;
+
+  if (type === "entry" || type === "return") {
+    newStock = currentStock + quantity;
+  } else if (type === "exit") {
+    newStock = currentStock - quantity;
+  } else {
+    throw new Error("Tipo de movimentação inválido.");
+  }
+
+  if (newStock < 0) {
+    throw new Error("Estoque não pode ficar negativo.");
+  }
+
+  const { error: updateError } = await supabase
+    .from("products")
+    .update({ stock: newStock })
+    .eq("id", productId)
+    .eq("company_id", companyId);
+
+  if (updateError) {
+    throw new Error("Erro ao atualizar estoque do produto.");
+  }
+
+  const { error: movementError } = await supabase
+    .from("stock_movements")
+    .insert({
       company_id: companyId,
       product_id: productId,
       type,
@@ -28,11 +68,11 @@ export async function registerStockMovement(params: StockMovementParams) {
       reason,
       note_id: noteId,
       created_by: createdBy,
-    },
-  ]);
+    });
 
-  if (error) {
-    console.error("Error registering stock movement:", error);
-    throw error;
+  if (movementError) {
+    throw new Error("Erro ao registrar movimentação de estoque.");
   }
+
+  return { success: true };
 }
