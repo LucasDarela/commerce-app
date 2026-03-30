@@ -3,7 +3,7 @@ import { createRouteSupabaseClient } from "@/lib/supabase/server";
 type RegisterStockMovementInput = {
   companyId: string;
   productId: string;
-  type: string;
+  type: "entry" | "exit" | "return";
   quantity: number;
   reason?: string;
   noteId?: string;
@@ -44,7 +44,7 @@ export async function registerStockMovement({
     throw new Error("Tipo de movimentação inválido.");
   }
 
-  if (newStock < 0) {
+  if (type === "exit" && newStock < 0) {
     throw new Error("Estoque não pode ficar negativo.");
   }
 
