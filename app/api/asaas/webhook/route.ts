@@ -6,24 +6,46 @@ type AsaasPayment = {
   id: string;
   value?: number;
   netValue?: number;
+  originalValue?: number;
   status?: string;
 };
+
 type AsaasWebhook = {
   event?: string;
   payment?: AsaasPayment;
   data?: { payment?: AsaasPayment };
 };
 
-function mapAsaasToFRStatus(asaasStatus?: string): "Paid" | "Unpaid" {
-  switch ((asaasStatus || "").toUpperCase()) {
-    case "RECEIVED":
-    case "CONFIRMED":
-    case "RECEIVED_IN_CASH":
-    case "RECEIVED_IN_BANK":
-      return "Paid";
-    default:
-      return "Unpaid";
-  }
+function normalizeAsaasStatus(status?: string) {
+  return (status || "").toUpperCase();
+}
+
+function isPaidStatus(asaasStatus?: string) {
+  const s = normalizeAsaasStatus(asaasStatus);
+
+  return (
+    s === "RECEIVED" ||
+    s === "CONFIRMED" ||
+    s === "RECEIVED_IN_CASH" ||
+    s === "RECEIVED_IN_BANK"
+  );
+}
+
+function isOverdueLikeStatus(asaasStatus?: string) {
+  const s = normalizeAsaasStatus(asaasStatus);
+
+  return (
+    s === "OVERDUE" ||
+    s === "PAYMENT_OVERDUE" ||
+    s === "BANK_SLIP_CANCELLED" ||
+    s === "PAYMENT_BANK_SLIP_CANCELLED"
+  );
+}
+
+function mapAsaasToOrderPaymentStatus(
+  asaasStatus?: string,
+): "Paid" | "Unpaid" {
+  return isPaidStatus(asaasStatus) ? "Paid" : "Unpaid";
 }
 
 export async function POST(req: Request) {
@@ -32,8 +54,9 @@ export async function POST(req: Request) {
     req.headers.get("x-asaas-access-token") ||
     req.headers.get("authorization");
 
-  if (!tokenHeader)
+  if (!tokenHeader) {
     return NextResponse.json({ error: "missing token" }, { status: 401 });
+  }
 
   let body: AsaasWebhook;
   try {
@@ -44,127 +67,214 @@ export async function POST(req: Request) {
 
   const payment: AsaasPayment =
     body.payment || body.data?.payment || ({} as AsaasPayment);
-  if (!payment?.id)
+
+  if (!payment?.id) {
     return NextResponse.json({ error: "payment id missing" }, { status: 400 });
+  }
 
   const SUPABASE_URL =
     process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
   const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!SUPABASE_URL || !SERVICE_ROLE)
+
+  if (!SUPABASE_URL || !SERVICE_ROLE) {
     return NextResponse.json({ error: "server env missing" }, { status: 500 });
+  }
 
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, {
     auth: { persistSession: false },
   });
 
+  const rawToken = tokenHeader.replace(/^Bearer\s+/i, "").trim();
+
   const { data: integ, error: integErr } = await supabase
     .from("company_integrations")
     .select("company_id")
     .eq("provider", "asaas")
-    .eq("webhook_token", tokenHeader.trim())
+    .eq("webhook_token", rawToken)
     .maybeSingle();
 
-  if (integErr || !integ)
+  if (integErr || !integ) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
 
   const companyId = integ.company_id;
-  const status = mapAsaasToFRStatus(payment.status);
-  const isPaid = status === "Paid";
-  const totalPayed =
-    typeof payment.netValue === "number"
-      ? payment.netValue
-      : typeof payment.value === "number"
-        ? payment.value
-        : null;
+  const asaasStatus = normalizeAsaasStatus(payment.status);
+  const paymentStatus = mapAsaasToOrderPaymentStatus(payment.status);
+  const paid = isPaidStatus(payment.status);
+  const overdueLike = isOverdueLikeStatus(payment.status);
 
-  const updateOrder: Record<string, any> = { payment_status: status };
+  const { data: order, error: orderErr } = await supabase
+    .from("orders")
+    .select("id, total, total_payed, note_number, customer_id, customer")
+    .eq("company_id", companyId)
+    .eq("boleto_id", payment.id)
+    .maybeSingle();
 
-  if (isPaid) {
-    const { data: orderRow, error: orderErr } = await supabase
-      .from("orders")
-      .select("id, total, total_payed")
-      .eq("company_id", companyId)
-      .eq("boleto_id", payment.id)
-      .maybeSingle();
+  if (orderErr) {
+    console.error("webhook asaas: erro ao buscar order:", orderErr);
+  }
 
-    if (!orderErr && orderRow) {
-      const alreadyClosed =
-        Number(orderRow.total_payed ?? 0) >= Number(orderRow.total ?? 0);
+  if (!order) {
+    return NextResponse.json({
+      ok: true,
+      company_id: companyId,
+      event: body.event ?? null,
+      payment_id: payment.id,
+      warning: "order not found for boleto_id",
+    });
+  }
 
-      if (!alreadyClosed) {
-        updateOrder.total_payed = orderRow.total;
-      }
+  const updateOrder: Record<string, any> = {
+    payment_status: paymentStatus,
+  };
+
+  /**
+   * REGRA CRÍTICA:
+   * Só mexer em total_payed quando realmente houve pagamento.
+   * Nunca atualizar total_payed em vencimento, cancelamento bancário,
+   * expiração ou qualquer outro status não pago.
+   */
+  if (paid) {
+    const orderTotal = Number(order.total ?? 0);
+    const currentPaid = Number(order.total_payed ?? 0);
+
+    // Preferimos value para o valor bruto pago pelo cliente.
+    // netValue é líquido após taxas e NÃO deve ser usado para baixar o pedido.
+    const paidValue =
+      typeof payment.value === "number"
+        ? Number(payment.value)
+        : typeof payment.originalValue === "number"
+          ? Number(payment.originalValue)
+          : orderTotal;
+
+    const nextPaid = Math.min(
+      Math.max(currentPaid, paidValue),
+      orderTotal > 0 ? orderTotal : paidValue,
+    );
+
+    updateOrder.total_payed = nextPaid;
+
+    if (orderTotal > 0 && nextPaid >= orderTotal) {
+      updateOrder.payment_status = "Paid";
     }
-  } else if (totalPayed !== null) {
-    updateOrder.total_payed = totalPayed;
+  }
+
+  /**
+   * Em vencimento/cancelamento do boleto bancário:
+   * - mantém em aberto
+   * - NÃO faz baixa
+   * - NÃO altera total_payed
+   */
+  if (overdueLike) {
+    updateOrder.payment_status = "Unpaid";
   }
 
   const { error: updErr } = await supabase
     .from("orders")
     .update(updateOrder)
     .eq("company_id", companyId)
-    .eq("boleto_id", payment.id);
+    .eq("id", order.id);
 
   if (updErr) {
     console.error("webhook asaas: erro ao atualizar orders:", updErr);
+    return NextResponse.json(
+      { error: "erro ao atualizar pedido" },
+      { status: 500 },
+    );
   }
 
-  const { data: order, error: orderErr } = await supabase
-    .from("orders")
-    .select("id, note_number, customer_id, customer")
-    .eq("company_id", companyId)
-    .eq("boleto_id", payment.id)
-    .maybeSingle(); 
+  let customerName: string | null = order.customer ?? null;
 
-  if (orderErr) {
-    console.error("Erro ao buscar pedido:", orderErr);
+  if (!customerName && order.customer_id) {
+    const { data: customer, error: custErr } = await supabase
+      .from("customers")
+      .select("name, fantasy_name")
+      .eq("company_id", companyId)
+      .eq("id", order.customer_id)
+      .maybeSingle();
+
+    if (custErr) {
+      console.error("Erro ao buscar cliente:", custErr);
+    }
+
+    customerName = customer?.fantasy_name || customer?.name || null;
   }
 
-let customerName: string | null = order?.customer ?? null;
+  const orderNumber = order.note_number ?? order.id ?? null;
 
-if (!customerName && order?.customer_id) {
-  const { data: customer, error: custErr } = await supabase
-    .from("customers")
-    .select("name, fantasy_name")
-    .eq("company_id", companyId)
-    .eq("id", order.customer_id)
-    .maybeSingle();
+  /**
+   * Notificação:
+   * só cria "Pagamento recebido" quando realmente recebeu.
+   */
+  if (paid) {
+    const grossPaid =
+      typeof payment.value === "number"
+        ? Number(payment.value)
+        : typeof payment.originalValue === "number"
+          ? Number(payment.originalValue)
+          : null;
 
-  if (custErr) console.error("Erro ao buscar cliente:", custErr);
+    const title = "Pagamento recebido";
+    const header =
+      `Cobrança de ${customerName ?? "Cliente desconhecido"}` +
+      (orderNumber ? ` - Pedido #${orderNumber}` : "") +
+      ` - marcada como Paga`;
 
-  customerName = customer?.fantasy_name || customer?.name || null;
-}
+    const valueLine = `Valor pago: R$ ${
+      grossPaid != null ? grossPaid.toFixed(2) : "—"
+    }`;
 
-const orderNumber = order?.note_number ?? order?.id ?? null;
+    const description = `${header}\n${valueLine}`;
 
-  const title = "Pagamento recebido";
-  const header =
-    `Cobrança de ` +
-    `${customerName ?? "Cliente desconhecido"}` +
-    (orderNumber ? ` - Pedido #${orderNumber}` : "") +
-    ` - marcada como Paga`;
-  const valueLine = `Valor líquido: R$ ${totalPayed != null ? Number(totalPayed).toFixed(2) : "—"}`;
-  const description = `${header}\n${valueLine}`;
+    const { error: notifErr } = await supabase.from("notifications").insert({
+      title,
+      description,
+      company_id: companyId,
+      date: new Date().toISOString(),
+      read: false,
+    });
 
-  const notifPayload: any = {
-    title,
-    description,
-    company_id: companyId,
-    date: new Date().toISOString(),
-    read: false,
-  };
+    if (notifErr) {
+      console.error("❌ Falha ao inserir notificação:", notifErr);
+    }
+  }
 
-  const { error: notifErr } = await supabase
-    .from("notifications")
-    .insert(notifPayload);
-  if (notifErr) console.error("❌ Falha ao inserir notificação:", notifErr);
+  if (overdueLike) {
+    const title = "Boleto vencido";
+    const header =
+      `Cobrança de ${customerName ?? "Cliente desconhecido"}` +
+      (orderNumber ? ` - Pedido #${orderNumber}` : "") +
+      ` - permanece em aberto`;
+
+    const valueLine = `Status Asaas: ${asaasStatus || "—"}`;
+    const description = `${header}\n${valueLine}`;
+
+    const { error: notifErr } = await supabase.from("notifications").insert({
+      title,
+      description,
+      company_id: companyId,
+      date: new Date().toISOString(),
+      read: false,
+    });
+
+    if (notifErr) {
+      console.error(
+        "❌ Falha ao inserir notificação de vencimento:",
+        notifErr,
+      );
+    }
+  }
 
   return NextResponse.json({
     ok: true,
     company_id: companyId,
     event: body.event ?? null,
     payment_id: payment.id,
-    status_applied: status,
-    total_payed: totalPayed,
+    asaas_status: asaasStatus,
+    status_applied: updateOrder.payment_status,
+    total_payed_applied:
+      typeof updateOrder.total_payed === "number"
+        ? updateOrder.total_payed
+        : null,
   });
 }
