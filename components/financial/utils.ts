@@ -1,7 +1,7 @@
 // components/data-financial/utils.ts
 import { Order } from "@/components/types/orders";
 import type { FinancialRecord } from "@/components/financial/schema";
-import type { CombinedRecord } from "@/components/financial/DataFinancialTable";
+import type { CombinedRecord } from "@/components/financial/types";
 
 export function isOrder(record: any): record is Order {
   return record?.source === "order";

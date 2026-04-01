@@ -11,7 +11,7 @@ import {
   ColumnDef,
 } from "@tanstack/react-table";
 import { DataTableConfig } from "./DataTableConfig";
-import { CombinedRecord } from "./DataFinancialTable";
+import type { CombinedRecord } from "./types";
 import { TablePagination } from "@/components/ui/pagination";
 import type { FinancialRecord } from "@/components/types/financial";
 import type { Order } from "@/components/types/orderSchema";

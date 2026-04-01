@@ -288,48 +288,40 @@ const handleSelectCustomer = async (customer: Customer) => {
   }
 };
 
-  const addItem = () => {
-    if (!selectedCustomer) {
-      toast.error("Selecione um cliente antes de adicionar produtos.");
-      return;
-    }
+const addItem = () => {
+  if (!selectedCustomer) {
+    toast.error("Selecione um cliente antes de adicionar produtos.");
+    return;
+  }
 
-    if (!selectedCustomer.price_table_id) {
-      toast.error("O cliente não possui tabela de preços vinculada.");
-      return;
-    }
+  if (!selectedProduct) {
+    toast.error("Selecione um produto.");
+    return;
+  }
 
-    if (!selectedProduct) {
-      toast.error("Selecione um produto.");
-      return;
-    }
+  if (quantity <= 0) {
+    toast.error("A quantidade deve ser maior que zero.");
+    return;
+  }
 
-    const catalogPrice = catalogPrices[String(selectedProduct.id)];
+  const catalogPrice = catalogPrices[String(selectedProduct.id)];
+  const finalPrice =
+    typeof catalogPrice === "number"
+      ? catalogPrice
+      : Number(selectedProduct.standard_price ?? 0);
 
-    if (typeof catalogPrice !== "number") {
-      toast.error(
-        "Este produto não possui preço na tabela de preços vinculada ao cliente."
-      );
-      return;
-    }
-
-    if (quantity <= 0) {
-      toast.error("A quantidade deve ser maior que zero.");
-      return;
-    }
-
-    const newItem = {
-      id: selectedProduct.id,
-      name: selectedProduct.name,
-      quantity,
-      standard_price: catalogPrice,
-    };
-
-    setOrderItems((prev) => [...prev, newItem]);
-    setSelectedProduct(null);
-    setQuantity(1);
-    setStandardPrice("");
+  const newItem = {
+    id: selectedProduct.id,
+    name: selectedProduct.name,
+    quantity,
+    standard_price: finalPrice,
   };
+
+  setOrderItems((prev) => [...prev, newItem]);
+  setSelectedProduct(null);
+  setQuantity(1);
+  setStandardPrice("");
+};
   const removeItem = (index: number) => {
     setOrderItems((prev) => prev.filter((_, i) => i !== index));
   };
@@ -358,14 +350,12 @@ const handleSelectCustomer = async (customer: Customer) => {
   };
 
 const handleEditPrice = (index: number, price: string) => {
-  if (selectedCustomer?.price_table_id) {
-    toast.error("Não é permitido alterar manualmente o preço para este cliente.");
-    return;
-  }
-
   setOrderItems((prev) => {
     const next = [...prev];
-    next[index] = { ...next[index], standard_price: Number(price) || 0 };
+    next[index] = {
+      ...next[index],
+      standard_price: Number(price) || 0,
+    };
     return next;
   });
 };
@@ -495,11 +485,15 @@ const itemsPayload = orderItems.map((item) => {
     );
   }
 
+  if (Number(item.standard_price) <= 0) {
+    throw new Error(`O produto "${item.name}" está com preço inválido.`);
+  }
+
   return {
     order_id: insertedOrder.id,
     product_id: item.id ?? null,
     quantity: item.quantity,
-    price: catalogPrice,
+    price: Number(item.standard_price),
   };
 });
 
@@ -873,19 +867,19 @@ useEffect(() => {
                     return;
                   }
 
-                  if (!selectedCustomer.price_table_id) {
-                    toast.error("O cliente não possui tabela de preços vinculada.");
-                    return;
-                  }
+if (!selectedCustomer.price_table_id) {
+  toast.error("O cliente não possui tabela de preços vinculada.");
+  return;
+}
 
-                  const catalogPrice = catalogPrices[String(product.id)];
+const catalogPrice = catalogPrices[String(product.id)];
 
-                  if (typeof catalogPrice !== "number") {
-                    toast.error(
-                      "Este produto não possui preço na tabela de preços vinculada ao cliente."
-                    );
-                    return;
-                  }
+if (typeof catalogPrice !== "number") {
+  toast.error(
+    "Este produto não possui preço na tabela de preços vinculada ao cliente."
+  );
+  return;
+}
 
                   setSelectedProduct(product);
                   setStandardPrice(catalogPrice);
@@ -973,7 +967,6 @@ useEffect(() => {
                         type="number"
                         value={item.standard_price}
                         onChange={(e) => handleEditPrice(index, e.target.value)}
-                        disabled={!!selectedCustomer?.price_table_id}
                       />
                       </TableCell>
 

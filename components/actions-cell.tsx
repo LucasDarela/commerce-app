@@ -10,21 +10,16 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { IconDotsVertical } from "@tabler/icons-react";
-import type { FinancialRecord } from "@/components/types/financial";
-import type { Order } from "@/components/types/orders";
+import type { CombinedRecord } from "@/components/financial/types";
 
 type Props = {
-  row: Row<Order | FinancialRecord>;
+  row: Row<CombinedRecord>;
   setSelectedOrder: React.Dispatch<
-    React.SetStateAction<Order | FinancialRecord | null>
+    React.SetStateAction<CombinedRecord | null>
   >;
   setIsPaymentOpen: (open: boolean) => void;
   onDelete: (id: string) => void;
 };
-
-function isOrder(record: any): record is Order {
-  return record && record.source === "order";
-}
 
 export function ActionsCell({
   row,

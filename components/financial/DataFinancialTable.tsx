@@ -35,6 +35,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "../ui/tabs";
 import { MonthlyFinancialTable } from "./MonthlyFinancialTable";
 import { orderSchema, type Order } from "@/components/types/orderSchema";
 import { financialSchema, type FinancialRecord } from "./schema";
+import type { CombinedRecord, InvoiceStatus } from "./types";
 
 type PersistedState = {
   selectedMonth?: string;
@@ -65,8 +66,6 @@ function toISO(d: Date | null) {
   return d ? d.toISOString().split("T")[0] : null;
 }
 
-export type CombinedRecord = Order | FinancialRecord;
-
 export default function DataFinancialTable() {
   const { companyId } = useAuthenticatedCompany();
   useEffect(() => {});
@@ -78,9 +77,7 @@ export default function DataFinancialTable() {
     [],
   );
   const [loading, setLoading] = useState(true);
-  const [selectedOrder, setSelectedOrder] = useState<
-    Order | FinancialRecord | null
-  >(null);
+const [selectedOrder, setSelectedOrder] = useState<CombinedRecord | null>(null);
   const [selectedFinancial, setSelectedFinancial] =
     useState<FinancialRecord | null>(null);
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
@@ -131,6 +128,14 @@ export default function DataFinancialTable() {
     [supabase, orders, financialRecords],
   );
 
+  const [nfeStatusByOrderId, setNfeStatusByOrderId] = useState<
+  Record<string, InvoiceStatus | null>
+>({});
+
+const [boletoStatusByOrderId, setBoletoStatusByOrderId] = useState<
+  Record<string, boolean>
+>({});
+
   const handleUpdateRecord = (id: string) => {
     setFinancialRecords((prev) =>
       prev.map((record) =>
@@ -139,29 +144,40 @@ export default function DataFinancialTable() {
     );
   };
 
-  const columns = useMemo(
-    () =>
-      financialColumns({
-        suppliers,
-        onDelete: deleteOrderById,
-        setSelectedOrder,
-        setIsPaymentOpen,
-      }),
-    [suppliers, deleteOrderById, setSelectedOrder, setIsPaymentOpen],
-  );
+const columns = useMemo(
+  () =>
+    financialColumns({
+      suppliers,
+      onDelete: deleteOrderById,
+      setSelectedOrder,
+      setIsPaymentOpen,
+      nfeStatusByOrderId,
+      boletoStatusByOrderId,
+    }),
+  [
+    suppliers,
+    deleteOrderById,
+    setSelectedOrder,
+    setIsPaymentOpen,
+    nfeStatusByOrderId,
+    boletoStatusByOrderId,
+  ],
+);
 
 const fetchAll = async () => {
   if (!companyId) {
     setOrders([]);
     setFinancialRecords([]);
     setSuppliers([]);
+    setNfeStatusByOrderId({});
+    setBoletoStatusByOrderId({});
     setLoading(false);
     return;
   }
 
   setLoading(true);
 
-  const [ordersRes, financialRes, suppliersRes] = await Promise.all([
+  const [ordersRes, financialRes, suppliersRes, invoicesRes] = await Promise.all([
     supabase
       .from("orders")
       .select("*")
@@ -178,6 +194,11 @@ const fetchAll = async () => {
       .from("suppliers")
       .select("id, name")
       .eq("company_id", companyId),
+
+    supabase
+      .from("invoices")
+      .select("order_id, status")
+      .eq("company_id", companyId),
   ]);
 
   const parsedOrders = orderSchema
@@ -189,6 +210,13 @@ const fetchAll = async () => {
       })),
     );
 
+  const boletoMap: Record<string, boolean> = {};
+  for (const order of ordersRes.data ?? []) {
+    boletoMap[String((order as any).id)] =
+      Boolean((order as any).boleto_url) || Boolean((order as any).boleto_id);
+  }
+  setBoletoStatusByOrderId(boletoMap);
+
   if (parsedOrders.success) {
     setOrders(parsedOrders.data);
   } else {
@@ -196,35 +224,43 @@ const fetchAll = async () => {
     setOrders([]);
   }
 
-const mappedFinancials = (financialRes.data ?? []).map((f) => ({
-  ...f,
-  payment_method:
-    f.payment_method === "Cash"
-      ? "Dinheiro"
-      : f.payment_method === "Card"
-        ? "Cartao"
-        : f.payment_method === "Ticket"
-          ? "Boleto"
-          : f.payment_method ?? undefined,
-  total_payed: Number(f.total_payed ?? 0),
-  source: "financial" as const,
-}));
+  const nfeMap: Record<string, InvoiceStatus | null> = {};
 
-const validFinancials: FinancialRecord[] = [];
-
-for (const item of mappedFinancials) {
-  const parsed = financialSchema.safeParse(item);
-
-  if (parsed.success) {
-    validFinancials.push(parsed.data);
-  } else {
-    console.error("Registro financeiro inválido:", item);
-    console.error(parsed.error.flatten());
+  for (const inv of invoicesRes.data ?? []) {
+    if (!inv.order_id) continue;
+    nfeMap[String(inv.order_id)] = (inv.status as InvoiceStatus) ?? null;
   }
-}
 
-setFinancialRecords(validFinancials);
+  setNfeStatusByOrderId(nfeMap);
 
+  const mappedFinancials = (financialRes.data ?? []).map((f) => ({
+    ...f,
+    payment_method:
+      f.payment_method === "Cash"
+        ? "Dinheiro"
+        : f.payment_method === "Card"
+          ? "Cartao"
+          : f.payment_method === "Ticket"
+            ? "Boleto"
+            : f.payment_method ?? undefined,
+    total_payed: Number(f.total_payed ?? 0),
+    source: "financial" as const,
+  }));
+
+  const validFinancials: FinancialRecord[] = [];
+
+  for (const item of mappedFinancials) {
+    const parsed = financialSchema.safeParse(item);
+
+    if (parsed.success) {
+      validFinancials.push(parsed.data);
+    } else {
+      console.error("Registro financeiro inválido:", item);
+      console.error(parsed.error.flatten());
+    }
+  }
+
+  setFinancialRecords(validFinancials);
   setSuppliers(suppliersRes.data || []);
   setLoading(false);
 };
@@ -263,34 +299,26 @@ useEffect(() => {
     persistColumnVisibility(columnVisibility);
   }, [columnVisibility]);
 
-  const combinedData: CombinedRecord[] = useMemo(() => {
-    return [
-      ...orders.map((o) => ({
+const combinedData: CombinedRecord[] = useMemo(() => {
+  return [
+    ...orders.map(
+      (o): CombinedRecord => ({
         ...o,
-        source: "order" as const,
-        amount: o.total,
-        status: o.payment_status === "Paid" ? "Paid" : "Unpaid",
-        payment_method: o.payment_method as
-          | "Pix"
-          | "Dinheiro"
-          | "Boleto"
-          | "Cartao",
-        supplier_id: "",
-        supplier: o.customer,
-        company_id: "",
-        category: "order",
-        description: o.customer,
-        type: "output",
-        notes: "",
-        total_payed: Number(o.total_payed ?? 0),
-        phone: o.phone,
-      })),
-      ...financialRecords.map((f) => ({
+        source: "order",
+        has_boleto: boletoStatusByOrderId[String(o.id)] ?? false,
+        has_nfe: !!nfeStatusByOrderId[String(o.id)],
+      }),
+    ),
+    ...financialRecords.map(
+      (f): CombinedRecord => ({
         ...f,
-        source: "financial" as const,
-      })),
-    ];
-  }, [orders, financialRecords]);
+        source: "financial",
+        has_boleto: false,
+        has_nfe: false,
+      }),
+    ),
+  ];
+}, [orders, financialRecords, nfeStatusByOrderId, boletoStatusByOrderId]);
 
   // ✅ Calcular agrupamento e ordenar os meses
   const groupedByMonth = useMemo(
