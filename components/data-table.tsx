@@ -1235,8 +1235,9 @@ const columns = React.useMemo<CustomColumnDef<Order>[]>(() => [
               <DropdownMenuSeparator />
 
               <DeleteOrderButton
-                orderId={row.original.id}
+                id={row.original.id}
                 companyId={companyId}
+                table="orders"
                 asDropdownItem
                 onDeleted={() => {
                   setOrders((prev) => prev.filter((o) => o.id !== row.original.id));

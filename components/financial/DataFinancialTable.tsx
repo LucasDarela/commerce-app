@@ -92,41 +92,25 @@ const [selectedOrder, setSelectedOrder] = useState<CombinedRecord | null>(null);
 
   const router = useRouter();
 
-  const deleteOrderById = useCallback(
-    async (id: string) => {
-      const confirmDelete = confirm(
-        "Tem certeza que deseja excluir esta nota?",
-      );
-      if (!confirmDelete) return;
+const deleteOrderById = useCallback(
+  (id: string) => {
+    const record = [...orders, ...financialRecords].find((r) => r.id === id);
 
-      const record = [...orders, ...financialRecords].find((r) => r.id === id);
-      if (!record) {
-        toast.error("Registro não encontrado.");
-        return;
-      }
+    if (!record) {
+      toast.error("Registro não encontrado.");
+      return;
+    }
 
-      const source = (record as CombinedRecord).source;
-      const tableName = source === "financial" ? "financial_records" : "orders";
+    const source = (record as CombinedRecord).source;
 
-      const { error } = await supabase.from(tableName).delete().eq("id", id);
-
-      if (error) {
-        console.error("❌ Erro ao deletar:", error);
-        toast.error("Erro ao deletar a nota.");
-        return;
-      }
-
-      toast.success("Nota excluída com sucesso!");
-
-      // Atualiza o estado local
-      if (source === "financial") {
-        setFinancialRecords((prev) => prev.filter((r) => r.id !== id));
-      } else {
-        setOrders((prev) => prev.filter((r) => r.id !== id));
-      }
-    },
-    [supabase, orders, financialRecords],
-  );
+    if (source === "financial") {
+      setFinancialRecords((prev) => prev.filter((r) => r.id !== id));
+    } else {
+      setOrders((prev) => prev.filter((r) => r.id !== id));
+    }
+  },
+  [orders, financialRecords],
+);
 
   const [nfeStatusByOrderId, setNfeStatusByOrderId] = useState<
   Record<string, InvoiceStatus | null>

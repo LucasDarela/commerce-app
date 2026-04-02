@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { IconDotsVertical } from "@tabler/icons-react";
 import type { CombinedRecord } from "@/components/financial/types";
+import { DeleteOrderButton } from "@/components/orders/DeleteOrderButton";
 
 type Props = {
   row: Row<CombinedRecord>;
@@ -70,13 +71,14 @@ export function ActionsCell({
         </DropdownMenuItem>
 
         <DropdownMenuSeparator />
+        <DeleteOrderButton
+          id={id}
+          companyId={(row.original as any).company_id}
+          table={isFinancial ? "financial_records" : "orders"}
+          asDropdownItem
+          onDeleted={() => onDelete(id)}
+        />
 
-        <DropdownMenuItem
-          onClick={() => onDelete(id)}
-          className="text-destructive focus:text-destructive"
-        >
-          Deletar
-        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

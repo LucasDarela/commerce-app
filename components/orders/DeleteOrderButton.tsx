@@ -17,15 +17,17 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { toast } from "sonner";
 
 type Props = {
-  orderId: string;
+  id: string;
   companyId: string;
+  table: "orders" | "financial_records";
   asDropdownItem?: boolean;
   onDeleted?: () => void;
 };
 
 export function DeleteOrderButton({
-  orderId,
+  id,
   companyId,
+  table,
   asDropdownItem = false,
   onDeleted,
 }: Props) {
@@ -34,7 +36,11 @@ export function DeleteOrderButton({
   const [confirm, setConfirm] = React.useState("");
   const [deleting, setDeleting] = React.useState(false);
 
-  const valid = confirm.trim().toLowerCase() === "deletar pedido";
+  const isOrder = table === "orders";
+  const label = isOrder ? "pedido" : "nota";
+  const expectedText = isOrder ? "deletar pedido" : "deletar nota";
+
+  const valid = confirm.trim().toLowerCase() === expectedText;
 
   const onDelete = async () => {
     if (!valid || deleting) return;
@@ -43,9 +49,9 @@ export function DeleteOrderButton({
       setDeleting(true);
 
       const { data, error } = await supabase
-        .from("orders")
+        .from(table)
         .delete()
-        .eq("id", orderId)
+        .eq("id", id)
         .eq("company_id", companyId)
         .select("id");
 
@@ -54,16 +60,28 @@ export function DeleteOrderButton({
       }
 
       if (!data || data.length === 0) {
-        throw new Error("Pedido não encontrado no banco.");
+        throw new Error(
+          isOrder
+            ? "Pedido não encontrado no banco."
+            : "Nota não encontrada no banco.",
+        );
       }
 
-      toast.success("Pedido deletado com sucesso.");
+      toast.success(
+        isOrder
+          ? "Pedido deletado com sucesso."
+          : "Nota deletada com sucesso.",
+      );
+
       onDeleted?.();
       setOpen(false);
       setConfirm("");
     } catch (e: any) {
-      console.error("Erro ao deletar pedido:", e);
-      toast.error(e?.message || "Falha ao deletar pedido.");
+      console.error(`Erro ao deletar ${label}:`, e);
+      toast.error(
+        e?.message ||
+          (isOrder ? "Falha ao deletar pedido." : "Falha ao deletar nota."),
+      );
     } finally {
       setDeleting(false);
     }
@@ -79,11 +97,11 @@ export function DeleteOrderButton({
             setOpen(true);
           }}
         >
-          Deletar pedido
+          {isOrder ? "Deletar pedido" : "Deletar nota"}
         </DropdownMenuItem>
       ) : (
         <Button variant="destructive" onClick={() => setOpen(true)}>
-          Deletar pedido
+          {isOrder ? "Deletar pedido" : "Deletar nota"}
         </Button>
       )}
 
@@ -91,9 +109,7 @@ export function DeleteOrderButton({
         open={open}
         onOpenChange={(next) => {
           setOpen(next);
-          if (!next) {
-            setConfirm("");
-          }
+          if (!next) setConfirm("");
         }}
       >
         <AlertDialogContent>
@@ -101,7 +117,7 @@ export function DeleteOrderButton({
             <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
             <AlertDialogDescription>
               Essa ação é <b>permanente</b>. Para confirmar, digite{" "}
-              <code>deletar pedido</code> abaixo.
+              <code>{expectedText}</code> abaixo.
             </AlertDialogDescription>
           </AlertDialogHeader>
 
@@ -110,7 +126,7 @@ export function DeleteOrderButton({
               autoFocus
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
-              placeholder='Digite: "deletar pedido"'
+              placeholder={`Digite: "${expectedText}"`}
             />
             {!valid && confirm.length > 0 && (
               <p className="mt-2 text-xs text-muted-foreground">
