@@ -604,66 +604,34 @@ const handleEditPrice = (index: number, value: string) => {
       <Card className="mb-6">
         <CardContent className="space-y-4">
           <h2 className="text-xl font-bold mb-4">Informações do Documento</h2>
+<div className="grid grid-cols-2 gap-3 w-full">
+  <Input
+    type="text"
+    placeholder="Número da Nota"
+    value={order?.note_number || ""}
+    onChange={(e) =>
+      setOrder((prev) => ({ ...prev, note_number: e.target.value }))
+    }
+    className="w-full"
+  />
 
-          <div className="flex gap-4 w-full">
-            <Select
-              value={order.document_type}
-              disabled
-              onValueChange={async (value) => {
-                let generatedNoteNumber = order.note_number;
-                if (value === "internal" && companyId) {
-                  generatedNoteNumber = await generateNextNoteNumber(companyId);
-                }
-
-                setOrder((prev) =>
-                  prev
-                    ? {
-                        ...prev,
-                        document_type: value,
-                        note_number: generatedNoteNumber,
-                      }
-                    : prev,
-                );
-              }}
-            >
-              <SelectTrigger className="w-full border rounded-md shadow-sm">
-                <SelectValue placeholder="Tipo de Documento" />
-              </SelectTrigger>
-              <SelectContent className="shadow-md rounded-md">
-                <SelectItem value="internal">Interno</SelectItem>
-                <SelectItem value="invoice">Fiscal</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Input
-              type="text"
-              placeholder="Número da Nota"
-              value={order?.note_number || ""}
-              onChange={(e) =>
-                setOrder((prev) =>
-                  prev ? { ...prev, note_number: e.target.value } : prev,
-                )
-              }
-              className="w-full"
-            />
-
-            <div className="flex items-center gap-2 w-full">
-              <span className="text-sm text-muted-foreground font-medium hidden sm:inline">
-                Emissão:
-              </span>
-              <Input
-                id="issue_date"
-                value={
-                  order?.issue_date
-                    ? format(new Date(order.issue_date), "dd/MM/yyyy")
-                    : ""
-                }
-                readOnly
-                className="cursor-not-allowed bg-muted w-full"
-              />
-            </div>
-          </div>
-
+  <div className="flex items-center gap-2 w-full">
+    <span className="text-sm text-muted-foreground font-medium hidden sm:inline">
+      Emissão:
+    </span>
+    <Input
+      id="issue_date"
+      value={
+        order?.issue_date
+          ? format(new Date(`${order.issue_date}T12:00:00`), "dd/MM/yyyy")
+          : ""
+      }
+      readOnly
+      className="cursor-not-allowed bg-muted w-full"
+    />
+  </div>
+</div>
+          {/* Seção Forma de Pagamento */}
           <div className="flex gap-4 items-center w-full mt-6">
             <Select
               value={order?.payment_method || ""}
@@ -671,23 +639,18 @@ const handleEditPrice = (index: number, value: string) => {
                 let days = "0";
                 if (value.toLowerCase() === "boleto") days = "10";
 
-                if (!["Pix", "Dinheiro", "Cartao", "Boleto"].includes(value)) {
+                if (!["Pix", "Dinheiro", "Cartao", "Boleto"].includes(value))
                   return;
-                }
 
-                setOrder((prev) =>
-                  prev
-                    ? {
-                        ...prev,
-                        payment_method: value as
-                          | "Pix"
-                          | "Dinheiro"
-                          | "Cartao"
-                          | "Boleto",
-                        days_ticket: days,
-                      }
-                    : prev,
-                );
+                setOrder((prev) => ({
+                  ...prev,
+                  payment_method: value as
+                    | "Pix"
+                    | "Dinheiro"
+                    | "Cartao"
+                    | "Boleto",
+                  days_ticket: days,
+                }));
               }}
             >
               <SelectTrigger className="w-full border rounded-md shadow-sm truncate">
@@ -706,9 +669,7 @@ const handleEditPrice = (index: number, value: string) => {
               placeholder="Prazo"
               value={order?.days_ticket || ""}
               onChange={(e) =>
-                setOrder((prev) =>
-                  prev ? { ...prev, days_ticket: e.target.value } : prev,
-                )
+                setOrder((prev) => ({ ...prev, days_ticket: e.target.value }))
               }
               disabled={["pix", "dinheiro"].includes(
                 order?.payment_method?.toLowerCase() || "",
@@ -741,8 +702,8 @@ const handleEditPrice = (index: number, value: string) => {
         <CardContent>
           <h2 className="text-xl font-bold mb-4">Informações do Cliente</h2>
 
-          <div className="grid grid-cols-5 gap-4 mb-4">
-            <div ref={dropdownRef} className="col-span-3 relative">
+          <div className="grid grid-cols-1 sm:grid-cols-5 gap-4 mb-4">
+            <div ref={dropdownRef} className="sm:col-span-3 relative w-full min-w-0">
               <Input
                 type="text"
                 placeholder="Procurar Cliente..."
@@ -779,10 +740,10 @@ const handleEditPrice = (index: number, value: string) => {
               )}
             </div>
 
-            <div className="col-span-2">
-              <Link href="/dashboard/customers/add" className="w-full">
+            <div className="sm:col-span-2 w-full">
+              <Link href="/dashboard/customers/add" className="block w-full">
                 <Button variant="default" className="w-full">
-                  Adicionar
+                  ou Criar
                 </Button>
               </Link>
             </div>
@@ -845,24 +806,29 @@ const handleEditPrice = (index: number, value: string) => {
         <CardContent className="space-y-4">
           <h2 className="text-xl font-bold mb-4">Selecione os Produtos</h2>
 
-          <div className="grid grid-cols-5 gap-4 items-center">
-            <div className="col-span-3">
+          <div className="grid grid-cols-1 sm:grid-cols-5 gap-4 items-start">
+            <div className="sm:col-span-3 w-full min-w-0">
               <Popover open={productOpen} onOpenChange={setProductOpen}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
                     role="combobox"
                     aria-expanded={productOpen}
-                    className="w-full justify-between border rounded-md shadow-sm"
+                    className="w-full justify-between border rounded-md shadow-sm min-w-0"
                   >
-                    {selectedProduct
-                      ? `${selectedProduct.code} - ${selectedProduct.name}`
-                      : "Selecionar Produto"}
+                    <span className="truncate">
+                      {selectedProduct
+                        ? `${selectedProduct.code} - ${selectedProduct.name}`
+                        : "Selecionar Produto"}
+                    </span>
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
 
-                <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
+                <PopoverContent
+                  align="start"
+                  className="w-[calc(100vw-3rem)] sm:w-[var(--radix-popover-trigger-width)] max-w-full p-0"
+                >
                   <Command shouldFilter={false}>
                     <CommandInput
                       placeholder="Buscar produto..."
@@ -896,7 +862,7 @@ const handleEditPrice = (index: number, value: string) => {
               </Popover>
             </div>
 
-            <Button className="col-span-2 w-full cursor-pointer" onClick={addItem}>
+            <Button className="sm:col-span-2 w-full cursor-pointer" onClick={addItem}>
               Adicionar
             </Button>
           </div>
@@ -911,7 +877,7 @@ const handleEditPrice = (index: number, value: string) => {
           </div>
 
           <div className="w-full overflow-x-auto">
-            <Table className="table-fixed w-full min-w-[600px] mt-4">
+            <Table className="table-fixed w-full min-w-[720px] mt-4">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[300px]">Produto</TableHead>
@@ -939,9 +905,7 @@ const handleEditPrice = (index: number, value: string) => {
                         <Input
                           className="w-full text-left"
                           type="number"
-                          min={1}
-                          step={1}
-                          value={item.quantity}
+                          value={item.quantity} 
                           onChange={(e) =>
                             handleEditQuantity(index, e.target.value)
                           }
@@ -952,8 +916,6 @@ const handleEditPrice = (index: number, value: string) => {
                         <Input
                           className="w-full text-left"
                           type="number"
-                          min={0}
-                          step="0.01"
                           value={item.standard_price}
                           onChange={(e) =>
                             handleEditPrice(index, e.target.value)
@@ -981,13 +943,13 @@ const handleEditPrice = (index: number, value: string) => {
           <div>
             <h2 className="text-xl font-bold mb-4">Agendamento de Entrega</h2>
 
-            <div className="grid grid-cols-2 gap-4">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full flex justify-between cursor-pointer hover:bg-gray-100"
-                  >
+              <div className="grid grid-cols-2 gap-4">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="h-auto w-full flex justify-between cursor-pointer hover:bg-gray-100"
+                    >
                     {appointment.date
                       ? format(appointment.date, "dd/MM/yyyy")
                       : "Data da Entrega"}
@@ -1023,7 +985,7 @@ const handleEditPrice = (index: number, value: string) => {
               <Input
                 type="time"
                 placeholder="Horário"
-                className="w-full max-w-[140px] sm:max-w-full"
+                className="h-auto w-full max-w-[135px] sm:max-w-full"
                 value={appointment.hour}
                 onChange={(e) =>
                   setAppointment({ ...appointment, hour: e.target.value })
