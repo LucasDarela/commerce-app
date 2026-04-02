@@ -86,31 +86,10 @@ const [selectedOrder, setSelectedOrder] = useState<CombinedRecord | null>(null);
     getInitialColumnVisibility,
   );
   const supabase = React.useMemo(() => createBrowserSupabaseClient(), []);
-  const { accessToken } = useCompanyIntegration("mercado_pago");
   const [issueDateInput, setIssueDateInput] = useState("");
   const [dueDateInput, setDueDateInput] = useState("");
 
   const router = useRouter();
-
-const deleteOrderById = useCallback(
-  (id: string) => {
-    const record = [...orders, ...financialRecords].find((r) => r.id === id);
-
-    if (!record) {
-      toast.error("Registro não encontrado.");
-      return;
-    }
-
-    const source = (record as CombinedRecord).source;
-
-    if (source === "financial") {
-      setFinancialRecords((prev) => prev.filter((r) => r.id !== id));
-    } else {
-      setOrders((prev) => prev.filter((r) => r.id !== id));
-    }
-  },
-  [orders, financialRecords],
-);
 
   const [nfeStatusByOrderId, setNfeStatusByOrderId] = useState<
   Record<string, InvoiceStatus | null>
@@ -128,27 +107,8 @@ const [boletoStatusByOrderId, setBoletoStatusByOrderId] = useState<
     );
   };
 
-const columns = useMemo(
-  () =>
-    financialColumns({
-      suppliers,
-      onDelete: deleteOrderById,
-      setSelectedOrder,
-      setIsPaymentOpen,
-      nfeStatusByOrderId,
-      boletoStatusByOrderId,
-    }),
-  [
-    suppliers,
-    deleteOrderById,
-    setSelectedOrder,
-    setIsPaymentOpen,
-    nfeStatusByOrderId,
-    boletoStatusByOrderId,
-  ],
-);
 
-const fetchAll = async () => {
+const fetchAll = useCallback(async () => {
   if (!companyId) {
     setOrders([]);
     setFinancialRecords([]);
@@ -247,7 +207,7 @@ const fetchAll = async () => {
   setFinancialRecords(validFinancials);
   setSuppliers(suppliersRes.data || []);
   setLoading(false);
-};
+}, [companyId, supabase]);
 
 const refreshOrders = async () => {
   if (!companyId) return;
@@ -273,6 +233,59 @@ const refreshOrders = async () => {
     console.error("Erro ao validar orders no refresh:", parsed.error);
   }
 };
+
+const deleteOrderById = useCallback(
+  async ({
+    id,
+    table,
+    deleteRecurring,
+    recurrenceGroupId,
+  }: {
+    id: string;
+    table: "orders" | "financial_records";
+    deleteRecurring?: boolean;
+    recurrenceGroupId?: string | null;
+  }) => {
+    if (table === "financial_records") {
+      if (deleteRecurring && recurrenceGroupId) {
+        setFinancialRecords((prev) =>
+          prev.filter((r: any) => r.recurrence_group_id !== recurrenceGroupId),
+        );
+
+        await fetchAll();
+        return;
+      }
+
+      setFinancialRecords((prev) => prev.filter((r) => r.id !== id));
+      await fetchAll();
+      return;
+    }
+
+    setOrders((prev) => prev.filter((r) => r.id !== id));
+    await fetchAll();
+  },
+  [fetchAll],
+);
+
+const columns = useMemo(
+  () =>
+    financialColumns({
+      suppliers,
+      onDelete: deleteOrderById,
+      setSelectedOrder,
+      setIsPaymentOpen,
+      nfeStatusByOrderId,
+      boletoStatusByOrderId,
+    }),
+  [
+    suppliers,
+    deleteOrderById,
+    setSelectedOrder,
+    setIsPaymentOpen,
+    nfeStatusByOrderId,
+    boletoStatusByOrderId,
+  ],
+);
 
 useEffect(() => {
   if (!companyId) return;

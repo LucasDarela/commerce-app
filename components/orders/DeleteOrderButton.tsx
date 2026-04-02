@@ -21,7 +21,12 @@ type Props = {
   companyId: string;
   table: "orders" | "financial_records";
   asDropdownItem?: boolean;
-  onDeleted?: () => void;
+  onDeleted?: (payload: {
+    deleteRecurring?: boolean;
+    recurrenceGroupId?: string | null;
+    table: "orders" | "financial_records";
+    id: string;
+  }) => void | Promise<void>;
 };
 
 export function DeleteOrderButton({
@@ -36,11 +41,54 @@ export function DeleteOrderButton({
   const [confirm, setConfirm] = React.useState("");
   const [deleting, setDeleting] = React.useState(false);
 
+  const [deleteRecurring, setDeleteRecurring] = React.useState(false);
+  const [recurrenceGroupId, setRecurrenceGroupId] = React.useState<string | null>(null);
+  const [hasRecurrenceGroup, setHasRecurrenceGroup] = React.useState(false);
+  const [loadingRecurrenceInfo, setLoadingRecurrenceInfo] = React.useState(false);
+
   const isOrder = table === "orders";
   const label = isOrder ? "pedido" : "nota";
   const expectedText = isOrder ? "deletar pedido" : "deletar nota";
-
   const valid = confirm.trim().toLowerCase() === expectedText;
+
+React.useEffect(() => {
+  let cancelled = false;
+
+  const loadFinancialRecord = async () => {
+    if (table !== "financial_records" || !open) return;
+
+    setLoadingRecurrenceInfo(true);
+
+    const { data, error } = await supabase
+      .from("financial_records")
+      .select("id, recurrence_group_id")
+      .eq("id", id)
+      .eq("company_id", companyId)
+      .limit(1);
+
+    if (cancelled) return;
+
+    if (error) {
+      console.error("Erro ao buscar recorrência da nota:", error);
+      setRecurrenceGroupId(null);
+      setHasRecurrenceGroup(false);
+      setLoadingRecurrenceInfo(false);
+      return;
+    }
+
+    const record = data?.[0] ?? null;
+
+    setRecurrenceGroupId(record?.recurrence_group_id ?? null);
+    setHasRecurrenceGroup(!!record?.recurrence_group_id);
+    setLoadingRecurrenceInfo(false);
+  };
+
+  loadFinancialRecord();
+
+  return () => {
+    cancelled = true;
+  };
+}, [open, table, id, companyId, supabase]);
 
   const onDelete = async () => {
     if (!valid || deleting) return;
@@ -48,34 +96,60 @@ export function DeleteOrderButton({
     try {
       setDeleting(true);
 
-      const { data, error } = await supabase
-        .from(table)
-        .delete()
-        .eq("id", id)
-        .eq("company_id", companyId)
-        .select("id");
+      if (table === "financial_records" && deleteRecurring && recurrenceGroupId) {
+        const { data, error } = await supabase
+          .from("financial_records")
+          .delete()
+          .eq("recurrence_group_id", recurrenceGroupId)
+          .eq("company_id", companyId)
+          .select("id");
 
-      if (error) {
-        throw error;
-      }
+        if (error) throw error;
 
-      if (!data || data.length === 0) {
-        throw new Error(
+        if (!data || data.length === 0) {
+          throw new Error("Nenhuma nota da recorrência foi encontrada.");
+        }
+
+        toast.success("Todas as notas da recorrência foram deletadas com sucesso.");
+      } else {
+        const { data, error } = await supabase
+          .from(table)
+          .delete()
+          .eq("id", id)
+          .eq("company_id", companyId)
+          .select("id");
+
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+          throw new Error(
+            isOrder
+              ? "Pedido não encontrado no banco."
+              : "Nota não encontrada no banco.",
+          );
+        }
+
+        toast.success(
           isOrder
-            ? "Pedido não encontrado no banco."
-            : "Nota não encontrada no banco.",
+            ? "Pedido deletado com sucesso."
+            : "Nota deletada com sucesso.",
         );
       }
 
-      toast.success(
-        isOrder
-          ? "Pedido deletado com sucesso."
-          : "Nota deletada com sucesso.",
-      );
-
-      onDeleted?.();
       setOpen(false);
       setConfirm("");
+      setDeleteRecurring(false);
+      setRecurrenceGroupId(null);
+      setHasRecurrenceGroup(false);
+
+      await Promise.resolve(
+        onDeleted?.({
+          deleteRecurring,
+          recurrenceGroupId,
+          table,
+          id,
+        }),
+      );
     } catch (e: any) {
       console.error(`Erro ao deletar ${label}:`, e);
       toast.error(
@@ -108,8 +182,17 @@ export function DeleteOrderButton({
       <AlertDialog
         open={open}
         onOpenChange={(next) => {
+          if (deleting) return;
+
           setOpen(next);
-          if (!next) setConfirm("");
+
+          if (!next) {
+            setConfirm("");
+            setDeleteRecurring(false);
+            setRecurrenceGroupId(null);
+            setHasRecurrenceGroup(false);
+            setLoadingRecurrenceInfo(false);
+          }
         }}
       >
         <AlertDialogContent>
@@ -121,26 +204,42 @@ export function DeleteOrderButton({
             </AlertDialogDescription>
           </AlertDialogHeader>
 
-          <div className="py-2">
+          <div className="py-2 space-y-3">
             <Input
               autoFocus
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
               placeholder={`Digite: "${expectedText}"`}
             />
+
             {!valid && confirm.length > 0 && (
-              <p className="mt-2 text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 O texto precisa corresponder exatamente.
               </p>
+            )}
+
+            {table === "financial_records" && hasRecurrenceGroup && (
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={deleteRecurring}
+                  onChange={(e) => setDeleteRecurring(e.target.checked)}
+                  disabled={deleting || loadingRecurrenceInfo}
+                />
+                Deletar todas as notas desta recorrência
+              </label>
             )}
           </div>
 
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleting}>
+              Cancelar
+            </AlertDialogCancel>
+
             <Button
               variant="destructive"
               onClick={onDelete}
-              disabled={!valid || deleting}
+              disabled={!valid || deleting || loadingRecurrenceInfo}
             >
               {deleting ? "Deletando..." : "Deletar"}
             </Button>

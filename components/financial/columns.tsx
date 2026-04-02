@@ -97,7 +97,12 @@ export function financialColumns({
   boletoStatusByOrderId,
 }: {
   suppliers: { id: string; name: string }[];
-  onDelete: (id: string) => void;
+  onDelete: (payload: {
+  id: string;
+  table: "orders" | "financial_records";
+  deleteRecurring?: boolean;
+  recurrenceGroupId?: string | null;
+}) => void | Promise<void>;
   setSelectedOrder: React.Dispatch<
     React.SetStateAction<CombinedRecord | null>
   >;

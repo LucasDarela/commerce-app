@@ -19,7 +19,12 @@ type Props = {
     React.SetStateAction<CombinedRecord | null>
   >;
   setIsPaymentOpen: (open: boolean) => void;
-  onDelete: (id: string) => void;
+  onDelete: (payload: {
+  id: string;
+  table: "orders" | "financial_records";
+  deleteRecurring?: boolean;
+  recurrenceGroupId?: string | null;
+}) => void | Promise<void>;
 };
 
 export function ActionsCell({
@@ -76,7 +81,7 @@ export function ActionsCell({
           companyId={(row.original as any).company_id}
           table={isFinancial ? "financial_records" : "orders"}
           asDropdownItem
-          onDeleted={() => onDelete(id)}
+          onDeleted={onDelete}
         />
 
       </DropdownMenuContent>

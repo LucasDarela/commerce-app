@@ -27,11 +27,13 @@ export function mapToFinancialPaymentMethod(method: string) {
 export function groupByDueMonth(data: CombinedRecord[]) {
   return data.reduce(
     (acc, item) => {
-      const dueDate = item.due_date || item.issue_date;
-      if (!dueDate) return acc;
+      if (!item.due_date) return acc;
 
-      const date = new Date(dueDate);
-      const key = `${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`;
+      const [year, month] = item.due_date.split("-");
+      if (!year || !month) return acc;
+
+      const key = `${month}/${year}`;
+
       acc[key] = acc[key] || [];
       acc[key].push(item);
 

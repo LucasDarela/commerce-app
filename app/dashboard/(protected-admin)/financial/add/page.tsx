@@ -252,6 +252,8 @@ if (selectedCategory === "others" && !customCategory.trim()) {
   toast.error("Digite uma categoria personalizada.");
   return;
 }
+const recurrenceGroupId =
+  isRecurring && recurrenceCount > 1 ? crypto.randomUUID() : null;
 
 const record = {
   company_id: companyId,
@@ -263,14 +265,15 @@ const record = {
   supplier: selectedSupplier.trim(),
   description: description || null,
   category:
-  selectedCategory === "others"
-    ? customCategory.trim() || "others"
-    : selectedCategory || "others",
+    selectedCategory === "others"
+      ? customCategory.trim() || "others"
+      : selectedCategory || "others",
   amount: calculatedAmount,
   notes: notes || null,
   bank_account_id: selectedAccount || null,
   type: noteType,
   payment_method: paymentMethod || null,
+  recurrence_group_id: recurrenceGroupId,
 };
 
     setLoading(true);
@@ -306,6 +309,7 @@ const record = {
           due_date: newDate.toISOString().split("T")[0],
           created_at: new Date().toISOString(),
           invoice_number: `${invoiceNumber || "rec"}-${i + 1}`,
+          recurrence_group_id: recurrenceGroupId,
         });
       }
 
