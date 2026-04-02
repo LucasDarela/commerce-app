@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -32,6 +32,36 @@ type Props = {
   onOpenProductReturnModal: () => void;
 };
 
+type GroupedEquipmentItem = {
+  equipmentName: string;
+  totalQuantity: number;
+  loanIds: string[];
+  originalItems: EquipmentItem[];
+};
+
+function groupItemsByEquipment(items: EquipmentItem[]): GroupedEquipmentItem[] {
+  const map = new Map<string, GroupedEquipmentItem>();
+
+  for (const item of items) {
+    const existing = map.get(item.equipmentName);
+
+    if (existing) {
+      existing.totalQuantity += item.quantity;
+      existing.loanIds.push(item.loanId);
+      existing.originalItems.push(item);
+    } else {
+      map.set(item.equipmentName, {
+        equipmentName: item.equipmentName,
+        totalQuantity: item.quantity,
+        loanIds: [item.loanId],
+        originalItems: [item],
+      });
+    }
+  }
+
+  return Array.from(map.values());
+}
+
 export function ReturnEquipmentModal({
   open,
   onOpenChange,
@@ -56,6 +86,29 @@ export function ReturnEquipmentModal({
     }
   }, [open]);
 
+  const groupedItems = useMemo(() => {
+    return groupItemsByEquipment(items ?? []);
+  }, [items]);
+
+  const remainingSummary = useMemo(() => {
+    return groupedItems
+      .map((group) => {
+        const isSelected = selectedItems.includes(group.equipmentName);
+
+        const selectedQty = isSelected
+          ? quantities[group.equipmentName] ?? group.totalQuantity
+          : 0;
+
+        const remainingQty = Math.max(group.totalQuantity - selectedQty, 0);
+
+        return {
+          equipmentName: group.equipmentName,
+          remainingQty,
+        };
+      })
+      .filter((item) => item.remainingQty > 0);
+  }, [groupedItems, selectedItems, quantities]);
+
   const handleConfirmReturn = async () => {
     if (loading) return;
 
@@ -74,67 +127,63 @@ export function ReturnEquipmentModal({
       return;
     }
 
-    // fluxo sem coleta
-      if (selectedItems.length === 0) {
-        const confirmed = window.confirm(
-          "Você não realizou coletas nessa viagem, confirma?",
-        );
+    if (selectedItems.length === 0) {
+      const confirmed = window.confirm(
+        "Você não realizou coletas nessa viagem, confirma?",
+      );
 
-        if (!confirmed) return;
+      if (!confirmed) return;
 
-        toast.success("Viagem registrada sem coletas.");
-        onOpenChange(false);
-        onReturnSuccess(true);
-        return;
-      }
+      toast.success("Viagem registrada sem coletas.");
+      onOpenChange(false);
+      onReturnSuccess(true);
+      return;
+    }
 
     setLoading(true);
 
     try {
-      const itemById = new Map(items.map((item) => [item.loanId, item]));
       const today = new Date().toISOString().split("T")[0];
 
-      const updates = selectedItems.map(async (loanId) => {
-        const original = itemById.get(loanId);
+      for (const equipmentName of selectedItems) {
+        const group = groupedItems.find((g) => g.equipmentName === equipmentName);
 
-        if (!original) {
-          throw new Error(`Item ${loanId} não encontrado.`);
+        if (!group) continue;
+
+        let remainingToReturn =
+          quantities[equipmentName] ?? group.totalQuantity;
+
+        for (const original of group.originalItems) {
+          if (remainingToReturn <= 0) break;
+
+          const returnQty = Math.min(original.quantity, remainingToReturn);
+          const remaining = Math.max(0, original.quantity - returnQty);
+
+          const payload =
+            remaining > 0
+              ? {
+                  quantity: remaining,
+                  status: "active",
+                  return_date: today,
+                }
+              : {
+                  quantity: 0,
+                  status: "returned",
+                  return_date: today,
+                };
+
+          const { error } = await supabase
+            .from("equipment_loans")
+            .update(payload)
+            .eq("id", original.loanId)
+            .eq("company_id", companyId)
+            .eq("customer_id", customerId);
+
+          if (error) throw error;
+
+          remainingToReturn -= returnQty;
         }
-
-        const requestedQty = quantities[loanId] ?? original.quantity;
-        const returnedQty = Math.max(
-          1,
-          Math.min(original.quantity, requestedQty),
-        );
-
-        const remaining = Math.max(0, original.quantity - returnedQty);
-
-        const payload =
-          remaining > 0
-            ? {
-                quantity: remaining,
-                status: "active",
-                return_date: today,
-              }
-            : {
-                quantity: 0,
-                status: "returned",
-                return_date: today,
-              };
-
-        const { error } = await supabase
-          .from("equipment_loans")
-          .update(payload)
-          .eq("id", loanId)
-          .eq("company_id", companyId)
-          .eq("customer_id", customerId);
-
-        if (error) {
-          throw error;
-        }
-      });
-
-      await Promise.all(updates);
+      }
 
       toast.success("Retorno registrado com sucesso!");
       onOpenChange(false);
@@ -160,57 +209,86 @@ export function ReturnEquipmentModal({
           <DialogTitle>Selecionar Itens para Retorno</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-2">
-          {(items ?? []).map((item) => {
-            const isSelected = selectedItems.includes(item.loanId);
+        <div className="space-y-4">
+          <div className="space-y-2">
+            {groupedItems.map((group) => {
+              const isSelected = selectedItems.includes(group.equipmentName);
 
-            return (
-              <div key={item.loanId} className="flex items-center space-x-2">
-                <Checkbox
-                  id={item.loanId}
-                  checked={isSelected}
-                  onCheckedChange={(checked) => {
-                    const enabled = checked === true;
+              return (
+                <div
+                  key={group.equipmentName}
+                  className="flex items-center space-x-2"
+                >
+                  <Checkbox
+                    id={group.equipmentName}
+                    checked={isSelected}
+                    onCheckedChange={(checked) => {
+                      const enabled = checked === true;
 
-                    setSelectedItems((prev) =>
-                      enabled
-                        ? [...prev, item.loanId]
-                        : prev.filter((id) => id !== item.loanId),
-                    );
+                      setSelectedItems((prev) =>
+                        enabled
+                          ? [...prev, group.equipmentName]
+                          : prev.filter((name) => name !== group.equipmentName),
+                      );
 
-                    setQuantities((prev) => ({
-                      ...prev,
-                      [item.loanId]: enabled ? item.quantity : 0,
-                    }));
-                  }}
-                />
+                      setQuantities((prev) => ({
+                        ...prev,
+                        [group.equipmentName]: enabled ? group.totalQuantity : 0,
+                      }));
+                    }}
+                  />
 
-                <label htmlFor={item.loanId} className="text-sm flex-1">
-                  {item.equipmentName} - emprestado: {item.quantity}
-                </label>
+                  <label htmlFor={group.equipmentName} className="text-sm flex-1">
+                    {group.equipmentName} – {group.totalQuantity}
+                  </label>
 
-                <input
-                  type="number"
-                  min={1}
-                  max={item.quantity}
-                  disabled={!isSelected || loading}
-                  value={isSelected ? (quantities[item.loanId] ?? item.quantity) : ""}
-                  onChange={(e) => {
-                    const parsed = parseInt(e.target.value, 10);
-                    const safeValue = Number.isNaN(parsed)
-                      ? 1
-                      : Math.max(1, Math.min(item.quantity, parsed));
+                  <input
+                    type="number"
+                    min={1}
+                    max={group.totalQuantity}
+                    disabled={!isSelected || loading}
+                    value={
+                      isSelected
+                        ? (quantities[group.equipmentName] ?? group.totalQuantity)
+                        : ""
+                    }
+                    onChange={(e) => {
+                      const parsed = parseInt(e.target.value, 10);
+                      const safeValue = Number.isNaN(parsed)
+                        ? 1
+                        : Math.max(1, Math.min(group.totalQuantity, parsed));
 
-                    setQuantities((prev) => ({
-                      ...prev,
-                      [item.loanId]: safeValue,
-                    }));
-                  }}
-                  className="w-16 border rounded px-2 py-1 text-sm"
-                />
-              </div>
-            );
-          })}
+                      setQuantities((prev) => ({
+                        ...prev,
+                        [group.equipmentName]: safeValue,
+                      }));
+                    }}
+                    className="w-16 border rounded px-2 py-1 text-sm"
+                  />
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="rounded-md border p-3 bg-muted/30">
+            <p className="text-sm font-medium mb-2">
+              Após esta coleta, ficará com o cliente:
+            </p>
+
+            {remainingSummary.length > 0 ? (
+              <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-1">
+                {remainingSummary.map((item) => (
+                  <li key={item.equipmentName}>
+                    {item.equipmentName} – {item.remainingQty}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Você recolheu tudo aqui.
+              </p>
+            )}
+          </div>
         </div>
 
         <DialogFooter>

@@ -17,14 +17,26 @@ import "react-datepicker/dist/react-datepicker.css";
 import CustomDateInput from "@/components/ui/CustomDateInput";
 import { IconTrash } from "@tabler/icons-react";
 
+const FIXED_CATEGORY_LABELS: Record<string, string> = {
+  compra_produto: "Compra de Produto",
+  compra_equipamento: "Compra de Equipamento",
+  pgto_funcionario: "Pagamento Funcionário",
+  vale_funcionario: "Vale Funcionário",
+  combustivel: "Combustível",
+  veiculo: "Gastos com Veículos",
+  aluguel: "Aluguel",
+  contabilidade: "Contabilidade",
+  utilidades: "Utilidades",
+  others: "+ Outros",
+  order: "Pedido",
+};
+
 type Props<T> = {
   table: Table<T>;
-
   issueDateInput: string;
   setIssueDateInput: React.Dispatch<React.SetStateAction<string>>;
   dueDateInput: string;
   setDueDateInput: React.Dispatch<React.SetStateAction<string>>;
-
   dateRange: [Date | null, Date | null];
   setDateRange: React.Dispatch<
     React.SetStateAction<[Date | null, Date | null]>
@@ -50,23 +62,62 @@ export function FinancialFilters<T>({
   };
 
   const sourceValue =
-  (table.getColumn("source")?.getFilterValue() as string) ?? "__all__";
+    (table.getColumn("source")?.getFilterValue() as string) ?? "__all__";
 
-const typeValue =
-  (table.getColumn("type")?.getFilterValue() as string) ?? "__all__";
+  const typeValue =
+    (table.getColumn("type")?.getFilterValue() as string) ?? "__all__";
 
-const categoryValue =
-  (table.getColumn("category")?.getFilterValue() as string) ?? "__all__";
+  const categoryValue =
+    (table.getColumn("category")?.getFilterValue() as string) ?? "__all__";
 
-const paymentMethodValue =
-  (table.getColumn("payment_method")?.getFilterValue() as string) ?? "__all__";
+  const paymentMethodValue =
+    (table.getColumn("payment_method")?.getFilterValue() as string) ??
+    "__all__";
 
-const paymentStatusValue =
-  (table.getColumn("payment_status")?.getFilterValue() as string) ?? "__all__";
+  const paymentStatusValue =
+    (table.getColumn("payment_status")?.getFilterValue() as string) ??
+    "__all__";
+
+  const preFilteredRows = table.getPreFilteredRowModel().rows;
+
+  const { fixedCategoryOptions, customCategoryOptions } = React.useMemo(() => {
+    const values = new Set<string>();
+
+    preFilteredRows.forEach((row) => {
+      const original = row.original as any;
+
+      if (original?.source === "financial" && original?.category) {
+        values.add(String(original.category).trim());
+      }
+
+      if (original?.source === "order") {
+        values.add("order");
+      }
+    });
+
+    const all = Array.from(values);
+
+    const fixed = all
+      .filter((category) => category in FIXED_CATEGORY_LABELS)
+      .sort((a, b) =>
+        (FIXED_CATEGORY_LABELS[a] ?? a).localeCompare(
+          FIXED_CATEGORY_LABELS[b] ?? b,
+          "pt-BR",
+        ),
+      );
+
+    const custom = all
+      .filter((category) => !(category in FIXED_CATEGORY_LABELS))
+      .sort((a, b) => a.localeCompare(b, "pt-BR"));
+
+    return {
+      fixedCategoryOptions: fixed,
+      customCategoryOptions: custom,
+    };
+  }, [preFilteredRows]);
 
   return (
-<div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 px-4 lg:px-6 py-2 items-center">
-      {/* Range due_date */}
+    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 px-4 lg:px-6 py-2 items-center">
       <div className="relative w-full min-w-0 z-50">
         <DatePicker
           selectsRange
@@ -78,7 +129,7 @@ const paymentStatusValue =
           isClearable={false}
           placeholderText="Filtrar por Período"
           dateFormat="dd/MM/yyyy"
-          customInput={<CustomDateInput/>}
+          customInput={<CustomDateInput />}
           wrapperClassName="w-full"
           popperPlacement="bottom-start"
           popperClassName="z-[9999]"
@@ -98,9 +149,8 @@ const paymentStatusValue =
       <Input
         placeholder="Buscar por Nome"
         value={
-          (table
-            .getColumn("customer_or_supplier")
-            ?.getFilterValue() as string) ?? ""
+          (table.getColumn("customer_or_supplier")?.getFilterValue() as string) ??
+          ""
         }
         onChange={(e) =>
           table
@@ -111,116 +161,131 @@ const paymentStatusValue =
       />
 
       <Select
-  value={sourceValue}
-  onValueChange={(value) =>
-    table
-      .getColumn("source")
-      ?.setFilterValue(value === "__all__" ? undefined : value)
-  }
->
-  <SelectTrigger
-    className={`w-full ${sourceValue === "__all__" ? "text-muted-foreground" : ""}`}
-  >
-    <SelectValue />
-  </SelectTrigger>
-
-  <SelectContent>
-    <SelectItem value="__all__">Origem</SelectItem>
-    <SelectItem value="order">Pedido</SelectItem>
-    <SelectItem value="financial">Nota Financeira</SelectItem>
-  </SelectContent>
-</Select>
-
-      <Select
-  value={typeValue}
-  onValueChange={(value) =>
-    table
-      .getColumn("type")
-      ?.setFilterValue(value === "__all__" ? undefined : value)
-  }
->
-  <SelectTrigger
-    className={`w-full ${typeValue === "__all__" ? "text-muted-foreground" : ""}`}
-  >
-    <SelectValue />
-  </SelectTrigger>
-  <SelectContent>
-    <SelectItem value="__all__">Tipo de nota</SelectItem>
-    <SelectItem value="input">Entrada</SelectItem>
-    <SelectItem value="output">Saída</SelectItem>
-  </SelectContent>
-</Select>
-
-<Select
-  value={categoryValue}
-  onValueChange={(value) =>
-    table
-      .getColumn("category")
-      ?.setFilterValue(value === "__all__" ? undefined : value)
-  }
->
-  <SelectTrigger
-    className={`w-full ${categoryValue === "__all__" ? "text-muted-foreground" : ""}`}
-  >
-    <SelectValue />
-  </SelectTrigger>
-  <SelectContent>
-    <SelectItem value="__all__">Categoria</SelectItem>
-    <SelectItem value="compra_produto">Compra de Produto</SelectItem>
-    <SelectItem value="compra_equipamento">Compra de Equipamento</SelectItem>
-    <SelectItem value="pgto_funcionario">Pagamento Funcionário</SelectItem>
-    <SelectItem value="vale_funcionario">Vale Funcionário</SelectItem>
-    <SelectItem value="combustivel">Combustível</SelectItem>
-    <SelectItem value="veiculo">Gastos com Veículos</SelectItem>
-    <SelectItem value="aluguel">Aluguel</SelectItem>
-    <SelectItem value="contabilidade">Contabilidade</SelectItem>
-    <SelectItem value="utilidades">Utilidades</SelectItem>
-    <SelectItem value="others">+ Outros</SelectItem>
-  </SelectContent>
-</Select>
+        value={sourceValue}
+        onValueChange={(value) =>
+          table
+            .getColumn("source")
+            ?.setFilterValue(value === "__all__" ? undefined : value)
+        }
+      >
+        <SelectTrigger
+          className={`w-full ${sourceValue === "__all__" ? "text-muted-foreground" : ""}`}
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__all__">Origem da Nota</SelectItem>
+          <SelectItem value="order">Pedido</SelectItem>
+          <SelectItem value="financial">Nota Financeira</SelectItem>
+        </SelectContent>
+      </Select>
 
       <Select
-  value={paymentMethodValue}
-  onValueChange={(value) =>
-    table
-      .getColumn("payment_method")
-      ?.setFilterValue(value === "__all__" ? undefined : value)
-  }
->
-  <SelectTrigger
-    className={`w-full ${paymentMethodValue === "__all__" ? "text-muted-foreground" : ""}`}
-  >
-    <SelectValue />
-  </SelectTrigger>
-  <SelectContent>
-    <SelectItem value="__all__">Método</SelectItem>
-    <SelectItem value="Pix">Pix</SelectItem>
-    <SelectItem value="Dinheiro">Dinheiro</SelectItem>
-    <SelectItem value="Boleto">Boleto</SelectItem>
-    <SelectItem value="Cartao">Cartão</SelectItem>
-  </SelectContent>
-</Select>
+        value={typeValue}
+        onValueChange={(value) =>
+          table
+            .getColumn("type")
+            ?.setFilterValue(value === "__all__" ? undefined : value)
+        }
+      >
+        <SelectTrigger
+          className={`w-full ${typeValue === "__all__" ? "text-muted-foreground" : ""}`}
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__all__">Tipo de nota</SelectItem>
+          <SelectItem value="input">Entrada</SelectItem>
+          <SelectItem value="output">Saída</SelectItem>
+        </SelectContent>
+      </Select>
 
       <Select
-  value={paymentStatusValue}
-  onValueChange={(value) =>
-    table
-      .getColumn("payment_status")
-      ?.setFilterValue(value === "__all__" ? undefined : value)
-  }
->
-  <SelectTrigger
-    className={`w-full ${paymentStatusValue === "__all__" ? "text-muted-foreground" : ""}`}
-  >
-    <SelectValue />
-  </SelectTrigger>
-  <SelectContent>
-    <SelectItem value="__all__">Status</SelectItem>
-    <SelectItem value="Unpaid">Pendente</SelectItem>
-    <SelectItem value="Paid">Pago</SelectItem>
-    <SelectItem value="Partial">Parcial</SelectItem>
-  </SelectContent>
-</Select>
+        value={categoryValue}
+        onValueChange={(value) =>
+          table
+            .getColumn("category")
+            ?.setFilterValue(value === "__all__" ? undefined : value)
+        }
+      >
+        <SelectTrigger
+          className={`w-full ${categoryValue === "__all__" ? "text-muted-foreground" : ""}`}
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__all__">Todas as Categorias</SelectItem>
+
+          {fixedCategoryOptions.length > 0 && (
+            <SelectItem value="__fixed_header" disabled>
+              ─ Categorias fixas ─
+            </SelectItem>
+          )}
+
+          {fixedCategoryOptions.map((category) => (
+            <SelectItem key={category} value={category}>
+              {FIXED_CATEGORY_LABELS[category] ?? category}
+            </SelectItem>
+          ))}
+
+          {customCategoryOptions.length > 0 && (
+            <>
+              <SelectItem value="__custom_header" disabled>
+                ─ Personalizadas ─
+              </SelectItem>
+
+              {customCategoryOptions.map((category) => (
+                <SelectItem key={category} value={category}>
+                  {category}
+                </SelectItem>
+              ))}
+            </>
+          )}
+        </SelectContent>
+      </Select>
+
+      <Select
+        value={paymentMethodValue}
+        onValueChange={(value) =>
+          table
+            .getColumn("payment_method")
+            ?.setFilterValue(value === "__all__" ? undefined : value)
+        }
+      >
+        <SelectTrigger
+          className={`w-full ${paymentMethodValue === "__all__" ? "text-muted-foreground" : ""}`}
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__all__">Método de Pagamento</SelectItem>
+          <SelectItem value="Pix">Pix</SelectItem>
+          <SelectItem value="Dinheiro">Dinheiro</SelectItem>
+          <SelectItem value="Boleto">Boleto</SelectItem>
+          <SelectItem value="Cartao">Cartão</SelectItem>
+        </SelectContent>
+      </Select>
+
+      <Select
+        value={paymentStatusValue}
+        onValueChange={(value) =>
+          table
+            .getColumn("payment_status")
+            ?.setFilterValue(value === "__all__" ? undefined : value)
+        }
+      >
+        <SelectTrigger
+          className={`w-full ${paymentStatusValue === "__all__" ? "text-muted-foreground" : ""}`}
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__all__">Status de Pagamento</SelectItem>
+          <SelectItem value="Unpaid">Pendente</SelectItem>
+          <SelectItem value="Paid">Pago</SelectItem>
+          <SelectItem value="Partial">Parcial</SelectItem>
+        </SelectContent>
+      </Select>
 
       <Button
         variant="outline"

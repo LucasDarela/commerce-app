@@ -36,7 +36,7 @@ interface ProductEntry {
 }
 
 type NoteType = "input" | "output";
-type CategoryType =
+type FixedCategory =
   | "compra_produto"
   | "compra_equipamento"
   | "pgto_funcionario"
@@ -46,8 +46,9 @@ type CategoryType =
   | "aluguel"
   | "contabilidade"
   | "utilidades"
-  | "others"
-  | "";
+  | "others";
+
+type CategoryType = FixedCategory | "";
 
 type ExistingFinancialRecord = {
   id: string;
@@ -101,7 +102,34 @@ function formatDate(value: string) {
   return parts.join("/");
 }
 
+const FIXED_CATEGORIES: FixedCategory[] = [
+  "compra_produto",
+  "compra_equipamento",
+  "pgto_funcionario",
+  "vale_funcionario",
+  "combustivel",
+  "veiculo",
+  "aluguel",
+  "contabilidade",
+  "utilidades",
+  "others",
+];
+
+const FIXED_CATEGORY_LABELS: Record<string, string> = {
+  compra_produto: "Compra de Produto",
+  compra_equipamento: "Compra de Equipamento",
+  pgto_funcionario: "Pagamento Funcionário",
+  vale_funcionario: "Vale Funcionário",
+  combustivel: "Combustível",
+  veiculo: "Gastos com Veículos",
+  aluguel: "Aluguel",
+  contabilidade: "Contabilidade",
+  utilidades: "Utilidades",
+  others: "+ Outros",
+};
+
 export default function EditFinancialRecord() {
+
   const router = useRouter();
   const params = useParams();
   const id = params?.id as string;
@@ -129,6 +157,8 @@ export default function EditFinancialRecord() {
   const [noteType, setNoteType] = useState<"input" | "output">("input");
   const [entities, setEntities] = useState<{ id: string; name: string }[]>([]);
   const [showEntityDropdown, setShowEntityDropdown] = useState(false);
+
+  const [customCategories, setCustomCategories] = useState<string[]>([]);
   const [existingRecord, setExistingRecord] =
     useState<ExistingFinancialRecord | null>(null);
 
@@ -404,6 +434,11 @@ export default function EditFinancialRecord() {
       calculatedAmount = Number(amount) || 0;
     }
 
+if (selectedCategory === "others" && !customCategory.trim()) {
+  toast.error("Digite uma categoria personalizada.");
+  return;
+}
+
 const record = {
   company_id: companyId,
   issue_date: issueDate
@@ -413,7 +448,10 @@ const record = {
   invoice_number: invoiceNumber || null,
   supplier: selectedSupplier || "",
   description: description || null,
-  category: selectedCategory || customCategory || "others",
+  category:
+    selectedCategory === "others"
+      ? customCategory.trim()
+      : selectedCategory || "others",
   amount: calculatedAmount,
   notes: notes || null,
   bank_account_id: selectedAccount || null,
@@ -550,18 +588,35 @@ const record = {
       const parsed = data as ExistingFinancialRecord;
 
       setExistingRecord(parsed);
-      setSelectedCategory((parsed.category as CategoryType) || "");
-      setSelectedSupplier(parsed.supplier || "");
-      setPaymentMethod(parsed.payment_method || "Pix");
-      setAmount(Number(parsed.amount ?? 0));
-      setDescription(parsed.description || "");
-      setDueDate(parsed.due_date ? formatDate(parsed.due_date) : "");
-      setIssueDate(parsed.issue_date ? formatDate(parsed.issue_date) : "");
-      setInvoiceNumber(parsed.invoice_number || "");
-      setNotes(parsed.notes || "");
-      setSelectedAccount(parsed.bank_account_id || "");
-      setNoteType(parsed.type || "input");
-      setPaymentDays("");
+
+const incomingCategory = (parsed.category || "").trim();
+
+if (
+  incomingCategory &&
+  FIXED_CATEGORIES.includes(incomingCategory as FixedCategory) &&
+  incomingCategory !== "others"
+) {
+  setSelectedCategory(incomingCategory as FixedCategory);
+  setCustomCategory("");
+} else if (incomingCategory) {
+  setSelectedCategory("others");
+  setCustomCategory(incomingCategory);
+} else {
+  setSelectedCategory("");
+  setCustomCategory("");
+}
+
+setSelectedSupplier(parsed.supplier || "");
+setPaymentMethod(parsed.payment_method || "Pix");
+setAmount(Number(parsed.amount ?? 0));
+setDescription(parsed.description || "");
+setDueDate(parsed.due_date ? formatDate(parsed.due_date) : "");
+setIssueDate(parsed.issue_date ? formatDate(parsed.issue_date) : "");
+setInvoiceNumber(parsed.invoice_number || "");
+setNotes(parsed.notes || "");
+setSelectedAccount(parsed.bank_account_id || "");
+setNoteType(parsed.type || "input");
+setPaymentDays("");
 
       setPageLoading(false);
     };
@@ -613,6 +668,35 @@ const record = {
     fetchProductEntries();
   }, [id, companyId, selectedCategory, supabase]);
 
+  useEffect(() => {
+  if (!companyId) return;
+
+  const fetchCustomCategories = async () => {
+    const { data, error } = await supabase
+      .from("financial_records")
+      .select("category")
+      .eq("company_id", companyId);
+
+    if (error || !data) return;
+
+    const uniqueCustomCategories = Array.from(
+      new Set(
+        data
+          .map((item) => String(item.category ?? "").trim())
+          .filter(
+            (category) =>
+              category &&
+              !FIXED_CATEGORIES.includes(category as (typeof FIXED_CATEGORIES)[number]),
+          ),
+      ),
+    ).sort((a, b) => a.localeCompare(b, "pt-BR"));
+
+    setCustomCategories(uniqueCustomCategories);
+  };
+
+  fetchCustomCategories();
+}, [companyId, supabase]);
+
   if (authLoading || pageLoading) {
     return (
       <div className="max-w-3xl mx-auto p-6 rounded-lg shadow-md">
@@ -641,30 +725,53 @@ const record = {
           </SelectContent>
         </Select>
 
-        <Select
-          disabled
-          value={selectedCategory}
-          onValueChange={(val) => setSelectedCategory(val as CategoryType)}
-        >
+<Select
+  value={selectedCategory}
+  onValueChange={(value) => {
+    if (FIXED_CATEGORIES.includes(value as FixedCategory)) {
+      setSelectedCategory(value as FixedCategory);
+      if (value !== "others") {
+        setCustomCategory("");
+      }
+    } else {
+      setSelectedCategory("others");
+      setCustomCategory(value);
+    }
+  }}
+>
           <SelectTrigger className="w-full">
             <SelectValue placeholder="Selecione a categoria" />
           </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="compra_produto">Compra de Produto</SelectItem>
-            <SelectItem value="compra_equipamento">
-              Compra de Equipamento
-            </SelectItem>
-            <SelectItem value="pgto_funcionario">
-              Pagamento Funcionário
-            </SelectItem>
-            <SelectItem value="vale_funcionario">Vale Funcionário</SelectItem>
-            <SelectItem value="combustivel">Combustível</SelectItem>
-            <SelectItem value="veiculo">Gastos com Veículos</SelectItem>
-            <SelectItem value="aluguel">Aluguel</SelectItem>
-            <SelectItem value="contabilidade">Contabilidade</SelectItem>
-            <SelectItem value="utilidades">Utilidades</SelectItem>
-            <SelectItem value="others">+ Outros</SelectItem>
-          </SelectContent>
+<SelectContent>
+  <SelectItem value="compra_produto">Compra de Produto</SelectItem>
+  <SelectItem value="compra_equipamento">
+    Compra de Equipamento
+  </SelectItem>
+  <SelectItem value="pgto_funcionario">
+    Pagamento Funcionário
+  </SelectItem>
+  <SelectItem value="vale_funcionario">Vale Funcionário</SelectItem>
+  <SelectItem value="combustivel">Combustível</SelectItem>
+  <SelectItem value="veiculo">Gastos com Veículos</SelectItem>
+  <SelectItem value="aluguel">Aluguel</SelectItem>
+  <SelectItem value="contabilidade">Contabilidade</SelectItem>
+  <SelectItem value="utilidades">Utilidades</SelectItem>
+  <SelectItem value="others">+ Outros</SelectItem>
+
+  {customCategories.length > 0 && (
+    <>
+      <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+        Categorias personalizadas
+      </div>
+
+      {customCategories.map((category) => (
+        <SelectItem key={category} value={category}>
+          {category}
+        </SelectItem>
+      ))}
+    </>
+  )}
+</SelectContent>
         </Select>
       </div>
 

@@ -85,7 +85,7 @@ export default function LoanByCustomerPage() {
 
     const grouped: Record<string, GroupedByCustomer> = {};
 
-    for (const loan of ((loans as LoanRow[]) || [])) {
+        for (const loan of ((loans as LoanRow[]) || [])) {
       const customerId = loan.customer_id;
       if (!customerId) continue;
 
@@ -120,6 +120,22 @@ export default function LoanByCustomerPage() {
   const filteredGroups = groupedData.filter((group) =>
     group.customerName.toLowerCase().includes(search.toLowerCase()),
   );
+
+    function groupItemsByEquipment(
+    items: { loanId: string; equipmentName: string; quantity: number }[],
+  ) {
+    const map = new Map<string, number>();
+
+    for (const item of items) {
+      const current = map.get(item.equipmentName) || 0;
+      map.set(item.equipmentName, current + item.quantity);
+    }
+
+    return Array.from(map.entries()).map(([equipmentName, quantity]) => ({
+      equipmentName,
+      quantity,
+    }));
+  }
 
   if (loading || isFetching) {
     return <TableSkeleton />;
@@ -177,8 +193,8 @@ export default function LoanByCustomerPage() {
               </div>
 
               <ul className="list-disc pl-6 text-sm text-muted-foreground mt-2">
-                {group.items.map((item, index) => (
-                  <li key={`${group.customerId}-${item.loanId}-${index}`}>
+                {groupItemsByEquipment(group.items).map((item, index) => (
+                  <li key={`${group.customerId}-${item.equipmentName}-${index}`}>
                     {item.equipmentName} – {item.quantity}
                   </li>
                 ))}

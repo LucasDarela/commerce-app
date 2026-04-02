@@ -16,6 +16,21 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { toast } from "sonner";
 import { Label } from "@radix-ui/react-label";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
+import { Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 
 interface BankAccount {
   id: string;
@@ -40,6 +55,20 @@ interface ProductEntry {
   quantity: number;
   unitPrice: number;
 }
+
+type FixedCategory =
+  | "compra_produto"
+  | "compra_equipamento"
+  | "pgto_funcionario"
+  | "vale_funcionario"
+  | "combustivel"
+  | "veiculo"
+  | "aluguel"
+  | "contabilidade"
+  | "utilidades"
+  | "others";
+
+type CategoryType = FixedCategory | "";
 
 function toISODate(dateStr: string): string {
   const [dd, mm, yyyy] = dateStr.split("/");
@@ -68,6 +97,32 @@ function isValidBrazilianDate(dateStr: string): boolean {
     dateObj.getDate() === day
   );
 }
+
+const FIXED_CATEGORIES: FixedCategory[] = [
+  "compra_produto",
+  "compra_equipamento",
+  "pgto_funcionario",
+  "vale_funcionario",
+  "combustivel",
+  "veiculo",
+  "aluguel",
+  "contabilidade",
+  "utilidades",
+  "others",
+];
+
+const FIXED_CATEGORY_LABELS: Record<string, string> = {
+  compra_produto: "Compra de Produto",
+  compra_equipamento: "Compra de Equipamento",
+  pgto_funcionario: "Pagamento Funcionário",
+  vale_funcionario: "Vale Funcionário",
+  combustivel: "Combustível",
+  veiculo: "Gastos com Veículos",
+  aluguel: "Aluguel",
+  contabilidade: "Contabilidade",
+  utilidades: "Utilidades",
+  others: "+ Outros",
+};
 
 export default function AddFinancialRecord() {
   const router = useRouter();
@@ -98,6 +153,11 @@ export default function AddFinancialRecord() {
     "daily" | "weekly" | "monthly" | "biweekly"
   >("monthly");
   const [recurrenceCount, setRecurrenceCount] = useState<number>(1);
+  const [customCategories, setCustomCategories] = useState<string[]>([]);
+
+  const [productComboboxOpen, setProductComboboxOpen] = useState<
+  Record<number, boolean>
+>({});
 
   const handleAddProduct = () => {
     setProductEntries((prev) => [
@@ -188,6 +248,11 @@ if (!selectedSupplier.trim()) {
   return;
 }
 
+if (selectedCategory === "others" && !customCategory.trim()) {
+  toast.error("Digite uma categoria personalizada.");
+  return;
+}
+
 const record = {
   company_id: companyId,
   issue_date: issueDate
@@ -197,7 +262,10 @@ const record = {
   invoice_number: invoiceNumber || null,
   supplier: selectedSupplier.trim(),
   description: description || null,
-  category: selectedCategory || customCategory || "others",
+  category:
+  selectedCategory === "others"
+    ? customCategory.trim() || "others"
+    : selectedCategory || "others",
   amount: calculatedAmount,
   notes: notes || null,
   bank_account_id: selectedAccount || null,
@@ -429,6 +497,35 @@ const record = {
     fetchBankAccounts();
   }, [companyId, supabase]);
 
+  useEffect(() => {
+  if (!companyId) return;
+
+  const fetchCustomCategories = async () => {
+    const { data, error } = await supabase
+      .from("financial_records")
+      .select("category")
+      .eq("company_id", companyId);
+
+    if (error || !data) return;
+
+    const uniqueCustomCategories = Array.from(
+      new Set(
+        data
+          .map((item) => String(item.category ?? "").trim())
+          .filter(
+            (category) =>
+              category &&
+              !FIXED_CATEGORIES.includes(category as (typeof FIXED_CATEGORIES)[number]),
+          ),
+      ),
+    ).sort((a, b) => a.localeCompare(b, "pt-BR"));
+
+    setCustomCategories(uniqueCustomCategories);
+  };
+
+  fetchCustomCategories();
+}, [companyId, supabase]);
+
   const formatDate = (value: string) => {
     const cleaned = value.replace(/\D/g, "").slice(0, 8);
     const parts = [];
@@ -448,6 +545,13 @@ const record = {
     return parts.join("/");
   };
 
+  const setComboboxOpen = (index: number, open: boolean) => {
+  setProductComboboxOpen((prev) => ({
+    ...prev,
+    [index]: open,
+  }));
+};
+
   return (
     <div className="max-w-3xl mx-auto p-6 rounded-lg shadow-md">
       <h1 className="text-2xl font-bold mb-4">Adicionar Nota</h1>
@@ -466,26 +570,53 @@ const record = {
           </SelectContent>
         </Select>
 
-        <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+        <Select
+  value={selectedCategory}
+  onValueChange={(value) => {
+    if (FIXED_CATEGORIES.includes(value as FixedCategory)) {
+      setSelectedCategory(value as FixedCategory);
+      if (value !== "others") {
+        setCustomCategory("");
+      }
+    } else {
+      setSelectedCategory("others");
+      setCustomCategory(value);
+    }
+  }}
+>
           <SelectTrigger className="w-full">
             <SelectValue placeholder="Selecione a categoria" />
           </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="compra_produto">Compra de Produto</SelectItem>
-            <SelectItem value="compra_equipamento">
-              Compra de Equipamento
-            </SelectItem>
-            <SelectItem value="pgto_funcionario">
-              Pagamento Funcionário
-            </SelectItem>
-            <SelectItem value="vale_funcionario">Vale Funcionário</SelectItem>
-            <SelectItem value="combustivel">Combustível</SelectItem>
-            <SelectItem value="veiculo">Gastos com Veículos</SelectItem>
-            <SelectItem value="aluguel">Aluguel</SelectItem>
-            <SelectItem value="contabilidade">Contabilidade</SelectItem>
-            <SelectItem value="utilidades">Utilidades</SelectItem>
-            <SelectItem value="others">+ Outros</SelectItem>
-          </SelectContent>
+<SelectContent>
+  <SelectItem value="compra_produto">Compra de Produto</SelectItem>
+  <SelectItem value="compra_equipamento">
+    Compra de Equipamento
+  </SelectItem>
+  <SelectItem value="pgto_funcionario">
+    Pagamento Funcionário
+  </SelectItem>
+  <SelectItem value="vale_funcionario">Vale Funcionário</SelectItem>
+  <SelectItem value="combustivel">Combustível</SelectItem>
+  <SelectItem value="veiculo">Gastos com Veículos</SelectItem>
+  <SelectItem value="aluguel">Aluguel</SelectItem>
+  <SelectItem value="contabilidade">Contabilidade</SelectItem>
+  <SelectItem value="utilidades">Utilidades</SelectItem>
+  <SelectItem value="others">+ Outros</SelectItem>
+
+  {customCategories.length > 0 && (
+    <>
+      <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+        Categorias personalizadas
+      </div>
+
+      {customCategories.map((category) => (
+        <SelectItem key={category} value={category}>
+          {category}
+        </SelectItem>
+      ))}
+    </>
+  )}
+</SelectContent>
         </Select>
       </div>
 
@@ -609,23 +740,55 @@ const record = {
               className="grid grid-cols-12 gap-3 my-2 items-center"
             >
               <div className="col-span-6">
-                <Select
-                  value={entry.productId}
-                  onValueChange={(val) =>
-                    handleProductChange(index, "productId", val)
-                  }
+                <Popover
+                  open={!!productComboboxOpen[index]}
+                  onOpenChange={(open) => setComboboxOpen(index, open)}
                 >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Produto ou Equipamento" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {products.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className="w-full justify-between"
+                    >
+                      <span className="truncate">
+                        {entry.productId
+                          ? products.find((p) => p.id === entry.productId)?.name ??
+                            "Produto ou Equipamento"
+                          : "Produto ou Equipamento"}
+                      </span>
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+
+                  <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
+                    <Command>
+                      <CommandInput placeholder="Buscar..." />
+                      <CommandList>
+                        <CommandEmpty>Nenhum item encontrado.</CommandEmpty>
+                        <CommandGroup>
+                          {products.map((p) => (
+                            <CommandItem
+                              key={p.id}
+                              value={p.name}
+                              onSelect={() => {
+                                handleProductChange(index, "productId", p.id);
+                                setComboboxOpen(index, false);
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  entry.productId === p.id ? "opacity-100" : "opacity-0",
+                                )}
+                              />
+                              {p.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
 
               <div className="col-span-2">

@@ -80,6 +80,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Tooltip,
@@ -308,6 +315,13 @@ export function DataTable({
     { name: string; quantity: number }[]
   >([]);
   const router = useRouter();
+
+  const [isDeliveryStatusModalOpen, setIsDeliveryStatusModalOpen] = useState(false);
+const [deliveryStatusOrder, setDeliveryStatusOrder] = useState<Order | null>(null);
+const [newDeliveryStatus, setNewDeliveryStatus] = useState<
+  "Entregar" | "Coletar" | "Coletado"
+>("Entregar");
+const [isUpdatingDeliveryStatus, setIsUpdatingDeliveryStatus] = useState(false);
 
   const FILTERS_KEY = React.useMemo(() => {
     return `orders_filters_v1:${companyId}`;
@@ -1205,6 +1219,21 @@ const columns = React.useMemo<CustomColumnDef<Order>[]>(() => [
                 Retornar Produto
               </DropdownMenuItem>
 
+              <DropdownMenuItem
+              onClick={() => {
+                setDeliveryStatusOrder(row.original);
+                setNewDeliveryStatus(
+                  (row.original.delivery_status as "Entregar" | "Coletar" | "Coletado") ||
+                    "Entregar",
+                );
+                setIsDeliveryStatusModalOpen(true);
+              }}
+            >
+              Alterar Delivery
+            </DropdownMenuItem>
+
+              <DropdownMenuSeparator />
+
               <DeleteOrderButton
                 orderId={row.original.id}
                 companyId={companyId}
@@ -1274,14 +1303,67 @@ data: React.useMemo(() => {
     getFacetedUniqueValues: getFacetedUniqueValues(),
   });
 
-  const filteredRows = table.getFilteredRowModel().rows;
+const filteredSalesTotal = React.useMemo(() => {
+  return orders
+    .filter((order) => {
+      if (!order.due_date) return false;
 
-  const filteredSalesTotal = React.useMemo(() => {
-    return filteredRows.reduce((sum, row) => {
-      const total = Number(row.original.total ?? 0);
-      return sum + total;
-    }, 0);
-  }, [filteredRows]);
+      if (!order.due_date.startsWith(selectedMonth)) return false;
+
+      if (role === "driver" && order.driver_id !== user?.id) {
+        return false;
+      }
+
+      if (selectedDriverId && order.driver_id !== selectedDriverId) {
+        return false;
+      }
+
+      const customerFilter = (
+        (table.getColumn("customer")?.getFilterValue() as string) ?? ""
+      )
+        .trim()
+        .toLowerCase();
+
+      if (customerFilter) {
+        const customer = String(order.customer ?? "").toLowerCase();
+        const noteNumber = String(order.note_number ?? "").toLowerCase();
+
+        if (
+          !customer.includes(customerFilter) &&
+          !noteNumber.includes(customerFilter)
+        ) {
+          return false;
+        }
+      }
+
+      const deliveryFilter = table.getColumn("delivery_status")?.getFilterValue() as
+        | string
+        | undefined;
+
+      if (deliveryFilter && order.delivery_status !== deliveryFilter) {
+        return false;
+      }
+
+      const paymentMethodFilter = table.getColumn("payment_method")?.getFilterValue() as
+        | string
+        | undefined;
+
+      if (paymentMethodFilter && order.payment_method !== paymentMethodFilter) {
+        return false;
+      }
+
+      const paymentStatusFilter = table.getColumn("payment_status")?.getFilterValue() as
+        | string
+        | undefined;
+
+      if (paymentStatusFilter && order.payment_status !== paymentStatusFilter) {
+        return false;
+      }
+
+      return true;
+    })
+    .reduce((sum, order) => sum + Number(order.total ?? 0), 0);
+}, [orders, selectedMonth, role, user, selectedDriverId, table]);
 
   const formattedFilteredSalesTotal = React.useMemo(() => {
     return filteredSalesTotal.toLocaleString("pt-BR", {
@@ -1362,6 +1444,49 @@ function clearAllFilters() {
       return orderDate > today;
     });
   }, [orders]);
+
+  async function updateDeliveryStatusManually() {
+  if (!deliveryStatusOrder) return;
+
+  try {
+    setIsUpdatingDeliveryStatus(true);
+
+    const { error } = await supabase
+      .from("orders")
+      .update({ delivery_status: newDeliveryStatus })
+      .eq("id", deliveryStatusOrder.id)
+      .eq("company_id", companyId);
+
+    if (error) {
+      console.error("Erro ao atualizar delivery_status:", error);
+      toast.error("Erro ao atualizar status de entrega.");
+      return;
+    }
+
+    setOrders((prev) =>
+      prev.map((order) =>
+        order.id === deliveryStatusOrder.id
+          ? { ...order, delivery_status: newDeliveryStatus }
+          : order,
+      ),
+    );
+
+    if (selectedCustomer?.id === deliveryStatusOrder.id) {
+      setSelectedCustomer((prev) =>
+        prev ? { ...prev, delivery_status: newDeliveryStatus } : prev,
+      );
+    }
+
+    toast.success("Status de entrega atualizado com sucesso!");
+    setIsDeliveryStatusModalOpen(false);
+    setDeliveryStatusOrder(null);
+  } catch (err) {
+    console.error(err);
+    toast.error("Erro inesperado ao atualizar status.");
+  } finally {
+    setIsUpdatingDeliveryStatus(false);
+  }
+}
 
 async function handleDeliveryStatusUpdate() {
   if (!selectedCustomer) return;
@@ -2328,6 +2453,56 @@ const clearFilter = () => {
           }}
         />
       )}
+
+      <Dialog
+  open={isDeliveryStatusModalOpen}
+  onOpenChange={setIsDeliveryStatusModalOpen}
+>
+  <DialogContent>
+    <DialogHeader>
+      <DialogTitle>Alterar status de entrega</DialogTitle>
+    </DialogHeader>
+
+    <div className="space-y-4">
+      <div className="text-sm text-muted-foreground">
+        Pedido: <strong>{deliveryStatusOrder?.note_number || "—"}</strong>
+        <br />
+        Cliente: <strong>{deliveryStatusOrder?.customer || "—"}</strong>
+      </div>
+
+      <Select
+        value={newDeliveryStatus}
+        onValueChange={(value) =>
+          setNewDeliveryStatus(value as "Entregar" | "Coletar" | "Coletado")
+        }
+      >
+        <SelectTrigger className="w-full">
+          <SelectValue placeholder="Selecione o status" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="Entregar">Entregar</SelectItem>
+          <SelectItem value="Coletar">Coletar</SelectItem>
+          <SelectItem value="Coletado">Coletado</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+
+    <DialogFooter>
+      <Button
+        variant="outline"
+        onClick={() => setIsDeliveryStatusModalOpen(false)}
+      >
+        Cancelar
+      </Button>
+      <Button
+        onClick={updateDeliveryStatusManually}
+        disabled={isUpdatingDeliveryStatus}
+      >
+        {isUpdatingDeliveryStatus ? "Salvando..." : "Salvar"}
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
     </>
   );
 }
