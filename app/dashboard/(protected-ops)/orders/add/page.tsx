@@ -420,6 +420,36 @@ const handleEditPrice = (index: number, price: string) => {
       const capitalize = (text: string) =>
         text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
 
+      // ✅ valida e prepara os itens ANTES de criar a order
+      const itemsPayloadBase = orderItems.map((item) => {
+        const catalogPrice = catalogPrices[String(item.id)];
+
+        if (
+          selectedCustomer?.price_table_id &&
+          typeof catalogPrice !== "number"
+        ) {
+          throw new Error(
+            `O produto "${item.name}" não possui preço na tabela do cliente.`,
+          );
+        }
+
+        if (Number(item.quantity) <= 0) {
+          toast.error(`O produto "${item.name}" está com quantidade inválida.`);
+          return;
+        }
+
+        if (Number(item.standard_price) < 0) {
+          toast.error(`O produto "${item.name}" está com preço inválido.`);
+          return;
+        }
+
+        return {
+          product_id: item.id ?? null,
+          quantity: Number(item.quantity),
+          price: Number(item.standard_price),
+        };
+      });
+
       const newOrder = {
         customer_id: order!.customer_id,
         customer: selectedCustomer?.name ?? "N/A",
@@ -469,46 +499,40 @@ const handleEditPrice = (index: number, price: string) => {
         .select()
         .single();
 
-      if (error) {
+      if (error || !insertedOrder) {
         toast.error("❌ Falha ao criar ordem.");
         console.error("❌ Error inserting order:", error);
         setLoading(false);
         return;
       }
 
-const itemsPayload = orderItems.map((item) => {
-  const catalogPrice = catalogPrices[String(item.id)];
+      const itemsPayload = itemsPayloadBase.map((item) => ({
+        ...item,
+        order_id: insertedOrder.id,
+      }));
 
-  if (typeof catalogPrice !== "number") {
-    throw new Error(
-      `O produto "${item.name}" não possui preço na tabela do cliente.`
-    );
-  }
-
-  if (Number(item.standard_price) <= 0) {
-    throw new Error(`O produto "${item.name}" está com preço inválido.`);
-  }
-
-  return {
-    order_id: insertedOrder.id,
-    product_id: item.id ?? null,
-    quantity: item.quantity,
-    price: Number(item.standard_price),
-  };
-});
-
-        const { data: insertedItems, error: itemError } = await supabase
-          .from("order_items")
-          .insert(itemsPayload)
-          .select();  
+      const { data: insertedItems, error: itemError } = await supabase
+        .from("order_items")
+        .insert(itemsPayload)
+        .select();
 
       if (itemError) {
-        toast.error("❌ Ordem criada mas ERRO ao inserir itens.");
         console.error("❌ Error inserting order items:", itemError);
-      } else {
-        toast.success("🍻 Venda criada com sucesso!");
-        router.push("/dashboard/orders");
+
+        // rollback da order para não ficar venda vazia
+        await supabase
+          .from("orders")
+          .delete()
+          .eq("id", insertedOrder.id)
+          .eq("company_id", companyId);
+
+        toast.error("❌ Erro ao inserir os itens da venda.");
+        setLoading(false);
+        return;
       }
+
+      toast.success("🍻 Venda criada com sucesso!");
+      router.push("/dashboard/orders");
     } catch (err) {
       console.error("❌ Erro geral:", err);
       toast.error("Erro ao criar pedido.");
@@ -995,7 +1019,7 @@ if (typeof catalogPrice !== "number") {
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    className="w-full flex justify-between cursor-pointer hover:bg-gray-100"
+                    className="h-auto w-full flex justify-between cursor-pointer hover:bg-gray-100"
                   >
                     {appointment.date
                       ? format(appointment.date, "dd/MM/yyyy")
@@ -1032,7 +1056,7 @@ if (typeof catalogPrice !== "number") {
               <Input
                 type="time"
                 placeholder="Horário"
-                className="w-full max-w-[140px] sm:max-w-full"
+                className="h-auto w-full max-w-[135px] sm:max-w-full"
                 value={appointment.hour}
                 onChange={(e) =>
                   setAppointment({ ...appointment, hour: e.target.value })

@@ -55,13 +55,42 @@ const helpSections: HelpSection[] = [
           "Apresenta o painel principal, os menus e a lógica geral de funcionamento do sistema.",
         videoUrl: "https://www.youtube.com/embed/zT46fCKzn7o?si=LyerUZCcxlQ7yK3D",
       },
+      // {
+      //   id: "how-dashboard-works",
+      //   title: "Como navegar pelo dashboard",
+      //   description:
+      //     "Mostra como acessar os módulos principais, entender os indicadores e localizar funções importantes.",
+      //   videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+      // },
       {
-        id: "how-dashboard-works",
-        title: "Como navegar pelo dashboard",
+        id: "how-company-works",
+        title: "Como editar informações da empresa",
         description:
-          "Mostra como acessar os módulos principais, entender os indicadores e localizar funções importantes.",
-        videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+          "Aprenda a editar as informações da sua empresa, como nome, endereço, telefone, e-mail, etc.",
+        videoUrl: "https://www.youtube.com/embed/iIL3ARtL0GA?si=IhTH9Dzdmro2AW0z",
       },
+    ],
+  },
+    {
+    id: "products",
+    title: "Produtos",
+    description: "Gestão do catálogo, estoque e valores utilizados no sistema.",
+    icon: Package,
+    videos: [
+      {
+        id: "product-create",
+        title: "Como cadastrar produtos",
+        description:
+          "Ensina como criar produtos, preencher preços e manter o catálogo organizado.",
+        videoUrl: "https://www.youtube.com/embed/2ZJH5QYY-Fo?si=_PwNCKSaLmiEE-b1",
+      },
+      // {
+      //   id: "product-stock",
+      //   title: "Controle de estoque",
+      //   description:
+      //     "Explica como o estoque é atualizado nas entradas financeiras, vendas e devoluções.",
+      //   videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+      // },
     ],
   },
   {
@@ -75,37 +104,15 @@ const helpSections: HelpSection[] = [
         title: "Como cadastrar um cliente",
         description:
           "Explica o preenchimento dos dados do cliente, vínculo com a empresa e informações usadas nas vendas.",
-        videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+        videoUrl: "https://www.youtube.com/embed/-k9KWZp0aqM?si=Tu8A9OFvNfiaultK",
       },
-      {
-        id: "customer-edit",
-        title: "Como editar clientes e vincular tabela de preço",
-        description:
-          "Mostra como atualizar dados do cliente e como associar um catálogo de preços personalizado.",
-        videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
-      },
-    ],
-  },
-  {
-    id: "products",
-    title: "Produtos",
-    description: "Gestão do catálogo, estoque e valores utilizados no sistema.",
-    icon: Package,
-    videos: [
-      {
-        id: "product-create",
-        title: "Como cadastrar produtos",
-        description:
-          "Ensina como criar produtos, preencher preços e manter o catálogo organizado.",
-        videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
-      },
-      {
-        id: "product-stock",
-        title: "Controle de estoque",
-        description:
-          "Explica como o estoque é atualizado nas entradas financeiras, vendas e devoluções.",
-        videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
-      },
+      // {
+      //   id: "customer-edit",
+      //   title: "Como editar clientes e vincular tabela de preço",
+      //   description:
+      //     "Mostra como atualizar dados do cliente e como associar um catálogo de preços personalizado.",
+      //   videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+      // },
     ],
   },
   {
@@ -119,46 +126,46 @@ const helpSections: HelpSection[] = [
         title: "Como criar uma venda",
         description:
           "Mostra como registrar uma nova venda, selecionar cliente, produtos e forma de pagamento.",
-        videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+        videoUrl: "https://www.youtube.com/embed/CANFqnwqnk4?si=goaQaVi9ZtqkmObO",
       },
       {
         id: "order-delivery",
         title: "Fluxo de entrega e coleta",
         description:
           "Explica o uso dos status Entregar, Coletar e Coletado, além da lógica operacional do pedido.",
-        videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+        videoUrl: "https://www.youtube.com/embed/dedTuYAXwPc?si=qg47BbqwcNG1OUvu",
       },
-      {
-        id: "order-payment",
-        title: "Pagamento parcial e total de pedidos",
-        description:
-          "Mostra como lançar pagamentos, acompanhar valores em aberto e atualizar o status da venda.",
-        videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
-      },
+      // {
+      //   id: "order-payment",
+      //   title: "Pagamento parcial e total de pedidos",
+      //   description:
+      //     "Mostra como lançar pagamentos, acompanhar valores em aberto e atualizar o status da venda.",
+      //   videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+      // },
     ],
   },
-  {
-    id: "equipments",
-    title: "Equipamentos e comodato",
-    description: "Controle de chopeiras, barris, cilindros e itens emprestados para clientes.",
-    icon: Beer,
-    videos: [
-      {
-        id: "loan-create",
-        title: "Como registrar empréstimo de equipamento",
-        description:
-          "Ensina como vincular equipamentos aos clientes e manter o controle de comodato.",
-        videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
-      },
-      {
-        id: "loan-return",
-        title: "Como registrar retorno de itens",
-        description:
-          "Mostra como devolver equipamentos e acompanhar o saldo ainda em posse do cliente.",
-        videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
-      },
-    ],
-  },
+  // {
+  //   id: "equipments",
+  //   title: "Equipamentos e comodato",
+  //   description: "Controle de chopeiras, barris, cilindros e itens emprestados para clientes.",
+  //   icon: Beer,
+  //   videos: [
+  //     {
+  //       id: "loan-create",
+  //       title: "Como registrar empréstimo de equipamento",
+  //       description:
+  //         "Ensina como vincular equipamentos aos clientes e manter o controle de comodato.",
+  //       videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+  //     },
+  //     {
+  //       id: "loan-return",
+  //       title: "Como registrar retorno de itens",
+  //       description:
+  //         "Mostra como devolver equipamentos e acompanhar o saldo ainda em posse do cliente.",
+  //       videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+  //     },
+  //   ],
+  // },
   {
     id: "financial",
     title: "Financeiro",
@@ -170,90 +177,90 @@ const helpSections: HelpSection[] = [
         title: "Como adicionar uma nota financeira",
         description:
           "Mostra como lançar notas de entrada e saída, selecionar categoria e informar valores.",
-        videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+        videoUrl: "https://www.youtube.com/embed/2wbcF_T8naU?si=MdVhmaNtvNJskTQK",
       },
-      {
-        id: "financial-filters",
-        title: "Como usar filtros e categorias no financeiro",
-        description:
-          "Explica o uso de filtros, categorias fixas e personalizadas, além da organização mensal.",
-        videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
-      },
-      {
-        id: "financial-payments",
-        title: "Como marcar notas como pagas",
-        description:
-          "Ensina a registrar pagamentos e interpretar corretamente o que já foi pago e o que ainda está pendente.",
-        videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
-      },
+      // {
+      //   id: "financial-filters",
+      //   title: "Como usar filtros e categorias no financeiro",
+      //   description:
+      //     "Explica o uso de filtros, categorias fixas e personalizadas, além da organização mensal.",
+      //   videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+      // },
+      // {
+      //   id: "financial-payments",
+      //   title: "Como marcar notas como pagas",
+      //   description:
+      //     "Ensina a registrar pagamentos e interpretar corretamente o que já foi pago e o que ainda está pendente.",
+      //   videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+      // },
     ],
   },
-  {
-    id: "deliveries",
-    title: "Rotas e operação",
-    description: "Uso operacional do sistema para entregas, motoristas e acompanhamento do pedido.",
-    icon: Truck,
-    videos: [
-      {
-        id: "driver-assignment",
-        title: "Como vincular motorista a um pedido",
-        description:
-          "Mostra como distribuir pedidos entre motoristas e organizar a operação de entrega.",
-        videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
-      },
-      {
-        id: "operational-flow",
-        title: "Fluxo operacional da entrega",
-        description:
-          "Explica o processo ideal desde o agendamento até a entrega, assinatura e coleta futura.",
-        videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
-      },
-    ],
-  },
-  {
-    id: "invoices",
-    title: "NF-e e documentos",
-    description: "Emissão de nota fiscal, espelho da venda e fluxo documental.",
-    icon: FileText,
-    videos: [
-      {
-        id: "nfe-issue",
-        title: "Como emitir NF-e",
-        description:
-          "Mostra como iniciar a emissão de NF-e a partir de um pedido e acompanhar o status.",
-        videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
-      },
-      {
-        id: "mirror-view",
-        title: "Como visualizar o espelho da venda",
-        description:
-          "Explica o uso do espelho da venda para conferência dos dados e apoio operacional.",
-        videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
-      },
-    ],
-  },
-  {
-    id: "settings",
-    title: "Configurações e cadastros base",
-    description: "Configurações da empresa, contas bancárias e estrutura inicial do sistema.",
-    icon: Settings,
-    videos: [
-      {
-        id: "company-settings",
-        title: "Como configurar a empresa",
-        description:
-          "Mostra como preencher os dados principais da empresa utilizados no sistema.",
-        videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
-      },
-      {
-        id: "bank-accounts",
-        title: "Como cadastrar contas bancárias",
-        description:
-          "Explica o cadastro de contas bancárias para uso nos lançamentos financeiros.",
-        videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
-      },
-    ],
-  },
+  // {
+  //   id: "deliveries",
+  //   title: "Rotas e operação",
+  //   description: "Uso operacional do sistema para entregas, motoristas e acompanhamento do pedido.",
+  //   icon: Truck,
+  //   videos: [
+  //     {
+  //       id: "driver-assignment",
+  //       title: "Como vincular motorista a um pedido",
+  //       description:
+  //         "Mostra como distribuir pedidos entre motoristas e organizar a operação de entrega.",
+  //       videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+  //     },
+  //     {
+  //       id: "operational-flow",
+  //       title: "Fluxo operacional da entrega",
+  //       description:
+  //         "Explica o processo ideal desde o agendamento até a entrega, assinatura e coleta futura.",
+  //       videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+  //     },
+  //   ],
+  // },
+  // {
+  //   id: "invoices",
+  //   title: "NF-e e documentos",
+  //   description: "Emissão de nota fiscal, espelho da venda e fluxo documental.",
+  //   icon: FileText,
+  //   videos: [
+  //     {
+  //       id: "nfe-issue",
+  //       title: "Como emitir NF-e",
+  //       description:
+  //         "Mostra como iniciar a emissão de NF-e a partir de um pedido e acompanhar o status.",
+  //       videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+  //     },
+  //     {
+  //       id: "mirror-view",
+  //       title: "Como visualizar o espelho da venda",
+  //       description:
+  //         "Explica o uso do espelho da venda para conferência dos dados e apoio operacional.",
+  //       videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+  //     },
+  //   ],
+  // },
+  // {
+  //   id: "settings",
+  //   title: "Configurações e cadastros base",
+  //   description: "Configurações da empresa, contas bancárias e estrutura inicial do sistema.",
+  //   icon: Settings,
+  //   videos: [
+  //     {
+  //       id: "company-settings",
+  //       title: "Como configurar a empresa",
+  //       description:
+  //         "Mostra como preencher os dados principais da empresa utilizados no sistema.",
+  //       videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+  //     },
+  //     {
+  //       id: "bank-accounts",
+  //       title: "Como cadastrar contas bancárias",
+  //       description:
+  //         "Explica o cadastro de contas bancárias para uso nos lançamentos financeiros.",
+  //       videoUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
+  //     },
+  //   ],
+  // },
 ];
 
 function HelpVideoCard({ video }: { video: HelpVideo }) {
@@ -458,8 +465,8 @@ export default function HelpPage() {
             <div>
               <h2 className="text-lg font-semibold">Mais conteúdos em breve</h2>
               <p className="text-sm text-muted-foreground">
-                Serão adicionados novos vídeos por módulo conforme o sistema
-                evoluir.
+                Serão adicionados novos vídeos por módulo conforme irmos gravando e o sistema
+                evoluindo.
               </p>
             </div>
 

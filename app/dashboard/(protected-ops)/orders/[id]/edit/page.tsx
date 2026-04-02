@@ -410,24 +410,30 @@ export default function EditOrderPage() {
   const handleEditQuantity = (index: number, value: string) => {
     setOrderItems((prevItems) => {
       const updatedItems = [...prevItems];
+      const parsed = Number(value);
+
       updatedItems[index] = {
         ...updatedItems[index],
-        quantity: Number(value) || 0,
+        quantity: value === "" ? 1 : Math.max(1, parsed || 1),
       };
+
       return updatedItems;
     });
   };
 
-  const handleEditPrice = (index: number, value: string) => {
-    setOrderItems((prevItems) => {
-      const updatedItems = [...prevItems];
-      updatedItems[index] = {
-        ...updatedItems[index],
-        standard_price: Number(value) || 0,
-      };
-      return updatedItems;
-    });
-  };
+const handleEditPrice = (index: number, value: string) => {
+  setOrderItems((prevItems) => {
+    const updatedItems = [...prevItems];
+    const parsed = Number(value);
+
+    updatedItems[index] = {
+      ...updatedItems[index],
+      standard_price: value === "" ? 0 : Math.max(0, parsed || 0),
+    };
+
+    return updatedItems;
+  });
+};
 
   const getTotal = () =>
     orderItems.reduce(
@@ -463,6 +469,17 @@ export default function EditOrderPage() {
 
     if (!orderItems.length) {
       toast.error("Adicione ao menos um produto.");
+      return;
+    }
+
+    const invalidItem = orderItems.find(
+      (item) => Number(item.quantity) < 1 || Number(item.standard_price) < 0,
+    );
+
+    if (invalidItem) {
+      toast.error(
+        `O produto "${invalidItem.name}" está com quantidade ou preço inválido.`,
+      );
       return;
     }
 
@@ -922,6 +939,8 @@ export default function EditOrderPage() {
                         <Input
                           className="w-full text-left"
                           type="number"
+                          min={1}
+                          step={1}
                           value={item.quantity}
                           onChange={(e) =>
                             handleEditQuantity(index, e.target.value)
@@ -933,6 +952,8 @@ export default function EditOrderPage() {
                         <Input
                           className="w-full text-left"
                           type="number"
+                          min={0}
+                          step="0.01"
                           value={item.standard_price}
                           onChange={(e) =>
                             handleEditPrice(index, e.target.value)
