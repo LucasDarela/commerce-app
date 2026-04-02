@@ -46,6 +46,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import NavDocumentsSidebar from "./nav-documents-sidebar";
 
@@ -126,6 +127,14 @@ const data = {
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { role } = useAuthenticatedCompany();
 
+  const { isMobile, setOpenMobile } = useSidebar();
+
+  const handleMobileClose = () => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  };
+
   const navMainTop =
   role === "driver"
     ? data.navMainTop.filter(
@@ -161,7 +170,7 @@ const navSecondary =
       <SidebarContent>
         <SidebarMenu className="mt-2 px-2">
           <SidebarMenuItem className="flex items-center gap-2">
-            <Link className="w-full" href="/dashboard/orders">
+            <Link className="w-full" href="/dashboard/orders" onClick={handleMobileClose}>
               <SidebarMenuButton
                 tooltip="Quick Action"
                 className="bg-primary -mb-2 text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground min-w-8 duration-200 ease-linear"

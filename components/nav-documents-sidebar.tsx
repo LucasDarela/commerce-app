@@ -20,6 +20,14 @@ export default function NavDocumentsSidebar() {
     setOpenDropdown((prev) => (prev === key ? null : key));
   };
 
+    const { isMobile, setOpenMobile } = useSidebar();
+
+    const handleMobileClose = () => {
+      if (isMobile) {
+        setOpenMobile(false);
+      }
+    };
+
   return (
     <SidebarGroup>
       <SidebarGroupContent className="flex flex-col gap-2">
@@ -44,12 +52,14 @@ export default function NavDocumentsSidebar() {
               <Link
                 href="/dashboard/barrel-control"
                 className="block text-sm text-muted-foreground hover:text-foreground transition"
+                onClick={handleMobileClose}
               >
                 Controle de Barril
               </Link>
               <Link
                 href="/dashboard/price-tables"
                 className="block text-sm text-muted-foreground hover:text-foreground transition"
+                onClick={handleMobileClose}
               >
                 Tabela de Preços
               </Link>

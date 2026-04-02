@@ -2,14 +2,13 @@
 
 import Link from "next/link";
 import type { Icon } from "@tabler/icons-react";
-import { IconCirclePlusFilled, IconMail } from "@tabler/icons-react";
-import { Button } from "@/components/ui/button";
 import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar";
 
 export type NavItem = {
@@ -19,6 +18,14 @@ export type NavItem = {
 };
 
 export function NavMain({ items }: { items: NavItem[] }) {
+  const { isMobile, setOpenMobile } = useSidebar();
+
+  const handleMobileClose = () => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  };
+
   return (
     <SidebarGroup>
       <SidebarGroupContent className="flex flex-col gap-2">
@@ -26,7 +33,7 @@ export function NavMain({ items }: { items: NavItem[] }) {
           {items.map((item) => (
             <SidebarMenuItem key={item.title}>
               <SidebarMenuButton tooltip={item.title} asChild>
-                <Link href={item.url}>
+                <Link href={item.url} onClick={handleMobileClose}>
                   {item.icon && <item.icon />}
                   <span>{item.title}</span>
                 </Link>
