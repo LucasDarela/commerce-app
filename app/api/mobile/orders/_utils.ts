@@ -1,29 +1,37 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createClient } from "@supabase/supabase-js";
 
 export async function getAuthenticatedContext(req?: Request) {
-  const supabase = await createServerSupabaseClient();
+  let supabase = await createServerSupabaseClient();
   let user = null;
   let userError = null;
-  // 1. Tentar coletar token via cabeçalho HTTP (Mobile) se enviaram o req
+
   const authHeader = req?.headers.get('authorization');
+
   if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.split(' ')[1];
-    const { data: authData, error: authErr } = await supabase.auth.getUser(token);
+    supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        global: {
+          headers: {
+            Authorization: authHeader,
+          },
+        },
+      }
+    );
+    
+    const { data: authData, error: authErr } = await supabase.auth.getUser();
     user = authData?.user;
     userError = authErr;
   } else {
-    // 2. Fallback pro comportamento de Cookies tradicional (Navegador/Painel Web)
     const { data: authData, error: authErr } = await supabase.auth.getUser();
     user = authData?.user;
     userError = authErr;
   }
+
   if (userError || !user) {
-    return {
-      supabase,
-      error: { error: "Não autenticado", status: 401 },
-      user: null,
-      companyId: null,
-    };
+    return { supabase, error: { error: "Não autenticado", status: 401 }, user: null, companyId: null };
   }
 
   const { data: comp, error: compErr } = await supabase
