@@ -1,13 +1,22 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
-export async function getAuthenticatedContext() {
+export async function getAuthenticatedContext(req?: Request) {
   const supabase = await createServerSupabaseClient();
-
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
+  let user = null;
+  let userError = null;
+  // 1. Tentar coletar token via cabeçalho HTTP (Mobile) se enviaram o req
+  const authHeader = req?.headers.get('authorization');
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1];
+    const { data: authData, error: authErr } = await supabase.auth.getUser(token);
+    user = authData?.user;
+    userError = authErr;
+  } else {
+    // 2. Fallback pro comportamento de Cookies tradicional (Navegador/Painel Web)
+    const { data: authData, error: authErr } = await supabase.auth.getUser();
+    user = authData?.user;
+    userError = authErr;
+  }
   if (userError || !user) {
     return {
       supabase,

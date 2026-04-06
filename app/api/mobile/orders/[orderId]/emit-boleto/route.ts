@@ -15,7 +15,8 @@ export async function POST(_: Request, { params }: Params) {
   try {
     const { orderId } = await params;
 
-    const ctx = await getAuthenticatedContext();
+    const ctx = await getAuthenticatedContext(_);
+
     if (ctx.error) {
       return NextResponse.json(
         { error: ctx.error.error },
