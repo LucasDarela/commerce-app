@@ -259,8 +259,32 @@ const fetchData = async () => {
         { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${id}` },
         (payload) => {
           setOrder((prev: any) => {
-             if (!prev) return prev;
-             return { ...prev, ...payload.new };
+            if (!prev) return prev;
+            const {
+              delivery_status,
+              customer_signature,
+              stock_updated,
+              payment_method,
+              freight,
+              text_note,
+              appointment_date,
+              appointment_local,
+              note_number,
+              status,
+            } = payload.new;
+            return {
+              ...prev,
+              ...(delivery_status !== undefined && { delivery_status }),
+              ...(customer_signature !== undefined && { customer_signature }),
+              ...(stock_updated !== undefined && { stock_updated }),
+              ...(payment_method !== undefined && { payment_method }),
+              ...(freight !== undefined && { freight }),
+              ...(text_note !== undefined && { text_note }),
+              ...(appointment_date !== undefined && { appointment_date }),
+              ...(appointment_local !== undefined && { appointment_local }),
+              ...(note_number !== undefined && { note_number }),
+              ...(status !== undefined && { status }),
+            };
           });
         }
       )
