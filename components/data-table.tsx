@@ -119,6 +119,7 @@ import type { ProductItem } from "@/components/types/products";
 import { TableSkeleton } from "./ui/TableSkeleton";
 import { orderSchema, type Order } from "@/components/types/orderSchema";
 import EmitNfeMenuItem from "./nf/EmitNfeMenuItem";
+import { GenerateBoletoButtons } from "@/components/generate-boleto-button";
 import { DeleteOrderButton } from "@/components/orders/DeleteOrderButton";
 import {
   canCreateOrder,
@@ -820,7 +821,58 @@ useEffect(() => {
   }
 
   fetchOrders();
-}, [companyId]);
+
+  const channel = supabase
+    .channel('orders_realtime')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'orders', filter: `company_id=eq.${companyId}` },
+      async (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const { data } = await supabase
+            .from("orders")
+            .select(`
+              id, customer_id, note_number, document_type, appointment_date, appointment_hour, appointment_local, customer, phone, products, freight, amount, total, total_payed, delivery_status, payment_status, payment_method, order_index, issue_date, due_date, customer_signature, text_note, boleto_id, driver_id,
+              customer_rel:customers!sales_customer_id_fkey(fantasy_name)
+            `)
+            .eq("id", payload.new.id)
+            .single();
+
+          if (data) {
+            const cr = (data as any).customer_rel;
+            const fantasyName = Array.isArray(cr) ? cr[0]?.fantasy_name : cr?.fantasy_name;
+            const newOrder = {
+              ...data,
+              fantasy_name: fantasyName || "",
+            };
+
+            const parsed = orderSchema.safeParse(newOrder);
+            if (parsed.success) {
+              setOrders((prev) => {
+                const exists = prev.some((o) => o.id === parsed.data.id);
+                if (exists) return prev;
+                return [parsed.data, ...prev];
+              });
+            }
+          }
+        } else if (payload.eventType === 'UPDATE') {
+          setOrders((prev) =>
+            prev.map((order) => {
+              if (order.id !== payload.new.id) return order;
+              return { ...order, ...payload.new } as Order;
+            })
+          );
+        } else if (payload.eventType === 'DELETE') {
+          setOrders((prev) => prev.filter((order) => order.id !== payload.old.id));
+        }
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, [companyId, supabase]);
 
 const columns = React.useMemo<CustomColumnDef<Order>[]>(() => [
     {
@@ -1192,6 +1244,15 @@ const columns = React.useMemo<CustomColumnDef<Order>[]>(() => [
                 }
                 showDebug={false}
               />
+
+              {row.original.payment_method?.toLowerCase() === "boleto" && (
+                <GenerateBoletoButtons
+                  orderId={row.original.id}
+                  paymentMethod={row.original.payment_method}
+                  signatureData={row.original.customer_signature || ""}
+                  asDropdownItem
+                />
+              )}
 
               <DropdownMenuSeparator />
 
@@ -2427,15 +2488,15 @@ const clearFilter = () => {
           items={returnEquipmentItems}
           order={selectedCustomer}
           user={user}
-          onReturnSuccess={async (shouldOpenProductReturnModal) => {
+          onReturnSuccess={(shouldOpenProductReturnModal) => {
             setIsReturnModalOpen(false);
 
-            await handleDeliveryStatusUpdate();
-            await refreshOrders();
-
             if (shouldOpenProductReturnModal && selectedCustomer?.id) {
-              await fetchOrderProductsForReturnModal(selectedCustomer.id);
+              // Fire request to fetch products concurrently so modal opens faster
+              fetchOrderProductsForReturnModal(selectedCustomer.id);
             }
+
+            handleDeliveryStatusUpdate().then(() => refreshOrders());
           }}
           onOpenProductReturnModal={() => {}}
         />

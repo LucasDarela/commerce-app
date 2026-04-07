@@ -21,6 +21,7 @@ import { ReturnEquipmentModal } from "@/components/equipment-loan/ReturnEquipmen
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
 import EmitNfeButton from "@/components/nf/EmitirNfeViewPage";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
+import { setBreadcrumbOverride, removeBreadcrumbOverride } from "@/hooks/useBreadcrumb";
 
 import type { OrderItem } from "@/components/types/orders";
 import type { OrderDetails } from "@/components/types/orderDetails";
@@ -197,6 +198,10 @@ const fetchData = async () => {
     if (!isMounted) return;
     setOrder(data);
 
+    if (data.note_number) {
+        setBreadcrumbOverride(id as string, `${data.note_number}`);
+    }
+
     if (data?.customer_signature) {
       setSignatureData(data.customer_signature);
     }
@@ -247,8 +252,24 @@ const fetchData = async () => {
       fetchData();
     }
 
+    const channel = supabase
+      .channel(`order_realtime_${id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${id}` },
+        (payload) => {
+          setOrder((prev: any) => {
+             if (!prev) return prev;
+             return { ...prev, ...payload.new };
+          });
+        }
+      )
+      .subscribe();
+
     return () => {
       isMounted = false;
+      supabase.removeChannel(channel);
+      removeBreadcrumbOverride(id as string);
     };
 }, [id, supabase, companyId]);
 

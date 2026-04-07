@@ -5,8 +5,25 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import { StockReservationReport } from "@/components/analytics/stockReservations";
 import { EquipmentLoansHistoryReport } from "@/components/analytics/EquipmentLoansHistoryReport";
+import { EquipmentMovementReport } from "@/components/analytics/EquipmentMovementReport";
+import { EquipmentByCustomerReport } from "@/components/analytics/EquipmentByCustomerReport";
+import { EquipmentTrackerReport } from "@/components/analytics/EquipmentTrackerReport";
+import {
+  InvoicesByPeriodReport,
+  InvoicesStatusReport,
+  InvoicesByCustomerReport,
+  FiscalOperationSummaryReport,
+  PendingInvoicesReport,
+  FiscalFieldIssuesReport,
+} from "@/components/analytics/FiscalReports";
+import {
+  CustomerHistoryReport,
+  ActiveInactiveCustomersReport,
+  NewCustomersByPeriodReport,
+  CustomersByPriceTableReport,
+} from "@/components/analytics/CustomerReports";
 import { TableSkeleton } from "../ui/TableSkeleton";
-import { X, Filter, FileText } from "lucide-react";
+import { X, Filter, FileText, ChevronsUpDown, Check } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SalesByPeriodReport } from "./SalesByPeriodReport";
@@ -15,12 +32,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 
 type SimpleCustomer = { id: string; name: string };
 
@@ -30,14 +55,60 @@ type ReportParams = {
   endDate?: string;
   customerId?: string;
   supplierFilter?: string;
+  equipmentFilter?: string;
   reportType: string;
 };
+
+const REPORT_OPTIONS: { value: string; label: string; group: string; disabled?: boolean }[] = [
+  // Vendas
+  { value: "sales_by_period", label: "Vendas por Período", group: "vendas" },
+  { value: "sales_grouped_by_customer", label: "Vendas Agrupadas por Cliente", group: "vendas" },
+  { value: "overdue_receivables", label: "Contas a Receber Vencidas", group: "vendas", disabled: true },
+  { value: "customer_statement", label: "Extrato por Cliente", group: "vendas", disabled: true },
+  { value: "receipts_by_period", label: "Recebimentos por Período", group: "vendas", disabled: true },
+  { value: "customer_default", label: "Inadimplência por Cliente", group: "vendas", disabled: true },
+  { value: "sales_by_product", label: "Vendas por Produto", group: "vendas", disabled: true },
+  { value: "top_customers", label: "Clientes que Mais Compram", group: "vendas", disabled: true },
+  // Financeiro
+  { value: "cash_flow", label: "Fluxo de Caixa por Período", group: "financeiro", disabled: true },
+  { value: "accounts_payable", label: "Contas a Pagar", group: "financeiro", disabled: true },
+  { value: "overdue_payables", label: "Contas a Pagar Vencidas", group: "financeiro", disabled: true },
+  { value: "expenses_by_category", label: "Despesas por Categoria", group: "financeiro", disabled: true },
+  { value: "revenue_vs_expense", label: "Receita x Despesa", group: "financeiro", disabled: true },
+  { value: "monthly_financial_summary", label: "Resumo Financeiro Mensal", group: "financeiro", disabled: true },
+  // Estoque
+  { value: "stock_reservations", label: "Reservas de Estoque", group: "estoque" },
+  { value: "stock_movements", label: "Estoque / Movimentações", group: "estoque", disabled: true },
+  { value: "current_stock_position", label: "Posição Atual de Estoque", group: "estoque", disabled: true },
+  { value: "low_stock", label: "Produtos com Estoque Baixo", group: "estoque", disabled: true },
+  { value: "product_returns", label: "Devoluções por Produto", group: "estoque", disabled: true },
+  // Clientes
+  { value: "customer_statement_full", label: "Histórico Completo por Cliente", group: "clientes" },
+  { value: "active_inactive_customers", label: "Clientes Ativos e Inativos", group: "clientes" },
+  { value: "new_customers_by_period", label: "Novos Clientes por Período", group: "clientes" },
+  { value: "customer_price_tables", label: "Clientes por Tabela de Preço", group: "clientes" },
+  // Equipamentos
+  { value: "equipment_loans_history", label: "Histórico de Comodatos", group: "equipamentos" },
+  { value: "equipment_movement_history", label: "Movimentações de Equipamentos", group: "equipamentos" },
+  { value: "equipment_by_customer", label: "Equipamentos por Cliente", group: "equipamentos" },
+  { value: "equipment_tracker", label: "Rastreio de Equipamento", group: "equipamentos" },
+  { value: "unreturned_equipments", label: "Equipamentos Não Retornados", group: "equipamentos", disabled: true },
+  { value: "available_vs_loaned_equipments", label: "Equipamentos Disponíveis x Emprestados", group: "equipamentos", disabled: true },
+  // Fiscal
+  { value: "issued_invoices", label: "NF-e Emitidas por Período", group: "fiscal" },
+  { value: "invoice_status", label: "NF-e Autorizadas / Rejeitadas", group: "fiscal" },
+  { value: "invoices_by_customer", label: "NF-e por Cliente", group: "fiscal" },
+  { value: "fiscal_operation_summary", label: "Resumo Fiscal por Operação", group: "fiscal" },
+  { value: "pending_invoice_issuance", label: "Notas Pendentes de Emissão", group: "fiscal" },
+  { value: "fiscal_field_issues", label: "Divergências Fiscais de Produtos", group: "fiscal" },
+];
 
 export default function ReportsPage() {
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const { companyId, loading } = useAuthenticatedCompany();
 
   const [reportType, setReportType] = useState("");
+  const [reportOpen, setReportOpen] = useState(false);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
@@ -49,9 +120,16 @@ export default function ReportsPage() {
 
   const [supplierFilter, setSupplierFilter] = useState("");
 
+  // Equipamento autocomplete
+  const [equipmentQuery, setEquipmentQuery] = useState("");
+  const [equipmentOptions, setEquipmentOptions] = useState<{ id: string; name: string }[]>([]);
+  const [showEquipmentList, setShowEquipmentList] = useState(false);
+  const [selectedEquipment, setSelectedEquipment] = useState<{ id: string; name: string } | null>(null);
+
   const [params, setParams] = useState<ReportParams | null>(null);
 
   const debounceRef = useRef<number | null>(null);
+  const equipDebounceRef = useRef<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -92,6 +170,30 @@ export default function ReportsPage() {
     };
   }, [companyId, customerQuery, supabase]);
 
+  // Busca equipamentos cadastrados
+  useEffect(() => {
+    let cancelled = false;
+    if (!companyId) return;
+    const q = equipmentQuery.trim();
+    if (q.length < 2) { setEquipmentOptions([]); return; }
+    if (equipDebounceRef.current) window.clearTimeout(equipDebounceRef.current);
+    equipDebounceRef.current = window.setTimeout(async () => {
+      const { data, error } = await supabase
+        .from("equipments")
+        .select("id, name")
+        .eq("company_id", companyId)
+        .ilike("name", `%${q}%`)
+        .order("name", { ascending: true })
+        .limit(20);
+      if (cancelled) return;
+      if (!error) setEquipmentOptions(data ?? []);
+    }, 250);
+    return () => {
+      cancelled = true;
+      if (equipDebounceRef.current) window.clearTimeout(equipDebounceRef.current);
+    };
+  }, [companyId, equipmentQuery, supabase]);
+
   const handlePickCustomer = (c: SimpleCustomer) => {
     setSelectedCustomer(c);
     setCustomerQuery(c.name);
@@ -105,6 +207,19 @@ export default function ReportsPage() {
     setShowCustomerList(false);
   };
 
+  const handlePickEquipment = (e: { id: string; name: string }) => {
+    setSelectedEquipment(e);
+    setEquipmentQuery(e.name);
+    setShowEquipmentList(false);
+  };
+
+  const clearEquipment = () => {
+    setSelectedEquipment(null);
+    setEquipmentQuery("");
+    setEquipmentOptions([]);
+    setShowEquipmentList(false);
+  };
+
   const clearAllFilters = () => {
     setStartDate("");
     setEndDate("");
@@ -112,6 +227,9 @@ export default function ReportsPage() {
     setCustomerOptions([]);
     setSelectedCustomer(null);
     setSupplierFilter("");
+    setEquipmentQuery("");
+    setEquipmentOptions([]);
+    setSelectedEquipment(null);
     setParams(null);
     setReportType("");
   };
@@ -147,6 +265,7 @@ export default function ReportsPage() {
       endDate: endDate || undefined,
       customerId: selectedCustomer?.id || undefined,
       supplierFilter: supplierFilter || undefined,
+      equipmentFilter: selectedEquipment?.name || equipmentQuery || undefined,
       reportType,
     });
 
@@ -158,6 +277,7 @@ export default function ReportsPage() {
   const showDownloadButton = [
     "sales_by_period",
     "sales_grouped_by_customer",
+    "equipment_movement_history",
   ].includes(normalizedReportType);
 
   if (loading) return <TableSkeleton />;
@@ -183,7 +303,9 @@ export default function ReportsPage() {
                 new Event(
                   normalizedReportType === "sales_grouped_by_customer"
                     ? "download-sales-grouped-report"
-                    : "download-sales-report",
+                    : normalizedReportType === "equipment_movement_history"
+                      ? "download-equipment-movement-report"
+                      : "download-sales-report",
                 ),
               )
             }
@@ -208,144 +330,143 @@ export default function ReportsPage() {
           <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label>Tipo de Relatório</Label>
-              <Select
-                value={reportType}
-                onValueChange={(value) => {
-                  setReportType(value);
-                }}
-              >
-                <SelectTrigger className="min-w-[260px] max-w-[360px] w-full">
-                  <SelectValue placeholder="Selecione um relatório" />
-                </SelectTrigger>
+              <Popover open={reportOpen} onOpenChange={setReportOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={reportOpen}
+                    className="min-w-[260px] max-w-[360px] w-full justify-between font-normal"
+                  >
+                    <span className="truncate">
+                      {reportType
+                        ? REPORT_OPTIONS.find((o) => o.value === reportType)?.label
+                        : "Selecione um relatório"}
+                    </span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="min-w-[360px] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Pesquisar relatório..." />
+                    <CommandList>
+                      <CommandEmpty>Nenhum relatório encontrado.</CommandEmpty>
 
-                <SelectContent className="max-h-[420px]">
-                  <div className="px-2 py-1.5 text-xs font-semibold uppercase text-muted-foreground">
-                    Vendas e Recebimentos
-                  </div>
-                  <SelectItem value="sales_by_period">
-                    Vendas por Período
-                  </SelectItem>
-                  <SelectItem value="sales_grouped_by_customer">
-                    Vendas Agrupadas por Cliente
-                  </SelectItem>
-                  <SelectItem value="overdue_receivables" disabled>
-                    Contas a Receber Vencidas
-                  </SelectItem>
-                  <SelectItem value="customer_statement" disabled>
-                    Extrato por Cliente
-                  </SelectItem>
-                  <SelectItem value="receipts_by_period" disabled>
-                    Recebimentos por Período
-                  </SelectItem>
-                  <SelectItem value="customer_default" disabled>
-                    Inadimplência por Cliente
-                  </SelectItem>
-                  <SelectItem value="sales_by_product" disabled>
-                    Vendas por Produto
-                  </SelectItem>
-                  <SelectItem value="top_customers" disabled>
-                    Clientes que Mais Compram
-                  </SelectItem>
+                      <CommandGroup heading="Vendas e Recebimentos">
+                        {REPORT_OPTIONS.filter((o) => o.group === "vendas").map((o) => (
+                          <CommandItem
+                            key={o.value}
+                            value={o.label}
+                            disabled={o.disabled}
+                            onSelect={() => {
+                              setReportType(o.value);
+                              setReportOpen(false);
+                            }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", reportType === o.value ? "opacity-100" : "opacity-0")} />
+                            {o.label}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
 
-                  <div className="mt-2 px-2 py-1.5 text-xs font-semibold uppercase text-muted-foreground">
-                    Financeiro
-                  </div>
-                  <SelectItem value="cash_flow" disabled>
-                    Fluxo de Caixa por Período
-                  </SelectItem>
-                  <SelectItem value="accounts_payable" disabled>
-                    Contas a Pagar
-                  </SelectItem>
-                  <SelectItem value="overdue_payables" disabled>
-                    Contas a Pagar Vencidas
-                  </SelectItem>
-                  <SelectItem value="expenses_by_category" disabled>
-                    Despesas por Categoria
-                  </SelectItem>
-                  <SelectItem value="revenue_vs_expense" disabled>
-                    Receita x Despesa
-                  </SelectItem>
-                  <SelectItem value="monthly_financial_summary" disabled>
-                    Resumo Financeiro Mensal
-                  </SelectItem>
+                      <CommandSeparator />
 
-                  <div className="mt-2 px-2 py-1.5 text-xs font-semibold uppercase text-muted-foreground">
-                    Estoque
-                  </div>
-                  <SelectItem value="stock_reservations">
-                    Reservas de Estoque
-                  </SelectItem>
-                  <SelectItem value="stock_movements" disabled>
-                    Estoque / Movimentações
-                  </SelectItem>
-                  <SelectItem value="current_stock_position" disabled>
-                    Posição Atual de Estoque
-                  </SelectItem>
-                  <SelectItem value="low_stock" disabled>
-                    Produtos com Estoque Baixo
-                  </SelectItem>
-                  <SelectItem value="product_returns" disabled>
-                    Devoluções por Produto
-                  </SelectItem>
+                      <CommandGroup heading="Financeiro">
+                        {REPORT_OPTIONS.filter((o) => o.group === "financeiro").map((o) => (
+                          <CommandItem
+                            key={o.value}
+                            value={o.label}
+                            disabled={o.disabled}
+                            onSelect={() => {
+                              setReportType(o.value);
+                              setReportOpen(false);
+                            }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", reportType === o.value ? "opacity-100" : "opacity-0")} />
+                            {o.label}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
 
-                  <div className="mt-2 px-2 py-1.5 text-xs font-semibold uppercase text-muted-foreground">
-                    Clientes
-                  </div>
-                  <SelectItem value="customer_statement_full" disabled>
-                    Histórico Completo por Cliente
-                  </SelectItem>
-                  <SelectItem value="active_inactive_customers" disabled>
-                    Clientes Ativos e Inativos
-                  </SelectItem>
-                  <SelectItem value="new_customers_by_period" disabled>
-                    Novos Clientes por Período
-                  </SelectItem>
-                  <SelectItem value="customer_price_tables" disabled>
-                    Clientes por Tabela de Preço
-                  </SelectItem>
+                      <CommandSeparator />
 
-                  <div className="mt-2 px-2 py-1.5 text-xs font-semibold uppercase text-muted-foreground">
-                    Equipamentos e Comodato
-                  </div>
-                  <SelectItem value="equipment_loans_history">
-                    Histórico de Comodatos
-                  </SelectItem>
-                  <SelectItem value="equipment_by_customer" disabled>
-                    Equipamentos por Cliente
-                  </SelectItem>
-                  <SelectItem value="unreturned_equipments" disabled>
-                    Equipamentos Não Retornados
-                  </SelectItem>
-                  <SelectItem value="available_vs_loaned_equipments" disabled>
-                    Equipamentos Disponíveis x Emprestados
-                  </SelectItem>
-                  <SelectItem value="equipment_movement_history" disabled>
-                    Movimentações de Equipamentos
-                  </SelectItem>
+                      <CommandGroup heading="Estoque">
+                        {REPORT_OPTIONS.filter((o) => o.group === "estoque").map((o) => (
+                          <CommandItem
+                            key={o.value}
+                            value={o.label}
+                            disabled={o.disabled}
+                            onSelect={() => {
+                              setReportType(o.value);
+                              setReportOpen(false);
+                            }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", reportType === o.value ? "opacity-100" : "opacity-0")} />
+                            {o.label}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
 
-                  <div className="mt-2 px-2 py-1.5 text-xs font-semibold uppercase text-muted-foreground">
-                    Fiscal
-                  </div>
-                  <SelectItem value="issued_invoices" disabled>
-                    NF-e Emitidas por Período
-                  </SelectItem>
-                  <SelectItem value="invoice_status" disabled>
-                    NF-e Autorizadas / Rejeitadas
-                  </SelectItem>
-                  <SelectItem value="invoices_by_customer" disabled>
-                    NF-e por Cliente
-                  </SelectItem>
-                  <SelectItem value="fiscal_operation_summary" disabled>
-                    Resumo Fiscal por Operação
-                  </SelectItem>
-                  <SelectItem value="pending_invoice_issuance" disabled>
-                    Notas Pendentes de Emissão
-                  </SelectItem>
-                  <SelectItem value="fiscal_field_issues" disabled>
-                    Divergências Fiscais de Produtos
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+                      <CommandSeparator />
+
+                      <CommandGroup heading="Clientes">
+                        {REPORT_OPTIONS.filter((o) => o.group === "clientes").map((o) => (
+                          <CommandItem
+                            key={o.value}
+                            value={o.label}
+                            disabled={o.disabled}
+                            onSelect={() => {
+                              setReportType(o.value);
+                              setReportOpen(false);
+                            }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", reportType === o.value ? "opacity-100" : "opacity-0")} />
+                            {o.label}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+
+                      <CommandSeparator />
+
+                      <CommandGroup heading="Equipamentos e Comodato">
+                        {REPORT_OPTIONS.filter((o) => o.group === "equipamentos").map((o) => (
+                          <CommandItem
+                            key={o.value}
+                            value={o.label}
+                            disabled={o.disabled}
+                            onSelect={() => {
+                              setReportType(o.value);
+                              setReportOpen(false);
+                            }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", reportType === o.value ? "opacity-100" : "opacity-0")} />
+                            {o.label}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+
+                      <CommandSeparator />
+
+                      <CommandGroup heading="Fiscal">
+                        {REPORT_OPTIONS.filter((o) => o.group === "fiscal").map((o) => (
+                          <CommandItem
+                            key={o.value}
+                            value={o.label}
+                            disabled={o.disabled}
+                            onSelect={() => {
+                              setReportType(o.value);
+                              setReportOpen(false);
+                            }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", reportType === o.value ? "opacity-100" : "opacity-0")} />
+                            {o.label}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
 
             <div className="space-y-2">
@@ -456,6 +577,53 @@ export default function ReportsPage() {
                 Usado apenas em <strong>Reservas de Estoque</strong>.
               </p>
             </div>
+
+            <div className="space-y-2 relative">
+              <Label>Filtrar por Equipamento</Label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Digite o nome do equipamento..."
+                  value={equipmentQuery}
+                  onChange={(e) => {
+                    setEquipmentQuery(e.target.value);
+                    setShowEquipmentList(true);
+                    setSelectedEquipment(null);
+                  }}
+                  onFocus={() => setShowEquipmentList(equipmentQuery.trim().length >= 2)}
+                  onBlur={() => setTimeout(() => setShowEquipmentList(false), 150)}
+                />
+                {equipmentQuery && (
+                  <Button type="button" variant="ghost" onClick={clearEquipment} className="shrink-0">
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+
+              {showEquipmentList && equipmentOptions.length > 0 && (
+                <div className="absolute z-20 top-full mt-1 w-full rounded-md border bg-popover shadow-md max-h-64 overflow-y-auto">
+                  {equipmentOptions.map((e) => (
+                    <button
+                      key={e.id}
+                      type="button"
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground transition"
+                      onMouseDown={(ev) => ev.preventDefault()}
+                      onClick={() => handlePickEquipment(e)}
+                    >
+                      {e.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {selectedEquipment && (
+                <p className="text-xs text-muted-foreground">
+                  Equipamento: <span className="font-medium text-foreground">{selectedEquipment.name}</span>
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Usado em <strong>Rastreio</strong> e <strong>Equip. por Cliente</strong>.
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -485,19 +653,21 @@ export default function ReportsPage() {
             <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
               <span>
                 <strong className="text-foreground">Tipo:</strong>{" "}
-                {params.reportType === "stock_reservations"
-                  ? "Reservas de Estoque"
-                  : params.reportType === "equipment_loans_history"
-                    ? "Histórico de Comodatos"
-                    : params.reportType === "sales_grouped_by_customer"
-                      ? "Vendas Agrupadas por Cliente"
-                      : "Vendas por Período"}
+                {
+                  params.reportType === "stock_reservations" ? "Reservas de Estoque"
+                  : params.reportType === "equipment_loans_history" ? "Histórico de Comodatos"
+                  : params.reportType === "equipment_movement_history" ? "Movimentações de Equipamentos"
+                  : params.reportType === "equipment_by_customer" ? "Equipamentos por Cliente"
+                  : params.reportType === "equipment_tracker" ? "Rastreio de Equipamento"
+                  : params.reportType === "sales_grouped_by_customer" ? "Vendas Agrupadas por Cliente"
+                  : "Vendas por Período"
+                }
               </span>
 
               <span>
                 <strong className="text-foreground">Período:</strong>{" "}
-                {params.startDate}
-                {params.endDate ? ` até ${params.endDate}` : ""}
+                {params.startDate.split("-").reverse().join("/")}
+                {params.endDate ? ` até ${params.endDate.split("-").reverse().join("/")}` : ""}
               </span>
 
               {selectedCustomer && (
@@ -537,6 +707,112 @@ export default function ReportsPage() {
               customerId={params.customerId}
             />
           )}
+
+        {params?.reportType === "equipment_movement_history" &&
+          params.companyId && (
+            <EquipmentMovementReport
+              companyId={params.companyId}
+              startDate={params.startDate}
+              endDate={params.endDate}
+              customerId={params.customerId}
+            />
+          )}
+
+        {params?.reportType === "equipment_by_customer" &&
+          params.companyId && (
+            <EquipmentByCustomerReport
+              companyId={params.companyId}
+              startDate={params.startDate}
+              endDate={params.endDate}
+              customerId={params.customerId}
+            />
+          )}
+
+        {params?.reportType === "equipment_tracker" &&
+          params.companyId && (
+            <EquipmentTrackerReport
+              companyId={params.companyId}
+              startDate={params.startDate}
+              endDate={params.endDate}
+              equipmentFilter={params.equipmentFilter ?? ""}
+            />
+          )}
+
+        {/* Relatórios Fiscais */}
+        {params?.reportType === "issued_invoices" && params.companyId && (
+          <InvoicesByPeriodReport
+            companyId={params.companyId}
+            startDate={params.startDate}
+            endDate={params.endDate}
+          />
+        )}
+        {params?.reportType === "invoice_status" && params.companyId && (
+          <InvoicesStatusReport
+            companyId={params.companyId}
+            startDate={params.startDate}
+            endDate={params.endDate}
+          />
+        )}
+        {params?.reportType === "invoices_by_customer" && params.companyId && (
+          <InvoicesByCustomerReport
+            companyId={params.companyId}
+            startDate={params.startDate}
+            endDate={params.endDate}
+            customerId={params.customerId}
+          />
+        )}
+        {params?.reportType === "fiscal_operation_summary" && params.companyId && (
+          <FiscalOperationSummaryReport
+            companyId={params.companyId}
+            startDate={params.startDate}
+            endDate={params.endDate}
+          />
+        )}
+        {params?.reportType === "pending_invoice_issuance" && params.companyId && (
+          <PendingInvoicesReport
+            companyId={params.companyId}
+            startDate={params.startDate}
+            endDate={params.endDate}
+          />
+        )}
+        {params?.reportType === "fiscal_field_issues" && params.companyId && (
+          <FiscalFieldIssuesReport
+            companyId={params.companyId}
+            startDate={params.startDate}
+            endDate={params.endDate}
+          />
+        )}
+
+        {/* Relatórios de Clientes */}
+        {params?.reportType === "customer_statement_full" && params.companyId && (
+          <CustomerHistoryReport
+            companyId={params.companyId}
+            startDate={params.startDate}
+            endDate={params.endDate}
+            customerId={params.customerId}
+          />
+        )}
+        {params?.reportType === "active_inactive_customers" && params.companyId && (
+          <ActiveInactiveCustomersReport
+            companyId={params.companyId}
+            startDate={params.startDate}
+            endDate={params.endDate}
+          />
+        )}
+        {params?.reportType === "new_customers_by_period" && params.companyId && (
+          <NewCustomersByPeriodReport
+            companyId={params.companyId}
+            startDate={params.startDate}
+            endDate={params.endDate}
+          />
+        )}
+        {params?.reportType === "customer_price_tables" && params.companyId && (
+          <CustomersByPriceTableReport
+            companyId={params.companyId}
+            startDate={params.startDate}
+            endDate={params.endDate}
+          />
+        )}
       </div>
     </div>
   );

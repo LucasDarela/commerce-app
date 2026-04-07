@@ -23,7 +23,6 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { InvoicesFilters } from "@/components/nf/InvoicesFilters";
-import RefreshButton from "@/components/nf/RefreshButton";
 import ViewDanfeButton from "@/components/nf/ViewDanfeButton";
 import { InvoiceStatusButton } from "@/components/nf/InvoiceStatusButton";
 import Link from "next/link";
@@ -76,6 +75,7 @@ useEffect(() => {
         order_id,
         customer_name,
         numero,
+        serie,
         note_number,
         natureza_operacao,
         valor_total,
@@ -104,6 +104,60 @@ useEffect(() => {
 
   fetchInvoices();
 }, [companyId, supabase]);
+
+  // === 1. Auto-Polling para Notas Fiscales Processando ===
+  useEffect(() => {
+    if (!companyId || invoices.length === 0) return;
+
+    const processingInvoices = invoices.filter(i => isProcessing(i.status));
+    if (processingInvoices.length === 0) return;
+
+    const intervalId = setInterval(() => {
+      processingInvoices.forEach(async (inv) => {
+        try {
+          await fetch("/api/nfe/status", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ref: inv.ref, companyId }),
+          });
+        } catch (e) {}
+      });
+    }, 8000);
+
+    return () => clearInterval(intervalId);
+  }, [companyId, invoices]);
+
+  // === 2. Supabase Realtime para captar o que o Polling atualizou no DB ===
+  useEffect(() => {
+    if (!companyId) return;
+
+    const channel = supabase
+      .channel('custom-invoices-channel')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'invoices', filter: `company_id=eq.${companyId}` },
+        (payload) => {
+          setInvoices((prev) => {
+            if (payload.eventType === 'INSERT') {
+              if (!prev.find(i => i.id === payload.new.id)) return [payload.new, ...prev];
+              return prev;
+            }
+            if (payload.eventType === 'UPDATE') {
+              return prev.map(inv => inv.id === payload.new.id ? { ...inv, ...payload.new } : inv);
+            }
+            if (payload.eventType === 'DELETE') {
+              return prev.filter(inv => inv.id !== payload.old.id);
+            }
+            return prev;
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [companyId, supabase]);
 
   const filtered = invoices.filter((invoice) => {
     const matchesCustomer =
@@ -208,9 +262,11 @@ useEffect(() => {
           <Card key={invoice.id} className="my-2">
             <CardHeader>
               {/* Nome do cliente */}
-              <CardTitle className="flex items-center gap-2 w-full">
-                <InvoiceStatusIndicator status={invoice.status} />
-                <span className="font-bold text-lg break-words w-full">
+              <CardTitle className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full overflow-hidden">
+                <span className="flex-shrink-0">
+                  <InvoiceStatusIndicator status={invoice.status} />
+                </span>
+                <span className="font-bold text-lg break-words line-clamp-2">
                   {invoice.customer_name || "Destinatário"}
                 </span>
               </CardTitle>
@@ -236,8 +292,8 @@ useEffect(() => {
             </CardHeader>
 
             {/* Botões no rodapé */}
-            <CardFooter className="flex flex-wrap gap-2 mt-2">
-              <Button asChild variant="secondary">
+            <CardFooter className="flex flex-wrap items-center gap-2 mt-2 w-full px-4 pb-4 [&_button]:h-8 [&_button]:text-xs [&_button]:px-3 [&_a]:h-8 [&_a]:text-xs [&_a]:px-3 [&_a]:flex [&_a]:items-center [&_a]:justify-center">
+              <Button asChild variant="secondary" size="sm">
                 <Link
                   href={`/dashboard/orders/${invoice.order_id}/view`}
                   target="_blank"
@@ -246,14 +302,6 @@ useEffect(() => {
                   Ver Espelho
                 </Link>
               </Button>
-
-              {isProcessing(invoice.status) && (
-                <RefreshButton
-                  refId={invoice.ref}
-                  companyId={invoice.company_id}
-                  setInvoices={setInvoices}
-                />
-              )}
 
               {shouldShowReason(invoice.status, invoice.danfe_url) && (
                 <InvoiceStatusButton
@@ -303,6 +351,8 @@ useEffect(() => {
                 refId={invoice.ref}
                 companyId={companyId}
                 status={invoice.status}
+                numero={invoice.numero}
+                serie={invoice.serie}
               />
             </CardFooter>
           </Card>

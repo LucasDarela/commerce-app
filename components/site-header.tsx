@@ -11,16 +11,19 @@ import NotificationsBell from "@/components/notifications/NotificationsBell";
 import RefreshButton from "./nf/RefreshButton";
 import { RefreshWindowButton } from "./refrash-window-button";
 import { Button } from "./ui/button";
+import { useBreadcrumbStore } from "@/hooks/useBreadcrumb";
 
 export function SiteHeader() {
   const pathname = usePathname();
   const router = useRouter();
 
-  const segments = pathname.split("/").filter(Boolean).slice(1); // remove "dashboard"
+  const segments = pathname.split("/").filter(Boolean).slice(1);
+
+  const overrides = useBreadcrumbStore();
 
   const breadcrumbs = segments.map((segment, index) => {
     const href = `/dashboard/${segments.slice(0, index + 1).join("/")}`;
-    const label = segment
+    const label = overrides[segment] || segment
       .replace(/-/g, " ")
       .replace(/\b\w/g, (l) => l.toUpperCase());
 

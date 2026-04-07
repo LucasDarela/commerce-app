@@ -10,11 +10,14 @@ import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { BarrelTable, BarrelEntry } from "./barrel-table";
+import { Search, Save, Download } from "lucide-react";
 
 interface Supplier {
   id: string;
   name: string;
+  isAvulso?: boolean;
 }
 
 interface BarrelRecord {
@@ -52,9 +55,18 @@ export default function BarrelControl() {
   const [searchSupplier, setSearchSupplier] = useState("");
   const [foundSuppliers, setFoundSuppliers] = useState<Supplier[]>([]);
   const [loadingSuppliers, setLoadingSuppliers] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   const [tabToDelete, setTabToDelete] = useState<string | null>(null);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+
+  const getTodayDate = () => {
+    const today = new Date();
+    const day = String(today.getDate()).padStart(2, '0');
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const year = today.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
 
   function formatDateFromDB(dateString: string) {
     if (!dateString) return "";
@@ -64,7 +76,7 @@ export default function BarrelControl() {
 
   function formatDateToYMD(dateStr: string) {
     const [day, month, year] = dateStr.split("/");
-    if (!day || !month || !year) return null;
+    if (!day || !month || !year || year.length < 4) return null;
     return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
   }
 
@@ -140,14 +152,25 @@ normalizedData.forEach((record) => {
   });
 });
 
-    const loadedTabs = Object.values(suppliersMap);
+    const loadedTabs = Object.values(suppliersMap).sort((a, b) => 
+      a.supplier.name.localeCompare(b.supplier.name)
+    );
     setTabs(loadedTabs);
     setSelectedTab((prev) => prev ?? loadedTabs[0]?.supplier.id);
+    setTimeout(() => setIsInitialLoad(false), 500);
   };
 
   useEffect(() => {
     fetchInitialData();
   }, [companyId]);
+
+  useEffect(() => {
+    if (isInitialLoad || tabs.length === 0) return;
+    const timeoutId = setTimeout(() => {
+      handleSave(true);
+    }, 2500);
+    return () => clearTimeout(timeoutId);
+  }, [tabs, isInitialLoad]);
 
   const handleSearchSupplier = async (value: string) => {
     setSearchSupplier(value);
@@ -185,19 +208,61 @@ normalizedData.forEach((record) => {
       return;
     }
 
-    setTabs((prev) => [...prev, { supplier, rows: [] }]);
+    setTabs((prev) => {
+      const nextTabs = [
+        ...prev,
+        {
+          supplier,
+          rows: [
+            {
+              date: getTodayDate(),
+              note: "",
+              had_30: 0,
+              had_50: 0,
+              arrived_30: 0,
+              arrived_50: 0,
+              returned_30: 0,
+              returned_50: 0,
+              total_30: 0,
+              total_50: 0,
+            },
+          ],
+        },
+      ];
+      return nextTabs.sort((a, b) => a.supplier.name.localeCompare(b.supplier.name));
+    });
     setSelectedTab(supplier.id);
     setSearchSupplier("");
     setFoundSuppliers([]);
   };
 
-  const handleSave = async () => {
+  const handleSave = async (silent: boolean | React.MouseEvent<HTMLButtonElement> = false) => {
     if (!companyId) {
-      toast.error("Empresa não identificada.");
+      if (silent !== true) toast.error("Empresa não identificada.");
       return;
     }
 
     for (const tab of tabs) {
+      if (tab.supplier.isAvulso) {
+        // Geração de um "documento" falso (14 dígitos) para evitar colisão Unique ou máscara
+        const fakeDocument = String(Math.floor(Math.random() * 89999999999999) + 10000000000000);
+        
+        const { error: sErr } = await supabase.from("suppliers").insert({
+          id: tab.supplier.id,
+          company_id: companyId,
+          name: tab.supplier.name,
+          type: "CNPJ",
+          document: fakeDocument,
+        });
+        
+        if (sErr) {
+            console.error("Erro banco:", sErr.message, sErr.details, sErr.hint, sErr.code);
+            if (silent !== true) toast.error(`Falha no banco ao salvar aba avulsa: ${sErr.message}`);
+        }
+        
+        tab.supplier.isAvulso = false; // evitar re-inserção
+      }
+
       const { error: deleteError } = await supabase
         .from("barrel_controls")
         .delete()
@@ -210,10 +275,12 @@ normalizedData.forEach((record) => {
         return;
       }
 
-      const insertPayload = tab.rows.map((row) => ({
+      const validRows = tab.rows.filter(r => r.date && formatDateToYMD(r.date) !== null);
+
+      const insertPayload = validRows.map((row) => ({
         company_id: companyId,
         supplier_id: tab.supplier.id,
-        date: row.date ? formatDateToYMD(row.date) : null,
+        date: formatDateToYMD(row.date),
         note: row.note || null,
         had_30: row.had_30 || 0,
         had_50: row.had_50 || 0,
@@ -232,14 +299,16 @@ normalizedData.forEach((record) => {
 
         if (insertError) {
           console.error(insertError);
-          toast.error(`Erro ao salvar dados do fornecedor ${tab.supplier.name}`);
+          if (silent !== true) toast.error(`Erro ao salvar dados do fornecedor ${tab.supplier.name}`);
           return;
         }
       }
     }
 
-    toast.success("Dados salvos com sucesso!");
-    await fetchInitialData();
+    if (silent !== true) {
+      toast.success("Dados salvos com sucesso!");
+      await fetchInitialData();
+    }
   };
 
   const handleDeleteSupplier = async (supplierId: string) => {
@@ -324,109 +393,136 @@ normalizedData.forEach((record) => {
   }
 
   return (
-    <div className="px-2 space-y-6 mt-9">
-      <div className="relative ml-4">
-        <h2 className="font-bold text-xl mb-4">Controle de Barril</h2>
+    <div className="w-full @container px-2 space-y-6 mt-9">
+      <div className="w-full">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4">
+          <div className="space-y-1">
+            <h2 className="text-2xl font-bold">Mapeamento de Barris</h2>
+            <p className="text-sm text-muted-foreground">
+              Controle de vasilhames e comodatos com fornecedores
+            </p>
+          </div>
 
-        <Input
-          value={searchSupplier}
-          onChange={(e) => handleSearchSupplier(e.target.value)}
-          placeholder="Buscar fornecedor..."
-          className="w-64"
-        />
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={searchSupplier}
+              onChange={(e) => handleSearchSupplier(e.target.value)}
+              placeholder="Buscar ou criar aba..."
+              className="pl-9 w-full"
+            />
 
-        {searchSupplier && (
-          <div className="absolute z-10 mt-1 w-64 rounded-md bg-background shadow border max-h-60 overflow-y-auto">
-            {loadingSuppliers ? (
-              <div className="p-2 text-center text-sm">Buscando...</div>
-            ) : foundSuppliers.length > 0 ? (
-              foundSuppliers.map((supplier) => (
-                <div
-                  key={supplier.id}
-                  onClick={() => handleAddSupplier(supplier)}
-                  className="cursor-pointer px-4 py-2 hover:bg-muted"
-                >
-                  {supplier.name}
-                </div>
-              ))
-            ) : (
-              <div className="p-2 text-center text-muted-foreground text-sm">
-                Nenhum fornecedor encontrado
+            {searchSupplier && (
+              <div className="absolute z-20 mt-1 w-full rounded-md bg-background shadow-lg border max-h-60 overflow-y-auto custom-scrollbar">
+                {loadingSuppliers ? (
+                  <div className="p-3 text-center text-sm text-muted-foreground">Buscando...</div>
+                ) : foundSuppliers.length > 0 ? (
+                  <>
+                    {foundSuppliers.map((supplier) => (
+                      <div
+                        key={supplier.id}
+                        onClick={() => handleAddSupplier(supplier)}
+                        className="cursor-pointer px-4 py-3 hover:bg-muted border-b last:border-0 transition-colors"
+                      >
+                        {supplier.name}
+                      </div>
+                    ))}
+                    <div
+                      onClick={() => handleAddSupplier({ id: crypto.randomUUID(), name: searchSupplier, isAvulso: true })}
+                      className="cursor-pointer px-4 py-3 hover:bg-muted text-primary text-sm font-medium border-t bg-muted/30 transition-colors"
+                    >
+                      + Criar aba avulsa "{searchSupplier}"
+                    </div>
+                  </>
+                ) : (
+                  <div 
+                    className="p-3 text-center text-primary text-sm cursor-pointer hover:bg-muted transition-colors font-medium"
+                    onClick={() => handleAddSupplier({ id: crypto.randomUUID(), name: searchSupplier, isAvulso: true })}
+                  >
+                    + Criar aba avulsa "{searchSupplier}"
+                  </div>
+                )}
               </div>
             )}
           </div>
-        )}
-      </div>
-
-      {tabs.length === 0 && (
-        <div className="rounded-lg border border-dashed border-gray-300 dark:border-gray-700 p-20 text-center text-muted-foreground mb-12 mx-4">
-          Nenhum fornecedor adicionado ainda
         </div>
-      )}
 
-      {tabs.length > 0 && (
-        <Tabs value={selectedTab} onValueChange={setSelectedTab}>
-          <TabsList className="flex gap-2 ml-4">
-            {tabs.map((tab) => (
-              <TabsTrigger
-                key={tab.supplier.id}
-                value={tab.supplier.id}
-                className="flex items-center gap-2"
-              >
-                <span>{tab.supplier.name}</span>
-                <span
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setTabToDelete(tab.supplier.id);
-                    setShowConfirmDelete(true);
-                  }}
-                  className="hover:text-destructive transition-colors cursor-pointer"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </span>
-              </TabsTrigger>
-            ))}
-          </TabsList>
+        <div className="mt-4 space-y-6">
+          {tabs.length === 0 && (
+            <div className="rounded-xl border-2 border-dashed border-muted p-12 sm:p-20 text-center text-muted-foreground my-8 hover:bg-muted/10 transition-colors cursor-default">
+              <p className="text-lg font-medium mb-1">Nenhum fornecedor monitorado</p>
+              <p className="text-sm">Use o campo de busca acima para adicionar uma aba</p>
+            </div>
+          )}
 
-          {tabs.map((tab) => (
-            <TabsContent key={tab.supplier.id} value={tab.supplier.id}>
-              <BarrelTable
-                rows={tab.rows}
-                setRows={(newRows) => {
-                  setTabs((prevTabs) =>
-                    prevTabs.map((t) =>
-                      t.supplier.id === tab.supplier.id
-                        ? { ...t, rows: newRows }
-                        : t,
-                    ),
-                  );
+          {tabs.length > 0 && (
+            <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
+              <ScrollArea className="w-full mb-4">
+                <TabsList className="inline-flex h-10 items-center justify-start rounded-md bg-muted p-1 text-muted-foreground w-max sm:w-auto overflow-x-auto whitespace-nowrap mb-2 custom-scrollbar">
+                  {tabs.map((tab) => (
+                    <TabsTrigger
+                      key={tab.supplier.id}
+                      value={tab.supplier.id}
+                      className="flex items-center gap-2 group data-[state=active]:shadow-sm"
+                    >
+                      <span>{tab.supplier.name}</span>
+                      <span
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setTabToDelete(tab.supplier.id);
+                          setShowConfirmDelete(true);
+                        }}
+                        className="text-muted-foreground/50 hover:text-destructive group-hover:text-muted-foreground transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </span>
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </ScrollArea>
+
+              {tabs.map((tab) => (
+                <TabsContent key={tab.supplier.id} value={tab.supplier.id} className="mt-0 outline-none">
+                  <div className="w-full overflow-hidden">
+                    <BarrelTable
+                      rows={tab.rows}
+                      setRows={(newRows) => {
+                        setTabs((prevTabs) =>
+                          prevTabs.map((t) =>
+                            t.supplier.id === tab.supplier.id
+                              ? { ...t, rows: newRows }
+                              : t,
+                          ),
+                        );
+                      }}
+                    />
+                  </div>
+                </TabsContent>
+              ))}
+            </Tabs>
+          )}
+
+          {tabs.length > 0 && (
+            <div className="flex flex-col sm:flex-row justify-end gap-3 pt-6 w-full border-t border-muted/50 mt-4">
+              <Button
+                onClick={() => {
+                  const currentTab = tabs.find((tab) => tab.supplier.id === selectedTab);
+                  if (currentTab) {
+                    downloadCSV(
+                      `controle-barris-${currentTab.supplier.name}.csv`,
+                      currentTab.rows,
+                    );
+                  }
                 }}
-              />
-            </TabsContent>
-          ))}
-        </Tabs>
-      )}
-
-      <div className="flex justify-end mr-4 -mt-6">
-        <Button onClick={handleSave}>Salvar Tudo</Button>
-      </div>
-
-      <div className="flex gap-2 justify-end mr-4 -mt-2">
-        <Button
-          onClick={() => {
-            const currentTab = tabs.find((tab) => tab.supplier.id === selectedTab);
-            if (currentTab) {
-              downloadCSV(
-                `controle-barris-${currentTab.supplier.name}.csv`,
-                currentTab.rows,
-              );
-            }
-          }}
-          variant="outline"
-          className="h-8 px-4 text-xs"
-        >
-          Exportar CSV
-        </Button>
+                variant="outline"
+                className="w-full sm:w-auto"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Exportar CSV
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
 
       {showConfirmDelete && (

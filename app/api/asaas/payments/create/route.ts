@@ -9,6 +9,7 @@ const bodySchema = z.object({
   appointmentDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "appointmentDate deve ser YYYY-MM-DD"),
+  daysTicket: z.number().int().nonnegative().optional(),
   description: z.string().optional(),
   postalService: z.boolean().optional(),
   discountValue: z.number().nonnegative().optional(),
@@ -38,6 +39,7 @@ export async function POST(req: Request) {
       customerId,
       value,
       appointmentDate,
+      daysTicket,
       description,
       postalService,
       discountValue,
@@ -48,9 +50,9 @@ export async function POST(req: Request) {
     } = bodySchema.parse(await req.json());
 
     const base = new Date(`${appointmentDate}T00:00:00`);
-    const plus12 = new Date(base);
-    plus12.setDate(plus12.getDate() + 12);
-    const dueDate = plus12.toISOString().slice(0, 10);
+    const dateToCalculate = new Date(base);
+    dateToCalculate.setDate(dateToCalculate.getDate() + (daysTicket ?? 12));
+    const dueDate = dateToCalculate.toISOString().slice(0, 10);
 
     const idFilter =
       typeof customerId === "number" ? String(customerId) : customerId;

@@ -89,17 +89,19 @@ export async function POST(req: Request) {
 
     const { data, mensagem_sefaz } = res;
 
+    const payloadToUpdate: any = {};
+    
+    if (data?.status) payloadToUpdate.status = data.status;
+    if (data?.numero) payloadToUpdate.numero = data.numero;
+    if (data?.serie) payloadToUpdate.serie = data.serie;
+    if (data?.chave) payloadToUpdate.chave_nfe = data.chave;
+    if (data?.xml_url) payloadToUpdate.xml_url = data.xml_url;
+    if (data?.danfe_url) payloadToUpdate.danfe_url = data.danfe_url;
+    if (data?.data_emissao) payloadToUpdate.data_emissao = data.data_emissao;
+
     const { error: updateError } = await supabase
       .from("invoices")
-      .update({
-        status: data?.status ?? null,
-        numero: data?.numero ?? null,
-        serie: data?.serie ?? null,
-        chave_nfe: data?.chave ?? null,
-        xml_url: data?.xml_url ?? null,
-        danfe_url: data?.danfe_url ?? null,
-        data_emissao: data?.data_emissao ?? null,
-      })
+      .update(payloadToUpdate)
       .eq("ref", ref)
       .eq("company_id", companyId);
 

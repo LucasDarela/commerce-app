@@ -76,7 +76,7 @@ export function ReturnEquipmentModal({
 }: Props) {
   const supabase = createBrowserSupabaseClient();
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
-  const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [quantities, setQuantities] = useState<Record<string, number | "">>({});
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -95,11 +95,12 @@ export function ReturnEquipmentModal({
       .map((group) => {
         const isSelected = selectedItems.includes(group.equipmentName);
 
+        const qtyVal = quantities[group.equipmentName];
         const selectedQty = isSelected
-          ? quantities[group.equipmentName] ?? group.totalQuantity
+          ? (qtyVal === "" ? 0 : (qtyVal ?? group.totalQuantity))
           : 0;
 
-        const remainingQty = Math.max(group.totalQuantity - selectedQty, 0);
+        const remainingQty = Math.max(group.totalQuantity - Number(selectedQty), 0);
 
         return {
           equipmentName: group.equipmentName,
@@ -150,8 +151,9 @@ export function ReturnEquipmentModal({
 
         if (!group) continue;
 
+        const qVal = quantities[equipmentName];
         let remainingToReturn =
-          quantities[equipmentName] ?? group.totalQuantity;
+          qVal === "" || qVal === undefined ? group.totalQuantity : Number(qVal);
 
         for (const original of group.originalItems) {
           if (remainingToReturn <= 0) break;
@@ -253,15 +255,33 @@ export function ReturnEquipmentModal({
                         : ""
                     }
                     onChange={(e) => {
-                      const parsed = parseInt(e.target.value, 10);
+                      const val = e.target.value;
+                      if (val === "") {
+                        setQuantities((prev) => ({
+                          ...prev,
+                          [group.equipmentName]: "",
+                        }));
+                        return;
+                      }
+
+                      const parsed = parseInt(val, 10);
                       const safeValue = Number.isNaN(parsed)
-                        ? 1
-                        : Math.max(1, Math.min(group.totalQuantity, parsed));
+                        ? ""
+                        : Math.min(group.totalQuantity, Math.max(0, parsed));
 
                       setQuantities((prev) => ({
                         ...prev,
                         [group.equipmentName]: safeValue,
                       }));
+                    }}
+                    onBlur={(e) => {
+                       const val = quantities[group.equipmentName];
+                       if (val === "" || val === 0) {
+                         setQuantities((prev) => ({
+                           ...prev,
+                           [group.equipmentName]: 1,
+                         }));
+                       }
                     }}
                     className="w-16 border rounded px-2 py-1 text-sm"
                   />

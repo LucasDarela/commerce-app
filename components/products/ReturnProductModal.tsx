@@ -37,7 +37,7 @@ export function ReturnProductModal({
   const supabase = createBrowserSupabaseClient();   
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [returnQuantities, setReturnQuantities] = useState<
-    Record<string, number>
+    Record<string, number | "">
   >({});
   const [loading, setLoading] = useState(false);
 
@@ -59,7 +59,8 @@ export function ReturnProductModal({
       const productsToReturn = selectedProductIds
         .map((productId) => {
           const originalItem = (items ?? []).find((item) => item.id === productId);
-          const requestedQuantity = returnQuantities[productId] ?? 0;
+          const qVal = returnQuantities[productId];
+          const requestedQuantity = qVal === "" || qVal === undefined ? 0 : Number(qVal);
           const maxQuantity = Number(originalItem?.quantity ?? 0);
 
           return {
@@ -171,6 +172,11 @@ export function ReturnProductModal({
     });
   };
 
+  const hasItemsToReturn = selectedProductIds.some((id) => {
+    const raw = returnQuantities[id];
+    return raw !== "" && raw !== undefined && raw > 0;
+  });
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent>
@@ -200,12 +206,25 @@ export function ReturnProductModal({
               disabled={!selectedProductIds.includes(item.id)}
               value={returnQuantities[item.id] ?? ""}
               onChange={(e) => {
-                const raw = Number(e.target.value);
-                const clamped = Math.max(1, Math.min(raw, item.quantity));
+                const val = e.target.value;
+                if (val === "") {
+                  setReturnQuantities((prev) => ({ ...prev, [item.id]: "" }));
+                  return;
+                }
+                const raw = parseInt(val, 10);
+                if (Number.isNaN(raw)) return;
+
+                const clamped = Math.max(0, Math.min(raw, item.quantity));
                 setReturnQuantities((prev) => ({
                   ...prev,
-                  [item.id]: Number.isNaN(clamped) ? 1 : clamped,
+                  [item.id]: clamped,
                 }));
+              }}
+              onBlur={(e) => {
+                const val = returnQuantities[item.id];
+                if (val === "" || val === 0) {
+                  setReturnQuantities((prev) => ({ ...prev, [item.id]: 1 }));
+                }
               }}
               className="w-16 text-sm"
             />
@@ -214,7 +233,7 @@ export function ReturnProductModal({
 
         <DialogFooter>
           <Button onClick={handleConfirm} disabled={loading}>
-            {loading ? "Salvando..." : "Confirmar Retorno"}
+            {loading ? "Salvando..." : (hasItemsToReturn ? "Confirmar Retorno" : "Nenhum Produto Devolvido")}
           </Button>
         </DialogFooter>
       </DialogContent>

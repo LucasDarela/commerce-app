@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 
 function formatYMD(d: Date) {
   return d.toISOString().slice(0, 10);
@@ -36,10 +37,12 @@ export function GenerateBoletoButtons({
   orderId,
   paymentMethod,
   signatureData,
+  asDropdownItem,
 }: {
   orderId: string;
   paymentMethod: string;
-  signatureData: string;
+  signatureData?: string;
+  asDropdownItem?: boolean;
 }) {
   const supabase = createBrowserSupabaseClient();
   const [provider, setProvider] = useState<Provider>(null);
@@ -85,6 +88,7 @@ export function GenerateBoletoButtons({
       <GenerateBoletoAsaasButton
         orderId={orderId}
         paymentMethod={paymentMethod}
+        asDropdownItem={asDropdownItem}
       />
     );
   }
@@ -92,7 +96,8 @@ export function GenerateBoletoButtons({
     <GenerateBoletoMPButton
       orderId={orderId}
       paymentMethod={paymentMethod}
-      signatureData={signatureData}
+      signatureData={signatureData || ""}
+      asDropdownItem={asDropdownItem}
     />
   );
 }
@@ -102,10 +107,12 @@ function GenerateBoletoMPButton({
   orderId,
   paymentMethod,
   signatureData,
+  asDropdownItem,
 }: {
   orderId: string;
   paymentMethod: string;
   signatureData: string;
+  asDropdownItem?: boolean;
 }) {
   const supabase = createBrowserSupabaseClient();
   const [loading, setLoading] = useState(false);
@@ -188,6 +195,14 @@ function GenerateBoletoMPButton({
 
   if (!paymentMethod || paymentMethod.toLowerCase() !== "boleto") return null;
 
+  if (asDropdownItem) {
+    return (
+      <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleGenerateBoleto(); }} disabled={loading}>
+        {loading ? "Gerando Boleto (MP)..." : "Gerar Boleto (Mercado Pago)"}
+      </DropdownMenuItem>
+    );
+  }
+
   return (
     <Button onClick={handleGenerateBoleto} disabled={loading} variant="default">
       {loading ? "Gerando Boleto (MP)..." : "Gerar Boleto (Mercado Pago)"}
@@ -199,9 +214,11 @@ function GenerateBoletoMPButton({
 function GenerateBoletoAsaasButton({
   orderId,
   paymentMethod,
+  asDropdownItem,
 }: {
   orderId: string;
   paymentMethod: string;
+  asDropdownItem?: boolean;
 }) {
   const supabase = createBrowserSupabaseClient();
   const [loading, setLoading] = useState(false);
@@ -242,6 +259,7 @@ function GenerateBoletoAsaasButton({
           customerId: cliente.id,
           value,
           appointmentDate: appt,
+          daysTicket: Number(order.days_ticket || 0),
           description: `Pedido #${order.note_number}`,
         }),
       });
@@ -272,13 +290,21 @@ function GenerateBoletoAsaasButton({
 
   if (!paymentMethod || paymentMethod.toLowerCase() !== "boleto") return null;
 
+  if (asDropdownItem) {
+    return (
+      <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleGenerateBoletoAsaas(); }} disabled={loading}>
+        {loading ? "Gerando Boleto ..." : "Gerar Boleto"}
+      </DropdownMenuItem>
+    );
+  }
+
   return (
     <Button
       onClick={handleGenerateBoletoAsaas}
       disabled={loading}
       variant="default"
     >
-      {loading ? "Gerando Boleto (Asaas)..." : "Gerar Boleto (Asaas)"}
+      {loading ? "Gerando Boleto..." : "Gerar Boleto"}
     </Button>
   );
 }
