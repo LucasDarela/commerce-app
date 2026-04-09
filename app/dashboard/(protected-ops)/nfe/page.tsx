@@ -136,7 +136,7 @@ useEffect(() => {
     const inFlight = new Set<string>();
 
     const intervalId = setInterval(() => {
-      // Polling de status para notas em processamento
+      // Polling de status apenas para notas que REALMENTE estão processando
       processingInvoices.forEach(async (inv) => {
         try {
           await fetch("/api/nfe/status", {
@@ -147,15 +147,15 @@ useEffect(() => {
         } catch (_) {}
       });
 
-      // Busca automática de links para notas autorizadas sem DANFE/XML
+      // Busca automática de links apenas para notas RECENTES e com poucas tentativas
       authorizedWithoutLinks.forEach(async (inv) => {
-        if (inFlight.has(inv.id)) return; // já há chamada em andamento
+        if (inFlight.has(inv.id)) return;
         const fails = fetchLinksFailures.current.get(inv.id) ?? 0;
-        if (fails >= MAX_LINK_RETRIES) return; // desistiu — não tenta mais
+        if (fails >= MAX_LINK_RETRIES) return;
 
         inFlight.add(inv.id);
         try {
-          const res = await fetch("/api/nfe/fetch-links", {
+          await fetch("/api/nfe/fetch-links", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -164,47 +164,14 @@ useEffect(() => {
               invoiceId: inv.id,
             }),
           });
-
-          if (!res.ok) {
-            // Incrementa contagem de falhas
-            fetchLinksFailures.current.set(inv.id, fails + 1);
-            if (fails + 1 >= MAX_LINK_RETRIES) {
-              console.warn(
-                `[NFe poll] Desistindo de buscar links para invoice ${inv.id} após ${MAX_LINK_RETRIES} tentativas.`,
-              );
-            }
-          } else {
-            // Sucesso — zera o contador de falhas
-            fetchLinksFailures.current.delete(inv.id);
-            const json = await res.json();
-            if (json?.data) {
-              const d = json.data;
-              setInvoices((prev) =>
-                prev.map((n) =>
-                  n.id === inv.id
-                    ? {
-                        ...n,
-                        numero: d.numero ?? n.numero,
-                        serie: d.serie ?? n.serie,
-                        chave_nfe: d.chave ?? n.chave_nfe,
-                        xml_url: d.xml_url ?? n.xml_url,
-                        danfe_url: d.danfe_url ?? n.danfe_url,
-                        // preserva data_emissao existente se Focus não retornar
-                        data_emissao: d.data_emissao ?? n.data_emissao,
-                        status: d.status ?? n.status,
-                      }
-                    : n,
-                ),
-              );
-            }
-          }
+          // Nota: O Realtime se encarrega de atualizar a UI quando o banco mudar
         } catch (_) {
           fetchLinksFailures.current.set(inv.id, fails + 1);
         } finally {
           inFlight.delete(inv.id);
         }
       });
-    }, 8000);
+    }, 20000); // Aumentado para 20 segundos (Redução de 60% nas chamadas de polling)
 
     return () => clearInterval(intervalId);
   }, [companyId, invoices]);

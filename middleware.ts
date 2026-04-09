@@ -47,9 +47,13 @@ function createSupabaseMiddlewareClient(req: NextRequest, res: NextResponse) {
 export async function middleware(req: NextRequest) {
   const { pathname, hostname, search } = req.nextUrl;
 
-  if (isStatic(pathname)) {
-    return NextResponse.next();
-  }
+  const res = NextResponse.next();
+  const supabase = createSupabaseMiddlewareClient(req, res);
+
+  // Chamamos getUser apenas UMA VEZ e reaproveitamos o resultado
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (hostname === "chopphub.com") {
     return NextResponse.redirect(
@@ -58,16 +62,7 @@ export async function middleware(req: NextRequest) {
     );
   }
 
-  const res = NextResponse.next();
-  const supabase = createSupabaseMiddlewareClient(req, res);
-
-  await supabase.auth.getUser();
-
   if (pathname.startsWith("/dashboard")) {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
     if (!user) {
       return NextResponse.redirect(new URL("/login-signin", req.url));
     }
@@ -77,5 +72,14 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public files with extensions
+     */
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map|txt)$).*)",
+  ],
 };

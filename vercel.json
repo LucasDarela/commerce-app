@@ -3,6 +3,10 @@
     {
       "path": "/api/asaas/process-reminders",
       "schedule": "30 11 * * *"
+    },
+    {
+      "path": "/api/nfe/cron/fetch-links",
+      "schedule": "0 * * * *"
     }
   ]
 }

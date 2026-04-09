@@ -18,6 +18,7 @@ export async function sendBoletoEmailIfReady(
   supabase: SupabaseClient,
   reminderType: BoletoReminderType = "emission"
 ): Promise<{ sent: boolean; reason?: string }> {
+  console.log(`[sendBoletoEmail] [${reminderType}] Iniciando processo para orderId: ${orderId}`);
   try {
     // 1. Definição da coluna de controle baseada no tipo
     const typeToColumn: Record<BoletoReminderType, string> = {
@@ -39,27 +40,31 @@ export async function sendBoletoEmailIfReady(
       .maybeSingle();
 
     if (orderErr || !order) {
-      console.warn("[sendBoletoEmail] Pedido não encontrado:", orderErr?.message);
+      console.warn("[sendBoletoEmail] Pedido não encontrado ou erro:", orderErr?.message);
       return { sent: false, reason: "order_not_found" };
     }
 
     // 3. Idempotência: Já enviamos esse tipo específico de lembrete?
     if ((order as any)[statusColumn]) {
+      console.log(`[sendBoletoEmail] [${reminderType}] Já enviado anteriormente em: ${(order as any)[statusColumn]}`);
       return { sent: false, reason: "already_sent" };
     }
 
     // 4. Se for lembrete de atraso ou hoje, só envia se ainda não estiver pago
     if (reminderType !== "emission" && order.payment_status === "Paid") {
+      console.log(`[sendBoletoEmail] [${reminderType}] Pedido já está pago, pulando lembrete.`);
       return { sent: false, reason: "already_paid" };
     }
 
     // 5. Verifica se tem os dados do boleto
     if (!order.boleto_url) {
+      console.warn("[sendBoletoEmail] Boleto sem URL no banco de dados.");
       return { sent: false, reason: "no_boleto_url" };
     }
 
     // 6. Busca email do cliente
     if (!order.customer_id) {
+      console.warn("[sendBoletoEmail] Pedido sem customer_id.");
       return { sent: false, reason: "no_customer_id" };
     }
 
@@ -70,6 +75,7 @@ export async function sendBoletoEmailIfReady(
       .maybeSingle();
 
     if (custErr || !customer?.email?.trim()) {
+      console.warn("[sendBoletoEmail] Cliente sem email ou erro ao buscar:", custErr?.message);
       return { sent: false, reason: "no_customer_email" };
     }
 
@@ -150,9 +156,6 @@ export async function sendBoletoEmailIfReady(
       .update({ [statusColumn]: new Date().toISOString() })
       .eq("id", orderId);
 
-    console.log(
-      `[sendBoletoEmail] [${reminderType}] Lembrete do pedido ${orderRef} enviado para ${customer.email}`
-    );
     return { sent: true };
   } catch (err: any) {
     console.error("[sendBoletoEmail] Erro inesperado:", err?.message ?? err);

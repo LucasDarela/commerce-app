@@ -61,6 +61,7 @@ export default function ListCustomers() {
   const { user, companyId, loading } = useAuthenticatedCompany();
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [search, setSearch] = useState<string>("");
+  const [debouncedSearch, setDebouncedSearch] = useState<string>("");
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [catalogName, setCatalogName] = useState<string | null>(null);
@@ -108,7 +109,16 @@ export default function ListCustomers() {
     };
 
     fetchCustomers();
-  }, [companyId, loading, search]);
+  }, [companyId, loading, debouncedSearch]);
+
+  // Debounce effect
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 500); // 500ms delay
+
+    return () => clearTimeout(timer);
+  }, [search]);
 
   // 🔹 Normaliza texto (remove acentos e converte para minúsculas)
   const normalizeText = (text: string) => {
