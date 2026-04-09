@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { asaasFetch } from "@/lib/asaas";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { sendBoletoEmailIfReady } from "@/lib/asaas/sendBoletoEmail";
 
 const bodySchema = z.object({
   customerId: z.union([z.string(), z.number()]),
@@ -177,6 +178,11 @@ if (orderId) {
         console.error(
           "❌ Falha ao atualizar order com dados do boleto:",
           updErr.message,
+        );
+      } else {
+        // Envio automático de e-mail do boleto
+        sendBoletoEmailIfReady(orderId, companyId, supabase).catch((err) =>
+          console.error("[asaas/payments/create] Erro ao disparar email:", err),
         );
       }
     }

@@ -6,6 +6,7 @@ import {
   parseDateToYmd,
   plusDays,
 } from "../../_utils";
+import { sendBoletoEmailIfReady } from "@/lib/asaas/sendBoletoEmail";
 
 type Params = {
   params: Promise<{ orderId: string }>;
@@ -205,6 +206,11 @@ try {
         { status: 500 },
       );
     }
+
+    // Envio automático de e-mail do boleto via Resend
+    sendBoletoEmailIfReady(orderId, companyId, supabase).catch((err) =>
+      console.error("[mobile/emit-boleto] Erro ao disparar email:", err),
+    );
 
     return NextResponse.json(
       {

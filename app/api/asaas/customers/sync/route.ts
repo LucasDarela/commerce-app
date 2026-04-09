@@ -62,6 +62,7 @@ function mapToAsaasCustomer(row: any): AsaasCustomer & Record<string, any> {
     company: row?.fantasy_name || undefined,
     stateInscription: row?.state_registration || undefined,
     externalReference: row?.id,
+    notificationDisabled: true,
   };
 }
 

@@ -15,6 +15,7 @@ export type AsaasCustomer = {
   complement?: string;
   province?: string;
   postalCode?: string;
+  notificationDisabled?: boolean;
 };
 
 function baseUrl(env: AsaasEnv) {
@@ -193,6 +194,7 @@ export function diffCustomer(
       "complement",
       "province",
       "postalCode",
+      "notificationDisabled",
     ] as const
   ).forEach((k) => {
     const cur = current?.[k];

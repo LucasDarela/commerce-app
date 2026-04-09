@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/asaas/process-reminders",
+      "schedule": "30 11 * * *"
+    }
+  ]
+}
