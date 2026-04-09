@@ -14,10 +14,11 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { useState } from "react";
-import { toast } from "sonner";
+import { useSearchParams } from "next/navigation";
 import { PasswordInput } from "../ui/password-input";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 const formSchema = z.object({
   email: z
@@ -36,6 +37,14 @@ export function LoginAccountForm() {
   const [sendingReset, setSendingReset] = useState(false);
 
   const supabase = createBrowserSupabaseClient();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const error = searchParams.get("error");
+    if (error === "multiple_sessions") {
+      toast.error("Sua sessão expirou pois você logou em outro dispositivo.");
+    }
+  }, [searchParams]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -108,6 +117,22 @@ export function LoginAccountForm() {
       if (!user || !session) {
         toast.error("Sessão não criada após o login.");
         return;
+      }
+
+      // ✅ Gera um identificador único para esta sessão
+      const sessionMarker = Math.random().toString(36).substring(2) + Date.now().toString(36);
+
+      // ✅ Grava o ID da nova sessão no banco para invalidar sessões antigas
+      const { error: sessionUpdateError } = await supabase
+        .from("profiles")
+        .update({ current_session_id: sessionMarker })
+        .eq("id", user.id);
+
+      if (sessionUpdateError) {
+        console.error("Erro ao registrar sessão:", sessionUpdateError);
+      } else {
+        // ✅ Salva o marcador localmente para o middleware validar
+        document.cookie = `session_marker=${sessionMarker}; path=/; max-age=2592000; SameSite=Lax`;
       }
 
       const { data: companyUser, error: companyUserError } = await supabase

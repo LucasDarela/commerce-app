@@ -3,6 +3,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Analytics } from "@vercel/analytics/next";
+import { SessionWatcher } from "@/components/auth/SessionWatcher";
 
 export default function SidebarLayout({
   children,
@@ -20,6 +21,7 @@ export default function SidebarLayout({
     >
       <AppSidebar variant="inset" />
       <SidebarInset>
+        <SessionWatcher />
         <SiteHeader />
         {children}
       </SidebarInset>

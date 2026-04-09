@@ -66,6 +66,28 @@ export async function middleware(req: NextRequest) {
     if (!user) {
       return NextResponse.redirect(new URL("/login-signin", req.url));
     }
+
+    // ✅ Validação de Sessão Única
+    const sessionMarker = req.cookies.get("session_marker")?.value;
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("current_session_id")
+      .eq("id", user.id)
+      .single();
+
+    if (profile?.current_session_id && profile.current_session_id !== sessionMarker) {
+      // Sessão foi invalidada por um login mais recente
+      console.log(`[Middleware] Sessão invalidada para o usuário ${user.id}.`);
+      
+      const response = NextResponse.redirect(new URL("/login-signin?error=multiple_sessions", req.url));
+      
+      // Limpa os cookies de autenticação e o marcador
+      await supabase.auth.signOut();
+      response.cookies.delete("session_marker");
+      
+      return response;
+    }
   }
 
   return res;
