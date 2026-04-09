@@ -25,9 +25,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Chopp Hub",
+  title: "Chopp Hub - Sistema para distribuidora de chopp",
   description:
-    "Gerencie sua distribuidora de Chopp com muito mais segurança e agilidade.",
+    "Controle pedidos, estoque, entregas, rotas e financeiro da sua distribuidora em um único sistema.",
   icons: {
     icon: [
       { url: "/favicon-16x16.png", type: "image/png", sizes: "16x16" },

@@ -7,6 +7,9 @@ import {
   IconBarcode,
   IconCurrencyDollar,
   IconBox,
+  IconTruckDelivery,
+  IconDeviceMobile,
+  IconShieldLock,
 } from "@tabler/icons-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -23,31 +26,49 @@ export default function Functionalities() {
       title: "Saiba exatamente o que entrou, saiu e ainda está disponível",
       icon: <IconBox className="mx-auto h-8 w-8 text-primary" />,
       description:
-        "Seu estoque é atualizado automaticamente a cada venda, devolução ou entrada de mercadoria, evitando erros e falta de produto.",
+        "Seu estoque é atualizado automaticamente a cada venda, devolução ou entrada de mercadoria, evitando erros, perdas e falta de produto.",
     },
     {
-      title: "Entregas mais organizadas, operação mais eficiente",
+      title: "Entregas e coletas mais organizadas",
       icon: <IconCalendar className="mx-auto h-8 w-8 text-primary" />,
       description:
-        "Defina data, hora e local de entrega ou coleta e mantenha sua logística diária sob controle.",
+        "Saiba exatamente o que precisa ser entregue, coletado e o que já foi finalizado no dia, sem depender de anotações soltas ou memória.",
     },
     {
-      title: "Emita NF-e sem complicação",
+      title: "Emita NF-e quando quiser, sem travar sua operação",
       icon: <IconFileInvoice className="mx-auto h-8 w-8 text-primary" />,
       description:
-        "Gere notas fiscais direto no sistema, com muito mais agilidade e menos risco de erro no processo.",
+        "Você decide de qual pedido deseja emitir nota fiscal. Se não precisar emitir, o sistema continua funcionando normalmente, sem burocracia desnecessária.",
     },
     {
-      title: "Cobrança mais simples e profissional",
+      title: "Boletos gerados com mais praticidade",
       icon: <IconBarcode className="mx-auto h-8 w-8 text-primary" />,
       description:
-        "Gere boletos com vencimento automático, envie ao cliente e tenha mais controle sobre o recebimento.",
+        "Gere boletos de forma simples, com mais organização na cobrança e no acompanhamento dos recebimentos da sua distribuidora.",
     },
     {
       title: "Tenha clareza do dinheiro que entra e do que sai",
       icon: <IconCurrencyDollar className="mx-auto h-8 w-8 text-primary" />,
       description:
-        "Acompanhe contas a pagar, contas a receber, fluxo de caixa e pagamentos em um painel muito mais organizado.",
+        "Acompanhe contas a pagar, contas a receber, pagamentos pendentes e o financeiro da empresa com muito mais controle.",
+    },
+    {
+      title: "Motorista pode dar baixa na entrega pelo celular",
+      icon: <IconDeviceMobile className="mx-auto h-8 w-8 text-primary" />,
+      description:
+        "Seu motorista acessa o sistema pelo celular e atualiza a entrega em tempo real, reduzindo ligações, mensagens e falta de informação no dia a dia.",
+    },
+    {
+      title: "Acesso do motorista limitado ao que realmente importa",
+      icon: <IconShieldLock className="mx-auto h-8 w-8 text-primary" />,
+      description:
+        "O motorista não tem acesso ao financeiro da empresa nem a áreas sensíveis do sistema. Cada perfil visualiza apenas o que precisa para trabalhar.",
+    },
+    {
+      title: "Relatórios para enxergar melhor sua operação",
+      icon: <IconTruckDelivery className="mx-auto h-8 w-8 text-primary" />,
+      description:
+        "Visualize relatórios de vendas, estoque, comodatos, equipamentos e produtos para identificar gargalos, melhorar a gestão e tomar decisões com mais segurança.",
     },
   ];
 
@@ -55,13 +76,13 @@ export default function Functionalities() {
     <section id="features" className="max-w-6xl mx-auto py-20 text-center">
       <div className="section-heading section-header px-6">
         <h2 className="section-title text-primary">
-          Tudo o que sua distribuidora precisa para vender mais e errar menos
+          Tudo o que sua distribuidora de bebidas precisa para vender mais
         </h2>
 
         <p className="section-description mt-5 text-muted-foreground max-w-3xl mx-auto">
           Pare de depender de planilhas, controles soltos e processos manuais.
           O Chopp Hub centraliza pedidos, estoque, entregas, notas fiscais,
-          boletos e financeiro em uma única plataforma.
+          boletos, financeiro e operação em uma única plataforma.
         </p>
       </div>
 
