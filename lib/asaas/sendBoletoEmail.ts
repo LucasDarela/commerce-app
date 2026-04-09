@@ -28,11 +28,11 @@ export async function sendBoletoEmailIfReady(
     };
     const statusColumn = typeToColumn[reminderType];
 
-    // 2. Busca os dados do pedido
+    // 2. Busca os dados do pedido (listamos todas as colunas explicitamente para evitar erro de parse do TS)
     const { data: order, error: orderErr } = await supabase
       .from("orders")
       .select(
-        `id, total, boleto_url, boleto_digitable_line, due_date, customer_id, customer, note_number, payment_status, ${statusColumn}`
+        "id, total, boleto_url, boleto_digitable_line, due_date, customer_id, customer, note_number, payment_status, boleto_email_sent_at, reminder_3d_before_sent_at, reminder_today_sent_at, reminder_3d_after_sent_at"
       )
       .eq("id", orderId)
       .eq("company_id", companyId)
