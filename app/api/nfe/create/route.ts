@@ -4,6 +4,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { emitInvoice } from "@/lib/focus-nfe/emitInvoice";
 import { invoiceSchema } from "@/lib/focus-nfe/invoiceSchema";
 import { fetchInvoiceStatus } from "@/lib/focus-nfe/fetchInvoiceStatus";
+import { sendNfeEmailIfReady } from "@/lib/nfe/sendNfeEmail";
 
 export async function POST(req: Request) {
   try {
@@ -257,6 +258,23 @@ export async function POST(req: Request) {
 
         result.xml_url = res.data.xml_url ?? result.xml_url;
         result.danfe_url = res.data.danfe_url ?? result.danfe_url;
+      }
+    }
+
+    // Tenta enviar o email da NF-e para o cliente de forma assíncrona
+    // (não bloqueia a resposta se o envio falhar)
+    if (isAuth) {
+      const { data: savedInvoice } = await supabase
+        .from("invoices")
+        .select("id")
+        .eq("ref", invoiceData.ref)
+        .eq("company_id", companyId)
+        .maybeSingle();
+
+      if (savedInvoice?.id) {
+        sendNfeEmailIfReady(savedInvoice.id, companyId, supabase).catch((err) =>
+          console.error("[NFe create] Erro ao enviar email:", err),
+        );
       }
     }
 

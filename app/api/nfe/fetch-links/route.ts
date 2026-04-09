@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { fetchInvoiceStatus } from "@/lib/focus-nfe/fetchInvoiceStatus";
 import { fetchAndStoreNfeFiles } from "@/lib/focus-nfe/fetchAndStoreNfeFiles";
+import { sendNfeEmailIfReady } from "@/lib/nfe/sendNfeEmail";
 
 async function createSupabaseRouteClient() {
   const cookieStore = await cookies();
@@ -100,7 +101,9 @@ export async function POST(req: Request) {
         chave_nfe: d.chave ?? null,
         xml_url: d.xml_url ?? null,
         danfe_url: d.danfe_url ?? null,
-        data_emissao: toIso(d.data_emissao) ?? null,
+        // Só atualiza data_emissao se a Focus retornou um valor válido;
+        // caso contrário preserva o que já está no banco.
+        ...(toIso(d.data_emissao) ? { data_emissao: toIso(d.data_emissao) } : {}),
         status: d.status ?? null,
       })
       .eq("ref", ref)
@@ -108,6 +111,14 @@ export async function POST(req: Request) {
 
     if (upErr) {
       return NextResponse.json({ error: upErr.message }, { status: 500 });
+    }
+
+    // Dispara o envio do email de forma assíncrona após atualizar os links
+    if (invoiceId && isAuth) {
+      const companyIdForEmail = companyId as string;
+      sendNfeEmailIfReady(invoiceId, companyIdForEmail, supabase).catch(
+        (err) => console.error("[fetch-links] Erro ao enviar email NF-e:", err),
+      );
     }
 
     return NextResponse.json({

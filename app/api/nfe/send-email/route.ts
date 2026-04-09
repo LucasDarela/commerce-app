@@ -1,52 +1,21 @@
-import { cookies } from "next/headers";
-import { createServerClient, type CookieOptions } from "@supabase/ssr";
-import sgMail from "@sendgrid/mail";
-
-async function createSupabaseRouteClient() {
-  const cookieStore = await cookies();
-
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(
-          cookiesToSet: { name: string; value: string; options?: CookieOptions }[],
-        ) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) => {
-              cookieStore.set(name, value, options);
-            });
-          } catch {
-            // sem alterar comportamento
-          }
-        },
-      },
-    },
-  );
-}
+// app/api/nfe/send-email/route.ts
+import { NextResponse } from "next/server";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { sendNfeEmailIfReady } from "@/lib/nfe/sendNfeEmail";
 
 export async function POST(req: Request) {
   try {
-    const supabase = await createSupabaseRouteClient();
-    const { refId, toEmail, subject, body } = await req.json();
+    const supabase = await createServerSupabaseClient();
 
-    // 1️⃣ Usuário autenticado
     const {
       data: { user },
+      error: userError,
     } = await supabase.auth.getUser();
 
-    if (!user) {
-      return Response.json(
-        { error: "Usuário não autenticado" },
-        { status: 401 },
-      );
+    if (userError || !user) {
+      return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
     }
 
-    // 2️⃣ Pega company_id do usuário
     const { data: companyUser } = await supabase
       .from("company_users")
       .select("company_id")
@@ -54,87 +23,30 @@ export async function POST(req: Request) {
       .maybeSingle();
 
     if (!companyUser?.company_id) {
-      return Response.json(
+      return NextResponse.json(
         { error: "Empresa não encontrada" },
-        { status: 401 },
+        { status: 403 },
       );
     }
 
     const companyId = companyUser.company_id;
+    const body = await req.json();
+    const { invoiceId } = body;
 
-    // 3️⃣ Pega credenciais SendGrid da empresa
-    const { data: creds } = await supabase
-      .from("email_credentials")
-      .select("sendgrid_api_key, sender_email, sender_name")
-      .eq("company_id", companyId)
-      .maybeSingle();
-
-    if (!creds?.sendgrid_api_key) {
-      return Response.json(
-        { error: "Credenciais SendGrid não encontradas" },
-        { status: 401 },
+    if (!invoiceId) {
+      return NextResponse.json(
+        { error: "invoiceId é obrigatório" },
+        { status: 400 },
       );
     }
 
-    sgMail.setApiKey(creds.sendgrid_api_key);
+    const result = await sendNfeEmailIfReady(invoiceId, companyId, supabase);
 
-    // 4️⃣ Busca arquivos PDF e XML direto do bucket
-    const pdfBucket = supabase.storage.from("nfe-files/pdf");
-    const xmlBucket = supabase.storage.from("nfe-files/xml");
-
-    const { data: pdfData, error: pdfError } = await pdfBucket.download(
-      `${refId}.pdf`,
-    );
-    const { data: xmlData, error: xmlError } = await xmlBucket.download(
-      `${refId}.xml`,
-    );
-
-    if (pdfError || xmlError) {
-      return Response.json(
-        { error: "Erro ao buscar arquivos no bucket", pdfError, xmlError },
-        { status: 500 },
-      );
-    }
-
-    const pdfBuffer = Buffer.from(await pdfData.arrayBuffer());
-    const xmlBuffer = Buffer.from(await xmlData.arrayBuffer());
-
-    // 5️⃣ Monta anexos em base64
-    const attachments = [
-      {
-        content: pdfBuffer.toString("base64"),
-        filename: `DANFE-${refId}.pdf`,
-        type: "application/pdf",
-        disposition: "attachment",
-      },
-      {
-        content: xmlBuffer.toString("base64"),
-        filename: `NF-e-${refId}.xml`,
-        type: "application/xml",
-        disposition: "attachment",
-      },
-    ];
-
-    // 6️⃣ Monta e envia e-mail
-    const msg = {
-      to: toEmail,
-      from: {
-        email: creds.sender_email,
-        name: creds.sender_name || "Sua Empresa",
-      },
-      subject: subject || `NF-e ${refId}`,
-      text: body || `Segue em anexo a NF-e ${refId}.`,
-      html: body || `<p>Segue em anexo a NF-e <strong>${refId}</strong>.</p>`,
-      attachments,
-    };
-
-    await sgMail.send(msg);
-
-    return Response.json({ success: true });
+    return NextResponse.json({ success: true, ...result });
   } catch (err: any) {
-    console.error("Erro ao enviar e-mail NF-e:", err);
-    return Response.json(
-      { error: "Erro interno ao enviar e-mail" },
+    console.error("[/api/nfe/send-email] Erro:", err?.message ?? err);
+    return NextResponse.json(
+      { error: "Erro interno ao enviar email" },
       { status: 500 },
     );
   }

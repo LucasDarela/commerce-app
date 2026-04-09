@@ -246,7 +246,13 @@ export async function POST(req: Request) {
       (orderNumber ? ` - Pedido #${orderNumber}` : "") +
       ` - permanece em aberto`;
 
-    const valueLine = `Status Asaas: ${asaasStatus || "—"}`;
+    const statusLabel: Record<string, string> = {
+      OVERDUE: "Boleto vencido sem pagamento",
+      PAYMENT_OVERDUE: "Pagamento em atraso",
+      BANK_SLIP_CANCELLED: "Boleto cancelado pelo banco",
+      PAYMENT_BANK_SLIP_CANCELLED: "Boleto de pagamento cancelado",
+    };
+    const valueLine = statusLabel[asaasStatus] ?? `Status: ${asaasStatus}`;
     const description = `${header}\n${valueLine}`;
 
     const { error: notifErr } = await supabase.from("notifications").insert({

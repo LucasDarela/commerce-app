@@ -40,7 +40,7 @@ export async function POST(req: Request) {
 
   try {
     await resend.emails.send({
-      from: `Contato Website <no-reply@onresend.com>`,
+      from: `Contato Website <no-reply@chopphub.com>`,
       to: [toEmail!],
       subject: "Nova mensagem de contato",
       replyTo: email,

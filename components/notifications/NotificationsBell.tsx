@@ -165,7 +165,14 @@ export default function NotificationBell() {
                       {n.description}
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">
-                      {new Date(n.date).toLocaleString()}
+                      {new Date(n.date).toLocaleString("pt-BR", {
+                        timeZone: "America/Sao_Paulo",
+                        day: "2-digit",
+                        month: "2-digit",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
                     </div>
                   </div>
 

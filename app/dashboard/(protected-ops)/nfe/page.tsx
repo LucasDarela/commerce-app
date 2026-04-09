@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { fetchOrders } from "@/lib/fetchOrders";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
@@ -10,7 +10,6 @@ import FiscalOperationsPage from "@/components/nf/FiscalOperationForm";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
 import { InvoiceStatusIndicator } from "@/components/nf/InvoiceStatusIndicator";
-import FetchLinksButton from "@/components/nf/FetchLinksButton";
 import ViewXmlButton from "@/components/nf/ViewXmlButton";
 import {
   Card,
@@ -105,14 +104,39 @@ useEffect(() => {
   fetchInvoices();
 }, [companyId, supabase]);
 
-  // === 1. Auto-Polling para Notas Fiscales Processando ===
+  // === 1. Auto-Polling: notas em processamento E notas autorizadas sem links ===
+  // Map: invoiceId → número de falhas consecutivas. Após MAX_RETRIES, para de tentar.
+  const fetchLinksFailures = useRef<Map<string, number>>(new Map());
+  const MAX_LINK_RETRIES = 3;
+
   useEffect(() => {
     if (!companyId || invoices.length === 0) return;
 
-    const processingInvoices = invoices.filter(i => isProcessing(i.status));
-    if (processingInvoices.length === 0) return;
+    const processingInvoices = invoices.filter((i) => isProcessing(i.status));
+
+    // Notas mais antigas que 30 dias provavelmente não existirão mais na Focus NFe;
+    // só tentamos buscar links de notas recentes para evitar 502 em loop.
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const authorizedWithoutLinks = invoices.filter(
+      (i) =>
+        isAuthorized(i.status) &&
+        (!i.danfe_url || !i.xml_url) &&
+        // Só notas criadas nos últimos 30 dias
+        new Date(i.created_at) >= thirtyDaysAgo &&
+        // Só inclui notas que ainda não esgotaram as tentativas
+        (fetchLinksFailures.current.get(i.id) ?? 0) < MAX_LINK_RETRIES,
+    );
+
+    if (processingInvoices.length === 0 && authorizedWithoutLinks.length === 0)
+      return;
+
+    // Ref para contrôle de chamadas em andamento (evita sobreposicao)
+    const inFlight = new Set<string>();
 
     const intervalId = setInterval(() => {
+      // Polling de status para notas em processamento
       processingInvoices.forEach(async (inv) => {
         try {
           await fetch("/api/nfe/status", {
@@ -120,7 +144,65 @@ useEffect(() => {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ ref: inv.ref, companyId }),
           });
-        } catch (e) {}
+        } catch (_) {}
+      });
+
+      // Busca automática de links para notas autorizadas sem DANFE/XML
+      authorizedWithoutLinks.forEach(async (inv) => {
+        if (inFlight.has(inv.id)) return; // já há chamada em andamento
+        const fails = fetchLinksFailures.current.get(inv.id) ?? 0;
+        if (fails >= MAX_LINK_RETRIES) return; // desistiu — não tenta mais
+
+        inFlight.add(inv.id);
+        try {
+          const res = await fetch("/api/nfe/fetch-links", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              ref: inv.ref,
+              companyId,
+              invoiceId: inv.id,
+            }),
+          });
+
+          if (!res.ok) {
+            // Incrementa contagem de falhas
+            fetchLinksFailures.current.set(inv.id, fails + 1);
+            if (fails + 1 >= MAX_LINK_RETRIES) {
+              console.warn(
+                `[NFe poll] Desistindo de buscar links para invoice ${inv.id} após ${MAX_LINK_RETRIES} tentativas.`,
+              );
+            }
+          } else {
+            // Sucesso — zera o contador de falhas
+            fetchLinksFailures.current.delete(inv.id);
+            const json = await res.json();
+            if (json?.data) {
+              const d = json.data;
+              setInvoices((prev) =>
+                prev.map((n) =>
+                  n.id === inv.id
+                    ? {
+                        ...n,
+                        numero: d.numero ?? n.numero,
+                        serie: d.serie ?? n.serie,
+                        chave_nfe: d.chave ?? n.chave_nfe,
+                        xml_url: d.xml_url ?? n.xml_url,
+                        danfe_url: d.danfe_url ?? n.danfe_url,
+                        // preserva data_emissao existente se Focus não retornar
+                        data_emissao: d.data_emissao ?? n.data_emissao,
+                        status: d.status ?? n.status,
+                      }
+                    : n,
+                ),
+              );
+            }
+          }
+        } catch (_) {
+          fetchLinksFailures.current.set(inv.id, fails + 1);
+        } finally {
+          inFlight.delete(inv.id);
+        }
       });
     }, 8000);
 
@@ -279,7 +361,9 @@ useEffect(() => {
                 <div>
                   Emissão:{" "}
                   {invoice.data_emissao
-                    ? new Date(invoice.data_emissao).toLocaleDateString("pt-BR")
+                    ? new Date(invoice.data_emissao).toLocaleDateString("pt-BR", {
+                        timeZone: "UTC",
+                      })
                     : "--"}
                 </div>
                 <div>
@@ -340,12 +424,9 @@ useEffect(() => {
 
               {isAuthorized(invoice.status) &&
                 (!invoice.danfe_url || !invoice.xml_url) && (
-                  <FetchLinksButton
-                    refId={invoice.ref}
-                    companyId={invoice.company_id}
-                    invoiceId={invoice.id}
-                    setInvoices={setInvoices}
-                  />
+                  <span className="text-xs text-muted-foreground animate-pulse">
+                    ⏳ Buscando XML/DANFE...
+                  </span>
                 )}
               <NfeActionsDropdown
                 refId={invoice.ref}
