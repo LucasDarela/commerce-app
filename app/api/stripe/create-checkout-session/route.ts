@@ -31,7 +31,7 @@ const supabase = createClient(
 
 export async function POST(req: Request) {
   try {
-    const { priceId, companyId } = await req.json();
+    const { priceId, companyId, addOnPriceId } = await req.json();
 
     if (!priceId) {
       return NextResponse.json({ error: "priceId obrigatório" }, { status: 400 });
@@ -41,10 +41,22 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "companyId obrigatório" }, { status: 400 });
     }
 
+    // Configuração de IDs que permitem trial
+    const TRIAL_ALLOWED_PLANS = [
+      "price_1TKV9t4Ik5RguVVSjcoyxCkh", // Essential Mensal
+      "price_1TKVB04Ik5RguVVSiYno016o", // Essential Anual
+      "price_1TKVBe4Ik5RguVVS5gwSObQ7", // Pro Mensal
+      "price_1TKVCF4Ik5RguVVS0JGxcik2", // Pro Anual
+    ];
+
+    // Regra: Só tem trial se o plano permitir E não houver Add-on (para cobrar o add-on agora)
+    const canHaveTrial = TRIAL_ALLOWED_PLANS.includes(priceId) && !addOnPriceId;
+
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
     const successUrl = `${siteUrl}/dashboard/billing?success=true&session_id={CHECKOUT_SESSION_ID}`;
     const cancelUrl = `${siteUrl}/dashboard/billing?canceled=true`;
 
+    // ... (rest of the fetching logic remains same)
     const { data: existingSubscription, error: existingSubscriptionError } =
       await supabase
         .from("subscriptions")
@@ -62,15 +74,46 @@ export async function POST(req: Request) {
       );
     }
 
-    if (existingSubscription) {
-      return NextResponse.json(
-        {
-          error: "Sua empresa já possui uma assinatura criada.",
-          code: "SUBSCRIPTION_ALREADY_EXISTS",
-        },
-        { status: 400 }
-      );
+    const MOBILE_OFFLINE_PRICE_IDS = [
+      "price_1TKVHW4Ik5RguVVS5ugnrF9X", // Mensal
+      "price_1TKVIG4Ik5RguVVSp3fOsdui", // Anual
+    ];
+
+    // --- LÓGICA DE UPGRADE AUTOMÁTICO ---
+    if (existingSubscription && existingSubscription.stripe_subscription_id) {
+      const sub = await stripe.subscriptions.retrieve(existingSubscription.stripe_subscription_id);
+      
+      // Encontra o item do plano principal (que não seja add-on)
+      const mainPlanItem = sub.items.data.find(
+        (item) => !MOBILE_OFFLINE_PRICE_IDS.includes(item.price.id)
+      ) || sub.items.data[0];
+
+      const itemsToUpdate = [
+        { id: mainPlanItem.id, price: priceId }
+      ];
+
+      // Lógica para Add-on Mobile no Upgrade
+      if (addOnPriceId) {
+        const existingMobileItem = sub.items.data.find(
+          (item) => MOBILE_OFFLINE_PRICE_IDS.includes(item.price.id)
+        );
+        if (existingMobileItem) {
+          itemsToUpdate.push({ id: existingMobileItem.id, price: addOnPriceId });
+        } else {
+          itemsToUpdate.push({ price: addOnPriceId });
+        }
+      }
+
+      await stripe.subscriptions.update(sub.id, {
+        items: itemsToUpdate,
+        proration_behavior: "always_invoice", // Cobra a diferença na hora
+        payment_behavior: "error_if_incomplete",
+      });
+
+      return NextResponse.json({ success: true, type: "upgrade" });
     }
+    // --- FIM DA LÓGICA DE UPGRADE ---
+
 
     const { data: company, error: companyError } = await supabase
       .from("companies")
@@ -78,72 +121,53 @@ export async function POST(req: Request) {
       .eq("id", companyId)
       .maybeSingle();
 
-    if (companyError) {
-      return NextResponse.json(
-        { error: companyError.message },
-        { status: 500 }
-      );
-    }
-
-    if (!company) {
+    if (companyError || !company) {
       return NextResponse.json(
         { error: "Empresa não encontrada" },
         { status: 404 }
       );
     }
 
-    let stripeCustomerId = company.stripe_customer_id ?? null;
+    let stripeCustomerId = company.stripe_customer_id;
 
     if (!stripeCustomerId) {
       const customer = await stripe.customers.create({
         email: company.email ?? undefined,
         name: company.name ?? undefined,
-        metadata: {
-          companyId,
-        },
+        metadata: { companyId },
       });
-
       stripeCustomerId = customer.id;
 
-      const { error: updateCompanyError } = await supabase
+      await supabase
         .from("companies")
-        .update({
-          stripe_customer_id: stripeCustomerId,
-        })
+        .update({ stripe_customer_id: stripeCustomerId })
         .eq("id", companyId);
-
-      if (updateCompanyError) {
-        return NextResponse.json(
-          { error: updateCompanyError.message },
-          { status: 500 }
-        );
-      }
     }
 
-    const price = await stripe.prices.retrieve(priceId);
+    // Prepara os itens do checkout
+    const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
+      { price: priceId, quantity: 1 }
+    ];
+
+    if (addOnPriceId) {
+      lineItems.push({ price: addOnPriceId, quantity: 1 });
+    }
 
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       customer: stripeCustomerId,
       payment_method_collection: "always",
-      line_items: [{ price: priceId, quantity: 1 }],
+      line_items: lineItems,
       success_url: successUrl,
       cancel_url: cancelUrl,
-      metadata: {
-        companyId,
-      },
+      metadata: { companyId },
       subscription_data: {
-        trial_period_days: 30,
-        trial_settings: {
-          end_behavior: {
-            missing_payment_method: "cancel",
-          },
-        },
-        metadata: {
-          companyId,
-        },
+        trial_period_days: canHaveTrial ? 30 : undefined,
+        metadata: { companyId },
       },
     });
+
+    return NextResponse.json({ url: session.url });
 
     return NextResponse.json({ url: session.url });
   } catch (err: any) {

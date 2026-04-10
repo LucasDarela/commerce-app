@@ -46,22 +46,33 @@ export async function POST(req: Request) {
 
     // 2. Envia o e-mail via Resend
     const { data, error } = await resend.emails.send({
-      from: `Contato Chopp Hub <contato@chopphub.com>`,
+      from: `Chopp Hub Contato <contato@chopphub.com>`,
       to: [recipientEmail],
-      subject: `[Site] Nova mensagem de ${name}`,
+      subject: `Mensagem de ${name} - Contato Site`,
       replyTo: email,
+      text: `Nova mensagem de contato:\n\nNome: ${name}\nE-mail: ${email}\nMensagem: ${message}`,
       html: `
-        <div style="font-family: sans-serif; line-height: 1.6; color: #333;">
-          <h2 style="color: #0070f3;">Nova mensagem de contato recebida</h2>
-          <p><strong>Nome:</strong> ${name}</p>
-          <p><strong>E-mail:</strong> ${email}</p>
-          <hr style="border: none; border-top: 1px solid #eaeaea; margin: 20px 0;" />
-          <p><strong>Mensagem:</strong></p>
-          <div style="background: #f9f9f9; padding: 15px; border-radius: 5px;">
+        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: auto; border: 1px solid #eee; padding: 20px; border-radius: 10px;">
+          <h2 style="color: #0070f3; border-bottom: 2px solid #0070f3; padding-bottom: 10px;">Nova Mensagem do Website</h2>
+          <p style="font-size: 16px;">Você recebeu uma nova mensagem através do formulário de contato.</p>
+          
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="padding: 8px 0; font-weight: bold; width: 100px;">Nome:</td>
+              <td style="padding: 8px 0;">${name}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; font-weight: bold;">E-mail:</td>
+              <td style="padding: 8px 0;"><a href="mailto:${email}">${email}</a></td>
+            </tr>
+          </table>
+
+          <div style="margin-top: 20px; padding: 15px; background-color: #f9f9f9; border-left: 4px solid #0070f3; font-style: italic;">
             ${message.replace(/\n/g, "<br>")}
           </div>
-          <p style="font-size: 12px; color: #888; margin-top: 30px;">
-            Enviado via formulário de contato do site Chopp Hub.
+
+          <p style="font-size: 11px; color: #999; margin-top: 30px; text-align: center; border-top: 1px solid #eee; padding-top: 10px;">
+            Este é um e-mail automático enviado pelo sistema Chopp Hub.
           </p>
         </div>
       `,

@@ -4,10 +4,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import SubscriptionManager from "@/components/subscription/SubscriptionManager";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
-import TrialStartButton from "@/components/subscription/TrialStartButton";
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { useSearchParams } from "next/navigation";
+import { Check, Smartphone } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
+import { toast } from "sonner";
 
 type PlanRow = {
   id: string;
@@ -32,10 +34,7 @@ type SubscriptionRow = {
 
 type CompanyRow = {
   billing_exempt: boolean;
-};
-
-type CompanyUserRow = {
-  role: string | null;
+  mobile_offline_enabled?: boolean;
 };
 
 export default function BillingPage() {
@@ -45,110 +44,38 @@ export default function BillingPage() {
   const success = searchParams.get("success");
 
   const [userRole, setUserRole] = useState<string | null>(null);
-  const [subscriptionData, setSubscriptionData] =
-    useState<SubscriptionRow | null>(null);
-  const [proPlan, setProPlan] = useState<PlanRow | null>(null);
+  const [subscriptionData, setSubscriptionData] = useState<SubscriptionRow | null>(null);
+  const [plans, setPlans] = useState<PlanRow[]>([]);
   const [companyData, setCompanyData] = useState<CompanyRow | null>(null);
   const [loading, setLoading] = useState(true);
-
-  const lastFetchedCompanyIdRef = useRef<string | null>(null);
+  const [isYearly, setIsYearly] = useState(false);
+  const [includeMobile, setIncludeMobile] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const fetchBillingData = useCallback(
     async ({ showLoading = false }: { showLoading?: boolean } = {}) => {
       if (!companyId) return;
-
-      if (showLoading) {
-        setLoading(true);
-      }
+      if (showLoading) setLoading(true);
 
       try {
-        const {
-          data: { user },
-          error: userError,
-        } = await supabase.auth.getUser();
-
-        if (userError) {
-          console.error("Erro ao buscar usuário autenticado:", userError);
-        }
-
+        const { data: { user } } = await supabase.auth.getUser();
         const userId = user?.id ?? null;
 
         const queries = await Promise.all([
-          userId
-            ? supabase
-                .from("company_users")
-                .select("role")
-                .eq("company_id", companyId)
-                .eq("user_id", userId)
-                .maybeSingle<CompanyUserRow>()
-            : Promise.resolve({ data: null, error: null }),
-          supabase
-            .from("subscriptions")
-            .select(
-              "id, company_id, price_id, status, trial_end, trial_will_end_notified, cancel_at_period_end, current_period_end, updated_at"
-            )
-            .eq("company_id", companyId)
-            .order("updated_at", { ascending: false })
-            .limit(1)
-            .maybeSingle<SubscriptionRow>(),
-          supabase
-            .from("plans")
-            .select("id, name, stripe_price_id, price, currency, interval")
-            .ilike("name", "pro")
-            .maybeSingle<PlanRow>(),
-          supabase
-            .from("companies")
-            .select("billing_exempt")
-            .eq("id", companyId)
-            .maybeSingle<CompanyRow>(),
+          userId ? supabase.from("company_users").select("role").eq("company_id", companyId).eq("user_id", userId).maybeSingle() : Promise.resolve({ data: null }),
+          supabase.from("subscriptions").select("*").eq("company_id", companyId).order("updated_at", { ascending: false }).limit(1).maybeSingle(),
+          supabase.from("plans").select("*").order("price", { ascending: true }),
+          supabase.from("companies").select("billing_exempt, mobile_offline_enabled").eq("id", companyId).maybeSingle(),
         ]);
 
-        const [
-          { data: companyUser, error: companyUserError },
-          { data: subscription, error: subscriptionError },
-          { data: plan, error: planError },
-          { data: company, error: companyError },
-        ] = queries;
+        const [userRes, subRes, plansRes, compRes] = queries;
 
-        if (companyUserError) {
-          console.error("Erro ao buscar role em company_users:", companyUserError);
-        }
-
-        if (subscriptionError) {
-          console.error("Erro ao buscar assinatura:", subscriptionError);
-        }
-
-        if (planError) {
-          console.error("Erro ao buscar plano Pro:", planError);
-        }
-
-        if (companyError) {
-          console.error("Erro ao buscar empresa:", companyError);
-        }
-
-        const rawRole = companyUser?.role ?? null;
-
-        const normalizedRole =
-          rawRole === "driver"
-            ? "driver"
-            : rawRole === "normal"
-              ? "normal"
-              : rawRole;
-
-        setUserRole(normalizedRole ?? null);
-        setSubscriptionData(subscription ?? null);
-        setProPlan(plan ?? null);
-        setCompanyData(company ?? null);
-
-      if (process.env.NODE_ENV === "development") {
-        console.log("Billing role from company_users:", rawRole);
-        console.log("Billing normalizedRole:", normalizedRole);
-        console.log("Billing subscription result:", subscription);
-        console.log("Billing plan result:", plan);
-        console.log("Billing company result:", company);
-      }
+        setUserRole(userRes.data?.role ?? null);
+        setSubscriptionData(subRes.data as SubscriptionRow ?? null);
+        setPlans(plansRes.data ?? []);
+        setCompanyData(compRes.data ?? null);
       } catch (error) {
-        console.error("Erro inesperado ao buscar dados da Billing:", error);
+        console.error("Erro na Billing:", error);
       } finally {
         setLoading(false);
       }
@@ -157,193 +84,295 @@ export default function BillingPage() {
   );
 
   useEffect(() => {
-    if (authLoading || !companyId) return;
-    if (lastFetchedCompanyIdRef.current === companyId) return;
-
-    lastFetchedCompanyIdRef.current = companyId;
-    fetchBillingData({ showLoading: true });
+    if (!authLoading && companyId) fetchBillingData({ showLoading: true });
   }, [authLoading, companyId, fetchBillingData]);
 
-useEffect(() => {
-  if (!companyId || success !== "true") return;
-  if (subscriptionData) return;
+  const handleCheckout = async (priceId: string) => {
+    setSubmitting(true);
+    try {
+      const mobilePriceId = isYearly 
+        ? "price_1TKVIG4Ik5RguVVSp3fOsdui" 
+        : "price_1TKVHW4Ik5RguVVS5ugnrF9X";
 
-  const interval = setInterval(() => {
-    fetchBillingData({ showLoading: false });
-  }, 2000);
+      const res = await fetch("/api/stripe/create-checkout-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          priceId,
+          companyId,
+          addOnPriceId: includeMobile ? mobilePriceId : undefined
+        }),
+      });
 
-  const timeout = setTimeout(() => {
-    clearInterval(interval);
-  }, 15000);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
 
-  return () => {
-    clearInterval(interval);
-    clearTimeout(timeout);
+      if (data.success) {
+        toast.success("Plano atualizado com sucesso!");
+        // Aguarda 2 segundos para o Webhook processar e recarrega os dados
+        setTimeout(() => {
+          fetchBillingData({ showLoading: true });
+        }, 2000);
+        return;
+      }
+
+      if (data.url) window.location.href = data.url;
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setSubmitting(false);
+    }
   };
-}, [companyId, success, subscriptionData, fetchBillingData]);
 
-  if (authLoading || loading) {
-    return <div>Carregando assinatura...</div>;
-  }
+  const handleManageBilling = async () => {
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/stripe/customer-portal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      if (data.url) window.location.href = data.url;
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
-  if (!companyId) {
-    return <div>Empresa não encontrada.</div>;
-  }
+  if (authLoading || loading) return <div className="p-8 text-center text-muted-foreground">Carregando cobrança...</div>;
+  if (!companyId) return <div className="p-8 text-center">Empresa não encontrada.</div>;
 
-  if (userRole === "driver") {
-    return (
-      <div className="max-w-3xl mx-auto p-6">
-        <div className="rounded-3xl border bg-card p-8 shadow-sm">
-          <div className="mx-auto max-w-2xl text-center">
-            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full border border-amber-200 bg-amber-50">
-              <span className="text-2xl">🔒</span>
-            </div>
+  const currentInterval = isYearly ? "year" : "month";
+  const displayedPlans = [
+    plans.find(p => p.name.includes("Essential") && p.interval === currentInterval),
+    plans.find(p => p.name.includes("Pro") && p.interval === currentInterval),
+    plans.find(p => p.name.includes("Enterprise") && p.interval === currentInterval),
+  ].filter(Boolean) as PlanRow[];
 
-            <h1 className="text-3xl font-semibold tracking-tight">
-              Acesso indisponível
-            </h1>
+  // Define os detalhes visuais de cada plano para o Dashboard (Resumido)
+  const planDetails: Record<string, { note: string; features: string[] }> = {
+    Essential: {
+      note: isYearly ? "Economia de 10% no anual." : "Ideal para organizar sua operação.",
+      features: ["Gestão de pedidos, financeiro e estoque", "Organização de entregas", "E muito mais..."]
+    },
+    Pro: {
+      note: isYearly ? "10% de desconto no plano total." : "O plano mais completo para gestão.",
+      features: ["Tudo do Essential", "Emissão de Boletos e NF-e", "Controle Financeiro", "E muito mais..."]
+    },
+    Enterprise: {
+      note: "Suporte e acompanhamento estratégico.",
+      features: ["Tudo do Pro", "Mentoria de implementação", "Reuniões de alinhamento", "E muito mais..."]
+    }
+  };
 
-            <p className="mt-3 text-sm text-muted-foreground md:text-base">
-              A página de cobrança está disponível apenas para administradores e
-              usuários responsáveis pela gestão da assinatura.
-            </p>
+  const currentPlan = plans.find(p => p.stripe_price_id === subscriptionData?.price_id);
+  const isSubscribed = subscriptionData && subscriptionData.status !== "canceled";
 
-            <div className="mt-8 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-              Seu perfil não possui permissão para acessar esta área.
-            </div>
+  // Função para calcular dias restantes de trial
+  const getTrialDaysLeft = (trialEnd: string | null) => {
+    if (!trialEnd) return null;
+    const end = new Date(trialEnd);
+    const now = new Date();
+    const diff = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    return diff > 0 ? diff : 0;
+  };
 
-            <div className="mt-8">
-              <Button asChild className="h-11 px-6">
-                <Link href="/dashboard/orders">Voltar para pedidos</Link>
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (companyData?.billing_exempt) {
-    return (
-      <div className="max-w-4xl mx-auto p-6">
-        <div className="rounded-3xl border bg-card p-8 shadow-sm">
-          <div className="mx-auto max-w-2xl text-center">
-            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50">
-              <span className="text-2xl">✓</span>
-            </div>
-
-            <h1 className="text-3xl font-semibold tracking-tight">
-              Sua conta está isenta de cobrança
-            </h1>
-
-            <p className="mt-3 text-sm text-muted-foreground md:text-base">
-              Esta empresa foi marcada como conta interna e não precisa realizar
-              pagamento para utilizar o sistema.
-            </p>
-
-            <div className="mt-8 grid gap-4 md:grid-cols-3">
-              <div className="rounded-2xl border p-4 text-left">
-                <h3 className="font-medium">Acesso liberado</h3>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Todos os recursos permitidos para sua conta continuam
-                  disponíveis normalmente.
-                </p>
-              </div>
-
-              <div className="rounded-2xl border p-4 text-left">
-                <h3 className="font-medium">Sem cobrança</h3>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Nenhuma assinatura Stripe será exigida para esta empresa.
-                </p>
-              </div>
-
-              <div className="rounded-2xl border p-4 text-left">
-                <h3 className="font-medium">Conta interna</h3>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Essa configuração é controlada internamente no sistema.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-8 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-              Cobrança desativada para esta empresa.
-            </div>
-
-            <div className="mt-8">
-              <Button asChild className="h-11 px-6">
-                <Link href="/dashboard">Ir para o dashboard</Link>
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!proPlan) {
-    return <div>Plano Pro não encontrado na tabela plans.</div>;
-  }
-
-  if (!subscriptionData) {
-    return (
-      <div className="max-w-4xl mx-auto p-6">
-        <div className="rounded-2xl border bg-card p-8 shadow-sm">
-          <div className="max-w-2xl space-y-5">
-            <div>
-              <h1 className="text-3xl font-semibold">
-                Comece seu teste gratuito
-              </h1>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Para liberar o acesso ao sistema, cadastre seu cartão e inicie
-                seu teste gratuito de 30 dias.
-              </p>
-            </div>
-
-            <div className="space-y-2 text-sm text-muted-foreground">
-              <p>• Acesso completo por 30 dias</p>
-              <p>• Cobrança somente após o período de teste</p>
-              <p>• Cancelamento a qualquer momento antes da cobrança</p>
-              <p>• O sistema será liberado automaticamente após a ativação</p>
-            </div>
-
-            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
-              <p className="text-sm text-blue-700">
-                Seu cartão será solicitado agora, mas nenhuma cobrança será
-                feita antes do fim do período gratuito.
-              </p>
-            </div>
-
-            <div className="pt-2">
-              <TrialStartButton
-                companyId={companyId}
-                priceId={proPlan.stripe_price_id}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const trialDaysLeft = getTrialDaysLeft(subscriptionData?.trial_end || null);
 
   return (
-    <SubscriptionManager
-      companyId={companyId}
-      subscriptionIdLocal={subscriptionData.id}
-      currentPriceId={subscriptionData.price_id}
-      subscriptionStatus={subscriptionData.status}
-      trialEndsAt={subscriptionData.trial_end}
-      cancelAtPeriodEnd={subscriptionData.cancel_at_period_end ?? false}
-      currentPeriodEnd={subscriptionData.current_period_end ?? null}
-      trialWillEndNotified={
-        subscriptionData.trial_will_end_notified ?? false
-      }
-      proPlan={{
-        name: proPlan.name,
-        stripePriceId: proPlan.stripe_price_id,
-        price: proPlan.price,
-        currency: proPlan.currency,
-        interval: proPlan.interval,
-      }}
-    />
+    <div className="max-w-6xl mx-auto p-6 space-y-10">
+      {/* Banner de Status da Assinatura Atual */}
+      {isSubscribed && (
+        <div className="bg-primary/5 border border-primary/20 rounded-3xl p-6 flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm overflow-hidden relative">
+          {/* Detalhe visual de fundo para trial */}
+          {subscriptionData?.status === "trialing" && (
+            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full -mr-16 -mt-16 blur-3xl" />
+          )}
+
+          <div className="space-y-2 text-center md:text-left relative z-10">
+            <h2 className="text-xl font-bold flex items-center justify-center md:justify-start gap-2">
+              <span className={`w-2.5 h-2.5 rounded-full animate-pulse ${subscriptionData?.status === "trialing" ? "bg-blue-500" : "bg-emerald-500"}`} />
+              Sua assinatura {currentPlan?.name.split(" ")[0]} está {subscriptionData?.status === "trialing" ? "em Período de Teste" : "Ativa"}
+            </h2>
+            
+            <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
+              <p className="text-sm text-muted-foreground">
+                {subscriptionData?.trial_end 
+                  ? `Seu teste termina em ${new Date(subscriptionData.trial_end).toLocaleDateString("pt-BR")}`
+                  : subscriptionData?.current_period_end 
+                    ? `Próxima renovação: ${new Date(subscriptionData.current_period_end).toLocaleDateString("pt-BR")}`
+                    : "Gerencie sua assinatura"}
+              </p>
+
+              {subscriptionData?.status === "trialing" && trialDaysLeft !== null && (
+                <div className="flex items-center gap-1.5 bg-blue-500/10 text-blue-600 px-3 py-1 rounded-full text-xs font-bold border border-blue-500/20">
+                  <Clock className="w-3.5 h-3.5" />
+                  RESTAM {trialDaysLeft} {trialDaysLeft === 1 ? "DIA" : "DIAS"}
+                </div>
+              )}
+            </div>
+
+            {companyData?.mobile_offline_enabled && (
+              <p className="text-sm font-medium text-primary flex items-center gap-2 mt-2">
+                <Smartphone className="h-4 w-4" /> Add-on Mobile Offline Ativo
+              </p>
+            )}
+          </div>
+          <Button variant="outline" onClick={handleManageBilling} disabled={submitting} className="h-11 px-6 font-semibold relative z-10 transition-all hover:bg-primary hover:text-primary-foreground">
+            Gerenciar no Stripe (Cancelar)
+          </Button>
+        </div>
+      )}
+
+
+      <div className="text-center space-y-4">
+        <h1 className="text-4xl font-bold tracking-tight">
+          {isSubscribed ? "Mude seu plano atual" : "Escolha seu plano"}
+        </h1>
+        <p className="text-muted-foreground text-lg">
+          {isSubscribed 
+            ? "O upgrade é aplicado instantaneamente com rateio de valores." 
+            : "Comece hoje mesmo com 30 dias de teste gratuito nos planos Essential e Pro."}
+        </p>
+        
+        <div className="flex items-center justify-center gap-4 pt-4">
+          <span className={!isYearly ? "font-semibold" : "text-muted-foreground text-sm"}>Mensal</span>
+          <Switch checked={isYearly} onCheckedChange={setIsYearly} />
+          <span className={isYearly ? "font-semibold" : "text-muted-foreground text-sm"}>Anual <span className="text-emerald-600 text-xs font-bold">(10% OFF)</span></span>
+        </div>
+      </div>
+
+      <div className="grid md:grid-cols-3 gap-8">
+        {displayedPlans.map((plan) => {
+          const name = plan.name.split(" ")[0];
+          const details = planDetails[name] || { note: "", features: [] };
+          const isCurrent = subscriptionData?.price_id === plan.stripe_price_id;
+          const isUpgrade = currentPlan && plan.price > currentPlan.price;
+          
+          let buttonText = "Iniciar teste";
+          if (isSubscribed) {
+            if (isCurrent) buttonText = "Plano Atual";
+            else if (isUpgrade) buttonText = "Fazer Upgrade";
+            else buttonText = "Mudar Plano";
+          } else if (name === "Enterprise") {
+            buttonText = "Contratar agora";
+          }
+
+          return (
+            <div key={plan.id} className={`relative flex flex-col p-8 bg-card rounded-3xl border shadow-sm transition-all hover:shadow-md ${isCurrent ? "border-emerald-500 ring-1 ring-emerald-500" : name === "Pro" && !isSubscribed ? "border-primary ring-1 ring-primary" : ""}`}>
+              {name === "Pro" && !isCurrent && (
+                <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">MAIS VENDIDO</span>
+              )}
+              {isCurrent && (
+                <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-emerald-500 text-white px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">SEU PLANO</span>
+              )}
+              <div className="mb-8">
+                <h3 className="text-xl font-bold">{name}</h3>
+                <div className="mt-4 flex items-baseline gap-1">
+                  <span className="text-4xl font-bold">R$ {plan.price.toLocaleString("pt-BR")}</span>
+                  <span className="text-muted-foreground text-sm">/{isYearly ? "ano" : "mês"}</span>
+                </div>
+                {details.note && (
+                  <p className="mt-2 text-xs font-medium text-emerald-600 italic">
+                    {details.note}
+                  </p>
+                )}
+                {!isSubscribed && (
+                  <p className="mt-4 text-sm text-muted-foreground">
+                    {name === "Enterprise" ? "Cobrança imediata" : "30 dias de teste grátis"}
+                  </p>
+                )}
+              </div>
+
+              <ul className="flex-1 space-y-4 mb-8 text-sm">
+                {details.features.map((feat, i) => (
+                  <li key={i} className="flex items-center gap-3">
+                    <Check className={`h-4 w-4 ${feat.includes("muito mais") ? "text-primary" : "text-emerald-600"}`} />
+                    <span className={feat.includes("muito mais") ? "font-medium text-primary" : ""}>{feat}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <Button 
+                className="w-full h-12 text-base font-bold shadow-sm" 
+                variant={isCurrent ? "secondary" : name === "Pro" ? "default" : "outline"}
+                onClick={() => !isCurrent && handleCheckout(plan.stripe_price_id)}
+                disabled={submitting || isCurrent}
+              >
+                {submitting ? "Processando..." : buttonText}
+              </Button>
+            </div>
+          );
+        })}
+      </div>
+
+<div
+  onClick={() => setIncludeMobile((prev) => !prev)}
+  className={`max-w-2xl mx-auto rounded-3xl border p-8 cursor-pointer transition-all
+    ${
+      includeMobile
+        ? "bg-primary/10 border-primary shadow-md"
+        : "bg-primary/5 border-primary/20 hover:border-primary/40"
+    }`}
+>
+  <div className="flex items-start gap-4">
+    {/* Ícone */}
+    <div className="bg-primary/10 p-3 rounded-2xl">
+      <Smartphone className="h-6 w-6 text-primary" />
+    </div>
+
+    <div className="flex-1">
+      {/* Header */}
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        
+        <div>
+          <h3 className="text-lg font-bold">
+            Aplicativo Mobile Offline
+          </h3>
+          <span className="text-xs text-muted-foreground">
+            Add-on opcional
+          </span>
+        </div>
+
+        {/* Preço + checkbox */}
+        <div className="flex items-center gap-3">
+          <span className="text-base font-semibold text-primary">
+            R$ {isYearly ? "1.047" : "97"}
+            <span className="text-xs text-muted-foreground ml-1">
+              /{isYearly ? "ano" : "mês"}
+            </span>
+          </span>
+
+          <div className="flex items-center justify-center h-6 w-6">
+            <Checkbox
+              id="mobile-addon"
+              checked={includeMobile || !!companyData?.mobile_offline_enabled}
+              disabled={!!companyData?.mobile_offline_enabled}
+              onCheckedChange={(v) => setIncludeMobile(!!v)}
+              className="h-5 w-5"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Descrição */}
+      <p className="text-sm text-muted-foreground mt-3 leading-6">
+        Permite que seus motoristas trabalhem mesmo sem internet, ideal para áreas
+        com sinal fraco. As entregas são sincronizadas automaticamente depois.
+      </p>
+
+      {/* Status visual */}
+      {(includeMobile || companyData?.mobile_offline_enabled) && (
+        <p className="mt-3 text-sm font-medium text-primary">
+          ✔ App mobile {companyData?.mobile_offline_enabled ? "Ativo na sua conta" : "incluído no plano"}
+        </p>
+      )}
+    </div>
+  </div>
+</div>
+    </div>
   );
 }

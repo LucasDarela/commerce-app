@@ -64,7 +64,7 @@ export function ContactForm() {
         return;
       }
 
-      toast.success("Mensagem enviada com sucesso!");
+      toast.success("Mensagem enviada com sucesso! Entraremos em contato em breve");
       form.reset();
     } catch (err) {
       toast.error("Erro inesperado ao enviar");

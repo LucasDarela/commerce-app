@@ -32,6 +32,7 @@ import {
   IconCirclePlusFilled,
   IconFileDots,
   IconTruckDelivery,
+  IconDeviceMobile,
 } from "@tabler/icons-react";
 
 import { NavDocuments } from "@/components/nav-documents";
@@ -117,6 +118,11 @@ const data = {
       icon: IconSettings,
     },
     {
+      title: "Mobile",
+      url: "/dashboard/mobile",
+      icon: IconDeviceMobile,
+    },
+    {
       title: "Ajuda",
       url: "/dashboard/help",
       icon: IconHelp,
@@ -125,7 +131,7 @@ const data = {
 };
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { role } = useAuthenticatedCompany();
+  const { role, mobileOfflineEnabled } = useAuthenticatedCompany();
 
   const { isMobile, setOpenMobile } = useSidebar();
 
@@ -144,12 +150,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       )
     : data.navMainTop;
 
-const navSecondary =
-  role === "driver"
-    ? data.navSecondary.filter(
-        (item) => item.url !== "/dashboard/settings"
-      )
-    : data.navSecondary;
+const navSecondary = data.navSecondary.filter((item) => {
+  // Se for motorista, esconde configurações
+  if (role === "driver" && item.url === "/dashboard/settings") return false;
+  
+  // Mantemos o "Mobile" sempre visível para instigar o upgrade na página interna
+  return true;
+});
 
   return (
     <Sidebar collapsible="offcanvas" {...props}>

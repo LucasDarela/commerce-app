@@ -2,6 +2,8 @@
 
 import { useThemeConfig } from "./active-theme";
 import { Label } from "@/components/ui/label";
+import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -12,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { IconChevronRight } from "@tabler/icons-react";
 
 const DEFAULT_THEMES = [
   {
@@ -60,11 +63,22 @@ const MONO_THEMES = [
 
 export function ThemeSelector() {
   const { activeTheme, setActiveTheme } = useThemeConfig();
+  const { planName, loading } = useAuthenticatedCompany();
 
   if (!activeTheme) return null;
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-3">
+      {/* Nome do Plano */}
+      {!loading && planName && (
+        <div className="flex items-center gap-2">
+          <Badge variant="secondary" className="px-3 py-1 bg-primary/10 text-primary border-primary/20 hover:bg-primary/20 transition-colors uppercase text-[10px] font-bold tracking-wider">
+            {planName.split(" ")[0]}
+          </Badge>
+          <IconChevronRight className="w-3 h-3 text-muted-foreground/40 hidden md:block" />
+        </div>
+      )}
+
       <Label htmlFor="theme-selector" className="sr-only">
         Theme
       </Label>

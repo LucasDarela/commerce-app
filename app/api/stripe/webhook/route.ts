@@ -195,11 +195,28 @@ async function upsertSubscriptionFromStripeSubscription(
     ? new Date(subscription.trial_end * 1000).toISOString()
     : null;
 
+  // IDs do Add-on Mobile Offline para verificação
+  const MOBILE_OFFLINE_PRICE_IDS = [
+    "price_1TKVHW4Ik5RguVVS5ugnrF9X", // Mensal
+    "price_1TKVIG4Ik5RguVVSp3fOsdui", // Anual
+  ];
+
+  // Verifica se o Add-on Mobile está presente em qualquer item da assinatura
+  const isMobileEnabled = subscription.items.data.some((item) =>
+    MOBILE_OFFLINE_PRICE_IDS.includes(item.price.id)
+  );
+
+  // Encontra o item do plano principal (que não seja o add-on)
+  const mainPlanItem =
+    subscription.items.data.find(
+      (item) => !MOBILE_OFFLINE_PRICE_IDS.includes(item.price.id)
+    ) || subscription.items.data[0];
+
   const payload = {
     company_id: companyId,
     stripe_customer_id: customerId,
     stripe_subscription_id: subscription.id,
-    price_id: subscription.items.data[0]?.price?.id ?? null,
+    price_id: mainPlanItem?.price?.id ?? null,
     status: subscription.status,
     started_at: startedAt,
     current_period_start: currentPeriodStart,
@@ -219,9 +236,9 @@ async function upsertSubscriptionFromStripeSubscription(
   console.log("subscription upsert payload:", {
     companyId,
     subscriptionId: subscription.id,
-    customerId,
     priceId: payload.price_id,
     status: payload.status,
+    isMobileEnabled,
   });
 
   const { error } = await supabase.from("subscriptions").upsert(payload, {
@@ -233,22 +250,21 @@ async function upsertSubscriptionFromStripeSubscription(
     throw error;
   }
 
-  if (customerId) {
-    const { error: companyUpdateError } = await supabase
-      .from("companies")
-      .update({
-        stripe_customer_id: customerId,
-      })
-      .eq("id", companyId)
-      .or(`stripe_customer_id.is.null,stripe_customer_id.eq.${customerId}`);
+  // Atualiza os dados da empresa (Customer ID e Flag do Mobile)
+  const { error: companyUpdateError } = await supabase
+    .from("companies")
+    .update({
+      stripe_customer_id: customerId,
+      mobile_offline_enabled: isMobileEnabled,
+    })
+    .eq("id", companyId);
 
-    if (companyUpdateError) {
-      console.error(
-        "Erro ao atualizar stripe_customer_id da empresa:",
-        companyUpdateError
-      );
-      throw companyUpdateError;
-    }
+  if (companyUpdateError) {
+    console.error(
+      "Erro ao atualizar dados da empresa no webhook:",
+      companyUpdateError
+    );
+    throw companyUpdateError;
   }
 }
 

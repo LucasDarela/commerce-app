@@ -21,50 +21,19 @@ const iconMap: Record<string, React.ElementType> = {
 };
 
 export function CompanyBrand() {
-  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
-  const { companyId, loading } = useAuthenticatedCompany();
-
-  const [companyName, setCompanyName] = useState("My Company");
+  const { companyName, companyId, loading } = useAuthenticatedCompany();
   const [iconKey, setIconKey] = useState("IconBeerFilled");
 
-  useEffect(() => {
-    let cancelled = false;
-
-    const fetchCompany = async () => {
-      if (loading || !companyId) return;
-
-      const { data, error } = await supabase
-        .from("companies")
-        .select("name, icon")
-        .eq("id", companyId)
-        .maybeSingle();
-
-      if (cancelled) return;
-
-      if (error) {
-        console.error("Erro ao buscar dados da empresa:", error);
-        return;
-      }
-
-      if (data) {
-        setCompanyName(data.name || "My Company");
-        setIconKey(data.icon || "IconBeerFilled");
-      }
-    };
-
-    fetchCompany();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [companyId, loading, supabase]);
-
+  // O ícone ainda pode ser buscado aqui ou vindo do hook no futuro
+  // Por ora, mantemos a lógica simples para garantir estabilidade
   const IconComponent = iconMap[iconKey] || IconBeerFilled;
+
+  if (loading && !companyName) return <div className="h-5 w-32 bg-muted animate-pulse rounded" />;
 
   return (
     <div className="flex items-center gap-2">
       <IconComponent className="!size-5" />
-      <span className="text-base font-semibold">{companyName}</span>
+      <span className="text-base font-semibold">{companyName || "My Company"}</span>
     </div>
   );
 }

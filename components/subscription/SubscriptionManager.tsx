@@ -31,7 +31,8 @@ export default function SubscriptionManager({
   cancelAtPeriodEnd = null,
   currentPeriodEnd = null,
   proPlan,
-}: Props) {
+  mobileOfflineEnabled = false,
+}: Props & { mobileOfflineEnabled?: boolean }) {
 const [loading, setLoading] = useState(false);
 const [message, setMessage] = useState<string | null>(null);
 const [status, setStatus] = useState<string | null>(subscriptionStatus);
@@ -288,6 +289,12 @@ const shouldShowTrialWarning =
         {status === "active" && !localCancelAtPeriodEnd && remainingDays !== null && (
           <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-700">
             Renova em {remainingDays} dias
+          </span>
+        )}
+
+        {mobileOfflineEnabled && (
+          <span className="rounded-full border border-purple-200 bg-purple-50 px-3 py-1 text-sm font-medium text-purple-700">
+            Mobile Offline: Ativo
           </span>
         )}
       </div>
