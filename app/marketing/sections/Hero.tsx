@@ -41,61 +41,61 @@ export default function Hero() {
   const settings = {
     dots: true,
     infinite: true,
-    speed: 800,
+    speed: 1500,
     autoplay: true,
-    autoplaySpeed: 4000,
+    autoplaySpeed: 8000,
     arrows: false,
     pauseOnHover: false,
+    lazyLoad: "ondemand" as const,
   };
 
   return (
     <section className="relative h-screen w-full overflow-hidden">
       <Slider {...settings} className="h-full">
-        {slides.map((slide, index) => (
-          <div key={index}>
-            <div className="relative h-screen w-full">
-              
-              {/* IMAGEM FULLSCREEN */}
-              <Image
-                src={slide.image}
-                alt="Hero"
-                fill
-                priority={index === 0}
-                className="object-cover"
-                sizes="100vw"
-              />
+        {slides.map((slide, index) => {
+          const isFirstSlide = index === 0;
 
-              {/* OVERLAY ESCURO */}
-              <div className="absolute inset-0 bg-black/50" />
+          return (
+            <div key={index}>
+              <div className="relative h-screen w-full">
+                <Image
+                  src={slide.image}
+                  alt={slide.title}
+                  fill
+                  priority={isFirstSlide}
+                  loading={isFirstSlide ? "eager" : "lazy"}
+                  fetchPriority={isFirstSlide ? "high" : "low"}
+                  className="object-cover"
+                  sizes="100vw"
+                />
 
-              {/* CONTEÚDO */}
-              <div className="absolute inset-0 flex items-center justify-center px-4">
-                <div className="max-w-3xl text-center text-white">
-                  
-                  <h1 className="text-3xl font-bold leading-tight sm:text-4xl md:text-6xl">
-                    {slide.title}
-                  </h1>
+                <div className="absolute inset-0 bg-black/50" />
 
-                  <p className="mt-4 text-base sm:text-lg md:text-xl text-white/90">
-                    {slide.description}
-                  </p>
+                <div className="absolute inset-0 flex items-center justify-center px-4">
+                  <div className="max-w-3xl text-center text-white">
+                    <h1 className="text-3xl font-bold leading-tight sm:text-4xl md:text-6xl">
+                      {slide.title}
+                    </h1>
 
-                  <div className="mt-8">
-                    <Button
-                      asChild
-                      size="lg"
-                      className="h-12 px-8 text-base font-semibold"
-                    >
-                      <Link href="#plans">{slide.cta}</Link>
-                    </Button>
+                    <p className="mt-4 text-base text-white/90 sm:text-lg md:text-xl">
+                      {slide.description}
+                    </p>
+
+                    <div className="mt-8">
+                      <Button
+                        asChild
+                        size="lg"
+                        className="h-12 px-8 text-base font-semibold"
+                      >
+                        <Link href="#plans">{slide.cta}</Link>
+                      </Button>
+                    </div>
                   </div>
-
                 </div>
               </div>
-
             </div>
-          </div>
-        ))}
+          );
+        })}
       </Slider>
     </section>
   );

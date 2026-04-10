@@ -143,7 +143,7 @@ export function ContactForm() {
           )}
 
           <Button type="submit" className="w-full h-11" disabled={isVerifying}>
-            {isVerifying ? "Validando..." : "Enviar mensagem"}
+            {isVerifying ? "Enviando..." : "Enviar mensagem"}
           </Button>
 
           <p className="text-xs text-center text-muted-foreground leading-5">
