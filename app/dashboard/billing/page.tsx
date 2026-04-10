@@ -6,7 +6,7 @@ import SubscriptionManager from "@/components/subscription/SubscriptionManager";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import { Button } from "@/components/ui/button";
 import { useSearchParams } from "next/navigation";
-import { Check, Smartphone } from "lucide-react";
+import { Check, Smartphone, Clock } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";

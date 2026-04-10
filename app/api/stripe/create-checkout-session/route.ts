@@ -88,7 +88,7 @@ export async function POST(req: Request) {
         (item) => !MOBILE_OFFLINE_PRICE_IDS.includes(item.price.id)
       ) || sub.items.data[0];
 
-      const itemsToUpdate = [
+      const itemsToUpdate: Stripe.SubscriptionUpdateParams.Item[] = [
         { id: mainPlanItem.id, price: priceId }
       ];
 
