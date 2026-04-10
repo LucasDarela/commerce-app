@@ -307,7 +307,5 @@ body {
 }
 
 .grecaptcha-badge {
-  bottom: 32px !important;
-  right: 32px !important;
-  transform: scale(0.9);
+  visibility: hidden;
 }
