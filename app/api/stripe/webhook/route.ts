@@ -201,15 +201,32 @@ async function upsertSubscriptionFromStripeSubscription(
     "price_1TKVIG4Ik5RguVVSp3fOsdui", // Anual
   ];
 
-  // Verifica se o Add-on Mobile está presente em qualquer item da assinatura
+  // IDs de Usuários Adicionais
+  const EXTRA_USER_PRICE_IDS = [
+    "price_1TKWbt4Ik5RguVVSc5CTvFl3", // Essential Mensal
+    "price_1TKWfb4Ik5RguVVSzczGyzdG", // Essential Anual
+    "price_1TKWcV4Ik5RguVVSrCaRcZ3F", // Pro Mensal
+    "price_1TKWgM4Ik5RguVVS9UuOp6nH", // Pro Anual
+    "price_1TKWdQ4Ik5RguVVS1KUoEx6P", // Enterprise Mensal
+    "price_1TKWgu4Ik5RguVVSZmM6oYoo", // Enterprise Anual
+  ];
+
+  // Verifica se o Add-on Mobile está presente
   const isMobileEnabled = subscription.items.data.some((item) =>
     MOBILE_OFFLINE_PRICE_IDS.includes(item.price.id)
   );
 
-  // Encontra o item do plano principal (que não seja o add-on)
+  // Calcula total de assentos extras somando a quantidade dos itens correspondentes
+  const extraSeats = subscription.items.data
+    .filter((item) => EXTRA_USER_PRICE_IDS.includes(item.price.id))
+    .reduce((sum, item) => sum + (item.quantity || 0), 0);
+
+  // Encontra o item do plano principal (que não seja add-on nem assento extra)
   const mainPlanItem =
     subscription.items.data.find(
-      (item) => !MOBILE_OFFLINE_PRICE_IDS.includes(item.price.id)
+      (item) => 
+        !MOBILE_OFFLINE_PRICE_IDS.includes(item.price.id) && 
+        !EXTRA_USER_PRICE_IDS.includes(item.price.id)
     ) || subscription.items.data[0];
 
   const payload = {
@@ -239,6 +256,7 @@ async function upsertSubscriptionFromStripeSubscription(
     priceId: payload.price_id,
     status: payload.status,
     isMobileEnabled,
+    extraSeats,
   });
 
   const { error } = await supabase.from("subscriptions").upsert(payload, {
@@ -250,12 +268,13 @@ async function upsertSubscriptionFromStripeSubscription(
     throw error;
   }
 
-  // Atualiza os dados da empresa (Customer ID e Flag do Mobile)
+  // Atualiza os dados da empresa (Customer ID, Flag do Mobile e Assentos Extras)
   const { error: companyUpdateError } = await supabase
     .from("companies")
     .update({
       stripe_customer_id: customerId,
       mobile_offline_enabled: isMobileEnabled,
+      extra_seats: extraSeats,
     })
     .eq("id", companyId);
 

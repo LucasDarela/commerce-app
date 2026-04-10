@@ -95,12 +95,14 @@ export async function POST(req: Request) {
 
     const { data: cu, error: cuErr } = await admin
       .from("company_users")
-      .select("company_id, role")
+      .select(`
+        company_id, 
+        role, 
+        companies(extra_seats), 
+        subscriptions(price_id, status)
+      `)
       .eq("user_id", inviter.id)
       .maybeSingle();
-
-    console.log("[add-member] company user:", cu);
-    console.log("[add-member] company error:", cuErr);
 
     if (cuErr || !cu?.company_id) {
       return NextResponse.json(
@@ -108,6 +110,48 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
+
+    // --- VALIDAÇÃO DE LIMITES DE USUÁRIO ---
+    const BASE_LIMITS: Record<string, number> = {
+      "price_1TKV9t4Ik5RguVVSjcoyxCkh": 2, // Essential Mensal
+      "price_1TKVB04Ik5RguVVSiYno016o": 2, // Essential Anual
+      "price_1TKVBe4Ik5RguVVS5gwSObQ7": 5, // Pro Mensal
+      "price_1TKVCF4Ik5RguVVS0JGxcik2": 5, // Pro Anual
+      "price_1TKVER4Ik5RguVVS71L2NInl": 15, // Enterprise Mensal
+      "price_1TKVFK4Ik5RguVVSL0e4G83O": 15, // Anual
+    };
+
+    const companies = cu.companies as any;
+    const subscriptions = cu.subscriptions as any;
+    
+    // Identifica assinatura ativa
+    const activeSub = Array.isArray(subscriptions) 
+      ? subscriptions.find(s => s.status === "active" || s.status === "trialing")
+      : (subscriptions?.status === "active" || subscriptions?.status === "trialing" ? subscriptions : null);
+
+    const baseLimit = BASE_LIMITS[activeSub?.price_id] || 2; // Default 2 (Essential)
+    const extraSeats = companies?.extra_seats || 0;
+    const totalLimit = baseLimit + extraSeats;
+
+    // Conta usuários atuais
+    const { count, error: countErr } = await admin
+      .from("company_users")
+      .select("*", { count: "exact", head: true })
+      .eq("company_id", cu.company_id);
+
+    if (countErr) throw countErr;
+
+    if (count !== null && count >= totalLimit) {
+      return NextResponse.json(
+        { 
+          error: "Limite de usuários atingido.", 
+          details: `Seu plano atual permite até ${totalLimit} usuários (${baseLimit} do plano + ${extraSeats} extras). Contrate usuários adicionais na aba Cobrança.` 
+        },
+        { status: 403 },
+      );
+    }
+    // --- FIM DA VALIDAÇÃO ---
+
 
     const validRoles = ["admin", "normal", "driver"];
 

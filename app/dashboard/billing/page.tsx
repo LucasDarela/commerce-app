@@ -6,7 +6,13 @@ import SubscriptionManager from "@/components/subscription/SubscriptionManager";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import { Button } from "@/components/ui/button";
 import { useSearchParams } from "next/navigation";
-import { Check, Smartphone, Clock } from "lucide-react";
+import { 
+  Check, 
+  ChevronRight, 
+  Smartphone, 
+  Clock,
+  Users
+} from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
@@ -87,6 +93,8 @@ export default function BillingPage() {
     if (!authLoading && companyId) fetchBillingData({ showLoading: true });
   }, [authLoading, companyId, fetchBillingData]);
 
+  const [extraUsers, setExtraUsers] = useState(0);
+
   const handleCheckout = async (priceId: string) => {
     setSubmitting(true);
     try {
@@ -100,7 +108,8 @@ export default function BillingPage() {
         body: JSON.stringify({
           priceId,
           companyId,
-          addOnPriceId: includeMobile ? mobilePriceId : undefined
+          addOnPriceId: includeMobile ? mobilePriceId : undefined,
+          extraSeatsQuantity: extraUsers
         }),
       });
 
@@ -182,12 +191,20 @@ export default function BillingPage() {
 
   const trialDaysLeft = getTrialDaysLeft(subscriptionData?.trial_end || null);
 
+  const getExtraUserPrice = () => {
+    const planName = currentPlan?.name.split(" ")[0] || displayedPlans[0]?.name.split(" ")[0];
+    if (planName === "Enterprise") return isYearly ? 421 : 39;
+    if (planName === "Pro") return isYearly ? 529 : 49;
+    return isYearly ? 637 : 59; 
+  };
+
+  const extraPrice = getExtraUserPrice();
+
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-10">
       {/* Banner de Status da Assinatura Atual */}
       {isSubscribed && (
         <div className="bg-primary/5 border border-primary/20 rounded-3xl p-6 flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm overflow-hidden relative">
-          {/* Detalhe visual de fundo para trial */}
           {subscriptionData?.status === "trialing" && (
             <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full -mr-16 -mt-16 blur-3xl" />
           )}
@@ -226,7 +243,6 @@ export default function BillingPage() {
           </Button>
         </div>
       )}
-
 
       <div className="text-center space-y-4">
         <h1 className="text-4xl font-bold tracking-tight">
@@ -309,70 +325,78 @@ export default function BillingPage() {
         })}
       </div>
 
-<div
-  onClick={() => setIncludeMobile((prev) => !prev)}
-  className={`max-w-2xl mx-auto rounded-3xl border p-8 cursor-pointer transition-all
-    ${
-      includeMobile
-        ? "bg-primary/10 border-primary shadow-md"
-        : "bg-primary/5 border-primary/20 hover:border-primary/40"
-    }`}
->
-  <div className="flex items-start gap-4">
-    {/* Ícone */}
-    <div className="bg-primary/10 p-3 rounded-2xl">
-      <Smartphone className="h-6 w-6 text-primary" />
-    </div>
-
-    <div className="flex-1">
-      {/* Header */}
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        
-        <div>
-          <h3 className="text-lg font-bold">
-            Aplicativo Mobile Offline
-          </h3>
-          <span className="text-xs text-muted-foreground">
-            Add-on opcional
-          </span>
+      <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+        {/* Add-on Mobile */}
+        <div
+          onClick={() => setIncludeMobile((prev) => !prev)}
+          className={`rounded-3xl border p-6 cursor-pointer transition-all flex items-start gap-4 shadow-sm
+            ${includeMobile ? "bg-primary/10 border-primary ring-1 ring-primary/20" : "bg-card border-border hover:border-primary/40"}`}
+        >
+          <div className="bg-primary/10 p-3 rounded-2xl">
+            <Smartphone className="h-6 w-6 text-primary" />
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-bold">App Mobile Offline</h3>
+                <p className="text-xs text-muted-foreground leading-tight mt-1">Sincronize entregas sem internet.</p>
+              </div>
+              <div className="text-right">
+                <span className="text-base font-bold text-primary italic">
+                  R$ {isYearly ? "1.047" : "97"}
+                </span>
+                <p className="text-[10px] text-muted-foreground italic">/{isYearly ? "ano" : "mês"}</p>
+              </div>
+            </div>
+            <div className="mt-4 flex items-center justify-between">
+              <span className="text-xs font-medium text-muted-foreground">Incluir recurso</span>
+              <Checkbox checked={includeMobile || !!companyData?.mobile_offline_enabled} disabled={!!companyData?.mobile_offline_enabled} className="h-5 w-5 rounded-md" />
+            </div>
+          </div>
         </div>
 
-        {/* Preço + checkbox */}
-        <div className="flex items-center gap-3">
-          <span className="text-base font-semibold text-primary">
-            R$ {isYearly ? "1.047" : "97"}
-            <span className="text-xs text-muted-foreground ml-1">
-              /{isYearly ? "ano" : "mês"}
-            </span>
-          </span>
-
-          <div className="flex items-center justify-center h-6 w-6">
-            <Checkbox
-              id="mobile-addon"
-              checked={includeMobile || !!companyData?.mobile_offline_enabled}
-              disabled={!!companyData?.mobile_offline_enabled}
-              onCheckedChange={(v) => setIncludeMobile(!!v)}
-              className="h-5 w-5"
-            />
+        {/* Add-on Usuários Extras */}
+        <div className="rounded-3xl border border-border bg-card p-6 flex items-start gap-4 shadow-sm hover:shadow-md transition-all">
+          <div className="bg-primary/10 p-3 rounded-2xl">
+            <Users className="h-6 w-6 text-primary" />
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <h3 className="font-bold">Usuários Extras</h3>
+                <p className="text-xs text-muted-foreground leading-tight mt-1">Expanda sua equipe operacional.</p>
+              </div>
+              <div className="text-right">
+                <span className="text-base font-bold text-primary italic">R$ {extraPrice}</span>
+                <p className="text-[10px] text-muted-foreground italic">/{isYearly ? "ano" : "mês"} cada</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-4 mt-4 bg-primary/5 p-2 rounded-2xl border border-primary/10 w-fit">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8 rounded-xl hover:bg-primary/10"
+                onClick={(e) => { e.stopPropagation(); setExtraUsers(Math.max(0, extraUsers - 1)); }}
+              >
+                -
+              </Button>
+              <span className="font-bold text-lg min-w-[24px] text-center">{extraUsers}</span>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8 rounded-xl hover:bg-primary/10"
+                onClick={(e) => { e.stopPropagation(); setExtraUsers(extraUsers + 1); }}
+              >
+                +
+              </Button>
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-3 italic font-medium">
+              * Seu plano atual inclui {currentPlan?.name.includes("Enterprise") ? 15 : currentPlan?.name.includes("Pro") ? 5 : 2} usuários base.
+            </p>
           </div>
         </div>
       </div>
-
-      {/* Descrição */}
-      <p className="text-sm text-muted-foreground mt-3 leading-6">
-        Permite que seus motoristas trabalhem mesmo sem internet, ideal para áreas
-        com sinal fraco. As entregas são sincronizadas automaticamente depois.
-      </p>
-
-      {/* Status visual */}
-      {(includeMobile || companyData?.mobile_offline_enabled) && (
-        <p className="mt-3 text-sm font-medium text-primary">
-          ✔ App mobile {companyData?.mobile_offline_enabled ? "Ativo na sua conta" : "incluído no plano"}
-        </p>
-      )}
-    </div>
-  </div>
-</div>
     </div>
   );
 }
