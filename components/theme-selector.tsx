@@ -71,7 +71,7 @@ export function ThemeSelector() {
     <div className="flex items-center gap-3">
       {/* Nome do Plano */}
       {!loading && planName && (
-        <div className="flex items-center gap-2">
+        <div className="hidden lg:flex items-center gap-2">
           <Badge variant="secondary" className="px-3 py-1 bg-primary/10 text-primary border-primary/20 hover:bg-primary/20 transition-colors uppercase text-[10px] font-bold tracking-wider">
             {planName.split(" ")[0]}
           </Badge>
