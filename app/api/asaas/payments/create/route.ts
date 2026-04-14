@@ -135,10 +135,39 @@ export async function POST(req: Request) {
       },
     );
 
-    const digitableLine =
+    let digitableLine: string | null =
       created.identificationField ?? created.digitableLine ?? null;
-    const barcode = created.bankSlipBarcode ?? null;
+    let barcode: string | null = created.bankSlipBarcode ?? null;
     const boletoUrl = created.bankSlipUrl ?? created.invoiceUrl ?? null;
+
+    // O Asaas processa o boleto de forma assíncrona — tentamos até 3x com delay
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      if (digitableLine && barcode) break;
+      try {
+        await sleep(2000);
+        const identification = await asaasFetch<any>(
+          supabase,
+          companyId,
+          `/payments/${created.id}/identificationField`,
+          { method: "GET" },
+        );
+        const newLine =
+          identification?.identificationField ??
+          identification?.digitableLine ??
+          null;
+        const newBarcode =
+          identification?.barCode ??
+          identification?.barcode ??
+          identification?.bankSlipBarcode ??
+          null;
+        if (newLine) digitableLine = newLine;
+        if (newBarcode) barcode = newBarcode;
+        console.log(`[asaas/payments/create] tentativa ${attempt}/3:`, { digitableLine, barcode });
+      } catch (err) {
+        console.warn(`⚠️ [asaas/payments/create] tentativa ${attempt}/3 - identificationField:`, err);
+      }
+    }
 
 if (orderId) {
   console.log("[asaas/payments/create] orderId:", orderId);

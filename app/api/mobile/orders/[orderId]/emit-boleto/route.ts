@@ -145,38 +145,56 @@ export async function POST(_: Request, { params }: Params) {
 
     const boletoUrl = created.bankSlipUrl ?? created.invoiceUrl ?? null;
 
-let digitableLine: string | null =
-  created.identificationField ?? created.digitableLine ?? null;
+    let digitableLine: string | null =
+      created.identificationField ?? created.digitableLine ?? null;
 
-let barcode: string | null =
-  created.bankSlipBarcode ?? null;
+    let barcode: string | null =
+      created.bankSlipBarcode ?? null;
 
-try {
-  const identification = await asaasFetch<any>(
-    supabase,
-    companyId,
-    `/lean/payments/${created.id}/identificationField`,
-    {
-      method: "GET",
-    },
-  );
+    // O Asaas leva alguns segundos para processar o boleto antes de disponibilizar
+    // o identificationField. Tentamos até 3x com delay crescente.
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const MAX_RETRIES = 3;
+    const RETRY_DELAY_MS = 2000;
 
-  digitableLine =
-    identification?.identificationField ??
-    identification?.digitableLine ??
-    digitableLine;
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      if (digitableLine && barcode) break; // já temos os dados
 
-  barcode =
-    identification?.barCode ??
-    identification?.barcode ??
-    identification?.bankSlipBarcode ??
-    barcode;
-} catch (err) {
-  console.warn(
-    "⚠️ Não foi possível obter linha digitável/código de barras logo após criar o boleto:",
-    err,
-  );
-}
+      try {
+        await sleep(RETRY_DELAY_MS);
+
+        const identification = await asaasFetch<any>(
+          supabase,
+          companyId,
+          `/payments/${created.id}/identificationField`,
+          { method: "GET" },
+        );
+
+        const newLine =
+          identification?.identificationField ??
+          identification?.digitableLine ??
+          null;
+
+        const newBarcode =
+          identification?.barCode ??
+          identification?.barcode ??
+          identification?.bankSlipBarcode ??
+          null;
+
+        if (newLine) digitableLine = newLine;
+        if (newBarcode) barcode = newBarcode;
+
+        console.log(`[emit-boleto] tentativa ${attempt}/${MAX_RETRIES}:`, {
+          digitableLine,
+          barcode,
+        });
+      } catch (err) {
+        console.warn(
+          `⚠️ [emit-boleto] tentativa ${attempt}/${MAX_RETRIES} - erro ao obter identificationField:`,
+          err,
+        );
+      }
+    }
 
     const update: Record<string, any> = {
       boleto_id: created.id,
