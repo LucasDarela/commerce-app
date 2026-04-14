@@ -63,7 +63,7 @@ export function useAuthenticatedCompany(): AuthenticatedCompany {
 
       // Identifica primeiro se a empresa é isenta de cobrança
       if (compData?.billing_exempt) {
-        setPlanName("Vitalício");
+        setPlanName("Pro");
       } else {
         // Busca o plano atual de forma independente
         const { data: subData } = await supabase
