@@ -169,11 +169,11 @@ export default function BillingPage() {
     },
     Pro: {
       note: isYearly ? "10% de desconto no plano total." : "O plano mais completo para gestão.",
-      features: ["Tudo do Essential", "Emissão de Boletos e NF-e", "Controle Financeiro", "E muito mais..."]
+      features: ["Tudo do Essential", "Emissão de Boletos e NF-e", "Controle Financeiro", "5 usuários", "E muito mais..."]
     },
     Enterprise: {
       note: "Suporte e acompanhamento estratégico.",
-      features: ["Tudo do Pro", "Mentoria de implementação", "Reuniões de alinhamento", "E muito mais..."]
+      features: ["Tudo do Pro", "Mentoria de implementação", "Reuniões de alinhamento", "Usuários ilimitados", "E muito mais..."]
     }
   };
 

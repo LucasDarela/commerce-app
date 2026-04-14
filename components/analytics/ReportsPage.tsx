@@ -17,6 +17,33 @@ import {
   FiscalFieldIssuesReport,
 } from "@/components/analytics/FiscalReports";
 import {
+  CashFlowReport,
+  AccountsPayableReport,
+  OverduePayablesReport,
+  ExpensesByCategoryReport,
+  RevenueVsExpenseReport,
+  MonthlyFinancialSummaryReport,
+} from "@/components/analytics/FinancialReports";
+import {
+  StockMovementsReport,
+  CurrentStockPositionReport,
+  LowStockProductsReport,
+  ReturnsByProductReport,
+} from "@/components/analytics/StockReports";
+import {
+  OverdueReceivablesReport,
+  ReceiptsByPeriodReport,
+  CustomerDefaultReport,
+  SalesByProductReport,
+  TopCustomersReport,
+  CustomerFullStatementReport,
+  SalesByVolumeReport,
+} from "@/components/analytics/SalesAnalyticsReports";
+import {
+  EquipmentNotReturnedReport,
+  EquipmentAvailableVsLoanedReport,
+} from "@/components/analytics/EquipmentAnalyticsReports";
+import {
   CustomerHistoryReport,
   ActiveInactiveCustomersReport,
   NewCustomersByPeriodReport,
@@ -63,25 +90,26 @@ const REPORT_OPTIONS: { value: string; label: string; group: string; disabled?: 
   // Vendas
   { value: "sales_by_period", label: "Vendas por Período", group: "vendas" },
   { value: "sales_grouped_by_customer", label: "Vendas Agrupadas por Cliente", group: "vendas" },
-  { value: "overdue_receivables", label: "Contas a Receber Vencidas", group: "vendas", disabled: true },
-  { value: "customer_statement", label: "Extrato por Cliente", group: "vendas", disabled: true },
-  { value: "receipts_by_period", label: "Recebimentos por Período", group: "vendas", disabled: true },
-  { value: "customer_default", label: "Inadimplência por Cliente", group: "vendas", disabled: true },
-  { value: "sales_by_product", label: "Vendas por Produto", group: "vendas", disabled: true },
-  { value: "top_customers", label: "Clientes que Mais Compram", group: "vendas", disabled: true },
+  { value: "overdue_receivables", label: "Contas a Receber Vencidas", group: "vendas" },
+  { value: "customer_statement", label: "Extrato por Cliente", group: "vendas" },
+  { value: "receipts_by_period", label: "Recebimentos por Período", group: "vendas" },
+  { value: "customer_default", label: "Inadimplência por Cliente", group: "vendas" },
+  { value: "sales_by_product", label: "Vendas por Produto", group: "vendas" },
+  { value: "top_customers", label: "Clientes que Mais Compram", group: "vendas" },
+  { value: "sales_by_volume", label: "Vendas por Litragem", group: "vendas" },
   // Financeiro
-  { value: "cash_flow", label: "Fluxo de Caixa por Período", group: "financeiro", disabled: true },
-  { value: "accounts_payable", label: "Contas a Pagar", group: "financeiro", disabled: true },
-  { value: "overdue_payables", label: "Contas a Pagar Vencidas", group: "financeiro", disabled: true },
-  { value: "expenses_by_category", label: "Despesas por Categoria", group: "financeiro", disabled: true },
-  { value: "revenue_vs_expense", label: "Receita x Despesa", group: "financeiro", disabled: true },
-  { value: "monthly_financial_summary", label: "Resumo Financeiro Mensal", group: "financeiro", disabled: true },
+  { value: "cash_flow", label: "Fluxo de Caixa por Período", group: "financeiro" },
+  { value: "accounts_payable", label: "Contas a Pagar", group: "financeiro" },
+  { value: "overdue_payables", label: "Contas a Pagar Vencidas", group: "financeiro" },
+  { value: "expenses_by_category", label: "Despesas por Categoria", group: "financeiro" },
+  { value: "revenue_vs_expense", label: "Receita x Despesa", group: "financeiro" },
+  { value: "monthly_financial_summary", label: "Resumo Financeiro Mensal", group: "financeiro" },
   // Estoque
   { value: "stock_reservations", label: "Reservas de Estoque", group: "estoque" },
-  { value: "stock_movements", label: "Estoque / Movimentações", group: "estoque", disabled: true },
-  { value: "current_stock_position", label: "Posição Atual de Estoque", group: "estoque", disabled: true },
-  { value: "low_stock", label: "Produtos com Estoque Baixo", group: "estoque", disabled: true },
-  { value: "product_returns", label: "Devoluções por Produto", group: "estoque", disabled: true },
+  { value: "stock_movements", label: "Estoque / Movimentações", group: "estoque" },
+  { value: "current_stock_position", label: "Posição Atual de Estoque", group: "estoque" },
+  { value: "low_stock", label: "Produtos com Estoque Baixo", group: "estoque" },
+  { value: "product_returns", label: "Devoluções por Produto", group: "estoque" },
   // Clientes
   { value: "customer_statement_full", label: "Histórico Completo por Cliente", group: "clientes" },
   { value: "active_inactive_customers", label: "Clientes Ativos e Inativos", group: "clientes" },
@@ -92,8 +120,8 @@ const REPORT_OPTIONS: { value: string; label: string; group: string; disabled?: 
   { value: "equipment_movement_history", label: "Movimentações de Equipamentos", group: "equipamentos" },
   { value: "equipment_by_customer", label: "Equipamentos por Cliente", group: "equipamentos" },
   { value: "equipment_tracker", label: "Rastreio de Equipamento", group: "equipamentos" },
-  { value: "unreturned_equipments", label: "Equipamentos Não Retornados", group: "equipamentos", disabled: true },
-  { value: "available_vs_loaned_equipments", label: "Equipamentos Disponíveis x Emprestados", group: "equipamentos", disabled: true },
+  { value: "unreturned_equipments", label: "Equipamentos Não Retornados", group: "equipamentos" },
+  { value: "available_vs_loaned_equipments", label: "Equipamentos Disponíveis x Emprestados", group: "equipamentos" },
   // Fiscal
   { value: "issued_invoices", label: "NF-e Emitidas por Período", group: "fiscal" },
   { value: "invoice_status", label: "NF-e Autorizadas / Rejeitadas", group: "fiscal" },
@@ -660,6 +688,25 @@ export default function ReportsPage() {
                   : params.reportType === "equipment_by_customer" ? "Equipamentos por Cliente"
                   : params.reportType === "equipment_tracker" ? "Rastreio de Equipamento"
                   : params.reportType === "sales_grouped_by_customer" ? "Vendas Agrupadas por Cliente"
+                  : params.reportType === "cash_flow" ? "Fluxo de Caixa por Período"
+                  : params.reportType === "accounts_payable" ? "Contas a Pagar"
+                  : params.reportType === "overdue_payables" ? "Contas a Pagar Vencidas"
+                  : params.reportType === "expenses_by_category" ? "Despesas por Categoria"
+                  : params.reportType === "revenue_vs_expense" ? "Receita x Despesa"
+                  : params.reportType === "monthly_financial_summary" ? "Resumo Financeiro Mensal"
+                  : params.reportType === "stock_movements" ? "Estoque / Movimentações"
+                  : params.reportType === "current_stock_position" ? "Posição Atual de Estoque"
+                  : params.reportType === "low_stock" ? "Produtos com Estoque Baixo"
+                  : params.reportType === "product_returns" ? "Devoluções por Produto"
+                  : params.reportType === "overdue_receivables" ? "Contas a Receber Vencidas"
+                  : params.reportType === "customer_statement" ? "Extrato por Cliente"
+                  : params.reportType === "receipts_by_period" ? "Recebimentos por Período"
+                  : params.reportType === "customer_default" ? "Inadimplência por Cliente"
+                  : params.reportType === "sales_by_product" ? "Vendas por Produto"
+                  : params.reportType === "top_customers" ? "Clientes que Mais Compram"
+                  : params.reportType === "sales_by_volume" ? "Vendas por Litragem"
+                  : params.reportType === "unreturned_equipments" ? "Equipamentos Não Retornados"
+                  : params.reportType === "available_vs_loaned_equipments" ? "Equipamentos Disponíveis x Emprestados"
                   : "Vendas por Período"
                 }
               </span>
@@ -689,12 +736,62 @@ export default function ReportsPage() {
       )}
 
       <div className="space-y-6">
+        {/* Estoque */}
+        {params?.reportType === "stock_movements" && params.companyId && (
+          <StockMovementsReport
+            companyId={params.companyId}
+            startDate={params.startDate}
+            endDate={params.endDate}
+          />
+        )}
+
+        {params?.reportType === "current_stock_position" && params.companyId && (
+          <CurrentStockPositionReport
+            companyId={params.companyId}
+            startDate={params.startDate}
+            endDate={params.endDate}
+          />
+        )}
+
+        {params?.reportType === "low_stock" && params.companyId && (
+          <LowStockProductsReport
+            companyId={params.companyId}
+            startDate={params.startDate}
+            endDate={params.endDate}
+          />
+        )}
+
+        {params?.reportType === "product_returns" && params.companyId && (
+          <ReturnsByProductReport
+            companyId={params.companyId}
+            startDate={params.startDate}
+            endDate={params.endDate}
+          />
+        )}
+
         {params?.reportType === "stock_reservations" && params.companyId && (
           <StockReservationReport
             companyId={params.companyId}
             startDate={params.startDate}
             endDate={params.endDate}
             supplierFilter={params.supplierFilter}
+          />
+        )}
+
+        {/* Equipamentos Avançado */}
+        {params?.reportType === "unreturned_equipments" && params.companyId && (
+          <EquipmentNotReturnedReport
+            companyId={params.companyId}
+            startDate={params.startDate}
+            endDate={params.endDate}
+          />
+        )}
+
+        {params?.reportType === "available_vs_loaned_equipments" && params.companyId && (
+          <EquipmentAvailableVsLoanedReport
+            companyId={params.companyId}
+            startDate={params.startDate}
+            endDate={params.endDate}
           />
         )}
 
@@ -737,6 +834,118 @@ export default function ReportsPage() {
               equipmentFilter={params.equipmentFilter ?? ""}
             />
           )}
+
+        {/* Relatórios Financeiros */}
+        {params?.reportType === "cash_flow" && params.companyId && (
+          <CashFlowReport
+            companyId={params.companyId}
+            startDate={params.startDate}
+            endDate={params.endDate}
+          />
+        )}
+
+        {params?.reportType === "accounts_payable" && params.companyId && (
+          <AccountsPayableReport
+            companyId={params.companyId}
+            startDate={params.startDate}
+            endDate={params.endDate}
+          />
+        )}
+
+        {params?.reportType === "overdue_payables" && params.companyId && (
+          <OverduePayablesReport
+            companyId={params.companyId}
+            startDate={params.startDate}
+            endDate={params.endDate}
+          />
+        )}
+
+        {params?.reportType === "expenses_by_category" && params.companyId && (
+          <ExpensesByCategoryReport
+            companyId={params.companyId}
+            startDate={params.startDate}
+            endDate={params.endDate}
+          />
+        )}
+
+        {params?.reportType === "revenue_vs_expense" && params.companyId && (
+          <RevenueVsExpenseReport
+            companyId={params.companyId}
+            startDate={params.startDate}
+            endDate={params.endDate}
+          />
+        )}
+
+        {params?.reportType === "monthly_financial_summary" && params.companyId && (
+          <MonthlyFinancialSummaryReport
+            companyId={params.companyId}
+            startDate={params.startDate}
+            endDate={params.endDate}
+          />
+        )}
+
+        {/* Vendas e Recebíveis */}
+        {params?.reportType === "overdue_receivables" && params.companyId && (
+          <OverdueReceivablesReport
+            companyId={params.companyId}
+            startDate={params.startDate}
+            endDate={params.endDate}
+            customerId={params.customerId}
+          />
+        )}
+
+        {params?.reportType === "receipts_by_period" && params.companyId && (
+          <ReceiptsByPeriodReport
+            companyId={params.companyId}
+            startDate={params.startDate}
+            endDate={params.endDate}
+            customerId={params.customerId}
+          />
+        )}
+
+        {params?.reportType === "customer_default" && params.companyId && (
+          <CustomerDefaultReport
+            companyId={params.companyId}
+            startDate={params.startDate}
+            endDate={params.endDate}
+            customerId={params.customerId}
+          />
+        )}
+
+        {params?.reportType === "sales_by_product" && params.companyId && (
+          <SalesByProductReport
+            companyId={params.companyId}
+            startDate={params.startDate}
+            endDate={params.endDate}
+            customerId={params.customerId}
+          />
+        )}
+
+        {params?.reportType === "top_customers" && params.companyId && (
+          <TopCustomersReport
+            companyId={params.companyId}
+            startDate={params.startDate}
+            endDate={params.endDate}
+          />
+        )}
+
+        {params?.reportType === "customer_statement" && params.companyId && (
+          <CustomerFullStatementReport
+            companyId={params.companyId}
+            startDate={params.startDate}
+            endDate={params.endDate}
+            customerId={params.customerId}
+          />
+        )}
+
+        {params?.reportType === "sales_by_volume" && params.companyId && (
+          <SalesByVolumeReport
+            companyId={params.companyId}
+            startDate={params.startDate}
+            endDate={params.endDate}
+            customerId={params.customerId}
+          />
+        )}
 
         {/* Relatórios Fiscais */}
         {params?.reportType === "issued_invoices" && params.companyId && (
