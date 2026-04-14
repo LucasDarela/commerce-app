@@ -31,7 +31,7 @@ const supabase = createClient(
 
 export async function POST(req: Request) {
   try {
-    const { priceId, companyId, addOnPriceId, extraSeatsQuantity = 0 } = await req.json();
+    const { priceId, companyId, addOnPriceId, extraSeatsQuantity = 0, skipTrial = false } = await req.json();
 
     if (!priceId) {
       return NextResponse.json({ error: "priceId obrigatório" }, { status: 400 });
@@ -64,8 +64,8 @@ export async function POST(req: Request) {
       "price_1TKVCF4Ik5RguVVS0JGxcik2", // Pro Anual
     ];
 
-    // Regra: Só tem trial se o plano permitir E não houver Add-ons / Extras
-    const canHaveTrial = TRIAL_ALLOWED_PLANS.includes(priceId) && !addOnPriceId && extraSeatsQuantity === 0;
+    // Regra: Só tem trial se o plano permitir E não houver Add-ons / Extras E NÃO solicitou skip
+    const canHaveTrial = TRIAL_ALLOWED_PLANS.includes(priceId) && !addOnPriceId && extraSeatsQuantity === 0 && !skipTrial;
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
     const successUrl = `${siteUrl}/dashboard/billing?success=true&session_id={CHECKOUT_SESSION_ID}`;
@@ -132,11 +132,18 @@ export async function POST(req: Request) {
         }
       }
 
-      await stripe.subscriptions.update(sub.id, {
+      const updateParams: Stripe.SubscriptionUpdateParams = {
         items: itemsToUpdate,
         proration_behavior: "always_invoice",
         payment_behavior: "error_if_incomplete",
-      });
+      };
+
+      // Se pedir pra pular trial no upgrade, encerra o trial end agora
+      if (skipTrial && sub.status === "trialing") {
+        updateParams.trial_end = "now";
+      }
+
+      await stripe.subscriptions.update(sub.id, updateParams);
 
       return NextResponse.json({ success: true, type: "upgrade" });
     }

@@ -48,6 +48,13 @@ export default function TeamManagementPage() {
     email: "",
     role: "driver",
   });
+  
+  const [capacity, setCapacity] = useState<{
+    used: number;
+    total: number;
+    base: number;
+    extra: number;
+  } | null>(null);
 
   async function fetchTeam() {
     try {
@@ -65,14 +72,12 @@ export default function TeamManagementPage() {
 
       const data = await res.json();
 
-      console.log("[frontend][team] status:", res.status);
-      console.log("[frontend][team] response:", data);
-
       if (!res.ok) {
         throw new Error(data?.error || "Falha ao buscar time");
       }
 
       setTeamMembers(data.members);
+      setCapacity(data.capacity);
 
       const me = data.members.find((m: TeamMember) => m.id === user?.id);
       if (me) {
@@ -333,7 +338,33 @@ export default function TeamManagementPage() {
 
   return (
     <div className="space-y-6 py-8">
-      <h2 className="text-xl font-bold">Gerencie sua Equipe</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold">Gerencie sua Equipe</h2>
+        
+        {capacity && (
+          <div className="flex items-center gap-3 bg-muted/40 px-4 py-2 rounded-2xl border text-sm">
+            <div className="flex flex-col">
+              <span className="text-muted-foreground text-[10px] uppercase font-bold">Capacidade de Usuários</span>
+              <span className="font-semibold">
+                {capacity.used} de {capacity.total} utilizados
+              </span>
+            </div>
+            <div className="h-8 w-[1px] bg-border mx-1" />
+            <div className="text-[10px] text-muted-foreground max-w-[120px] leading-tight">
+              {capacity.base} do plano + {capacity.extra} extras
+            </div>
+          </div>
+        )}
+      </div>
+
+      {capacity && capacity.used >= capacity.total && (
+        <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl text-amber-800 text-sm flex items-center gap-3">
+          <span>⚠️</span>
+          <p>
+            <strong>Limite de usuários atingido.</strong> Para adicionar novos membros, remova alguém ou contrate usuários adicionais na página de <a href="/dashboard/billing" className="underline font-bold">Cobrança</a>.
+          </p>
+        </div>
+      )}
 
       <div className="grid grid-cols-3 gap-4">
         <Input

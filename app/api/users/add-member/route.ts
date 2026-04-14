@@ -95,12 +95,7 @@ export async function POST(req: Request) {
 
     const { data: cu, error: cuErr } = await admin
       .from("company_users")
-      .select(`
-        company_id, 
-        role, 
-        companies(extra_seats), 
-        subscriptions(price_id, status)
-      `)
+      .select("company_id, role")
       .eq("user_id", inviter.id)
       .maybeSingle();
 
@@ -111,6 +106,13 @@ export async function POST(req: Request) {
       );
     }
 
+    const [compRes, subRes] = await Promise.all([
+      admin.from("companies").select("extra_seats").eq("id", cu.company_id).maybeSingle(),
+      admin.from("subscriptions").select("price_id, status").eq("company_id", cu.company_id).maybeSingle()
+    ]);
+
+    if (compRes.error) return NextResponse.json({ error: compRes.error.message }, { status: 400 });
+
     // --- VALIDAÇÃO DE LIMITES DE USUÁRIO ---
     const BASE_LIMITS: Record<string, number> = {
       "price_1TKV9t4Ik5RguVVSjcoyxCkh": 2, // Essential Mensal
@@ -118,19 +120,15 @@ export async function POST(req: Request) {
       "price_1TKVBe4Ik5RguVVS5gwSObQ7": 5, // Pro Mensal
       "price_1TKVCF4Ik5RguVVS0JGxcik2": 5, // Pro Anual
       "price_1TKVER4Ik5RguVVS71L2NInl": 15, // Enterprise Mensal
-      "price_1TKVFK4Ik5RguVVSL0e4G83O": 15, // Anual
+      "price_1TKVFK4Ik5RguVVSL0e4G83O": 15, // Enterprise Anual
     };
 
-    const companies = cu.companies as any;
-    const subscriptions = cu.subscriptions as any;
+    const company = compRes.data as any;
+    const activeSub = subRes.data as any;
     
     // Identifica assinatura ativa
-    const activeSub = Array.isArray(subscriptions) 
-      ? subscriptions.find(s => s.status === "active" || s.status === "trialing")
-      : (subscriptions?.status === "active" || subscriptions?.status === "trialing" ? subscriptions : null);
-
-    const baseLimit = BASE_LIMITS[activeSub?.price_id] || 2; // Default 2 (Essential)
-    const extraSeats = companies?.extra_seats || 0;
+    const baseLimit = BASE_LIMITS[activeSub?.price_id || ""] || 2; // Default 2 (Essential)
+    const extraSeats = company?.extra_seats || 0;
     const totalLimit = baseLimit + extraSeats;
 
     // Conta usuários atuais

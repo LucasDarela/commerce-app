@@ -57,6 +57,27 @@ export default function BillingPage() {
   const [isYearly, setIsYearly] = useState(false);
   const [includeMobile, setIncludeMobile] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [skipTrial, setSkipTrial] = useState(false);
+
+  const handleActivateNow = async () => {
+    if (!companyId) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/stripe/activate-now", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      toast.success("Assinatura ativada com sucesso! Cobrança processada.");
+      fetchBillingData({ showLoading: true });
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const fetchBillingData = useCallback(
     async ({ showLoading = false }: { showLoading?: boolean } = {}) => {
@@ -109,7 +130,8 @@ export default function BillingPage() {
           priceId,
           companyId,
           addOnPriceId: includeMobile ? mobilePriceId : undefined,
-          extraSeatsQuantity: extraUsers
+          extraSeatsQuantity: extraUsers,
+          skipTrial
         }),
       });
 
@@ -165,15 +187,15 @@ export default function BillingPage() {
   const planDetails: Record<string, { note: string; features: string[] }> = {
     Essential: {
       note: isYearly ? "Economia de 10% no anual." : "Ideal para organizar sua operação.",
-      features: ["Gestão de pedidos, financeiro e estoque", "Organização de entregas", "E muito mais..."]
+      features: ["Gestão de pedidos, financeiro e estoque", "Organização de entregas", "Até 2 usuários inclusos", "E muito mais..."]
     },
     Pro: {
       note: isYearly ? "10% de desconto no plano total." : "O plano mais completo para gestão.",
-      features: ["Tudo do Essential", "Emissão de Boletos e NF-e", "Controle Financeiro", "5 usuários", "E muito mais..."]
+      features: ["Tudo do Essential", "Emissão de Boletos e NF-e", "Controle Financeiro", "Até 5 usuários inclusos", "E muito mais..."]
     },
     Enterprise: {
       note: "Suporte e acompanhamento estratégico.",
-      features: ["Tudo do Pro", "Mentoria de implementação", "Reuniões de alinhamento", "Usuários ilimitados", "E muito mais..."]
+      features: ["Tudo do Pro", "Mentoria de implementação", "Reuniões de alinhamento", "Até 15 usuários inclusos", "E muito mais..."]
     }
   };
 
@@ -238,9 +260,20 @@ export default function BillingPage() {
               </p>
             )}
           </div>
-          <Button variant="outline" onClick={handleManageBilling} disabled={submitting} className="h-11 px-6 font-semibold relative z-10 transition-all hover:bg-primary hover:text-primary-foreground">
-            Gerenciar no Stripe (Cancelar)
-          </Button>
+          <div className="flex flex-col sm:flex-row items-center gap-3 relative z-10 w-full md:w-auto">
+            {subscriptionData?.status === "trialing" && (
+              <Button 
+                onClick={handleActivateNow} 
+                disabled={submitting} 
+                className="h-11 px-6 font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-500/20"
+              >
+                Ativar Agora (Pagar Agora)
+              </Button>
+            )}
+            <Button variant="outline" onClick={handleManageBilling} disabled={submitting} className="h-11 px-6 font-semibold transition-all hover:bg-primary hover:text-primary-foreground">
+              Gerenciar no Stripe (Cancelar)
+            </Button>
+          </div>
         </div>
       )}
 
@@ -254,10 +287,27 @@ export default function BillingPage() {
             : "Comece hoje mesmo com 30 dias de teste gratuito nos planos Essential e Pro."}
         </p>
         
-        <div className="flex items-center justify-center gap-4 pt-4">
-          <span className={!isYearly ? "font-semibold" : "text-muted-foreground text-sm"}>Mensal</span>
-          <Switch checked={isYearly} onCheckedChange={setIsYearly} />
-          <span className={isYearly ? "font-semibold" : "text-muted-foreground text-sm"}>Anual <span className="text-emerald-600 text-xs font-bold">(10% OFF)</span></span>
+        <div className="flex flex-col items-center gap-4 pt-4">
+          <div className="flex items-center justify-center gap-4">
+            <span className={!isYearly ? "font-semibold" : "text-muted-foreground text-sm"}>Mensal</span>
+            <Switch checked={isYearly} onCheckedChange={setIsYearly} />
+            <span className={isYearly ? "font-semibold" : "text-muted-foreground text-sm"}>Anual <span className="text-emerald-600 text-xs font-bold">(10% OFF)</span></span>
+          </div>
+
+          {!isSubscribed && (
+            <div className="flex items-center gap-2 bg-primary/5 px-4 py-2 rounded-full border border-primary/10 animate-in fade-in zoom-in duration-300">
+              <input 
+                type="checkbox" 
+                id="skip-trial" 
+                checked={skipTrial} 
+                onChange={(e) => setSkipTrial(e.target.checked)}
+                className="w-4 h-4 rounded border-primary text-primary focus:ring-primary cursor-pointer"
+              />
+              <label htmlFor="skip-trial" className="text-xs font-bold cursor-pointer select-none">
+                Pular teste grátis e ATIVAR AGORA ⚡
+              </label>
+            </div>
+          )}
         </div>
       </div>
 
@@ -268,7 +318,7 @@ export default function BillingPage() {
           const isCurrent = subscriptionData?.price_id === plan.stripe_price_id;
           const isUpgrade = currentPlan && plan.price > currentPlan.price;
           
-          let buttonText = "Iniciar teste";
+          let buttonText = skipTrial ? "Ativar agora" : "Iniciar teste";
           if (isSubscribed) {
             if (isCurrent) buttonText = "Plano Atual";
             else if (isUpgrade) buttonText = "Fazer Upgrade";

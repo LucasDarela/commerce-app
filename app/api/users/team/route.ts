@@ -30,17 +30,34 @@ export async function GET() {
       .eq("user_id", inviter.id)
       .maybeSingle();
 
-    if (cuErr) {
-      console.error("[team] company_users error:", cuErr);
-      return NextResponse.json({ error: cuErr.message }, { status: 400 });
+    if (cuErr || !cu?.company_id) {
+      return NextResponse.json({ error: "Company not found for inviter" }, { status: 400 });
     }
 
-    if (!cu?.company_id) {
-      return NextResponse.json(
-        { error: "Company not found for inviter" },
-        { status: 400 },
-      );
-    }
+    const [compRes, subRes] = await Promise.all([
+      admin.from("companies").select("extra_seats").eq("id", cu.company_id).maybeSingle(),
+      admin.from("subscriptions").select("price_id, status").eq("company_id", cu.company_id).maybeSingle()
+    ]);
+
+    if (compRes.error) return NextResponse.json({ error: compRes.error.message }, { status: 400 });
+
+    // --- CÁLCULO DE LIMITES ---
+    const BASE_LIMITS: Record<string, number> = {
+      "price_1TKV9t4Ik5RguVVSjcoyxCkh": 2, // Essential Mensal
+      "price_1TKVB04Ik5RguVVSiYno016o": 2, // Essential Anual
+      "price_1TKVBe4Ik5RguVVS5gwSObQ7": 5, // Pro Mensal
+      "price_1TKVCF4Ik5RguVVS0JGxcik2": 5, // Pro Anual
+      "price_1TKVER4Ik5RguVVS71L2NInl": 15, // Enterprise Mensal
+      "price_1TKVFK4Ik5RguVVSL0e4G83O": 15, // Enterprise Anual
+    };
+
+    const company = compRes.data as any;
+    const activeSub = subRes.data as any;
+
+    const baseLimit = BASE_LIMITS[activeSub?.price_id || ""] || 2;
+    const extraSeats = company?.extra_seats || 0;
+    const totalLimit = baseLimit + extraSeats;
+    // --- FIM CÁLCULO ---
 
     const { data: rows, error: listErr } = await admin
       .from("company_users")
@@ -55,7 +72,10 @@ export async function GET() {
     const userIds = (rows ?? []).map((r) => r.user_id).filter(Boolean);
 
     if (!userIds.length) {
-      return NextResponse.json({ members: [] }, { status: 200 });
+      return NextResponse.json({ 
+        members: [], 
+        capacity: { used: 0, total: totalLimit, base: baseLimit, extra: extraSeats } 
+      }, { status: 200 });
     }
 
     const { data: profiles, error: profilesErr } = await admin
@@ -81,14 +101,7 @@ export async function GET() {
         }
 
         const u = ures?.user;
-        const p = profileMap.get(row.user_id) as
-          | {
-              id: string;
-              email: string | null;
-              is_blocked: boolean | null;
-              username?: string | null;
-            }
-          | undefined;
+        const p = profileMap.get(row.user_id) as any;
 
         return {
           id: row.user_id,
@@ -103,7 +116,10 @@ export async function GET() {
       }),
     );
 
-    return NextResponse.json({ members }, { status: 200 });
+    return NextResponse.json({ 
+      members, 
+      capacity: { used: members.length, total: totalLimit, base: baseLimit, extra: extraSeats } 
+    }, { status: 200 });
   } catch (e: any) {
     console.error("[team] GET error:", e);
 

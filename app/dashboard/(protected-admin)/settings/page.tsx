@@ -9,9 +9,10 @@ import RegisterBankAccount from "../register-bank-account/page";
 import FocusNFeSection from "@/components/nf/FocusNfeSection";
 import PaymentSettingsCard from "@/components/settings/PaymentSettingsCard";
 import { useRouteGuard } from "@/hooks/useRouteGuard";  
+import { UpgradePlanBanner } from "@/components/settings/UpgradePlanBanner";
 
 export default function SettingsPage() {
-  const { user, companyId, loading, role } = useAuthenticatedCompany();
+  const { user, companyId, loading, role, planName } = useAuthenticatedCompany();
   useRouteGuard();
 
   if (loading) {
@@ -19,13 +20,28 @@ export default function SettingsPage() {
   }
   if (role === "driver") return null;
   
+  const isLimitedPlan = !planName || 
+    planName.toLowerCase().includes("essential") || 
+    planName.toLowerCase() === "gratuito";
+
   return (
     <div className="space-y-6 px-10 mt-9">
       <h2 className="text-2xl font-bold">Configurações</h2>
       <CompanySettingsForm />
       <TeamManagementPage />
-      <IntegrationsPage />
-      <FocusNFeSection />
+      
+      {!isLimitedPlan ? (
+        <>
+          <IntegrationsPage />
+          <FocusNFeSection />
+        </>
+      ) : (
+        <UpgradePlanBanner 
+          title="Recursos de Automação e Fiscal Bloqueados" 
+          description="A emissão de NF-e e a integração automática de boletos são exclusivas para assinantes dos planos Pro e Enterprise. Organize sua operação e economize tempo agora mesmo!"
+        />
+      )}
+
       <RegisterBankAccount />
       {/* Em desenvolvimento */}
       {/* <PaymentSettingsCard /> */}
