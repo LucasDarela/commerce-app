@@ -117,7 +117,7 @@ export function ReturnProductModal({
 
       const { data: orderData, error: orderError } = await supabase
         .from("orders")
-        .select("id, total, company_id")
+        .select("id, total, amount, products, company_id")
         .eq("id", orderId)
         .eq("company_id", companyId)
         .maybeSingle();
@@ -130,9 +130,45 @@ export function ReturnProductModal({
       const currentTotal = Number(orderData.total ?? 0);
       const newTotal = Math.max(0, currentTotal - totalDiscount);
 
+      const currentAmount = Number(orderData.amount ?? 0);
+      const newAmount = Math.max(0, currentAmount - totalDiscount);
+
+      let newProductsText = orderData.products || "";
+      if (newProductsText) {
+        interface ParsedProduct {
+          name: string;
+          quantity: number;
+        }
+
+        const parsed: ParsedProduct[] = newProductsText.split(",").map((entry: string) => {
+          const match = entry.trim().match(/^(.+?) \((\d+)x\)$/);
+          if (!match) return { name: entry.trim(), quantity: 1 };
+          return { name: match[1].trim(), quantity: Number(match[2]) };
+        });
+
+        for (const { productId, quantity } of productsToReturn) {
+          const itemDef = (items ?? []).find(i => i.id === productId);
+          if (!itemDef) continue;
+          
+          const targetIndex = parsed.findIndex((p: ParsedProduct) => p.name === itemDef.name);
+          if (targetIndex !== -1) {
+            parsed[targetIndex].quantity -= (quantity as number);
+          }
+        }
+
+        newProductsText = parsed
+          .filter((p: ParsedProduct) => p.quantity > 0)
+          .map((p: ParsedProduct) => `${p.name} (${p.quantity}x)`)
+          .join(", ");
+      }
+
       const { error: updateOrderError } = await supabase
         .from("orders")
-        .update({ total: newTotal })
+        .update({ 
+          total: newTotal,
+          amount: newAmount,
+          products: newProductsText 
+        })
         .eq("id", orderId)
         .eq("company_id", companyId);
 

@@ -425,9 +425,18 @@ const fetchOrderProductsForReturnModal = async (orderId: string) => {
   };
 
   const markOrderStatus = async (next: "Coletar" | "Coletado") => {
+    const updates: any = { delivery_status: next };
+    const nowISO = new Date().toISOString();
+    
+    if (next === "Coletar") {
+      updates.delivered_at = nowISO;
+    } else if (next === "Coletado") {
+      updates.collected_at = nowISO;
+    }
+
     const { error } = await supabase
       .from("orders")
-      .update({ delivery_status: next })
+      .update(updates)
       .eq("id", order.id)
       .eq("company_id", order.company?.id ?? "");
 
@@ -436,7 +445,7 @@ const fetchOrderProductsForReturnModal = async (orderId: string) => {
       return false;
     }
 
-    setOrder((prev: any) => (prev ? { ...prev, delivery_status: next } : prev));
+    setOrder((prev: any) => (prev ? { ...prev, ...updates } : prev));
     return true;
   };
 
@@ -517,9 +526,18 @@ const fetchOrderProductsForReturnModal = async (orderId: string) => {
 
       const next = order.delivery_status === "Entregar" ? "Coletar" : "Coletado";
 
+      const updates: any = { delivery_status: next };
+      const nowISO = new Date().toISOString();
+      
+      if (next === "Coletar") {
+        updates.delivered_at = nowISO;
+      } else if (next === "Coletado") {
+        updates.collected_at = nowISO;
+      }
+
       const { error } = await supabase
         .from("orders")
-        .update({ delivery_status: next })
+        .update(updates)
         .eq("id", order.id)
         .eq("company_id", order.company?.id ?? "");
 
@@ -529,7 +547,7 @@ const fetchOrderProductsForReturnModal = async (orderId: string) => {
       }
 
       setOrder((prev: any) =>
-        prev ? { ...prev, delivery_status: next } : prev,
+        prev ? { ...prev, ...updates } : prev,
       );
     } catch (err) {
       console.error(err);

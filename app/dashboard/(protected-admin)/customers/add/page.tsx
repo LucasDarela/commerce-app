@@ -43,7 +43,19 @@ function limparNumero(valor: string | null | undefined): number | null {
 }
 
 function formatarTelefone(valor: string) {
-  const numeros = valor.replace(/\D/g, "").slice(0, 13);
+  let numeros = valor.replace(/\D/g, "");
+
+  if (numeros.startsWith("550")) {
+    numeros = "55" + numeros.substring(3);
+  } else if (numeros.startsWith("0")) {
+    numeros = numeros.substring(1);
+  }
+
+  if ((numeros.length === 10 || numeros.length === 11) && !numeros.startsWith("55")) {
+    numeros = "55" + numeros;
+  }
+
+  numeros = numeros.slice(0, 13);
 
   if (numeros.length >= 12) {
     return numeros.replace(/^(\d{2})(\d{2})(\d{5})(\d{4})$/, "+$1 ($2) $3-$4");
@@ -230,6 +242,12 @@ export default function CreateClient() {
 
       if (cliente.type === "CPF" && !validarCPF(cliente.document)) {
         toast.error("CPF inválido!");
+        return;
+      }
+
+      const telefoneNumericoText = cliente.phone.replace(/\D/g, "");
+      if (telefoneNumericoText.length > 0 && telefoneNumericoText.length < 12) {
+        toast.error("Telefone inválido: o DDD e o número devem estar completos.");
         return;
       }
 

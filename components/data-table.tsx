@@ -659,6 +659,8 @@ const refreshOrders = async () => {
       total,
       total_payed,
       delivery_status,
+      delivered_at,
+      collected_at,
       payment_status,
       payment_method,
       order_index,
@@ -688,9 +690,13 @@ const refreshOrders = async () => {
     const fantasyName = Array.isArray(cr)
       ? cr[0]?.fantasy_name
       : cr?.fantasy_name;
+    const currentName = Array.isArray(cr)
+      ? cr[0]?.name
+      : cr?.name;
 
     return {
       ...r,
+      customer: currentName || r.customer,
       fantasy_name: fantasyName || "",
     };
   });
@@ -772,6 +778,8 @@ useEffect(() => {
         total,
         total_payed,
         delivery_status,
+        delivered_at,
+        collected_at,
         payment_status,
         payment_method,
         order_index,
@@ -801,9 +809,13 @@ useEffect(() => {
       const fantasyName = Array.isArray(cr)
         ? cr[0]?.fantasy_name
         : cr?.fantasy_name;
+      const currentName = Array.isArray(cr)
+        ? cr[0]?.name
+        : cr?.name;
 
       return {
         ...r,
+        customer: currentName || r.customer,
         fantasy_name: fantasyName || "",
       };
     });
@@ -1113,7 +1125,39 @@ const columns = React.useMemo<CustomColumnDef<Order>[]>(() => [
       header: "Delivery",
       size: 100,
       meta: { className: "w-[100px] uppercase" },
-      cell: ({ row }) => row.original.delivery_status,
+      cell: ({ row }) => {
+        const order = row.original;
+        const status = order.delivery_status;
+
+        const labels: React.ReactNode[] = [];
+        if (order.delivered_at) {
+          labels.push(<div key="env">Entregue: {format(parseISO(order.delivered_at), "dd/MM/yyyy 'às' HH:mm")}</div>);
+        }
+        if (order.collected_at) {
+          labels.push(<div key="col">Coletado: {format(parseISO(order.collected_at), "dd/MM/yyyy 'às' HH:mm")}</div>);
+        }
+
+        if (labels.length > 0) {
+          return (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="cursor-help border-b border-dashed border-muted-foreground">
+                    {status}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <div className="flex flex-col gap-1 text-xs">
+                    {labels}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          );
+        }
+
+        return status;
+      },
     },
     {
       accessorKey: "issue_date",
@@ -1513,9 +1557,18 @@ function clearAllFilters() {
   try {
     setIsUpdatingDeliveryStatus(true);
 
+    const updates: any = { delivery_status: newDeliveryStatus };
+    const nowISO = new Date().toISOString();
+    
+    if (newDeliveryStatus === "Coletar") {
+      updates.delivered_at = nowISO;
+    } else if (newDeliveryStatus === "Coletado") {
+      updates.collected_at = nowISO;
+    }
+
     const { error } = await supabase
       .from("orders")
-      .update({ delivery_status: newDeliveryStatus })
+      .update(updates)
       .eq("id", deliveryStatusOrder.id)
       .eq("company_id", companyId);
 
@@ -1528,14 +1581,14 @@ function clearAllFilters() {
     setOrders((prev) =>
       prev.map((order) =>
         order.id === deliveryStatusOrder.id
-          ? { ...order, delivery_status: newDeliveryStatus }
+          ? { ...order, ...updates }
           : order,
       ),
     );
 
     if (selectedCustomer?.id === deliveryStatusOrder.id) {
       setSelectedCustomer((prev) =>
-        prev ? { ...prev, delivery_status: newDeliveryStatus } : prev,
+        prev ? { ...prev, ...updates } : prev,
       );
     }
 
@@ -1562,22 +1615,31 @@ async function handleDeliveryStatusUpdate() {
   }
 
   if (nextStatus) {
+    const updates: any = { delivery_status: nextStatus };
+    const nowISO = new Date().toISOString();
+    
+    if (nextStatus === "Coletar") {
+      updates.delivered_at = nowISO;
+    } else if (nextStatus === "Coletado") {
+      updates.collected_at = nowISO;
+    }
+
     const { error } = await supabase
       .from("orders")
-      .update({ delivery_status: nextStatus })
+      .update(updates)
       .eq("id", selectedCustomer.id)
       .eq("company_id", companyId);
 
     if (!error) {
       setSelectedCustomer({
         ...selectedCustomer,
-        delivery_status: nextStatus,
+        ...updates,
       });
 
       setOrders((prev) =>
         prev.map((order) =>
           order.id === selectedCustomer.id
-            ? { ...order, delivery_status: nextStatus! }
+            ? { ...order, ...updates }
             : order,
         ),
       );
@@ -2277,15 +2339,14 @@ const clearFilter = () => {
                                 selectedCustomer.id,
                                 companyId,
                               ); 
+                              const customerQuery = selectedCustomer.customer_id
+                                ? supabase.from("customers").select("id, name").eq("id", selectedCustomer.customer_id)
+                                : supabase.from("customers").select("id, name").eq("name", selectedCustomer.customer).eq("company_id", companyId);
+
                               const {
                                 data: matchingCustomer,
                                 error: customerError,
-                              } = await supabase
-                                .from("customers")
-                                .select("id, name")
-                                .eq("name", selectedCustomer.customer)
-                                .eq("company_id", companyId)
-                                .maybeSingle(); 
+                              } = await customerQuery.maybeSingle(); 
 
                               if (!matchingCustomer || customerError) {
                                 toast.error(
@@ -2303,15 +2364,14 @@ const clearFilter = () => {
                             } else if (
                               selectedCustomer.delivery_status === "Coletar"
                             ) {
+                              const customerQuery = selectedCustomer.customer_id
+                                ? supabase.from("customers").select("id, name").eq("id", selectedCustomer.customer_id)
+                                : supabase.from("customers").select("id, name").eq("name", selectedCustomer.customer).eq("company_id", companyId);
+
                               const {
                                 data: matchingCustomer,
                                 error: customerError,
-                              } = await supabase
-                                .from("customers")
-                                .select("id, name")
-                                .eq("name", selectedCustomer.customer)
-                                .eq("company_id", companyId)
-                                .maybeSingle();   
+                              } = await customerQuery.maybeSingle();
 
                               if (!matchingCustomer || customerError) {
                                 toast.error(
