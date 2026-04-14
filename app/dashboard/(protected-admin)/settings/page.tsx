@@ -37,7 +37,7 @@ export default function SettingsPage() {
         </>
       ) : (
         <UpgradePlanBanner 
-          title="Recursos de Automação e Fiscal Bloqueados" 
+          title="Recursos de Boletos e Emissão de Notas Fiscais Bloqueados" 
           description="A emissão de NF-e e a integração automática de boletos são exclusivas para assinantes dos planos Pro e Enterprise. Organize sua operação e economize tempo agora mesmo!"
         />
       )}
