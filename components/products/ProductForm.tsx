@@ -254,7 +254,7 @@ export function ProductForm({
   if (loadingCompany) {
     return (
       <div className="p-6 text-center text-muted-foreground">
-        Loading company data...
+        Carregando dados da empresa...
       </div>
     );
   }
