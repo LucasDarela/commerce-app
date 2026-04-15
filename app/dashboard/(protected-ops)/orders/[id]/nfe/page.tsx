@@ -17,6 +17,10 @@ import {
 import { format } from "date-fns";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
+import {
+  setBreadcrumbOverride,
+  removeBreadcrumbOverride,
+} from "@/hooks/useBreadcrumb";
 
 type UiProduct = {
   item_id: string;
@@ -43,7 +47,7 @@ type UiProduct = {
 
 export default function EmitNfePage() {
   const params = useParams();
-const id = Array.isArray(params.id) ? params.id[0] : params.id;
+  const id = Array.isArray(params.id) ? params.id[0] : params.id;
   const { companyId } = useAuthenticatedCompany();
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
 
@@ -73,9 +77,10 @@ const id = Array.isArray(params.id) ? params.id[0] : params.id;
       }
 
       // 2) Itens do pedido
-const { data: items, error: itemsErr } = await supabase
-  .from("order_items")
-  .select(`
+      const { data: items, error: itemsErr } = await supabase
+        .from("order_items")
+        .select(
+          `
     id,
     order_id,
     product_id,
@@ -97,8 +102,9 @@ const { data: items, error: itemsErr } = await supabase
       cofins,
       ipi
     )
-  `)
-  .eq("order_id", id);
+  `,
+        )
+        .eq("order_id", id);
 
       if (itemsErr) {
         console.error(itemsErr);
@@ -163,49 +169,60 @@ const { data: items, error: itemsErr } = await supabase
         returnedByProduct.set(pid, (returnedByProduct.get(pid) ?? 0) + qty);
       }
 
-const uiProducts: UiProduct[] = (items ?? []).map((i: any) => {
-  const pid = i.product_id ? String(i.product_id) : "";
-  const soldQty = Number(i.quantity ?? 0);
-  const returnedQty = Number(returnedByProduct.get(pid) ?? 0);
-  const netQty = Math.max(soldQty - returnedQty, 0);
+      const uiProducts: UiProduct[] = (items ?? []).map((i: any) => {
+        const pid = i.product_id ? String(i.product_id) : "";
+        const soldQty = Number(i.quantity ?? 0);
+        const returnedQty = Number(returnedByProduct.get(pid) ?? 0);
+        const netQty = Math.max(soldQty - returnedQty, 0);
 
-  const product = Array.isArray(i.products)
-    ? i.products[0] ?? null
-    : i.products ?? null;
+        const product = Array.isArray(i.products)
+          ? (i.products[0] ?? null)
+          : (i.products ?? null);
 
-  return {
-    item_id: String(i.id),
-    product_id: pid,
-    code: String(product?.code ?? ""),
-    name: String(product?.name ?? "Produto sem vínculo"),
-    unit: String(product?.unit ?? "UN"),
-    soldQty,
-    returnedQty,
-    netQty,
-    price: Number(i.price ?? 0),
+        return {
+          item_id: String(i.id),
+          product_id: pid,
+          code: String(product?.code ?? ""),
+          name: String(product?.name ?? "Produto sem vínculo"),
+          unit: String(product?.unit ?? "UN"),
+          soldQty,
+          returnedQty,
+          netQty,
+          price: Number(i.price ?? 0),
 
-    ncm: product?.ncm ?? null,
-    cest: product?.cest ?? null,
-    cfop: product?.cfop ?? null,
-    icms_origem: product?.icms_origem ?? null,
-    cst_icms: product?.cst_icms ?? null,
-    csosn_icms: product?.csosn_icms ?? null,
-    icms_situacao_tributaria: product?.icms_situacao_tributaria ?? null,
-    pis: product?.pis ?? null,
-    cofins: product?.cofins ?? null,
-    ipi: product?.ipi ?? null,
-  };
-});
-console.log("uiProducts:", uiProducts);
-console.log("order items raw:", items);
-(items ?? []).forEach((i: any) => {
-  console.log("item product raw:", i.products);
-});
+          ncm: product?.ncm ?? null,
+          cest: product?.cest ?? null,
+          cfop: product?.cfop ?? null,
+          icms_origem: product?.icms_origem ?? null,
+          cst_icms: product?.cst_icms ?? null,
+          csosn_icms: product?.csosn_icms ?? null,
+          icms_situacao_tributaria: product?.icms_situacao_tributaria ?? null,
+          pis: product?.pis ?? null,
+          cofins: product?.cofins ?? null,
+          ipi: product?.ipi ?? null,
+        };
+      });
+      console.log("uiProducts:", uiProducts);
+      console.log("order items raw:", items);
+      (items ?? []).forEach((i: any) => {
+        console.log("item product raw:", i.products);
+      });
       setProducts(uiProducts);
     };
 
     fetchAll();
   }, [id, companyId, supabase]);
+
+  useEffect(() => {
+    if (id && order?.note_number) {
+      setBreadcrumbOverride(id, `${order.note_number}`);
+    }
+    return () => {
+      if (id) {
+        removeBreadcrumbOverride(id);
+      }
+    };
+  }, [id, order?.note_number]);
 
   const operacaoFiscal = useMemo(
     () => operations.find((o) => String(o.id) === selectedOperation),
@@ -232,12 +249,12 @@ console.log("order items raw:", items);
 
     const produtosParaNfe = products.filter((p) => p.netQty > 0);
     const invalidLinkedProduct = produtosParaNfe.find(
-      (p) => !p.product_id || p.product_id === "null"
+      (p) => !p.product_id || p.product_id === "null",
     );
 
     if (invalidLinkedProduct) {
       toast.error(
-        "Existe item da venda sem vínculo com produto cadastrado. Edite ou recrie a venda."
+        "Existe item da venda sem vínculo com produto cadastrado. Edite ou recrie a venda.",
       );
       return;
     }
@@ -249,81 +266,98 @@ console.log("order items raw:", items);
     }
 
     // 🔴 valida NCM
-const invalidProductNcm = produtosParaNfe.find((p) => {
-  const ncm = String(p.ncm ?? "").replace(/\D/g, "");
-  return ncm.length !== 8;
-});
+    const invalidProductNcm = produtosParaNfe.find((p) => {
+      const ncm = String(p.ncm ?? "").replace(/\D/g, "");
+      return ncm.length !== 8;
+    });
 
-if (invalidProductNcm) {
-  toast.error(`O produto ${invalidProductNcm.name} está com NCM ausente ou inválido.`);
-  return;
-}
+    if (invalidProductNcm) {
+      toast.error(
+        `O produto ${invalidProductNcm.name} está com NCM ausente ou inválido.`,
+      );
+      return;
+    }
 
-// 🔴 valida CFOP
-const invalidProductCfop = produtosParaNfe.find((p) => {
-  const cfop = String(p.cfop || operacaoFiscal.cfop || "").replace(/\D/g, "");
-  return cfop.length !== 4;
-});
+    // 🔴 valida CFOP
+    const invalidProductCfop = produtosParaNfe.find((p) => {
+      const cfop = String(p.cfop || operacaoFiscal.cfop || "").replace(
+        /\D/g,
+        "",
+      );
+      return cfop.length !== 4;
+    });
 
-if (invalidProductCfop) {
-  toast.error(`O produto ${invalidProductCfop.name} está com CFOP inválido.`);
-  return;
-}
+    if (invalidProductCfop) {
+      toast.error(
+        `O produto ${invalidProductCfop.name} está com CFOP inválido.`,
+      );
+      return;
+    }
 
-// 🔴 valida PIS
-const invalidProductPis = produtosParaNfe.find((p) => {
-  const pis = String(p.pis ?? "").replace(/\D/g, "");
-  return pis.length !== 2;
-});
+    // 🔴 valida PIS
+    const invalidProductPis = produtosParaNfe.find((p) => {
+      const pis = String(p.pis ?? "").replace(/\D/g, "");
+      return pis.length !== 2;
+    });
 
-if (invalidProductPis) {
-  toast.error(`O produto ${invalidProductPis.name} está com PIS inválido.`);
-  return;
-}
+    if (invalidProductPis) {
+      toast.error(`O produto ${invalidProductPis.name} está com PIS inválido.`);
+      return;
+    }
 
-// 🔴 valida COFINS
-const invalidProductCofins = produtosParaNfe.find((p) => {
-  const cofins = String(p.cofins ?? "").replace(/\D/g, "");
-  return cofins.length !== 2;
-});
+    // 🔴 valida COFINS
+    const invalidProductCofins = produtosParaNfe.find((p) => {
+      const cofins = String(p.cofins ?? "").replace(/\D/g, "");
+      return cofins.length !== 2;
+    });
 
-if (invalidProductCofins) {
-  toast.error(`O produto ${invalidProductCofins.name} está com COFINS inválido.`);
-  return;
-}
+    if (invalidProductCofins) {
+      toast.error(
+        `O produto ${invalidProductCofins.name} está com COFINS inválido.`,
+      );
+      return;
+    }
 
-const regime = String(emissor.regime_tributario ?? "");
+    const regime = String(emissor.regime_tributario ?? "");
 
-if (regime === "1" || regime === "2" || regime === "4") {
-  const invalidProductCsosn = produtosParaNfe.find((p) => {
-    const csosn = String(p.csosn_icms ?? "").replace(/\D/g, "");
-    return csosn.length !== 3;
-  });
+    if (regime === "1" || regime === "2" || regime === "4") {
+      const invalidProductCsosn = produtosParaNfe.find((p) => {
+        const csosn = String(p.csosn_icms ?? "").replace(/\D/g, "");
+        return csosn.length !== 3;
+      });
 
-  if (invalidProductCsosn) {
-    toast.error(`O produto ${invalidProductCsosn.name} está sem CSOSN cadastrado.`);
-    return;
-  }
-} else {
-const invalidProductCst = produtosParaNfe.find((p) => {
-  const cst = String(p.icms_situacao_tributaria ?? p.cst_icms ?? "").replace(/\D/g, "");
-  return cst.length < 2 || cst.length > 3;
-});
+      if (invalidProductCsosn) {
+        toast.error(
+          `O produto ${invalidProductCsosn.name} está sem CSOSN cadastrado.`,
+        );
+        return;
+      }
+    } else {
+      const invalidProductCst = produtosParaNfe.find((p) => {
+        const cst = String(
+          p.icms_situacao_tributaria ?? p.cst_icms ?? "",
+        ).replace(/\D/g, "");
+        return cst.length < 2 || cst.length > 3;
+      });
 
-  if (invalidProductCst) {
-    toast.error(`O produto ${invalidProductCst.name} está sem CST ICMS cadastrado.`);
-    return;
-  }
-}
-const invalidProductOrigem = produtosParaNfe.find((p) => {
-  const origem = String(p.icms_origem ?? "").trim();
-  return !["0", "1", "2", "3", "4", "5", "6", "7", "8"].includes(origem);
-});
+      if (invalidProductCst) {
+        toast.error(
+          `O produto ${invalidProductCst.name} está sem CST ICMS cadastrado.`,
+        );
+        return;
+      }
+    }
+    const invalidProductOrigem = produtosParaNfe.find((p) => {
+      const origem = String(p.icms_origem ?? "").trim();
+      return !["0", "1", "2", "3", "4", "5", "6", "7", "8"].includes(origem);
+    });
 
-if (invalidProductOrigem) {
-  toast.error(`O produto ${invalidProductOrigem.name} está com origem do ICMS inválida.`);
-  return;
-}
+    if (invalidProductOrigem) {
+      toast.error(
+        `O produto ${invalidProductOrigem.name} está com origem do ICMS inválida.`,
+      );
+      return;
+    }
 
     setLoading(true);
 
@@ -332,87 +366,95 @@ if (invalidProductOrigem) {
 
       const isSimples = regime === "1" || regime === "2" || regime === "4";
 
-const hasIcms60 = !isSimples && produtosParaNfe.some((p) => {
-  const code = String(
-    p.icms_situacao_tributaria ?? p.cst_icms ?? "",
-  ).trim();
-  return code === "60";
-});
+      const hasIcms60 =
+        !isSimples &&
+        produtosParaNfe.some((p) => {
+          const code = String(
+            p.icms_situacao_tributaria ?? p.cst_icms ?? "",
+          ).trim();
+          return code === "60";
+        });
 
-if (hasIcms60) {
-  const faltaST =
-    operacaoFiscal.vbc_st_ret == null ||
-    operacaoFiscal.pst == null ||
-    operacaoFiscal.vicms_substituto == null ||
-    operacaoFiscal.vicms_st_ret == null;
+      if (hasIcms60) {
+        const faltaST =
+          operacaoFiscal.vbc_st_ret == null ||
+          operacaoFiscal.pst == null ||
+          operacaoFiscal.vicms_substituto == null ||
+          operacaoFiscal.vicms_st_ret == null;
 
-  if (faltaST) {
-    toast.error(
-      "Existe produto com ICMS 60. Preencha na operação fiscal: vbc_st_ret, pst, vicms_substituto e vicms_st_ret.",
-    );
-    return;
-  }
-}
+        if (faltaST) {
+          toast.error(
+            "Existe produto com ICMS 60. Preencha na operação fiscal: vbc_st_ret, pst, vicms_substituto e vicms_st_ret.",
+          );
+          return;
+        }
+      }
 
-const customerDocumentDigits = String(customer.document ?? "").replace(/\D/g, "");
+      const customerDocumentDigits = String(customer.document ?? "").replace(
+        /\D/g,
+        "",
+      );
 
-const isCpf = customerDocumentDigits.length === 11;
-const isCnpj = customerDocumentDigits.length === 14;
+      const isCpf = customerDocumentDigits.length === 11;
+      const isCnpj = customerDocumentDigits.length === 14;
 
-if (!isCpf && !isCnpj) {
-  toast.error("Cliente inválido: CPF/CNPJ inválido.");
-  return;
-} 
+      if (!isCpf && !isCnpj) {
+        toast.error("Cliente inválido: CPF/CNPJ inválido.");
+        return;
+      }
 
-const items = produtosParaNfe.map((p, index) => {
-  const cfop = String(p.cfop || operacaoFiscal.cfop || "").replace(/\D/g, "");
-const ncm = String(p.ncm || "").replace(/\D/g, "");
-const cest = String(p.cest || "").replace(/\D/g, "");
-const pis = String(p.pis ?? "").replace(/\D/g, "");
-const cofins = String(p.cofins ?? "").replace(/\D/g, "");
-  const icmsItem = String(
-    p.icms_situacao_tributaria ?? p.cst_icms ?? "",
-  ).trim();
+      const items = produtosParaNfe.map((p, index) => {
+        const cfop = String(p.cfop || operacaoFiscal.cfop || "").replace(
+          /\D/g,
+          "",
+        );
+        const ncm = String(p.ncm || "").replace(/\D/g, "");
+        const cest = String(p.cest || "").replace(/\D/g, "");
+        const pis = String(p.pis ?? "").replace(/\D/g, "");
+        const cofins = String(p.cofins ?? "").replace(/\D/g, "");
+        const icmsItem = String(
+          p.icms_situacao_tributaria ?? p.cst_icms ?? "",
+        ).trim();
 
-  const csosnItem = String(p.csosn_icms ?? "").trim();
+        const csosnItem = String(p.csosn_icms ?? "").trim();
 
-  return {
-    numero_item: index + 1,
-    codigo_produto: String(p.code ?? ""),
-    descricao: p.name ?? "",
-cfop: cfop,
-unidade_comercial: String(p.unit ?? "UN").toUpperCase(),
-    quantidade_comercial: Number(p.netQty),
-    valor_unitario_comercial: Number(p.price),
-    valor_unitario_tributavel: Number(p.price),
-unidade_tributavel: String(p.unit ?? "UN").toUpperCase(),
-codigo_ncm: ncm,
-codigo_cest: cest || undefined, 
-    quantidade_tributavel: Number(p.netQty),
-    valor_bruto: Number(p.price) * Number(p.netQty),
-    icms_origem: String(p.icms_origem ?? "0"),
+        return {
+          numero_item: index + 1,
+          codigo_produto: String(p.code ?? ""),
+          descricao: p.name ?? "",
+          cfop: cfop,
+          unidade_comercial: String(p.unit ?? "UN").toUpperCase(),
+          quantidade_comercial: Number(p.netQty),
+          valor_unitario_comercial: Number(p.price),
+          valor_unitario_tributavel: Number(p.price),
+          unidade_tributavel: String(p.unit ?? "UN").toUpperCase(),
+          codigo_ncm: ncm,
+          codigo_cest: cest || undefined,
+          quantidade_tributavel: Number(p.netQty),
+          valor_bruto: Number(p.price) * Number(p.netQty),
+          icms_origem: String(p.icms_origem ?? "0"),
 
-...(isSimples
-  ? {
-      icms_situacao_tributaria: csosnItem || "102",
-    }
-  : {
-      icms_situacao_tributaria: icmsItem || "00",
-    }),
+          ...(isSimples
+            ? {
+                icms_situacao_tributaria: csosnItem || "102",
+              }
+            : {
+                icms_situacao_tributaria: icmsItem || "00",
+              }),
 
-pis_situacao_tributaria: pis.padStart(2, "0"),
-cofins_situacao_tributaria: cofins.padStart(2, "0"),
+          pis_situacao_tributaria: pis.padStart(2, "0"),
+          cofins_situacao_tributaria: cofins.padStart(2, "0"),
 
-...(!isSimples && icmsItem === "60"
-  ? {
-      vbc_st_ret: Number(operacaoFiscal.vbc_st_ret),
-      pst: Number(operacaoFiscal.pst),
-      vicms_substituto: Number(operacaoFiscal.vicms_substituto),
-      vicms_st_ret: Number(operacaoFiscal.vicms_st_ret),
-    }
-  : {}),
-  };
-});
+          ...(!isSimples && icmsItem === "60"
+            ? {
+                vbc_st_ret: Number(operacaoFiscal.vbc_st_ret),
+                pst: Number(operacaoFiscal.pst),
+                vicms_substituto: Number(operacaoFiscal.vicms_substituto),
+                vicms_st_ret: Number(operacaoFiscal.vicms_st_ret),
+              }
+            : {}),
+        };
+      });
 
       const invoiceData = {
         ambiente: "1",
@@ -445,9 +487,9 @@ cofins_situacao_tributaria: cofins.padStart(2, "0"),
         uf_emitente: emissor.state,
         cep_emitente: emissor.zip_code?.replace(/\D/g, "") ?? "",
 
-...(isCnpj
-  ? { cnpj_destinatario: customerDocumentDigits }
-  : { cpf_destinatario: customerDocumentDigits }),
+        ...(isCnpj
+          ? { cnpj_destinatario: customerDocumentDigits }
+          : { cpf_destinatario: customerDocumentDigits }),
 
         nome_destinatario: customer.name,
         telefone_destinatario: String(customer.phone ?? "")
@@ -520,15 +562,24 @@ cofins_situacao_tributaria: cofins.padStart(2, "0"),
 
       <Label>Tipo de Operação Fiscal</Label>
       <Select value={selectedOperation} onValueChange={setSelectedOperation}>
-        <SelectTrigger>
+        <SelectTrigger className="w-full overflow-hidden">
           <SelectValue placeholder="Selecione uma operação fiscal" />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="max-w-[calc(100vw-2rem)]">
           {operations.map((op) => (
             <SelectItem key={op.id} value={String(op.id)}>
-              {op.operation_id} - {op.natureza_operacao} -{" "}
-              {op.tipo_documento === "0" ? "Entrada" : "Saída"} - Estado{" "}
-              {op.state} - CFOP - {op.cfop}
+              <div className="flex flex-col sm:flex-row gap-0.5 sm:gap-2 text-xs sm:text-sm overflow-hidden">
+                <span className="font-medium whitespace-nowrap">
+                  {op.operation_id} - {op.natureza_operacao}
+                </span>
+                <span className="hidden sm:inline text-muted-foreground">
+                  /
+                </span>
+                <span className="truncate text-muted-foreground">
+                  {op.tipo_documento === "0" ? "Entrada" : "Saída"} - {op.state}{" "}
+                  - CFOP {op.cfop}
+                </span>
+              </div>
             </SelectItem>
           ))}
         </SelectContent>
@@ -578,6 +629,6 @@ cofins_situacao_tributaria: cofins.padStart(2, "0"),
       {/* <Button variant="outline" onClick={handleDebugNfe}>
         Debug NF-e
       </Button> */}
-    </div>  
+    </div>
   );
 }

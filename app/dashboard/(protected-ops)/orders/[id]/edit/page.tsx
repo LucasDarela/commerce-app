@@ -54,6 +54,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import { setBreadcrumbOverride, removeBreadcrumbOverride } from "@/hooks/useBreadcrumb";
 
 interface Customer {
   id: string;
@@ -338,6 +339,17 @@ export default function EditOrderPage() {
 
     checkIfBoletoExists();
   }, [orderId, companyId, router, supabase]);
+
+  useEffect(() => {
+    if (id && order?.note_number) {
+      setBreadcrumbOverride(id, `${order.note_number}`);
+    }
+    return () => {
+      if (id) {
+        removeBreadcrumbOverride(id);
+      }
+    };
+  }, [id, order?.note_number]);
 
   useEffect(() => {
     const fetchPriceTableItems = async () => {
