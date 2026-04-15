@@ -1,5 +1,5 @@
 // app/api/asaas/webhook/route.ts
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 type AsaasPayment = {
@@ -183,93 +183,95 @@ export async function POST(req: Request) {
     );
   }
 
-  let customerName: string | null = order.customer ?? null;
+  after(async () => {
+    let customerName: string | null = order.customer ?? null;
 
-  if (!customerName && order.customer_id) {
-    const { data: customer, error: custErr } = await supabase
-      .from("customers")
-      .select("name, fantasy_name")
-      .eq("company_id", companyId)
-      .eq("id", order.customer_id)
-      .maybeSingle();
+    if (!customerName && order.customer_id) {
+      const { data: customer, error: custErr } = await supabase
+        .from("customers")
+        .select("name, fantasy_name")
+        .eq("company_id", companyId)
+        .eq("id", order.customer_id)
+        .maybeSingle();
 
-    if (custErr) {
-      console.error("Erro ao buscar cliente:", custErr);
+      if (custErr) {
+        console.error("Erro ao buscar cliente:", custErr);
+      }
+
+      customerName = customer?.fantasy_name || customer?.name || null;
     }
 
-    customerName = customer?.fantasy_name || customer?.name || null;
-  }
+    const orderNumber = order.note_number ?? order.id ?? null;
 
-  const orderNumber = order.note_number ?? order.id ?? null;
+    /**
+     * Notificação:
+     * só cria "Pagamento recebido" quando realmente recebeu.
+     */
+    if (paid) {
+      const grossPaid =
+        typeof payment.value === "number"
+          ? Number(payment.value)
+          : typeof payment.originalValue === "number"
+            ? Number(payment.originalValue)
+            : null;
 
-  /**
-   * Notificação:
-   * só cria "Pagamento recebido" quando realmente recebeu.
-   */
-  if (paid) {
-    const grossPaid =
-      typeof payment.value === "number"
-        ? Number(payment.value)
-        : typeof payment.originalValue === "number"
-          ? Number(payment.originalValue)
-          : null;
+      const title = "Pagamento recebido";
+      const header =
+        `Cobrança de ${customerName ?? "Cliente desconhecido"}` +
+        (orderNumber ? ` - Pedido #${orderNumber}` : "") +
+        ` - marcada como Paga`;
 
-    const title = "Pagamento recebido";
-    const header =
-      `Cobrança de ${customerName ?? "Cliente desconhecido"}` +
-      (orderNumber ? ` - Pedido #${orderNumber}` : "") +
-      ` - marcada como Paga`;
+      const valueLine = `Valor pago: R$ ${
+        grossPaid != null ? grossPaid.toFixed(2) : "—"
+      }`;
 
-    const valueLine = `Valor pago: R$ ${
-      grossPaid != null ? grossPaid.toFixed(2) : "—"
-    }`;
+      const description = `${header}\n${valueLine}`;
 
-    const description = `${header}\n${valueLine}`;
+      const { error: notifErr } = await supabase.from("notifications").insert({
+        title,
+        description,
+        company_id: companyId,
+        date: new Date().toISOString(),
+        read: false,
+      });
 
-    const { error: notifErr } = await supabase.from("notifications").insert({
-      title,
-      description,
-      company_id: companyId,
-      date: new Date().toISOString(),
-      read: false,
-    });
-
-    if (notifErr) {
-      console.error("❌ Falha ao inserir notificação:", notifErr);
+      if (notifErr) {
+        console.error("❌ Falha ao inserir notificação:", notifErr);
+      }
     }
-  }
 
-  if (overdueLike) {
-    const title = "Boleto vencido";
-    const header =
-      `Cobrança de ${customerName ?? "Cliente desconhecido"}` +
-      (orderNumber ? ` - Pedido #${orderNumber}` : "") +
-      ` - permanece em aberto`;
+    if (overdueLike) {
+      const title = "Boleto vencido";
+      const header =
+        `Cobrança de ${customerName ?? "Cliente desconhecido"}` +
+        (orderNumber ? ` - Pedido #${orderNumber}` : "") +
+        ` - permanece em aberto`;
 
-    const statusLabel: Record<string, string> = {
-      OVERDUE: "Boleto vencido sem pagamento",
-      PAYMENT_OVERDUE: "Pagamento em atraso",
-      BANK_SLIP_CANCELLED: "Boleto cancelado pelo banco",
-      PAYMENT_BANK_SLIP_CANCELLED: "Boleto de pagamento cancelado",
-    };
-    const valueLine = statusLabel[asaasStatus] ?? `Status: ${asaasStatus}`;
-    const description = `${header}\n${valueLine}`;
+      const statusLabel: Record<string, string> = {
+        OVERDUE: "Boleto vencido sem pagamento",
+        PAYMENT_OVERDUE: "Pagamento em atraso",
+        BANK_SLIP_CANCELLED: "Boleto cancelado pelo banco",
+        PAYMENT_BANK_SLIP_CANCELLED: "Boleto de pagamento cancelado",
+      };
+      const valueLine = statusLabel[asaasStatus] ?? `Status: ${asaasStatus}`;
+      const description = `${header}\n${valueLine}`;
 
-    const { error: notifErr } = await supabase.from("notifications").insert({
-      title,
-      description,
-      company_id: companyId,
-      date: new Date().toISOString(),
-      read: false,
-    });
+      const { error: notifErr } = await supabase.from("notifications").insert({
+        title,
+        description,
+        company_id: companyId,
+        date: new Date().toISOString(),
+        read: false,
+      });
 
-    if (notifErr) {
-      console.error(
-        "❌ Falha ao inserir notificação de vencimento:",
-        notifErr,
-      );
+      if (notifErr) {
+        console.error(
+          "❌ Falha ao inserir notificação de vencimento:",
+          notifErr,
+        );
+      }
     }
-  }
+  });
 
   return NextResponse.json({
     ok: true,
