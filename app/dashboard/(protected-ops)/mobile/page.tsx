@@ -16,7 +16,7 @@ import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 
 export default function DownloadAppPage() {
   const { mobileOfflineEnabled, loading } = useAuthenticatedCompany();
-  const androidDownloadUrl = "./downloads/ChoppHubDriver.apk";
+  const androidDownloadUrl = "/api/download/apk";
 
   const features = [
     {
