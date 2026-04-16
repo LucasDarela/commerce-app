@@ -1,14 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { Download, Smartphone, Apple, ShieldCheck, WifiOff, Truck, Lock } from "lucide-react";
+import {
+  Download,
+  Smartphone,
+  Apple,
+  ShieldCheck,
+  WifiOff,
+  Truck,
+  Lock,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 
 export default function DownloadAppPage() {
   const { mobileOfflineEnabled, loading } = useAuthenticatedCompany();
-  const androidDownloadUrl = "/downloads/chopp-hub-driver.apk";
+  const androidDownloadUrl = "./downloads/ChoppHubDriver.apk";
 
   const features = [
     {
@@ -31,7 +39,12 @@ export default function DownloadAppPage() {
     },
   ];
 
-  if (loading) return <div className="p-8 text-center text-muted-foreground">Verificando permissões...</div>;
+  if (loading)
+    return (
+      <div className="p-8 text-center text-muted-foreground">
+        Verificando permissões...
+      </div>
+    );
 
   // Tela de bloqueio caso não tenha o add-on
   if (!mobileOfflineEnabled) {
@@ -42,10 +55,13 @@ export default function DownloadAppPage() {
             <Lock className="w-10 h-10 text-primary" />
           </div>
           <div className="space-y-2">
-            <h1 className="text-3xl font-bold tracking-tight">Recurso Premium</h1>
+            <h1 className="text-3xl font-bold tracking-tight">
+              Recurso Premium
+            </h1>
             <p className="text-muted-foreground leading-relaxed">
-              O aplicativo mobile offline para motoristas é um add-on opcional do Chopp Hub. 
-              Ative-o para dar mais agilidade à sua equipe de campo.
+              O aplicativo mobile offline para motoristas é um add-on opcional
+              do Chopp Hub. Ative-o para dar mais agilidade à sua equipe de
+              campo.
             </p>
           </div>
           <Card className="bg-muted/50 border-dashed">
@@ -88,31 +104,42 @@ export default function DownloadAppPage() {
             </div>
 
             <h1 className="mt-6 text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
-              Baixe o app Android do <span className="text-primary">Chopp Hub Driver</span>
+              Baixe o app Android do{" "}
+              <span className="text-primary">Chopp Hub Driver</span>
             </h1>
 
             <p className="mt-5 text-base leading-7 text-muted-foreground sm:text-lg">
-              Dê mais agilidade para suas entregas e coletas. Com o app, o motorista
-              pode acessar os pedidos, atualizar status e trabalhar com muito mais praticidade no dia a dia.
+              Dê mais agilidade para suas entregas e coletas. Com o app, o
+              motorista pode acessar os pedidos, atualizar status e trabalhar
+              com muito mais praticidade no dia a dia.
             </p>
 
             <div className="mt-8 flex flex-col gap-4 sm:flex-row">
-              <Button asChild size="lg" className="h-12 px-6 text-base font-semibold">
+              <Button
+                asChild
+                size="lg"
+                className="h-12 px-6 text-base font-semibold"
+              >
                 <a href={androidDownloadUrl} download>
                   <Download className="mr-2 h-5 w-5" />
                   Baixar app Android
                 </a>
               </Button>
 
-              <Button variant="outline" size="lg" className="h-12 px-6 text-base font-semibold" disabled>
+              <Button
+                variant="outline"
+                size="lg"
+                className="h-12 px-6 text-base font-semibold"
+                disabled
+              >
                 <Apple className="mr-2 h-5 w-5" />
                 iOS em breve
               </Button>
             </div>
 
             <p className="mt-4 text-sm text-muted-foreground">
-              Disponível para Android. Caso o download não inicie automaticamente,
-              entre em contato com o suporte da sua empresa.
+              Disponível para Android. Caso o download não inicie
+              automaticamente, entre em contato com o suporte da sua empresa.
             </p>
           </div>
 
@@ -128,7 +155,9 @@ export default function DownloadAppPage() {
                     </div>
                     <div>
                       <p className="text-sm opacity-90">Aplicativo mobile</p>
-                      <h2 className="text-xl font-semibold">Chopp Hub Driver</h2>
+                      <h2 className="text-xl font-semibold">
+                        Chopp Hub Driver
+                      </h2>
                     </div>
                   </div>
                 </div>
@@ -144,7 +173,9 @@ export default function DownloadAppPage() {
                           {feature.icon}
                         </div>
                         <div>
-                          <h3 className="font-semibold text-foreground">{feature.title}</h3>
+                          <h3 className="font-semibold text-foreground">
+                            {feature.title}
+                          </h3>
                           <p className="mt-1 text-sm leading-6 text-muted-foreground">
                             {feature.description}
                           </p>
@@ -158,7 +189,8 @@ export default function DownloadAppPage() {
                       Em breve no iPhone
                     </p>
                     <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                      A versão para iOS está em desenvolvimento e será disponibilizada em breve.
+                      A versão para iOS está em desenvolvimento e será
+                      disponibilizada em breve.
                     </p>
                   </div>
                 </div>
@@ -176,7 +208,8 @@ export default function DownloadAppPage() {
                 Precisa de ajuda para instalar?
               </h2>
               <p className="text-sm text-muted-foreground">
-                Se o seu celular bloquear a instalação, fale com o suporte para receber orientação.
+                Se o seu celular bloquear a instalação, fale com o suporte para
+                receber orientação.
               </p>
             </div>
 
