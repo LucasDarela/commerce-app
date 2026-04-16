@@ -12,10 +12,12 @@ import RefreshButton from "./nf/RefreshButton";
 import { RefreshWindowButton } from "./refrash-window-button";
 import { Button } from "./ui/button";
 import { useBreadcrumbStore } from "@/hooks/useBreadcrumb";
+import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 
 export function SiteHeader() {
   const pathname = usePathname();
   const router = useRouter();
+  const { role } = useAuthenticatedCompany();
 
   const segments = pathname.split("/").filter(Boolean).slice(1);
 
@@ -69,7 +71,7 @@ export function SiteHeader() {
         <div className="ml-auto flex items-center gap-2">
           <ThemeSelector />
           <ModeToggle />
-          <NotificationsBell />
+          {role === "admin" && <NotificationsBell />}
         </div>
       </div>
     </header>
