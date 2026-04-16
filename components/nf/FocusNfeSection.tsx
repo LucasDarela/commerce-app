@@ -16,6 +16,7 @@ export default function FocusNFeSection() {
   const [loading, setLoading] = useState(false);
   const [focusToken, setFocusToken] = useState("");
   const [cpfEmitente, setCpfEmitente] = useState("");
+  const [companyCnpj, setCompanyCnpj] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -28,12 +29,13 @@ export default function FocusNFeSection() {
           .maybeSingle(),
         supabase
           .from("companies")
-          .select("cpf_emitente")
+          .select("cpf_emitente, document")
           .eq("id", companyId)
           .maybeSingle(),
       ]);
       if (cred?.focus_token) setFocusToken(cred.focus_token);
       if (comp?.cpf_emitente) setCpfEmitente(String(comp.cpf_emitente));
+      if (comp?.document) setCompanyCnpj(String(comp.document));
     })();
   }, [companyId, supabase]);
 
@@ -49,12 +51,21 @@ export default function FocusNFeSection() {
       }
 
       if (focusToken) {
-        const { error: upCredErr } = await supabase
-          .from("nfe_credentials")
-          .upsert(
-            { company_id: companyId, focus_token: focusToken },
-            { onConflict: "company_id" },
+        if (!companyCnpj) {
+          toast.error(
+            "CNPJ da empresa não encontrado. Preencha os dados da empresa primeiro.",
           );
+          return;
+        }
+
+        const { error: upCredErr } = await supabase.from("nfe_credentials").upsert(
+          {
+            company_id: companyId,
+            focus_token: focusToken,
+            cnpj: companyCnpj,
+          },
+          { onConflict: "company_id" },
+        );
         if (upCredErr) throw upCredErr;
       }
 
