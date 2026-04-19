@@ -120,7 +120,8 @@ export function LoginAccountForm() {
       }
 
       // ✅ Gera um identificador único para esta sessão
-      const sessionMarker = Math.random().toString(36).substring(2) + Date.now().toString(36);
+      const sessionMarker =
+        Math.random().toString(36).substring(2) + Date.now().toString(36);
 
       // ✅ Grava o ID da nova sessão no banco para invalidar sessões antigas
       const { error: sessionUpdateError } = await supabase
@@ -168,13 +169,11 @@ export function LoginAccountForm() {
   };
 
   return (
-    <div className="flex flex-col justify-center items-center space-y-2">
-      <span className="text-lg p-4">É bom ver você novamente.</span>
-
+    <div className="flex flex-col justify-center items-center space-y-2 px-6 py-4">
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit(onSubmit)}
-          className="flex flex-col space-y-2"
+          className="flex flex-col space-y-2 w-full"
         >
           <FormField
             control={form.control}

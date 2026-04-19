@@ -1,4 +1,3 @@
-
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CreateAccountForm } from "@/components/auth/create-account-form";
 import { LoginAccountForm } from "@/components/auth/login-account-form";
@@ -41,8 +40,8 @@ export default async function LogInSignIn() {
             </div> */}
           </TabsContent>
         </Tabs>
-        <Link href="/" className="mt-4 text-muted-foreground text-sm">
-          Voltar para Início
+        <Link href="/" className="mt-4 text-blue-500 text-sm">
+          Voltar para o início
         </Link>
       </div>
     </>

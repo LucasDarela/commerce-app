@@ -2,6 +2,8 @@
 
 import React from "react";
 import Image from "next/image";
+import Link from "next/link";
+import logo from "@/app/assets/logo-blue.png";
 
 export default function Footer() {
   const handleScroll = (
@@ -12,7 +14,7 @@ export default function Footer() {
     const targetElement = document.querySelector(targetId);
     if (targetElement) {
       window.scrollTo({
-        top: (targetElement as HTMLElement).offsetTop - 80, 
+        top: (targetElement as HTMLElement).offsetTop - 80,
         behavior: "smooth",
       });
     }
@@ -25,7 +27,14 @@ export default function Footer() {
     >
       <div className="container mx-auto">
         <div className="inline-flex relative">
-          <h2 className="relative text-xl font-bold">Chopp Hub</h2>
+          <Link href="/" className="flex items-center gap-2">
+            <Image
+              src={logo}
+              alt="Logo Chopp Hub"
+              className="h-9 w-9 object-contain"
+            />
+            <span className="text-xl font-bold text-white">Chopp Hub</span>
+          </Link>
         </div>
 
         <nav className="flex flex-col md:flex-row md:justify-center gap-6 mt-6">

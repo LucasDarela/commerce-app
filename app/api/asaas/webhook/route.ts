@@ -215,60 +215,86 @@ export async function POST(req: Request) {
             ? Number(payment.originalValue)
             : null;
 
-      const title = "Pagamento recebido";
-      const header =
-        `Cobrança de ${customerName ?? "Cliente desconhecido"}` +
-        (orderNumber ? ` - Pedido #${orderNumber}` : "") +
-        ` - marcada como Paga`;
+      // Deduplicação: evita notificação duplicada para o mesmo pagamento
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { data: existing } = await supabase
+        .from("notifications")
+        .select("id")
+        .eq("company_id", companyId)
+        .eq("title", "Pagamento recebido")
+        .ilike("description", `%Pedido #${orderNumber}%`)
+        .gte("date", since)
+        .limit(1)
+        .maybeSingle();
 
-      const valueLine = `Valor pago: R$ ${
-        grossPaid != null ? grossPaid.toFixed(2) : "—"
-      }`;
+      if (!existing) {
+        const formattedValue =
+          grossPaid != null
+            ? new Intl.NumberFormat("pt-BR", {
+                style: "currency",
+                currency: "BRL",
+              }).format(grossPaid)
+            : "—";
 
-      const description = `${header}\n${valueLine}`;
+        const title = "Pagamento recebido";
+        const description =
+          `Cobrança de ${customerName ?? "Cliente desconhecido"}` +
+          (orderNumber ? ` - Pedido #${orderNumber}` : "") +
+          ` - marcada como Paga | Valor: ${formattedValue}`;
 
-      const { error: notifErr } = await supabase.from("notifications").insert({
-        title,
-        description,
-        company_id: companyId,
-        date: new Date().toISOString(),
-        read: false,
-      });
+        const { error: notifErr } = await supabase.from("notifications").insert({
+          title,
+          description,
+          company_id: companyId,
+          date: new Date().toISOString(),
+          read: false,
+        });
 
-      if (notifErr) {
-        console.error("❌ Falha ao inserir notificação:", notifErr);
+        if (notifErr) {
+          console.error("❌ Falha ao inserir notificação:", notifErr);
+        }
       }
     }
 
     if (overdueLike) {
-      const title = "Boleto vencido";
-      const header =
-        `Cobrança de ${customerName ?? "Cliente desconhecido"}` +
-        (orderNumber ? ` - Pedido #${orderNumber}` : "") +
-        ` - permanece em aberto`;
+      // Deduplicação: evita notificação duplicada para o mesmo boleto vencido
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { data: existing } = await supabase
+        .from("notifications")
+        .select("id")
+        .eq("company_id", companyId)
+        .eq("title", "Boleto vencido")
+        .ilike("description", `%Pedido #${orderNumber}%`)
+        .gte("date", since)
+        .limit(1)
+        .maybeSingle();
 
-      const statusLabel: Record<string, string> = {
-        OVERDUE: "Boleto vencido sem pagamento",
-        PAYMENT_OVERDUE: "Pagamento em atraso",
-        BANK_SLIP_CANCELLED: "Boleto cancelado pelo banco",
-        PAYMENT_BANK_SLIP_CANCELLED: "Boleto de pagamento cancelado",
-      };
-      const valueLine = statusLabel[asaasStatus] ?? `Status: ${asaasStatus}`;
-      const description = `${header}\n${valueLine}`;
+      if (!existing) {
+        const statusLabel: Record<string, string> = {
+          OVERDUE: "Boleto vencido sem pagamento",
+          PAYMENT_OVERDUE: "Pagamento em atraso",
+          BANK_SLIP_CANCELLED: "Boleto cancelado pelo banco",
+          PAYMENT_BANK_SLIP_CANCELLED: "Boleto de pagamento cancelado",
+        };
+        const statusLine = statusLabel[asaasStatus] ?? `Status: ${asaasStatus}`;
 
-      const { error: notifErr } = await supabase.from("notifications").insert({
-        title,
-        description,
-        company_id: companyId,
-        date: new Date().toISOString(),
-        read: false,
-      });
+        const title = "Boleto vencido";
+        const description =
+          `Cobrança de ${customerName ?? "Cliente desconhecido"}` +
+          (orderNumber ? ` - Pedido #${orderNumber}` : "") +
+          ` - permanece em aberto | ${statusLine}`;
 
-      if (notifErr) {
-        console.error(
-          "❌ Falha ao inserir notificação de vencimento:",
-          notifErr,
-        );
+        const { error: notifErr } = await supabase.from("notifications").insert({
+          title,
+          description,
+          company_id: companyId,
+          date: new Date().toISOString(),
+          read: false,
+        });
+
+        if (notifErr) {
+          console.error("❌ Falha ao inserir notificação de vencimento:", notifErr);
+        }
       }
     }
   });

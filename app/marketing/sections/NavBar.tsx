@@ -10,6 +10,13 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import logo from "@/app/assets/logo-blue.png";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { LoginAccountForm } from "@/components/auth/login-account-form";
 
 const navLinks = [
   { label: "Funcionalidades", href: "#features" },
@@ -23,6 +30,7 @@ export default function NavBar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
 
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
 
@@ -31,30 +39,21 @@ export default function NavBar() {
   const handleScroll = (
     event: React.MouseEvent<HTMLAnchorElement>,
     targetId: string,
-    closeMenu?: boolean
+    closeMenu?: boolean,
   ) => {
     event.preventDefault();
 
     const targetElement = document.querySelector(targetId);
     if (targetElement) {
       const y = (targetElement as HTMLElement).offsetTop - 90;
-
-      window.scrollTo({
-        top: y,
-        behavior: "smooth",
-      });
+      window.scrollTo({ top: y, behavior: "smooth" });
     }
 
-    if (closeMenu) {
-      setMenuOpen(false);
-    }
+    if (closeMenu) setMenuOpen(false);
   };
 
   useEffect(() => {
-    const onScroll = () => {
-      setScrolled(window.scrollY > 10);
-    };
-
+    const onScroll = () => setScrolled(window.scrollY > 10);
     window.addEventListener("scroll", onScroll);
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
@@ -64,7 +63,6 @@ export default function NavBar() {
       const {
         data: { session },
       } = await supabase.auth.getSession();
-
       setIsLoggedIn(!!session?.user);
     }
 
@@ -73,21 +71,16 @@ export default function NavBar() {
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setIsLoggedIn(!!session?.user);
-      }
+      },
     );
 
-    return () => {
-      listener.subscription.unsubscribe();
-    };
+    return () => listener.subscription.unsubscribe();
   }, [supabase]);
 
   useEffect(() => {
     const closeOnResize = () => {
-      if (window.innerWidth >= 1024) {
-        setMenuOpen(false);
-      }
+      if (window.innerWidth >= 1024) setMenuOpen(false);
     };
-
     window.addEventListener("resize", closeOnResize);
     return () => window.removeEventListener("resize", closeOnResize);
   }, []);
@@ -99,7 +92,7 @@ export default function NavBar() {
           "fixed inset-x-0 top-0 z-50 transition-all duration-300",
           scrolled
             ? "border-b bg-background/80 backdrop-blur-xl"
-            : "bg-background/95"
+            : "bg-background/95",
         )}
       >
         <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
@@ -120,7 +113,7 @@ export default function NavBar() {
             </span>
           </Link>
 
-          {/* Links desktop / notebook */}
+          {/* Links desktop */}
           <ul className="hidden lg:flex items-center gap-6 xl:gap-8 text-sm font-medium">
             {navLinks.map((item) => (
               <li key={item.href}>
@@ -140,6 +133,16 @@ export default function NavBar() {
             <ThemeSelector />
             <ModeToggle />
 
+            {!isLoggedIn && (
+              <Button
+                variant="outline"
+                className="h-10 px-5 font-semibold"
+                onClick={() => setLoginModalOpen(true)}
+              >
+                Entrar
+              </Button>
+            )}
+
             <Button asChild className="h-10 px-5 font-semibold">
               <Link href={isLoggedIn ? "/dashboard" : "/login-signin"}>
                 {isLoggedIn ? "Ir para o dashboard" : "Começar teste grátis"}
@@ -147,11 +150,10 @@ export default function NavBar() {
             </Button>
           </div>
 
-          {/* Actions mobile / tablet */}
+          {/* Actions mobile */}
           <div className="flex items-center gap-2 lg:hidden">
             <ThemeSelector />
             <ModeToggle />
-
             <Button
               variant="ghost"
               size="icon"
@@ -164,7 +166,7 @@ export default function NavBar() {
         </div>
       </nav>
 
-      {/* Mobile / tablet menu */}
+      {/* Mobile menu */}
       {menuOpen && (
         <div className="fixed inset-x-0 top-20 z-[60] border-b bg-background/95 backdrop-blur-xl lg:hidden">
           <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
@@ -182,7 +184,20 @@ export default function NavBar() {
               ))}
             </ul>
 
-            <div className="mt-5">
+            <div className="mt-5 flex flex-col gap-2">
+              {!isLoggedIn && (
+                <Button
+                  variant="outline"
+                  className="w-full h-11 font-semibold"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setLoginModalOpen(true);
+                  }}
+                >
+                  Entrar
+                </Button>
+              )}
+
               <Button asChild className="w-full h-11 font-semibold">
                 <Link
                   href={isLoggedIn ? "/dashboard" : "/login-signin"}
@@ -195,6 +210,18 @@ export default function NavBar() {
           </div>
         </div>
       )}
+
+      {/* Login Modal */}
+      <Dialog open={loginModalOpen} onOpenChange={setLoginModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-center text-lg">
+              Entrar na sua conta
+            </DialogTitle>
+          </DialogHeader>
+          <LoginAccountForm />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

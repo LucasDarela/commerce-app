@@ -45,7 +45,8 @@ const helpSections: HelpSection[] = [
   {
     id: "getting-started",
     title: "Primeiros passos",
-    description: "Entenda a estrutura do sistema e como começar a usar o Chopp Hub.",
+    description:
+      "Entenda a estrutura do sistema e como começar a usar o Chopp Hub.",
     icon: LifeBuoy,
     videos: [
       {
@@ -53,7 +54,8 @@ const helpSections: HelpSection[] = [
         title: "Visão geral do sistema",
         description:
           "Apresenta o painel principal, os menus e a lógica geral de funcionamento do sistema.",
-        videoUrl: "https://www.youtube.com/embed/zT46fCKzn7o?si=LyerUZCcxlQ7yK3D",
+        videoUrl:
+          "https://www.youtube.com/embed/zT46fCKzn7o?si=LyerUZCcxlQ7yK3D",
       },
       // {
       //   id: "how-dashboard-works",
@@ -67,11 +69,12 @@ const helpSections: HelpSection[] = [
         title: "Como editar informações da empresa",
         description:
           "Aprenda a editar as informações da sua empresa, como nome, endereço, telefone, e-mail, etc.",
-        videoUrl: "https://www.youtube.com/embed/iIL3ARtL0GA?si=IhTH9Dzdmro2AW0z",
+        videoUrl:
+          "https://www.youtube.com/embed/iIL3ARtL0GA?si=IhTH9Dzdmro2AW0z",
       },
     ],
   },
-    {
+  {
     id: "products",
     title: "Produtos",
     description: "Gestão do catálogo, estoque e valores utilizados no sistema.",
@@ -82,7 +85,8 @@ const helpSections: HelpSection[] = [
         title: "Como cadastrar produtos",
         description:
           "Ensina como criar produtos, preencher preços e manter o catálogo organizado.",
-        videoUrl: "https://www.youtube.com/embed/2ZJH5QYY-Fo?si=_PwNCKSaLmiEE-b1",
+        videoUrl:
+          "https://www.youtube.com/embed/2ZJH5QYY-Fo?si=_PwNCKSaLmiEE-b1",
       },
       // {
       //   id: "product-stock",
@@ -96,7 +100,8 @@ const helpSections: HelpSection[] = [
   {
     id: "customers",
     title: "Clientes",
-    description: "Cadastro, edição, pesquisa e organização dos clientes da empresa.",
+    description:
+      "Cadastro, edição, pesquisa e organização dos clientes da empresa.",
     icon: Users,
     videos: [
       {
@@ -104,7 +109,8 @@ const helpSections: HelpSection[] = [
         title: "Como cadastrar um cliente",
         description:
           "Explica o preenchimento dos dados do cliente, vínculo com a empresa e informações usadas nas vendas.",
-        videoUrl: "https://www.youtube.com/embed/-k9KWZp0aqM?si=Tu8A9OFvNfiaultK",
+        videoUrl:
+          "https://www.youtube.com/embed/-k9KWZp0aqM?si=Tu8A9OFvNfiaultK",
       },
       // {
       //   id: "customer-edit",
@@ -118,7 +124,8 @@ const helpSections: HelpSection[] = [
   {
     id: "orders",
     title: "Vendas e pedidos",
-    description: "Criação de pedidos, pagamento, entrega, coleta e espelho da venda.",
+    description:
+      "Criação de pedidos, pagamento, entrega, coleta e espelho da venda.",
     icon: ShoppingCart,
     videos: [
       {
@@ -126,14 +133,16 @@ const helpSections: HelpSection[] = [
         title: "Como criar uma venda",
         description:
           "Mostra como registrar uma nova venda, selecionar cliente, produtos e forma de pagamento.",
-        videoUrl: "https://www.youtube.com/embed/CANFqnwqnk4?si=goaQaVi9ZtqkmObO",
+        videoUrl:
+          "https://www.youtube.com/embed/CANFqnwqnk4?si=goaQaVi9ZtqkmObO",
       },
       {
         id: "order-delivery",
         title: "Fluxo de entrega e coleta",
         description:
           "Explica o uso dos status Entregar, Coletar e Coletado, além da lógica operacional do pedido.",
-        videoUrl: "https://www.youtube.com/embed/dedTuYAXwPc?si=qg47BbqwcNG1OUvu",
+        videoUrl:
+          "https://www.youtube.com/embed/dedTuYAXwPc?si=qg47BbqwcNG1OUvu",
       },
       // {
       //   id: "order-payment",
@@ -169,7 +178,8 @@ const helpSections: HelpSection[] = [
   {
     id: "financial",
     title: "Financeiro",
-    description: "Contas a pagar, contas a receber, notas financeiras e lançamentos.",
+    description:
+      "Contas a pagar, contas a receber, notas financeiras e lançamentos.",
     icon: Wallet,
     videos: [
       {
@@ -177,7 +187,8 @@ const helpSections: HelpSection[] = [
         title: "Como adicionar uma nota financeira",
         description:
           "Mostra como lançar notas de entrada e saída, selecionar categoria e informar valores.",
-        videoUrl: "https://www.youtube.com/embed/2wbcF_T8naU?si=MdVhmaNtvNJskTQK",
+        videoUrl:
+          "https://www.youtube.com/embed/2wbcF_T8naU?si=MdVhmaNtvNJskTQK",
       },
       // {
       //   id: "financial-filters",
@@ -404,7 +415,8 @@ export default function HelpPage() {
               <CardTitle className="text-base">Documentos</CardTitle>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground">
-              Entenda o fluxo de espelho da venda, NF-e e documentos da operação.
+              Entenda o fluxo de espelho da venda, NF-e e documentos da
+              operação.
             </CardContent>
           </Card>
         </div>
@@ -465,14 +477,14 @@ export default function HelpPage() {
             <div>
               <h2 className="text-lg font-semibold">Mais conteúdos em breve</h2>
               <p className="text-sm text-muted-foreground">
-                Serão adicionados novos vídeos por módulo conforme irmos gravando e o sistema
-                evoluindo.
+                Serão adicionados novos vídeos por módulo conforme irmos
+                gravando e o sistema evoluindo.
               </p>
             </div>
 
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <ShieldCheck className="h-4 w-4" />
-              Base pronta para escalar sua central de ajuda
+              Base pronta para escalar sua distribuidora.
             </div>
           </CardContent>
         </Card>

@@ -10,6 +10,12 @@ import type { Order } from "@/components/types/orders";
 import { Input } from "../ui/input";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 type GroupedByCustomer = {
   customerId: string;
@@ -41,13 +47,12 @@ export default function LoanByCustomerPage() {
 
   const [groupedData, setGroupedData] = useState<GroupedByCustomer[]>([]);
   const [openModal, setOpenModal] = useState(false);
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(
-    null,
-  );
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [isLoanModalOpen, setIsLoanModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [search, setSearch] = useState("");
   const [isFetching, setIsFetching] = useState(false);
+  const [openAccordions, setOpenAccordions] = useState<string[]>([]);
 
   const fetchData = useCallback(async () => {
     if (!companyId) return;
@@ -70,10 +75,7 @@ export default function LoanByCustomerPage() {
     const { data: equipmentList, error: equipmentsError } = equipmentsRes;
 
     if (loansError || equipmentsError) {
-      console.error("Erro ao buscar dados de comodato:", {
-        loansError,
-        equipmentsError,
-      });
+      console.error("Erro ao buscar dados de comodato:", { loansError, equipmentsError });
       toast.error("Erro ao buscar dados");
       setIsFetching(false);
       return;
@@ -85,20 +87,15 @@ export default function LoanByCustomerPage() {
 
     const grouped: Record<string, GroupedByCustomer> = {};
 
-        for (const loan of ((loans as LoanRow[]) || [])) {
+    for (const loan of (loans as LoanRow[]) || []) {
       const customerId = loan.customer_id;
       if (!customerId) continue;
 
       const customerName = loan.customer_name ?? "Desconhecido";
-      const equipmentName =
-        equipmentsMap.get(loan.equipment_id) || "Equipamento";
+      const equipmentName = equipmentsMap.get(loan.equipment_id) || "Equipamento";
 
       if (!grouped[customerId]) {
-        grouped[customerId] = {
-          customerId,
-          customerName,
-          items: [],
-        };
+        grouped[customerId] = { customerId, customerName, items: [] };
       }
 
       grouped[customerId].items.push({
@@ -117,11 +114,38 @@ export default function LoanByCustomerPage() {
     fetchData();
   }, [companyId, fetchData]);
 
-  const filteredGroups = groupedData.filter((group) =>
-    group.customerName.toLowerCase().includes(search.toLowerCase()),
-  );
+  const term = search.toLowerCase().trim();
 
-    function groupItemsByEquipment(
+  // For each group, figure out which equipment items match
+  const filteredGroups = groupedData
+    .filter((group) => {
+      if (!term) return true;
+      const matchesCustomer = group.customerName.toLowerCase().includes(term);
+      const matchesEquipment = group.items.some((item) =>
+        item.equipmentName.toLowerCase().includes(term),
+      );
+      return matchesCustomer || matchesEquipment;
+    })
+    .sort((a, b) =>
+      a.customerName.localeCompare(b.customerName, "pt-BR", { sensitivity: "base" }),
+    );
+
+  // IDs of groups that match ONLY because of equipment (auto-open them)
+  const equipmentMatchIds = filteredGroups
+    .filter(
+      (group) =>
+        term &&
+        !group.customerName.toLowerCase().includes(term) &&
+        group.items.some((item) => item.equipmentName.toLowerCase().includes(term)),
+    )
+    .map((g) => g.customerId);
+
+  // Merged open state: user-toggled + auto-opened by equipment match
+  const accordionValue = [
+    ...new Set([...openAccordions, ...equipmentMatchIds]),
+  ];
+
+  function groupItemsByEquipment(
     items: { loanId: string; equipmentName: string; quantity: number }[],
   ) {
     const map = new Map<string, number>();
@@ -131,10 +155,11 @@ export default function LoanByCustomerPage() {
       map.set(item.equipmentName, current + item.quantity);
     }
 
-    return Array.from(map.entries()).map(([equipmentName, quantity]) => ({
-      equipmentName,
-      quantity,
-    }));
+    return Array.from(map.entries())
+      .map(([equipmentName, quantity]) => ({ equipmentName, quantity }))
+      .sort((a, b) =>
+        a.equipmentName.localeCompare(b.equipmentName, "pt-BR", { sensitivity: "base" }),
+      );
   }
 
   if (loading || isFetching) {
@@ -146,9 +171,7 @@ export default function LoanByCustomerPage() {
       <div className="flex justify-between">
         <h1 className="text-2xl font-bold mb-6">Equipamentos por Cliente</h1>
 
-        <Button onClick={() => setIsLoanModalOpen(true)}>
-          Novo Empréstimo
-        </Button>
+        <Button onClick={() => setIsLoanModalOpen(true)}>Novo Empréstimo</Button>
 
         <LoanEquipmentModal
           open={isLoanModalOpen}
@@ -160,7 +183,7 @@ export default function LoanByCustomerPage() {
       <div className="flex items-center gap-4 mb-4">
         <Input
           type="text"
-          placeholder="Buscar cliente por nome..."
+          placeholder="Buscar por cliente ou equipamento..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="max-w-sm"
@@ -168,17 +191,46 @@ export default function LoanByCustomerPage() {
       </div>
 
       {filteredGroups.length === 0 ? (
-        <p className="text-muted-foreground">
-          Nenhum empréstimo ativo encontrado.
-        </p>
+        <p className="text-muted-foreground">Nenhum empréstimo ativo encontrado.</p>
       ) : (
-        <div className="space-y-6">
+        <Accordion
+          type="multiple"
+          value={accordionValue}
+          onValueChange={setOpenAccordions}
+          className="space-y-2"
+        >
           {filteredGroups.map((group) => (
-            <div key={`customer-${group.customerId}`} className="mb-6">
-              <div className="flex justify-between items-center">
-                <h2 className="text-lg font-semibold text-primary">
-                  {group.customerName}
-                </h2>
+            <AccordionItem
+              key={`customer-${group.customerId}`}
+              value={group.customerId}
+              className="border rounded-lg px-4"
+            >
+              <AccordionTrigger className="hover:no-underline">
+                <div className="flex flex-1 items-center justify-between pr-2">
+                  <span className="text-base font-semibold text-primary">
+                    {group.customerName}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {groupItemsByEquipment(group.items).length} tipo(s)
+                  </span>
+                </div>
+              </AccordionTrigger>
+
+              <AccordionContent>
+                <ul className="list-disc pl-6 text-sm text-muted-foreground mb-4 space-y-1">
+                  {groupItemsByEquipment(group.items).map((item, index) => {
+                    const isMatch =
+                      !!term && item.equipmentName.toLowerCase().includes(term);
+                    return (
+                      <li
+                        key={`${group.customerId}-${item.equipmentName}-${index}`}
+                        className={isMatch ? "text-foreground font-semibold" : ""}
+                      >
+                        {item.equipmentName} – {item.quantity}
+                      </li>
+                    );
+                  })}
+                </ul>
 
                 <Button
                   size="sm"
@@ -190,18 +242,10 @@ export default function LoanByCustomerPage() {
                 >
                   Retornar Itens
                 </Button>
-              </div>
-
-              <ul className="list-disc pl-6 text-sm text-muted-foreground mt-2">
-                {groupItemsByEquipment(group.items).map((item, index) => (
-                  <li key={`${group.customerId}-${item.equipmentName}-${index}`}>
-                    {item.equipmentName} – {item.quantity}
-                  </li>
-                ))}
-              </ul>
-            </div>
+              </AccordionContent>
+            </AccordionItem>
           ))}
-        </div>
+        </Accordion>
       )}
 
       {openModal && selectedCustomerId && companyId && (
@@ -213,8 +257,7 @@ export default function LoanByCustomerPage() {
           user={user}
           customerId={selectedCustomerId}
           items={
-            groupedData.find((g) => g.customerId === selectedCustomerId)
-              ?.items ?? []
+            groupedData.find((g) => g.customerId === selectedCustomerId)?.items ?? []
           }
           onReturnSuccess={() => {
             setOpenModal(false);

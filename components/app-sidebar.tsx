@@ -100,11 +100,11 @@ const data = {
       url: "/dashboard/orders",
       icon: IconShoppingCart,
     },
-    {
-      title: "Rotas",
-      url: "/dashboard/routes-delivery",
-      icon: IconTruckDelivery,
-    },
+    // {
+    //   title: "Rotas",
+    //   url: "/dashboard/routes-delivery",
+    //   icon: IconTruckDelivery,
+    // },
     {
       title: "Comodatos",
       url: "/dashboard/loan",
@@ -142,21 +142,20 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   };
 
   const navMainTop =
-  role === "driver"
-    ? data.navMainTop.filter(
-        (item) =>
-          item.url !== "/dashboard" &&
-          item.url !== "/dashboard/financial"
-      )
-    : data.navMainTop;
+    role === "driver"
+      ? data.navMainTop.filter(
+          (item) =>
+            item.url !== "/dashboard" && item.url !== "/dashboard/financial",
+        )
+      : data.navMainTop;
 
-const navSecondary = data.navSecondary.filter((item) => {
-  // Se for motorista, esconde configurações
-  if (role === "driver" && item.url === "/dashboard/settings") return false;
-  
-  // Mantemos o "Mobile" sempre visível para instigar o upgrade na página interna
-  return true;
-});
+  const navSecondary = data.navSecondary.filter((item) => {
+    // Se for motorista, esconde configurações
+    if (role === "driver" && item.url === "/dashboard/settings") return false;
+
+    // Mantemos o "Mobile" sempre visível para instigar o upgrade na página interna
+    return true;
+  });
 
   return (
     <Sidebar collapsible="offcanvas" {...props}>
@@ -177,7 +176,11 @@ const navSecondary = data.navSecondary.filter((item) => {
       <SidebarContent>
         <SidebarMenu className="mt-2 px-2">
           <SidebarMenuItem className="flex items-center gap-2">
-            <Link className="w-full" href="/dashboard/orders" onClick={handleMobileClose}>
+            <Link
+              className="w-full"
+              href="/dashboard/orders"
+              onClick={handleMobileClose}
+            >
               <SidebarMenuButton
                 tooltip="Quick Action"
                 className="bg-primary -mb-2 text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground min-w-8 duration-200 ease-linear"
@@ -191,7 +194,6 @@ const navSecondary = data.navSecondary.filter((item) => {
         <NavMain items={navMainTop} />
         <div className="my-2 h-px bg-border shrink-0" />
         <NavMain items={data.navMainBottom} />
-
         <NavDocumentsSidebar />
         <NavSecondary items={navSecondary} className="mt-auto" />
       </SidebarContent>

@@ -228,7 +228,9 @@ export default function BankManagement() {
       <Tabs defaultValue="account" className="w-full">
         <TabsList className="w-full h-auto">
           <TabsTrigger value="account">Cadastrar</TabsTrigger>
-          <TabsTrigger value="tickets" disabled>Boletos</TabsTrigger>
+          <TabsTrigger value="tickets" disabled>
+            Boletos
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="account" className="grid grid-cols-2 gap-4 mt-4">
@@ -378,7 +380,7 @@ export default function BankManagement() {
           }
           className="w-full"
         >
-          {isSaving ? "Saving..." : "Add Bank"}
+          {isSaving ? "Salvando..." : "Adicionar Conta"}
         </Button>
       </div>
 
@@ -418,7 +420,7 @@ export default function BankManagement() {
                 colSpan={4}
                 className="text-center text-sm text-muted-foreground"
               >
-                No bank accounts found.
+                Nenhuma conta bancária encontrada.
               </TableCell>
             </TableRow>
           )}

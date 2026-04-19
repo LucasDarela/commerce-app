@@ -50,7 +50,10 @@ export default async function ProtectedOpsLayout({
         ? "normal"
         : rawRole;
 
-  if (!normalizedRole || !["admin", "normal", "driver"].includes(normalizedRole)) {
+  if (
+    !normalizedRole ||
+    !["admin", "normal", "driver"].includes(normalizedRole)
+  ) {
     redirect("/dashboard/forbidden");
   }
 
@@ -92,7 +95,7 @@ export default async function ProtectedOpsLayout({
         title="Em desenvolvimento"
         description="Esta página está em desenvolvimento, em breve você terá novidades..."
         backHref="/dashboard/orders"
-        backLabel="Voltar para o Vendas"
+        backLabel="Voltar para Vendas"
       />
     );
   }

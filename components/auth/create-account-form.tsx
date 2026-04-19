@@ -2,7 +2,7 @@
 
 import * as z from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -18,6 +18,26 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { PasswordInput } from "../ui/password-input";
 import { useState } from "react";
+import { CheckCircle2, XCircle } from "lucide-react";
+
+// ─── Regras de senha ──────────────────────────────────────────────────────────
+const passwordRules = [
+  {
+    id: "minLength",
+    label: "Mínimo de 8 caracteres",
+    test: (v: string) => v.length >= 8,
+  },
+  {
+    id: "hasUppercase",
+    label: "Pelo menos uma letra maiúscula",
+    test: (v: string) => /[A-Z]/.test(v),
+  },
+  {
+    id: "hasNumber",
+    label: "Pelo menos um número",
+    test: (v: string) => /[0-9]/.test(v),
+  },
+];
 
 const formSchema = z
   .object({
@@ -26,8 +46,10 @@ const formSchema = z
       .email("Deve ser um e-mail válido."),
     password: z
       .string({ required_error: "A senha é obrigatória." })
-      .min(7, "A senha deve ter pelo menos 7 caracteres.")
-      .max(15, "Limite excedido de 15 caracteres."),
+      .min(8, "A senha deve ter pelo menos 8 caracteres.")
+      .max(15, "Limite excedido de 15 caracteres.")
+      .regex(/[A-Z]/, "A senha deve conter pelo menos uma letra maiúscula.")
+      .regex(/[0-9]/, "A senha deve conter pelo menos um número."),
     confirmPassword: z.string({
       required_error: "Você deve confirmar sua senha.",
     }),
@@ -37,6 +59,35 @@ const formSchema = z
     path: ["confirmPassword"],
   });
 
+// ─── Componente de checklist ──────────────────────────────────────────────────
+function PasswordChecklist({ value }: { value: string }) {
+  if (!value) return null;
+
+  return (
+    <ul className="mt-2 space-y-1">
+      {passwordRules.map((rule) => {
+        const ok = rule.test(value);
+        return (
+          <li
+            key={rule.id}
+            className={`flex items-center gap-1.5 text-xs transition-colors ${
+              ok ? "text-green-600 dark:text-green-400" : "text-destructive"
+            }`}
+          >
+            {ok ? (
+              <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+            ) : (
+              <XCircle className="h-3.5 w-3.5 shrink-0" />
+            )}
+            {rule.label}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+// ─── Formulário ───────────────────────────────────────────────────────────────
 export function CreateAccountForm() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -45,6 +96,9 @@ export function CreateAccountForm() {
     resolver: zodResolver(formSchema),
     defaultValues: { email: "", password: "", confirmPassword: "" },
   });
+
+  // Observa o valor do campo senha em tempo real
+  const passwordValue = useWatch({ control: form.control, name: "password" });
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
@@ -59,15 +113,13 @@ export function CreateAccountForm() {
 
       const { data, error } = await supabase.auth.signUp({
         email,
-        password, // senha já criada aqui (cadastro normal)
+        password,
         options: {
-          // fluxo normal: não usar /set-password
           emailRedirectTo: `${siteUrl}/auth/callback?type=signup&next=/marketing/registration-confirmed`,
         },
       });
 
       if (error) {
-        // mensagens mais amigáveis
         if ((error as any)?.code === "user_already_exists") {
           toast.error("Este e-mail já está em uso.");
         } else {
@@ -77,14 +129,12 @@ export function CreateAccountForm() {
         return;
       }
 
-      // Caso peculiar do Supabase: usuário pode existir e vir sem erro
       if (data.user && (data.user as any).identities?.length === 0) {
         toast.error("Este e-mail já está em uso.");
         return;
       }
 
       if (data.session) {
-        // confirmação de e-mail desativada → já autenticado
         toast.success("Conta criada com sucesso!");
         router.replace("/marketing/registration-confirmed");
         return;
@@ -104,12 +154,14 @@ export function CreateAccountForm() {
   };
 
   return (
-    <div className="flex flex-col justify-center items-center space-y-2">
-      <span className="text-lg p-4">Que bom ver você por aqui!</span>
+    <div className="flex flex-col justify-center items-center space-y-2 px-6">
+      <span className="text-base pt-3 pb-1 text-muted-foreground">
+        Crie sua conta para iniciar o teste grátis.
+      </span>
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit(onSubmit)}
-          className="flex flex-col space-y-2"
+          className="flex flex-col space-y-2 w-full"
         >
           <FormField
             control={form.control}
@@ -129,6 +181,7 @@ export function CreateAccountForm() {
               </FormItem>
             )}
           />
+
           <FormField
             control={form.control}
             name="password"
@@ -142,10 +195,13 @@ export function CreateAccountForm() {
                     {...field}
                   />
                 </FormControl>
+                {/* Checklist visual em tempo real */}
+                <PasswordChecklist value={passwordValue ?? ""} />
                 <FormMessage />
               </FormItem>
             )}
           />
+
           <FormField
             control={form.control}
             name="confirmPassword"

@@ -72,7 +72,10 @@ export function ThemeSelector() {
       {/* Nome do Plano */}
       {!loading && planName && (
         <div className="hidden lg:flex items-center gap-2">
-          <Badge variant="secondary" className="px-3 py-1 bg-primary/10 text-primary border-primary/20 hover:bg-primary/20 transition-colors uppercase text-[10px] font-bold tracking-wider">
+          <Badge
+            variant="secondary"
+            className="px-3 py-1 bg-primary/10 text-primary border-primary/20 hover:bg-primary/20 transition-colors uppercase text-[10px] font-bold tracking-wider"
+          >
             {planName.split(" ")[0]}
           </Badge>
           <IconChevronRight className="w-3 h-3 text-muted-foreground/40 hidden md:block" />
@@ -88,15 +91,13 @@ export function ThemeSelector() {
           size="sm"
           className="justify-start *:data-[slot=select-value]:w-12"
         >
-          <span className="text-muted-foreground hidden md:block">
-            Select a theme:
-          </span>
-          <span className="text-muted-foreground block md:hidden">Theme</span>
-          <SelectValue placeholder="Select a theme" />
+          <span className="text-muted-foreground hidden md:block">Tema:</span>
+          <span className="text-muted-foreground block md:hidden">Tema:</span>
+          <SelectValue placeholder="Tema" />
         </SelectTrigger>
         <SelectContent align="end">
           <SelectGroup>
-            <SelectLabel>Default</SelectLabel>
+            <SelectLabel>Selecione o Tema</SelectLabel>
             {DEFAULT_THEMES.map((theme) => (
               <SelectItem key={theme.name} value={theme.value}>
                 {theme.name}
@@ -105,7 +106,7 @@ export function ThemeSelector() {
           </SelectGroup>
           <SelectSeparator />
           <SelectGroup>
-            <SelectLabel>Scaled</SelectLabel>
+            <SelectLabel>Escalonado</SelectLabel>
             {SCALED_THEMES.map((theme) => (
               <SelectItem key={theme.name} value={theme.value}>
                 {theme.name}
@@ -113,7 +114,7 @@ export function ThemeSelector() {
             ))}
           </SelectGroup>
           <SelectGroup>
-            <SelectLabel>Monospaced</SelectLabel>
+            <SelectLabel>Monoespaçado</SelectLabel>
             {MONO_THEMES.map((theme) => (
               <SelectItem key={theme.name} value={theme.value}>
                 {theme.name}

@@ -59,7 +59,9 @@ function groupItemsByEquipment(items: EquipmentItem[]): GroupedEquipmentItem[] {
     }
   }
 
-  return Array.from(map.values());
+  return Array.from(map.values()).sort((a, b) =>
+    a.equipmentName.localeCompare(b.equipmentName, "pt-BR", { sensitivity: "base" }),
+  );
 }
 
 export function ReturnEquipmentModal({
@@ -206,12 +208,12 @@ export function ReturnEquipmentModal({
         onOpenChange(nextOpen);
       }}
     >
-      <DialogContent>
+      <DialogContent className="flex flex-col max-h-[90vh]">
         <DialogHeader>
           <DialogTitle>Selecionar Itens para Retorno</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-4 overflow-y-auto flex-1 pr-1">
           <div className="space-y-2">
             {groupedItems.map((group) => {
               const isSelected = selectedItems.includes(group.equipmentName);
@@ -235,7 +237,7 @@ export function ReturnEquipmentModal({
 
                       setQuantities((prev) => ({
                         ...prev,
-                        [group.equipmentName]: enabled ? group.totalQuantity : 0,
+                        [group.equipmentName]: enabled ? 1 : 0,
                       }));
                     }}
                   />
@@ -251,7 +253,7 @@ export function ReturnEquipmentModal({
                     disabled={!isSelected || loading}
                     value={
                       isSelected
-                        ? (quantities[group.equipmentName] ?? group.totalQuantity)
+                        ? (quantities[group.equipmentName] ?? 1)
                         : ""
                     }
                     onChange={(e) => {

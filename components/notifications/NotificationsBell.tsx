@@ -103,26 +103,30 @@ export default function NotificationBell() {
         </Button>
       </PopoverTrigger>
 
-      <PopoverContent align="end" className="w-[380px] p-0 overflow-hidden">
+      <PopoverContent
+        align="end"
+        className="w-[400px] p-0 overflow-hidden rounded-xl shadow-xl"
+      >
         {/* Cabeçalho */}
-        <div className="flex items-center justify-between px-4 py-3 border-b">
-          <div className="font-semibold text-sm">
-            Notificações{" "}
+        <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/40">
+          <div className="flex items-center gap-2">
+            <Bell className="h-4 w-4 text-primary" />
+            <span className="font-semibold text-sm">Notificações</span>
             {unread > 0 && (
-              <span className="text-muted-foreground text-xs">
-                • {unread} novas
-              </span>
+              <Badge variant="secondary" className="text-[10px] h-5 px-1.5">
+                {unread} nova{unread > 1 ? "s" : ""}
+              </Badge>
             )}
           </div>
           <div className="flex gap-2">
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 px-2 text-xs"
+              className="h-7 px-2 text-xs text-muted-foreground"
               onClick={markAllAsRead}
               disabled={unread === 0}
             >
-              Ler Todas
+              Ler todas
             </Button>
             <Link
               href="/dashboard/notifications"
@@ -140,31 +144,51 @@ export default function NotificationBell() {
         </div>
 
         {/* Lista */}
-        <div className="max-h-[60vh] overflow-y-auto">
+        <div className="max-h-[60vh] overflow-y-auto divide-y">
           {loading ? (
-            <div className="p-4 text-sm text-muted-foreground">Carregando…</div>
+            <div className="p-6 text-sm text-muted-foreground text-center">
+              Carregando…
+            </div>
           ) : items.length === 0 ? (
-            <div className="p-4 text-sm text-muted-foreground">
-              Sem notificações.
+            <div className="p-6 text-sm text-muted-foreground text-center">
+              Nenhuma notificação.
             </div>
           ) : (
-            <ul className="divide-y">
-              {items.map((n) => (
-                <li
+            items.map((n) => {
+              const isPaid = n.title.toLowerCase().includes("pagamento");
+              return (
+                <div
                   key={n.id}
-                  className={`grid grid-cols-[24px,1fr,72px] gap-3 px-4 py-3 ${
-                    n.read ? "opacity-70" : ""
+                  className={`flex items-start gap-3 px-4 py-3 transition-colors hover:bg-muted/30 ${
+                    n.read ? "opacity-60" : ""
                   }`}
                 >
-                  {/* conteúdo */}
-                  <div className="min-w-0 max-h-8">
-                    <div className="font-medium text-sm truncate">
+                  {/* Ícone colorido */}
+                  <div
+                    className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                      isPaid
+                        ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
+                        : "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
+                    }`}
+                  >
+                    <Bell className="h-4 w-4" />
+                  </div>
+
+                  {/* Conteúdo */}
+                  <div className="flex-1 min-w-0">
+                    <p
+                      className={`text-sm font-semibold leading-tight ${
+                        isPaid
+                          ? "text-green-700 dark:text-green-400"
+                          : "text-amber-700 dark:text-amber-400"
+                      }`}
+                    >
                       {n.title}
-                    </div>
-                    <div className="text-xs text-muted-foreground break-words">
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5 leading-snug break-words">
                       {n.description}
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">
+                    </p>
+                    <p className="text-[10px] text-muted-foreground/70 mt-1">
                       {new Date(n.date).toLocaleString("pt-BR", {
                         timeZone: "America/Sao_Paulo",
                         day: "2-digit",
@@ -173,38 +197,35 @@ export default function NotificationBell() {
                         hour: "2-digit",
                         minute: "2-digit",
                       })}
-                    </div>
+                    </p>
                   </div>
 
-                  {/* ações – largura fixa para manter alinhamento */}
-                  <div className="flex items-center justify-end gap-2">
-                    {/* Placeholder invisível quando já lida, para não “pular” */}
-                    {n.read ? (
-                      <span className="w-8 h-8 inline-block" aria-hidden />
-                    ) : (
+                  {/* Ações */}
+                  <div className="flex flex-col items-center gap-1 shrink-0">
+                    {!n.read && (
                       <Button
-                        variant="outline"
+                        variant="ghost"
                         size="icon"
-                        className="h-8 w-8"
+                        className="h-7 w-7 text-muted-foreground hover:text-primary"
                         onClick={() => markAsRead(n.id)}
                         title="Marcar como lida"
                       >
-                        <Check className="h-4 w-4" />
+                        <Check className="h-3.5 w-3.5" />
                       </Button>
                     )}
                     <Button
-                      variant="destructive"
+                      variant="ghost"
                       size="icon"
-                      className="h-8 w-8"
+                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
                       onClick={() => deleteOne(n.id)}
                       title="Excluir"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>
-                </li>
-              ))}
-            </ul>
+                </div>
+              );
+            })
           )}
         </div>
       </PopoverContent>
