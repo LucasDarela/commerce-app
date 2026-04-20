@@ -1614,6 +1614,8 @@ export function DataTable({ companyId, user, role }: DataTableProps) {
           order.appointment_hour || "—",
           String(order.customer || "").toUpperCase(),
           String(order.products || "").toUpperCase(),
+          String(order.appointment_local || "").toUpperCase(),
+          String(order.text_note || "").toUpperCase(),
           order.payment_method || "—",
           order.payment_status === "Paid" ? "PAGO" : "PENDENTE",
           String(order.delivery_status || "—").toUpperCase(),
@@ -1632,6 +1634,8 @@ export function DataTable({ companyId, user, role }: DataTableProps) {
             "HORA",
             "CLIENTE",
             "PRODUTOS",
+            "LOCALIZAÇÃO",
+            "OBSERVAÇÃO",
             "PAGAMENTO",
             "STATUS PAG.",
             "STATUS ENTREGA",
@@ -1641,10 +1645,12 @@ export function DataTable({ companyId, user, role }: DataTableProps) {
         body: tableData,
         theme: "striped",
         headStyles: { fillColor: [0, 112, 243], textColor: 255 },
-        styles: { fontSize: 8, cellPadding: 2 },
+        styles: { fontSize: 7, cellPadding: 1.5 },
         columnStyles: {
-          3: { cellWidth: 60 }, // Produtos mais largo
-          2: { cellWidth: 40 }, // Cliente
+          3: { cellWidth: 50 }, // Produtos
+          4: { cellWidth: 35 }, // Localização
+          5: { cellWidth: 35 }, // Observação
+          2: { cellWidth: 35 }, // Cliente
         },
       });
 
@@ -2002,7 +2008,27 @@ export function DataTable({ companyId, user, role }: DataTableProps) {
                       column.toggleVisibility(!!value)
                     }
                   >
-                    {column.id}
+                    {(() => {
+                      const labels: Record<string, string> = {
+                        appointment_date: "Data de Entrega",
+                        appointment_hour: "Hora",
+                        customer: "Cliente",
+                        driver: "Motorista",
+                        phone: "WhatsApp",
+                        products: "Produtos",
+                        text_note: "Observação",
+                        appointment_local: "Localização",
+                        delivery_status: "Status Entrega",
+                        issue_date: "Emissão",
+                        due_date: "Vencimento",
+                        payment_method: "Tipo Pagamento",
+                        payment_status: "Status Pagamento",
+                        remaining: "Restante",
+                        total: "Total",
+                        nfe: "NF-e",
+                      };
+                      return labels[column.id] || column.id.replace(/_/g, " ");
+                    })()}
                   </DropdownMenuCheckboxItem>
                 ))}
             </DropdownMenuContent>
