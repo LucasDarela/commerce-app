@@ -4,7 +4,8 @@ import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 // Usamos uma variável específica para não dar conflito com o sistema de NFe/Boletos
-const recipientEmail = process.env.CONTACT_FORM_RECIPIENT || "lucasdarela@live.com";
+const recipientEmail =
+  process.env.CONTACT_FORM_RECIPIENT || "lucasdarela@live.com";
 
 export async function POST(req: Request) {
   try {
@@ -46,7 +47,7 @@ export async function POST(req: Request) {
 
     // 2. Envia o e-mail via Resend
     const { data, error } = await resend.emails.send({
-      from: `Chopp Hub Contato <contato@chopphub.com>`,
+      from: `Chopp Hub Contato <suporte@chopphub.com>`,
       to: [recipientEmail],
       subject: `Mensagem de ${name} - Contato Site`,
       replyTo: email,

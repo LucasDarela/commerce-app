@@ -45,7 +45,7 @@ export default function Footer() {
           >
             Funcionalidades
           </a>
-                    <a
+          <a
             href="#testimonials"
             className="hover:text-primary"
             onClick={(e) => handleScroll(e, "#testimonials")}
@@ -74,17 +74,17 @@ export default function Footer() {
           >
             Contato
           </a>
-
         </nav>
         <div className="flex gap-4 justify-center mt-8">
           <h3>48 9 9144-7684</h3>
-          <h4>contato@chopphub.com</h4>
+          <h4>suporte@chopphub.com</h4>
         </div>
 
         <div className="flex flex-col items-center gap-6 mt-6">
           <p className="mt-6">
-            © {new Date().getFullYear()} <span className="font-bold">Chopp Hub</span>. Todos
-            os direitos reservados.
+            © {new Date().getFullYear()}{" "}
+            <span className="font-bold">Chopp Hub</span>. Todos os direitos
+            reservados.
           </p>
         </div>
       </div>
