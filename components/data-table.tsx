@@ -33,8 +33,11 @@ import {
   IconLayoutColumns,
   IconPlus,
   IconTrash,
+  IconFileDescription,
 } from "@tabler/icons-react";
 import clsx from "clsx";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -284,22 +287,18 @@ async function parseProductsWithIds(
 
   return parsed
     .map((p) => {
-      const match = data.find((d: { id: number; name: string }) => d.name === p.name);
+      const match = data.find(
+        (d: { id: number; name: string }) => d.name === p.name,
+      );
       return { id: match?.id ?? 0, quantity: p.quantity };
     })
     .filter((p) => p.id !== 0);
 }
 
-export function DataTable({
-  companyId,
-  user,
-  role,
-}: DataTableProps) {
-  const supabase = useMemo(() => createBrowserSupabaseClient(), []); 
+export function DataTable({ companyId, user, role }: DataTableProps) {
+  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const safeRole: UserRole | null =
-    role === "admin" || role === "driver" || role === "normal"
-      ? role
-      : null;
+    role === "admin" || role === "driver" || role === "normal" ? role : null;
   const [selectedCustomer, setSelectedCustomer] = React.useState<Sale | null>(
     null,
   );
@@ -317,25 +316,29 @@ export function DataTable({
   >([]);
   const router = useRouter();
 
-  const [isDeliveryStatusModalOpen, setIsDeliveryStatusModalOpen] = useState(false);
-const [deliveryStatusOrder, setDeliveryStatusOrder] = useState<Order | null>(null);
-const [newDeliveryStatus, setNewDeliveryStatus] = useState<
-  "Entregar" | "Coletar" | "Coletado"
->("Entregar");
-const [isUpdatingDeliveryStatus, setIsUpdatingDeliveryStatus] = useState(false);
+  const [isDeliveryStatusModalOpen, setIsDeliveryStatusModalOpen] =
+    useState(false);
+  const [deliveryStatusOrder, setDeliveryStatusOrder] = useState<Order | null>(
+    null,
+  );
+  const [newDeliveryStatus, setNewDeliveryStatus] = useState<
+    "Entregar" | "Coletar" | "Coletado"
+  >("Entregar");
+  const [isUpdatingDeliveryStatus, setIsUpdatingDeliveryStatus] =
+    useState(false);
 
   const FILTERS_KEY = React.useMemo(() => {
     return `orders_filters_v1:${companyId}`;
   }, [companyId]);
 
-type PersistedOrdersFilters = {
-  selectedMonth: string;
-  columnFilters: ColumnFiltersState;
-  dateRange: [string | null, string | null];
-  issueDate: string | null;
-  sorting: SortingState;
-  selectedDriverId: string | null;
-};
+  type PersistedOrdersFilters = {
+    selectedMonth: string;
+    columnFilters: ColumnFiltersState;
+    dateRange: [string | null, string | null];
+    issueDate: string | null;
+    sorting: SortingState;
+    selectedDriverId: string | null;
+  };
 
   function safeParseJSON<T>(value: string | null): T | null {
     if (!value) return null;
@@ -399,29 +402,29 @@ type PersistedOrdersFilters = {
 
   const [startDate, endDate] = dateRange;
 
-  const [selectedDriverId, setSelectedDriverId] = useState<string | null>(() => {
-  if (typeof window === "undefined") return null;
+  const [selectedDriverId, setSelectedDriverId] = useState<string | null>(
+    () => {
+      if (typeof window === "undefined") return null;
 
-  const saved = safeParseJSON<PersistedOrdersFilters>(
-    localStorage.getItem(FILTERS_KEY),
+      const saved = safeParseJSON<PersistedOrdersFilters>(
+        localStorage.getItem(FILTERS_KEY),
+      );
+
+      return saved?.selectedDriverId ?? null;
+    },
   );
 
-  return saved?.selectedDriverId ?? null;
-});
+  const defaultSorting: SortingState = [{ id: "appointment_date", desc: true }];
 
-    const defaultSorting: SortingState = [
-  { id: "appointment_date", desc: true },
-];
+  const [sorting, setSorting] = React.useState<SortingState>(() => {
+    if (typeof window === "undefined") return defaultSorting;
 
-const [sorting, setSorting] = React.useState<SortingState>(() => {
-  if (typeof window === "undefined") return defaultSorting;
+    const saved = safeParseJSON<PersistedOrdersFilters>(
+      localStorage.getItem(FILTERS_KEY),
+    );
 
-  const saved = safeParseJSON<PersistedOrdersFilters>(
-    localStorage.getItem(FILTERS_KEY),
-  );
-
-  return saved?.sorting?.length ? saved.sorting : defaultSorting;
-});
+    return saved?.sorting?.length ? saved.sorting : defaultSorting;
+  });
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -436,11 +439,11 @@ const [sorting, setSorting] = React.useState<SortingState>(() => {
       ],
       issueDate: issueDateFilter ? toLocalISODate(issueDateFilter) : null,
       sorting,
-      selectedDriverId, 
+      selectedDriverId,
     };
 
     localStorage.setItem(FILTERS_KEY, JSON.stringify(payload));
-  }, [  
+  }, [
     FILTERS_KEY,
     companyId,
     selectedMonth,
@@ -448,7 +451,7 @@ const [sorting, setSorting] = React.useState<SortingState>(() => {
     startDate,
     endDate,
     issueDateFilter,
-    sorting,  
+    sorting,
     selectedDriverId,
   ]);
 
@@ -485,41 +488,41 @@ const [sorting, setSorting] = React.useState<SortingState>(() => {
 
   // driver select
 
-const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
 
-useEffect(() => {
-  async function fetchDrivers() {
-    if (!companyId) return;
+  useEffect(() => {
+    async function fetchDrivers() {
+      if (!companyId) return;
 
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("id, username, email")
-      .eq("company_id", companyId)
-      .order("username", { ascending: true });
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, username, email")
+        .eq("company_id", companyId)
+        .order("username", { ascending: true });
 
-    if (error) {
-      console.error("Erro ao buscar motoristas:", error);
-      setDrivers([]);
-      return;
+      if (error) {
+        console.error("Erro ao buscar motoristas:", error);
+        setDrivers([]);
+        return;
+      }
+
+      setDrivers(
+        (data ?? []).map((p: any) => ({
+          id: p.id,
+          name: p.username || p.email || "Sem nome",
+        })),
+      );
     }
 
-    setDrivers(
-      (data ?? []).map((p: any) => ({
-        id: p.id,
-        name: p.username || p.email || "Sem nome",
-      }))
-    );
-  }
-
-  fetchDrivers();
-}, [companyId, supabase]);
+    fetchDrivers();
+  }, [companyId, supabase]);
 
   async function setOrderDriver(orderId: string, driverId: string | null) {
     const { data, error } = await supabase
       .from("orders")
       .update({ driver_id: driverId })
       .eq("id", orderId)
-      .eq("company_id", companyId)  
+      .eq("company_id", companyId)
       .select("id, driver_id")
       .single();
 
@@ -640,10 +643,11 @@ useEffect(() => {
     }
   }
 
-const refreshOrders = async () => {
-  const { data, error } = await supabase
-    .from("orders")
-    .select(`
+  const refreshOrders = async () => {
+    const { data, error } = await supabase
+      .from("orders")
+      .select(
+        `
       id,
       customer_id,
       note_number,
@@ -676,38 +680,37 @@ const refreshOrders = async () => {
         fantasy_name,
         emit_nf
       )
-    `)
-    .order("order_index", { ascending: true })
-    .eq("company_id", companyId);
+    `,
+      )
+      .order("order_index", { ascending: true })
+      .eq("company_id", companyId);
 
-  if (error) {
-    console.error("Erro ao buscar pedidos:", error);
-    return;
-  }
+    if (error) {
+      console.error("Erro ao buscar pedidos:", error);
+      return;
+    }
 
-  const ordersWithFantasy = (data ?? []).map((r) => {
-    const cr = (r as any).customer_rel;
-    const fantasyName = Array.isArray(cr)
-      ? cr[0]?.fantasy_name
-      : cr?.fantasy_name;
-    const currentName = Array.isArray(cr)
-      ? cr[0]?.name
-      : cr?.name;
+    const ordersWithFantasy = (data ?? []).map((r) => {
+      const cr = (r as any).customer_rel;
+      const fantasyName = Array.isArray(cr)
+        ? cr[0]?.fantasy_name
+        : cr?.fantasy_name;
+      const currentName = Array.isArray(cr) ? cr[0]?.name : cr?.name;
 
-    return {
-      ...r,
-      customer: currentName || r.customer,
-      fantasy_name: fantasyName || "",
-    };
-  });
+      return {
+        ...r,
+        customer: currentName || r.customer,
+        fantasy_name: fantasyName || "",
+      };
+    });
 
-  const parsed = orderSchema.array().safeParse(ordersWithFantasy);
-  if (parsed.success) {
-    setOrders(parsed.data);
-  } else {
-    console.error("Erro ao validar schema Zod:", parsed.error);
-  }
-};
+    const parsed = orderSchema.array().safeParse(ordersWithFantasy);
+    if (parsed.success) {
+      setOrders(parsed.data);
+    } else {
+      console.error("Erro ao validar schema Zod:", parsed.error);
+    }
+  };
 
   const restoreStockBeforeDelete = async (orderId: string) => {
     const { data: items, error: fetchError } = await supabase
@@ -754,15 +757,16 @@ const refreshOrders = async () => {
     }
   }, [columnVisibility]);
 
-useEffect(() => {
-  async function fetchOrders() {
-        if (!companyId) {
-      setLoading(false);
-      return;
-    }
-    const { data, error } = await supabase
-      .from("orders")
-      .select(`
+  useEffect(() => {
+    async function fetchOrders() {
+      if (!companyId) {
+        setLoading(false);
+        return;
+      }
+      const { data, error } = await supabase
+        .from("orders")
+        .select(
+          `
         id,
         customer_id,
         note_number,
@@ -795,565 +799,594 @@ useEffect(() => {
           fantasy_name,
           emit_nf
         )
-      `)
-      .order("order_index", { ascending: true })
-      .eq("company_id", companyId);
+      `,
+        )
+        .order("order_index", { ascending: true })
+        .eq("company_id", companyId);
 
-    if (error) {
-      console.error("Erro ao buscar pedidos:", error);
-      return;
+      if (error) {
+        console.error("Erro ao buscar pedidos:", error);
+        return;
+      }
+
+      const ordersWithFantasy = (data ?? []).map((r) => {
+        const cr = (r as any).customer_rel;
+        const fantasyName = Array.isArray(cr)
+          ? cr[0]?.fantasy_name
+          : cr?.fantasy_name;
+        const currentName = Array.isArray(cr) ? cr[0]?.name : cr?.name;
+
+        return {
+          ...r,
+          customer: currentName || r.customer,
+          fantasy_name: fantasyName || "",
+        };
+      });
+
+      const parsed = orderSchema.array().safeParse(ordersWithFantasy);
+      if (parsed.success) {
+        setOrders(parsed.data);
+      } else {
+        console.error("Erro ao validar schema Zod:", parsed.error);
+      }
+
+      if (!companyId) return;
+
+      setLoading(false);
     }
 
-    const ordersWithFantasy = (data ?? []).map((r) => {
-      const cr = (r as any).customer_rel;
-      const fantasyName = Array.isArray(cr)
-        ? cr[0]?.fantasy_name
-        : cr?.fantasy_name;
-      const currentName = Array.isArray(cr)
-        ? cr[0]?.name
-        : cr?.name;
+    fetchOrders();
 
-      return {
-        ...r,
-        customer: currentName || r.customer,
-        fantasy_name: fantasyName || "",
-      };
-    });
-
-    const parsed = orderSchema.array().safeParse(ordersWithFantasy);
-    if (parsed.success) {
-      setOrders(parsed.data);
-    } else {
-      console.error("Erro ao validar schema Zod:", parsed.error);
-    }
-
-    if (!companyId) return;
-
-    setLoading(false);
-  }
-
-  fetchOrders();
-
-  const channel = supabase
-    .channel('orders_realtime')
-    .on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'orders', filter: `company_id=eq.${companyId}` },
-      async (payload) => {
-        if (payload.eventType === 'INSERT') {
-          const { data } = await supabase
-            .from("orders")
-            .select(`
+    const channel = supabase
+      .channel("orders_realtime")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "orders",
+          filter: `company_id=eq.${companyId}`,
+        },
+        async (payload) => {
+          if (payload.eventType === "INSERT") {
+            const { data } = await supabase
+              .from("orders")
+              .select(
+                `
               id, customer_id, note_number, document_type, appointment_date, appointment_hour, appointment_local, customer, phone, products, freight, amount, total, total_payed, delivery_status, payment_status, payment_method, order_index, issue_date, due_date, customer_signature, text_note, boleto_id, driver_id,
               customer_rel:customers!sales_customer_id_fkey(fantasy_name)
-            `)
-            .eq("id", payload.new.id)
-            .single();
+            `,
+              )
+              .eq("id", payload.new.id)
+              .single();
 
-          if (data) {
-            const cr = (data as any).customer_rel;
-            const fantasyName = Array.isArray(cr) ? cr[0]?.fantasy_name : cr?.fantasy_name;
-            const newOrder = {
-              ...data,
-              fantasy_name: fantasyName || "",
-            };
+            if (data) {
+              const cr = (data as any).customer_rel;
+              const fantasyName = Array.isArray(cr)
+                ? cr[0]?.fantasy_name
+                : cr?.fantasy_name;
+              const newOrder = {
+                ...data,
+                fantasy_name: fantasyName || "",
+              };
 
-            const parsed = orderSchema.safeParse(newOrder);
-            if (parsed.success) {
-              setOrders((prev) => {
-                const exists = prev.some((o) => o.id === parsed.data.id);
-                if (exists) return prev;
-                return [parsed.data, ...prev];
-              });
+              const parsed = orderSchema.safeParse(newOrder);
+              if (parsed.success) {
+                setOrders((prev) => {
+                  const exists = prev.some((o) => o.id === parsed.data.id);
+                  if (exists) return prev;
+                  return [parsed.data, ...prev];
+                });
+              }
             }
+          } else if (payload.eventType === "UPDATE") {
+            setOrders((prev) =>
+              prev.map((order) => {
+                if (order.id !== payload.new.id) return order;
+                return { ...order, ...payload.new } as Order;
+              }),
+            );
+          } else if (payload.eventType === "DELETE") {
+            setOrders((prev) =>
+              prev.filter((order) => order.id !== payload.old.id),
+            );
           }
-        } else if (payload.eventType === 'UPDATE') {
-          setOrders((prev) =>
-            prev.map((order) => {
-              if (order.id !== payload.new.id) return order;
-              return { ...order, ...payload.new } as Order;
-            })
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [companyId, supabase]);
+
+  const columns = React.useMemo<CustomColumnDef<Order>[]>(
+    () => [
+      {
+        id: "drag",
+        header: () => null,
+        size: 25,
+        meta: { className: "w-[30px]" },
+        cell: () => null,
+        enableSorting: false,
+        enableHiding: false,
+      },
+
+      {
+        accessorKey: "appointment_date",
+        header: "Data",
+        size: 90,
+        meta: { className: "w-[90px]" },
+        sortingFn: (rowA, rowB) => {
+          const dateA = rowA.original.appointment_date ?? "";
+          const hourA = rowA.original.appointment_hour ?? "00:00";
+
+          const dateB = rowB.original.appointment_date ?? "";
+          const hourB = rowB.original.appointment_hour ?? "00:00";
+
+          const dateTimeA = new Date(`${dateA}T${hourA}:00`).getTime();
+          const dateTimeB = new Date(`${dateB}T${hourB}:00`).getTime();
+
+          return dateTimeA - dateTimeB;
+        },
+        filterFn: (row, columnId, filterValue) => {
+          const rowDate = row.getValue<string>(columnId);
+          if (!rowDate || typeof rowDate !== "string") return false;
+
+          const rowTime = new Date(rowDate).getTime();
+
+          if (typeof filterValue === "string") {
+            return rowDate === filterValue;
+          }
+
+          if (filterValue?.from && filterValue?.to) {
+            const fromTime = new Date(filterValue.from).getTime();
+            const toTime = new Date(filterValue.to).getTime();
+            return rowTime >= fromTime && rowTime <= toTime;
+          }
+
+          return true;
+        },
+        cell: ({ row }) => {
+          const rawDate = row.original.appointment_date;
+          if (!rawDate) return "—";
+          const [year, month, day] = rawDate.split("-");
+          return `${day}/${month}/${year}`;
+        },
+      },
+      {
+        accessorKey: "appointment_hour",
+        header: "Hora",
+        size: 55,
+        meta: { className: "w-[55px]" },
+        cell: ({ row }) => row.original.appointment_hour,
+      },
+      {
+        id: "nfe",
+        header: "",
+        size: 55,
+        meta: { className: "w-[25px]" },
+        cell: ({ row }) => {
+          const status = nfeStatusByOrderId[String(row.original.id)] ?? null;
+          return <NfeDot status={status} />;
+        },
+      },
+
+      {
+        accessorKey: "customer",
+        header: "Cliente",
+        size: 200,
+        meta: { className: "w-[220px] truncate uppercase" },
+        filterFn: (row, columnId, filterValue) => {
+          const search = String(filterValue ?? "")
+            .trim()
+            .toLowerCase();
+
+          if (!search) return true;
+
+          const customer = String(row.original.customer ?? "").toLowerCase();
+          const noteNumber = String(
+            row.original.note_number ?? "",
+          ).toLowerCase();
+
+          return customer.includes(search) || noteNumber.includes(search);
+        },
+        cell: ({ row }) => {
+          const order = row.original;
+
+          return (
+            <Button
+              variant="link"
+              className="p-0 text-left text-primary hover:underline"
+              onClick={() => {
+                setSelectedCustomer(order);
+                setSheetOpen(true);
+              }}
+            >
+              {order.customer}
+            </Button>
           );
-        } else if (payload.eventType === 'DELETE') {
-          setOrders((prev) => prev.filter((order) => order.id !== payload.old.id));
-        }
-      }
-    )
-    .subscribe();
-
-  return () => {
-    supabase.removeChannel(channel);
-  };
-}, [companyId, supabase]);
-
-const columns = React.useMemo<CustomColumnDef<Order>[]>(() => [
-    {
-      id: "drag",
-      header: () => null,
-      size: 25,
-      meta: { className: "w-[30px]" },
-      cell: () => null,
-      enableSorting: false,
-      enableHiding: false,
-    },
-
-{
-  accessorKey: "appointment_date",
-  header: "Data",
-  size: 90,
-  meta: { className: "w-[90px]" },
-  sortingFn: (rowA, rowB) => {
-    const dateA = rowA.original.appointment_date ?? "";
-    const hourA = rowA.original.appointment_hour ?? "00:00";
-
-    const dateB = rowB.original.appointment_date ?? "";
-    const hourB = rowB.original.appointment_hour ?? "00:00";
-
-    const dateTimeA = new Date(`${dateA}T${hourA}:00`).getTime();
-    const dateTimeB = new Date(`${dateB}T${hourB}:00`).getTime();
-
-    return dateTimeA - dateTimeB;
-  },
-  filterFn: (row, columnId, filterValue) => {
-    const rowDate = row.getValue<string>(columnId);
-    if (!rowDate || typeof rowDate !== "string") return false;
-
-    const rowTime = new Date(rowDate).getTime();
-
-    if (typeof filterValue === "string") {
-      return rowDate === filterValue;
-    }
-
-    if (filterValue?.from && filterValue?.to) {
-      const fromTime = new Date(filterValue.from).getTime();
-      const toTime = new Date(filterValue.to).getTime();
-      return rowTime >= fromTime && rowTime <= toTime;
-    }
-
-    return true;
-  },
-  cell: ({ row }) => {
-    const rawDate = row.original.appointment_date;
-    if (!rawDate) return "—";
-    const [year, month, day] = rawDate.split("-");
-    return `${day}/${month}/${year}`;
-  },
-},
-    {
-      accessorKey: "appointment_hour",
-      header: "Hora",
-      size: 55,
-      meta: { className: "w-[55px]" },
-      cell: ({ row }) => row.original.appointment_hour,
-    },
-    {
-      id: "nfe",
-      header: "",
-      size: 55,
-      meta: { className: "w-[25px]" },
-      cell: ({ row }) => {
-        const status = nfeStatusByOrderId[String(row.original.id)] ?? null;
-        return <NfeDot status={status} />;
+        },
       },
-    },
+      {
+        id: "driver",
+        header: "Motorista",
+        size: 160,
+        meta: { className: "w-[150px] truncate" },
+        cell: ({ row }) => {
+          const canAssign = canAssignDriver(safeRole);
 
-    {
-  accessorKey: "customer",
-  header: "Cliente",
-  size: 200,
-  meta: { className: "w-[220px] truncate uppercase" },
-  filterFn: (row, columnId, filterValue) => {
-    const search = String(filterValue ?? "").trim().toLowerCase();
+          return (
+            <div onClick={(e) => e.stopPropagation()}>
+              <Select
+                value={
+                  row.original.driver_id == null
+                    ? "none"
+                    : String(row.original.driver_id)
+                }
+                onValueChange={(value) => {
+                  if (!canAssign) return;
 
-    if (!search) return true;
+                  const driverId = value === "none" ? null : value;
+                  setOrderDriver(String(row.original.id), driverId);
+                }}
+                disabled={!canAssign}
+              >
+                <SelectTrigger className="h-8">
+                  <SelectValue placeholder="" />
+                </SelectTrigger>
 
-    const customer = String(row.original.customer ?? "").toLowerCase();
-    const noteNumber = String(row.original.note_number ?? "").toLowerCase();
+                <SelectContent>
+                  <SelectItem value="none">
+                    <span className="h-5 text-muted-foreground"></span>
+                  </SelectItem>
 
-    return customer.includes(search) || noteNumber.includes(search);
-  },
-  cell: ({ row }) => {
-    const order = row.original;
-
-    return (
-      <Button
-        variant="link"
-        className="p-0 text-left text-primary hover:underline"
-        onClick={() => {
-          setSelectedCustomer(order);
-          setSheetOpen(true);
-        }}
-      >
-        {order.customer}
-      </Button>
-    );
-  },
-},
-    {
-  id: "driver",
-  header: "Motorista",
-  size: 160,
-  meta: { className: "w-[150px] truncate" },
-  cell: ({ row }) => {
-    const canAssign = canAssignDriver(safeRole);
-
-    return (
-      <div onClick={(e) => e.stopPropagation()}>
-        <Select
-          value={
-            row.original.driver_id == null
-              ? "none"
-              : String(row.original.driver_id)
-          }
-          onValueChange={(value) => {
-            if (!canAssign) return;
-
-            const driverId = value === "none" ? null : value;
-            setOrderDriver(String(row.original.id), driverId);
-          }}
-          disabled={!canAssign}
-        >
-          <SelectTrigger className="h-8">
-            <SelectValue placeholder="" />
-          </SelectTrigger>
-
-          <SelectContent>
-            <SelectItem value="none">
-              <span className="h-5 text-muted-foreground"></span>
-            </SelectItem>
-
-            {drivers.map((d) => (
-              <SelectItem key={d.id} value={String(d.id)}>
-                {d.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-    );
-  },
-},
-    {
-      accessorKey: "phone",
-      header: "Tel",
-      size: 50,
-      meta: { className: "w-[50px]" },
-      cell: ({ row }) => {
-        const raw = row.original.phone || "";
-        const cleaned = raw.replace(/\D/g, "");
-        const message = "Olá, tudo bem? Sua entrega de chopp está a caminho.";
-        const encodedMessage = encodeURIComponent(message);
-
-        const handleClick = (e: React.MouseEvent) => {
-          if (!cleaned) {
-            e.preventDefault();
-            toast.warning("⚠️ Cliente sem número de telefone cadastrado.");
-          }
-        };
-
-        const link = `https://wa.me/${cleaned}?text=${encodedMessage}`;
-
-        return (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <a
-                  href={link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={handleClick}
-                >
-                  <svg
-                    width="28"
-                    height="28"
-                    viewBox="0 0 32 32"
-                    className="text-primary hover:text-primary/80 fill-current transition-transform hover:scale-110"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d=" M19.11 17.205c-.372 0-1.088 1.39-1.518 1.39a.63.63 0 0 1-.315-.1c-.802-.402-1.504-.817-2.163-1.447-.545-.516-1.146-1.29-1.46-1.963a.426.426 0 0 1-.073-.215c0-.33.99-.945.99-1.49 0-.143-.73-2.09-.832-2.335-.143-.372-.214-.487-.6-.487-.187 0-.36-.043-.53-.043-.302 0-.53.115-.746.315-.688.645-1.032 1.318-1.06 2.264v.114c-.015.99.472 1.977 1.017 2.78 1.23 1.82 2.506 3.41 4.554 4.34.616.287 2.035.888 2.722.888.817 0 2.15-.515 2.478-1.318.13-.33.244-.73.244-1.088 0-.058 0-.144-.03-.215-.1-.172-2.434-1.39-2.678-1.39zm-2.908 7.593c-1.747 0-3.48-.53-4.942-1.49L7.793 24.41l1.132-3.337a8.955 8.955 0 0 1-1.72-5.272c0-4.955 4.04-8.995 8.997-8.995S25.2 10.845 25.2 15.8c0 4.958-4.04 8.998-8.998 8.998zm0-19.798c-5.96 0-10.8 4.842-10.8 10.8 0 1.964.53 3.898 1.546 5.574L5 27.176l5.974-1.92a10.807 10.807 0 0 0 16.03-9.455c0-5.958-4.842-10.8-10.802-10.8z"
-                      fillRule="evenodd"
-                    ></path>
-                  </svg>
-                </a>
-              </TooltipTrigger>
-              <TooltipContent>
-                {cleaned ? "Enviar mensagem via WhatsApp" : "Sem telefone"}
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        );
+                  {drivers.map((d) => (
+                    <SelectItem key={d.id} value={String(d.id)}>
+                      {d.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          );
+        },
       },
-    },
+      {
+        accessorKey: "phone",
+        header: "Tel",
+        size: 50,
+        meta: { className: "w-[50px]" },
+        cell: ({ row }) => {
+          const raw = row.original.phone || "";
+          const cleaned = raw.replace(/\D/g, "");
+          const message = "Olá, tudo bem? Sua entrega de chopp está a caminho.";
+          const encodedMessage = encodeURIComponent(message);
 
-    {
-      accessorKey: "products",
-      header: "Produtos",
-      size: 200,
-      meta: { className: "w-[300px]" },
-      cell: ({ row }) => (
-        <div className="leading-tight whitespace-pre-line break-words uppercase">
-          {row.original.products}
-        </div>
-      ),
-    },
+          const handleClick = (e: React.MouseEvent) => {
+            if (!cleaned) {
+              e.preventDefault();
+              toast.warning("⚠️ Cliente sem número de telefone cadastrado.");
+            }
+          };
 
-    {
-      accessorKey: "text_note",
-      header: "Observação",
-      size: 250,
-      meta: { className: "w-[250px] truncate" },
-      cell: ({ row }) => (
-        <div className="whitespace-pre-wrap lowercase text-muted-foreground">
-          {row.original.text_note || ""}
-        </div>
-      ),
-    },
-    {
-      accessorKey: "appointment_local",
-      header: "Localização",
-      size: 250,
-      meta: { className: "w-[250px]" },
-      cell: ({ row }) => (
-        <div className="whitespace-pre-wrap lowercase text-muted-foreground">
-          {row.original.appointment_local || ""}
-        </div>
-      ),
-    },
-    {
-      accessorKey: "delivery_status",
-      header: "Delivery",
-      size: 100,
-      meta: { className: "w-[100px] uppercase" },
-      cell: ({ row }) => {
-        const order = row.original;
-        const status = order.delivery_status;
+          const link = `https://wa.me/${cleaned}?text=${encodedMessage}`;
 
-        const labels: React.ReactNode[] = [];
-        if (order.delivered_at) {
-          labels.push(<div key="env">Entregue: {format(parseISO(order.delivered_at), "dd/MM/yyyy 'às' HH:mm")}</div>);
-        }
-        if (order.collected_at) {
-          labels.push(<div key="col">Coletado: {format(parseISO(order.collected_at), "dd/MM/yyyy 'às' HH:mm")}</div>);
-        }
-
-        if (labels.length > 0) {
           return (
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span className="cursor-help border-b border-dashed border-muted-foreground">
-                    {status}
-                  </span>
+                  <a
+                    href={link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={handleClick}
+                  >
+                    <svg
+                      width="28"
+                      height="28"
+                      viewBox="0 0 32 32"
+                      className="text-primary hover:text-primary/80 fill-current transition-transform hover:scale-110"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d=" M19.11 17.205c-.372 0-1.088 1.39-1.518 1.39a.63.63 0 0 1-.315-.1c-.802-.402-1.504-.817-2.163-1.447-.545-.516-1.146-1.29-1.46-1.963a.426.426 0 0 1-.073-.215c0-.33.99-.945.99-1.49 0-.143-.73-2.09-.832-2.335-.143-.372-.214-.487-.6-.487-.187 0-.36-.043-.53-.043-.302 0-.53.115-.746.315-.688.645-1.032 1.318-1.06 2.264v.114c-.015.99.472 1.977 1.017 2.78 1.23 1.82 2.506 3.41 4.554 4.34.616.287 2.035.888 2.722.888.817 0 2.15-.515 2.478-1.318.13-.33.244-.73.244-1.088 0-.058 0-.144-.03-.215-.1-.172-2.434-1.39-2.678-1.39zm-2.908 7.593c-1.747 0-3.48-.53-4.942-1.49L7.793 24.41l1.132-3.337a8.955 8.955 0 0 1-1.72-5.272c0-4.955 4.04-8.995 8.997-8.995S25.2 10.845 25.2 15.8c0 4.958-4.04 8.998-8.998 8.998zm0-19.798c-5.96 0-10.8 4.842-10.8 10.8 0 1.964.53 3.898 1.546 5.574L5 27.176l5.974-1.92a10.807 10.807 0 0 0 16.03-9.455c0-5.958-4.842-10.8-10.802-10.8z"
+                        fillRule="evenodd"
+                      ></path>
+                    </svg>
+                  </a>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <div className="flex flex-col gap-1 text-xs">
-                    {labels}
-                  </div>
+                  {cleaned ? "Enviar mensagem via WhatsApp" : "Sem telefone"}
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
           );
-        }
-
-        return status;
+        },
       },
-    },
-    {
-      accessorKey: "issue_date",
-      header: "Emissão",
-      size: 110,
-      meta: { className: "w-[110px]" },
-      cell: ({ row }) =>
-        row.original.issue_date
-          ? format(parseISO(row.original.issue_date), "dd/MM/yyyy")
-          : "—",
-    },
-    {
-      accessorKey: "due_date",
-      header: "Vencimento",
-      size: 110,
-      meta: { className: "w-[110px]" },
-      cell: ({ row }) =>
-        row.original.due_date
-          ? format(parseISO(row.original.due_date), "dd/MM/yyyy")
-          : "—",
-    },
-    {
-      accessorKey: "payment_method",
-      header: "Tipo",
-      size: 80,
-      meta: { className: "w-[80px] uppercase" },
-      cell: ({ row }) => {
-        const method = row.original.payment_method;
 
-        // ✅ critério: boleto gerado quando tem boleto_id
-        const boletoGenerated = Boolean((row.original as any).boleto_id);
-
-        // só mostra tooltip pra boleto
-        if (method !== "Boleto") return method;
-
-        return (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="cursor-help">{method}</span>
-              </TooltipTrigger>
-
-              <TooltipContent>
-                {boletoGenerated
-                  ? "Boleto já gerado ✅"
-                  : "Boleto não gerado ⚠️"}
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        );
+      {
+        accessorKey: "products",
+        header: "Produtos",
+        size: 200,
+        meta: { className: "w-[300px]" },
+        cell: ({ row }) => (
+          <div className="leading-tight whitespace-pre-line break-words uppercase">
+            {row.original.products}
+          </div>
+        ),
       },
-    },
-    {
-      accessorKey: "payment_status",
-      header: "Pagamento",
-      size: 100,
-      meta: { className: "w-[100px] uppercase" },
-      filterFn: "equals",
-      cell: ({ row }) => {
-        const payment_status = row.original.payment_status;
-        return getTranslatedStatus({ source: "order", payment_status });
-      },
-    },
-    {
-      accessorKey: "remaining",
-      header: "Restante",
-      size: 100,
-      meta: { className: "w-[100px] text-right uppercase" },
-      cell: ({ row }) => {
-        const { total, total_payed } = row.original;
-        const remaining = total - (total_payed ?? 0);
-        return `R$ ${remaining.toFixed(2).replace(".", ",")}`;
-      },
-    },
-    {
-      accessorKey: "total",
-      header: "Total",
-      size: 100,
-      meta: { className: "w-[100px] text-right uppercase" },
-      cell: ({ row }) => {
-        const value = row.original.total;
-        return `R$ ${value.toFixed(2).replace(".", ",")}`;
-      },
-    },
-    {
-      id: "actions",
-      header: "",
-      size: 50,
-      meta: { className: "w-[50px]" },
-      cell: ({ row }) => {
-        return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-muted-foreground"
-              >
-                <IconDotsVertical size={16} />
-              </Button>
-            </DropdownMenuTrigger>
 
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem asChild>
-                <a
-                  href={`/dashboard/orders/${row.original.id}/view`}
-                  rel="noopener noreferrer"
-                  className="w-full text-left"
+      {
+        accessorKey: "text_note",
+        header: "Observação",
+        size: 250,
+        meta: { className: "w-[250px] truncate" },
+        cell: ({ row }) => (
+          <div className="whitespace-pre-wrap lowercase text-muted-foreground">
+            {row.original.text_note || ""}
+          </div>
+        ),
+      },
+      {
+        accessorKey: "appointment_local",
+        header: "Localização",
+        size: 250,
+        meta: { className: "w-[250px]" },
+        cell: ({ row }) => (
+          <div className="whitespace-pre-wrap lowercase text-muted-foreground">
+            {row.original.appointment_local || ""}
+          </div>
+        ),
+      },
+      {
+        accessorKey: "delivery_status",
+        header: "Delivery",
+        size: 100,
+        meta: { className: "w-[100px] uppercase" },
+        cell: ({ row }) => {
+          const order = row.original;
+          const status = order.delivery_status;
+
+          const labels: React.ReactNode[] = [];
+          if (order.delivered_at) {
+            labels.push(
+              <div key="env">
+                Entregue:{" "}
+                {format(parseISO(order.delivered_at), "dd/MM/yyyy 'às' HH:mm")}
+              </div>,
+            );
+          }
+          if (order.collected_at) {
+            labels.push(
+              <div key="col">
+                Coletado:{" "}
+                {format(parseISO(order.collected_at), "dd/MM/yyyy 'às' HH:mm")}
+              </div>,
+            );
+          }
+
+          if (labels.length > 0) {
+            return (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="cursor-help border-b border-dashed border-muted-foreground">
+                      {status}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <div className="flex flex-col gap-1 text-xs">{labels}</div>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            );
+          }
+
+          return status;
+        },
+      },
+      {
+        accessorKey: "issue_date",
+        header: "Emissão",
+        size: 110,
+        meta: { className: "w-[110px]" },
+        cell: ({ row }) =>
+          row.original.issue_date
+            ? format(parseISO(row.original.issue_date), "dd/MM/yyyy")
+            : "—",
+      },
+      {
+        accessorKey: "due_date",
+        header: "Vencimento",
+        size: 110,
+        meta: { className: "w-[110px]" },
+        cell: ({ row }) =>
+          row.original.due_date
+            ? format(parseISO(row.original.due_date), "dd/MM/yyyy")
+            : "—",
+      },
+      {
+        accessorKey: "payment_method",
+        header: "Tipo",
+        size: 80,
+        meta: { className: "w-[80px] uppercase" },
+        cell: ({ row }) => {
+          const method = row.original.payment_method;
+
+          // ✅ critério: boleto gerado quando tem boleto_id
+          const boletoGenerated = Boolean((row.original as any).boleto_id);
+
+          // só mostra tooltip pra boleto
+          if (method !== "Boleto") return method;
+
+          return (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="cursor-help">{method}</span>
+                </TooltipTrigger>
+
+                <TooltipContent>
+                  {boletoGenerated
+                    ? "Boleto já gerado ✅"
+                    : "Boleto não gerado ⚠️"}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          );
+        },
+      },
+      {
+        accessorKey: "payment_status",
+        header: "Pagamento",
+        size: 100,
+        meta: { className: "w-[100px] uppercase" },
+        filterFn: "equals",
+        cell: ({ row }) => {
+          const payment_status = row.original.payment_status;
+          return getTranslatedStatus({ source: "order", payment_status });
+        },
+      },
+      {
+        accessorKey: "remaining",
+        header: "Restante",
+        size: 100,
+        meta: { className: "w-[100px] text-right uppercase" },
+        cell: ({ row }) => {
+          const { total, total_payed } = row.original;
+          const remaining = total - (total_payed ?? 0);
+          return `R$ ${remaining.toFixed(2).replace(".", ",")}`;
+        },
+      },
+      {
+        accessorKey: "total",
+        header: "Total",
+        size: 100,
+        meta: { className: "w-[100px] text-right uppercase" },
+        cell: ({ row }) => {
+          const value = row.original.total;
+          return `R$ ${value.toFixed(2).replace(".", ",")}`;
+        },
+      },
+      {
+        id: "actions",
+        header: "",
+        size: 50,
+        meta: { className: "w-[50px]" },
+        cell: ({ row }) => {
+          return (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-muted-foreground"
                 >
-                  Ver Espelho
-                </a>
-              </DropdownMenuItem>
+                  <IconDotsVertical size={16} />
+                </Button>
+              </DropdownMenuTrigger>
 
-              <DropdownMenuItem
-                onClick={() => {
-                  setSelectedOrder(row.original);
-                  setIsPaymentOpen(true);
-                }}
-              >
-                Pagar
-              </DropdownMenuItem>
-              <EmitNfeMenuItem
-                orderId={row.original.id}
-                customerId={row.original.customer_id}
-                emitNfFromOrder={(row.original as any)?.emit_nf}
-                emitNfFromCustomer={
-                  (row.original as any)?.customer_rel?.emit_nf
-                }
-                showDebug={false}
-              />
-
-              {row.original.payment_method?.toLowerCase() === "boleto" && (
-                <GenerateBoletoButtons
-                  orderId={row.original.id}
-                  paymentMethod={row.original.payment_method}
-                  signatureData={row.original.customer_signature || ""}
-                  asDropdownItem
-                />
-              )}
-
-              <DropdownMenuSeparator />
-
-              {!row.original.customer_signature ? (
+              <DropdownMenuContent align="end">
                 <DropdownMenuItem asChild>
-                  <Link href={`/dashboard/orders/${row.original.id}/edit`}>
-                    Editar
-                  </Link>
+                  <a
+                    href={`/dashboard/orders/${row.original.id}/view`}
+                    rel="noopener noreferrer"
+                    className="w-full text-left"
+                  >
+                    Ver Espelho
+                  </a>
                 </DropdownMenuItem>
-              ) : (
+
                 <DropdownMenuItem
-                  disabled
-                  className="text-foreground text-sm tracking-tighter"
+                  onClick={() => {
+                    setSelectedOrder(row.original);
+                    setIsPaymentOpen(true);
+                  }}
                 >
-                  Edição bloqueada
+                  Pagar
                 </DropdownMenuItem>
-              )}
+                <EmitNfeMenuItem
+                  orderId={row.original.id}
+                  customerId={row.original.customer_id}
+                  emitNfFromOrder={(row.original as any)?.emit_nf}
+                  emitNfFromCustomer={
+                    (row.original as any)?.customer_rel?.emit_nf
+                  }
+                  showDebug={false}
+                />
 
-              <DropdownMenuItem
-                onClick={() => {
-                  fetchOrderProductsForReturnModal(row.original.id);
-                  setSelectedCustomer(row.original);
-                }}
-              >
-                Retornar Produto
-              </DropdownMenuItem>
+                {row.original.payment_method?.toLowerCase() === "boleto" && (
+                  <GenerateBoletoButtons
+                    orderId={row.original.id}
+                    paymentMethod={row.original.payment_method}
+                    signatureData={row.original.customer_signature || ""}
+                    asDropdownItem
+                  />
+                )}
 
-              <DropdownMenuItem
-              onClick={() => {
-                setDeliveryStatusOrder(row.original);
-                setNewDeliveryStatus(
-                  (row.original.delivery_status as "Entregar" | "Coletar" | "Coletado") ||
-                    "Entregar",
-                );
-                setIsDeliveryStatusModalOpen(true);
-              }}
-            >
-              Alterar Delivery
-            </DropdownMenuItem>
+                <DropdownMenuSeparator />
 
-              <DropdownMenuSeparator />
+                {!row.original.customer_signature ? (
+                  <DropdownMenuItem asChild>
+                    <Link href={`/dashboard/orders/${row.original.id}/edit`}>
+                      Editar
+                    </Link>
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem
+                    disabled
+                    className="text-foreground text-sm tracking-tighter"
+                  >
+                    Edição bloqueada
+                  </DropdownMenuItem>
+                )}
 
-              <DeleteOrderButton
-                id={row.original.id}
-                companyId={companyId}
-                table="orders"
-                asDropdownItem
-                onDeleted={() => {
-                  setOrders((prev) => prev.filter((o) => o.id !== row.original.id));
-                }}
-              />
-            </DropdownMenuContent>
-          </DropdownMenu>
-        );
+                <DropdownMenuItem
+                  onClick={() => {
+                    fetchOrderProductsForReturnModal(row.original.id);
+                    setSelectedCustomer(row.original);
+                  }}
+                >
+                  Retornar Produto
+                </DropdownMenuItem>
+
+                <DropdownMenuItem
+                  onClick={() => {
+                    setDeliveryStatusOrder(row.original);
+                    setNewDeliveryStatus(
+                      (row.original.delivery_status as
+                        | "Entregar"
+                        | "Coletar"
+                        | "Coletado") || "Entregar",
+                    );
+                    setIsDeliveryStatusModalOpen(true);
+                  }}
+                >
+                  Alterar Delivery
+                </DropdownMenuItem>
+
+                <DropdownMenuSeparator />
+
+                <DeleteOrderButton
+                  id={row.original.id}
+                  companyId={companyId}
+                  table="orders"
+                  asDropdownItem
+                  onDeleted={() => {
+                    setOrders((prev) =>
+                      prev.filter((o) => o.id !== row.original.id),
+                    );
+                  }}
+                />
+              </DropdownMenuContent>
+            </DropdownMenu>
+          );
+        },
       },
-    },
-     ], [orders, drivers, nfeStatusByOrderId]);
+    ],
+    [orders, drivers, nfeStatusByOrderId],
+  );
 
   const [rowSelection, setRowSelection] = React.useState({});
 
@@ -1369,23 +1402,23 @@ const columns = React.useMemo<CustomColumnDef<Order>[]>(() => [
   );
 
   const table = useReactTable<Order>({
-data: React.useMemo(() => {
-  return orders.filter((order) => {
-    if (!order.appointment_date) return false;
+    data: React.useMemo(() => {
+      return orders.filter((order) => {
+        if (!order.appointment_date) return false;
 
-    // motorista logado só vê pedidos dele
-    if (role === "driver" && order.driver_id !== user?.id) {
-      return false;
-    }
+        // motorista logado só vê pedidos dele
+        if (role === "driver" && order.driver_id !== user?.id) {
+          return false;
+        }
 
-    // filtro manual por motorista (admin)
-    if (selectedDriverId && order.driver_id !== selectedDriverId) {
-      return false;
-    }
+        // filtro manual por motorista (admin)
+        if (selectedDriverId && order.driver_id !== selectedDriverId) {
+          return false;
+        }
 
-    return order.appointment_date.startsWith(selectedMonth);
-  });
-}, [orders, selectedMonth, role, user, selectedDriverId]),
+        return order.appointment_date.startsWith(selectedMonth);
+      });
+    }, [orders, selectedMonth, role, user, selectedDriverId]),
     columns,
     state: {
       sorting,
@@ -1409,67 +1442,73 @@ data: React.useMemo(() => {
     getFacetedUniqueValues: getFacetedUniqueValues(),
   });
 
-const filteredSalesTotal = React.useMemo(() => {
-  return orders
-    .filter((order) => {
-      if (!order.due_date) return false;
+  const filteredSalesTotal = React.useMemo(() => {
+    return orders
+      .filter((order) => {
+        if (!order.due_date) return false;
 
-      if (!order.due_date.startsWith(selectedMonth)) return false;
+        if (!order.due_date.startsWith(selectedMonth)) return false;
 
-      if (role === "driver" && order.driver_id !== user?.id) {
-        return false;
-      }
+        if (role === "driver" && order.driver_id !== user?.id) {
+          return false;
+        }
 
-      if (selectedDriverId && order.driver_id !== selectedDriverId) {
-        return false;
-      }
+        if (selectedDriverId && order.driver_id !== selectedDriverId) {
+          return false;
+        }
 
-      const customerFilter = (
-        (table.getColumn("customer")?.getFilterValue() as string) ?? ""
-      )
-        .trim()
-        .toLowerCase();
+        const customerFilter = (
+          (table.getColumn("customer")?.getFilterValue() as string) ?? ""
+        )
+          .trim()
+          .toLowerCase();
 
-      if (customerFilter) {
-        const customer = String(order.customer ?? "").toLowerCase();
-        const noteNumber = String(order.note_number ?? "").toLowerCase();
+        if (customerFilter) {
+          const customer = String(order.customer ?? "").toLowerCase();
+          const noteNumber = String(order.note_number ?? "").toLowerCase();
+
+          if (
+            !customer.includes(customerFilter) &&
+            !noteNumber.includes(customerFilter)
+          ) {
+            return false;
+          }
+        }
+
+        const deliveryFilter = table
+          .getColumn("delivery_status")
+          ?.getFilterValue() as string | undefined;
+
+        if (deliveryFilter && order.delivery_status !== deliveryFilter) {
+          return false;
+        }
+
+        const paymentMethodFilter = table
+          .getColumn("payment_method")
+          ?.getFilterValue() as string | undefined;
 
         if (
-          !customer.includes(customerFilter) &&
-          !noteNumber.includes(customerFilter)
+          paymentMethodFilter &&
+          order.payment_method !== paymentMethodFilter
         ) {
           return false;
         }
-      }
 
-      const deliveryFilter = table.getColumn("delivery_status")?.getFilterValue() as
-        | string
-        | undefined;
+        const paymentStatusFilter = table
+          .getColumn("payment_status")
+          ?.getFilterValue() as string | undefined;
 
-      if (deliveryFilter && order.delivery_status !== deliveryFilter) {
-        return false;
-      }
+        if (
+          paymentStatusFilter &&
+          order.payment_status !== paymentStatusFilter
+        ) {
+          return false;
+        }
 
-      const paymentMethodFilter = table.getColumn("payment_method")?.getFilterValue() as
-        | string
-        | undefined;
-
-      if (paymentMethodFilter && order.payment_method !== paymentMethodFilter) {
-        return false;
-      }
-
-      const paymentStatusFilter = table.getColumn("payment_status")?.getFilterValue() as
-        | string
-        | undefined;
-
-      if (paymentStatusFilter && order.payment_status !== paymentStatusFilter) {
-        return false;
-      }
-
-      return true;
-    })
-    .reduce((sum, order) => sum + Number(order.total ?? 0), 0);
-}, [orders, selectedMonth, role, user, selectedDriverId, table]);
+        return true;
+      })
+      .reduce((sum, order) => sum + Number(order.total ?? 0), 0);
+  }, [orders, selectedMonth, role, user, selectedDriverId, table]);
 
   const formattedFilteredSalesTotal = React.useMemo(() => {
     return filteredSalesTotal.toLocaleString("pt-BR", {
@@ -1478,18 +1517,18 @@ const filteredSalesTotal = React.useMemo(() => {
     });
   }, [filteredSalesTotal]);
 
-function handleDateSortChange(value: string) {
-  switch (value) {
-    case "date_asc":
-      setSorting([{ id: "appointment_date", desc: false }]);
-      break;
+  function handleDateSortChange(value: string) {
+    switch (value) {
+      case "date_asc":
+        setSorting([{ id: "appointment_date", desc: false }]);
+        break;
 
-    case "default":
-    default:
-      setSorting([{ id: "appointment_date", desc: true }]);
-      break;
+      case "default":
+      default:
+        setSorting([{ id: "appointment_date", desc: true }]);
+        break;
+    }
   }
-}
 
   function toLocalISODate(d: Date) {
     return format(d, "yyyy-MM-dd"); // sem UTC, sem shift
@@ -1532,16 +1571,90 @@ function handleDateSortChange(value: string) {
       });
   }
 
-function clearAllFilters() {
-  table.resetColumnFilters();
-  setSorting([{ id: "appointment_date", desc: true }]);
-  setDateRange([null, null]);
-  setissueDateFilter(null);
-  setSelectedDate(undefined);
-  setDateInput("");
-  setSelectedDriverId(null);
-  table.setPageIndex(0);
-}
+  function clearAllFilters() {
+    table.resetColumnFilters();
+    setSorting([{ id: "appointment_date", desc: true }]);
+    setDateRange([null, null]);
+    setissueDateFilter(null);
+    setSelectedDate(undefined);
+    setDateInput("");
+    setSelectedDriverId(null);
+    table.setPageIndex(0);
+  }
+
+  const exportToPDF = () => {
+    try {
+      const doc = new jsPDF("l", "mm", "a4");
+      const filteredRows = table.getFilteredRowModel().rows;
+
+      if (filteredRows.length === 0) {
+        toast.error("Não há dados filtrados para exportar.");
+        return;
+      }
+
+      // Título e Meta
+      doc.setFontSize(18);
+      doc.text("Relatório de Vendas - Chopp Hub", 14, 15);
+
+      doc.setFontSize(10);
+      doc.setTextColor(100);
+      const periodStr = selectedMonth
+        ? `Mês de Referência: ${selectedMonth}`
+        : "";
+      const dateStr = `Gerado em: ${new Date().toLocaleString("pt-BR")}`;
+      doc.text(`${periodStr} | ${dateStr}`, 14, 22);
+
+      const tableData = filteredRows.map((row) => {
+        const order = row.original;
+        const [year, month, day] = (order.appointment_date || "").split("-");
+        const dateFormatted = day ? `${day}/${month}/${year}` : "—";
+
+        return [
+          dateFormatted,
+          order.appointment_hour || "—",
+          String(order.customer || "").toUpperCase(),
+          String(order.products || "").toUpperCase(),
+          order.payment_method || "—",
+          order.payment_status === "Paid" ? "PAGO" : "PENDENTE",
+          String(order.delivery_status || "—").toUpperCase(),
+          Number(order.total || 0).toLocaleString("pt-BR", {
+            style: "currency",
+            currency: "BRL",
+          }),
+        ];
+      });
+
+      autoTable(doc, {
+        startY: 28,
+        head: [
+          [
+            "DATA",
+            "HORA",
+            "CLIENTE",
+            "PRODUTOS",
+            "PAGAMENTO",
+            "STATUS PAG.",
+            "STATUS ENTREGA",
+            "TOTAL",
+          ],
+        ],
+        body: tableData,
+        theme: "striped",
+        headStyles: { fillColor: [0, 112, 243], textColor: 255 },
+        styles: { fontSize: 8, cellPadding: 2 },
+        columnStyles: {
+          3: { cellWidth: 60 }, // Produtos mais largo
+          2: { cellWidth: 40 }, // Cliente
+        },
+      });
+
+      doc.save(`vendas_${selectedMonth || "geral"}.pdf`);
+      toast.success("PDF gerado com sucesso!");
+    } catch (error) {
+      console.error("Erro ao gerar PDF:", error);
+      toast.error("Erro ao gerar relatório em PDF.");
+    }
+  };
 
   const futureReservations = React.useMemo(() => {
     return orders.filter((order) => {
@@ -1552,103 +1665,99 @@ function clearAllFilters() {
   }, [orders]);
 
   async function updateDeliveryStatusManually() {
-  if (!deliveryStatusOrder) return;
+    if (!deliveryStatusOrder) return;
 
-  try {
-    setIsUpdatingDeliveryStatus(true);
+    try {
+      setIsUpdatingDeliveryStatus(true);
 
-    const updates: any = { delivery_status: newDeliveryStatus };
-    const nowISO = new Date().toISOString();
-    
-    if (newDeliveryStatus === "Coletar") {
-      updates.delivered_at = nowISO;
-    } else if (newDeliveryStatus === "Coletado") {
-      updates.collected_at = nowISO;
-    }
+      const updates: any = { delivery_status: newDeliveryStatus };
+      const nowISO = new Date().toISOString();
 
-    const { error } = await supabase
-      .from("orders")
-      .update(updates)
-      .eq("id", deliveryStatusOrder.id)
-      .eq("company_id", companyId);
+      if (newDeliveryStatus === "Coletar") {
+        updates.delivered_at = nowISO;
+      } else if (newDeliveryStatus === "Coletado") {
+        updates.collected_at = nowISO;
+      }
 
-    if (error) {
-      console.error("Erro ao atualizar delivery_status:", error);
-      toast.error("Erro ao atualizar status de entrega.");
-      return;
-    }
+      const { error } = await supabase
+        .from("orders")
+        .update(updates)
+        .eq("id", deliveryStatusOrder.id)
+        .eq("company_id", companyId);
 
-    setOrders((prev) =>
-      prev.map((order) =>
-        order.id === deliveryStatusOrder.id
-          ? { ...order, ...updates }
-          : order,
-      ),
-    );
-
-    if (selectedCustomer?.id === deliveryStatusOrder.id) {
-      setSelectedCustomer((prev) =>
-        prev ? { ...prev, ...updates } : prev,
-      );
-    }
-
-    toast.success("Status de entrega atualizado com sucesso!");
-    setIsDeliveryStatusModalOpen(false);
-    setDeliveryStatusOrder(null);
-  } catch (err) {
-    console.error(err);
-    toast.error("Erro inesperado ao atualizar status.");
-  } finally {
-    setIsUpdatingDeliveryStatus(false);
-  }
-}
-
-async function handleDeliveryStatusUpdate() {
-  if (!selectedCustomer) return;
-
-  let nextStatus: "Coletar" | "Coletado" | null = null;
-
-  if (selectedCustomer.delivery_status === "Entregar") {
-    nextStatus = "Coletar";
-  } else if (selectedCustomer.delivery_status === "Coletar") {
-    nextStatus = "Coletado";
-  }
-
-  if (nextStatus) {
-    const updates: any = { delivery_status: nextStatus };
-    const nowISO = new Date().toISOString();
-    
-    if (nextStatus === "Coletar") {
-      updates.delivered_at = nowISO;
-    } else if (nextStatus === "Coletado") {
-      updates.collected_at = nowISO;
-    }
-
-    const { error } = await supabase
-      .from("orders")
-      .update(updates)
-      .eq("id", selectedCustomer.id)
-      .eq("company_id", companyId);
-
-    if (!error) {
-      setSelectedCustomer({
-        ...selectedCustomer,
-        ...updates,
-      });
+      if (error) {
+        console.error("Erro ao atualizar delivery_status:", error);
+        toast.error("Erro ao atualizar status de entrega.");
+        return;
+      }
 
       setOrders((prev) =>
         prev.map((order) =>
-          order.id === selectedCustomer.id
+          order.id === deliveryStatusOrder.id
             ? { ...order, ...updates }
             : order,
         ),
       );
-    } else {
-      toast.error("Erro ao atualizar status.");
-      console.error(error);
+
+      if (selectedCustomer?.id === deliveryStatusOrder.id) {
+        setSelectedCustomer((prev) => (prev ? { ...prev, ...updates } : prev));
+      }
+
+      toast.success("Status de entrega atualizado com sucesso!");
+      setIsDeliveryStatusModalOpen(false);
+      setDeliveryStatusOrder(null);
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro inesperado ao atualizar status.");
+    } finally {
+      setIsUpdatingDeliveryStatus(false);
     }
   }
-}
+
+  async function handleDeliveryStatusUpdate() {
+    if (!selectedCustomer) return;
+
+    let nextStatus: "Coletar" | "Coletado" | null = null;
+
+    if (selectedCustomer.delivery_status === "Entregar") {
+      nextStatus = "Coletar";
+    } else if (selectedCustomer.delivery_status === "Coletar") {
+      nextStatus = "Coletado";
+    }
+
+    if (nextStatus) {
+      const updates: any = { delivery_status: nextStatus };
+      const nowISO = new Date().toISOString();
+
+      if (nextStatus === "Coletar") {
+        updates.delivered_at = nowISO;
+      } else if (nextStatus === "Coletado") {
+        updates.collected_at = nowISO;
+      }
+
+      const { error } = await supabase
+        .from("orders")
+        .update(updates)
+        .eq("id", selectedCustomer.id)
+        .eq("company_id", companyId);
+
+      if (!error) {
+        setSelectedCustomer({
+          ...selectedCustomer,
+          ...updates,
+        });
+
+        setOrders((prev) =>
+          prev.map((order) =>
+            order.id === selectedCustomer.id ? { ...order, ...updates } : order,
+          ),
+        );
+      } else {
+        toast.error("Erro ao atualizar status.");
+        console.error(error);
+      }
+    }
+  }
 
   async function fetchOrderProductsForReturnModal(orderId: string) {
     const { data, error } = await supabase
@@ -1721,29 +1830,27 @@ async function handleDeliveryStatusUpdate() {
   }, [selectedCustomer]);
 
   useEffect(() => {
-  const [start, end] = dateRange;
+    const [start, end] = dateRange;
 
-  if (start && end) {
-    table.getColumn("appointment_date")?.setFilterValue({
-      from: toLocalISODate(start),
-      to: toLocalISODate(end),
-    });
-  } else {
-    table.getColumn("appointment_date")?.setFilterValue(undefined);
-  }
-}, [dateRange, table]);
+    if (start && end) {
+      table.getColumn("appointment_date")?.setFilterValue({
+        from: toLocalISODate(start),
+        to: toLocalISODate(end),
+      });
+    } else {
+      table.getColumn("appointment_date")?.setFilterValue(undefined);
+    }
+  }, [dateRange, table]);
 
   const sortValue =
-  sorting.length && sorting[0]?.id === "appointment_date"
-    ? sorting[0].desc
-      ? "default"
-      : "date_asc"
-    : "default";
+    sorting.length && sorting[0]?.id === "appointment_date"
+      ? sorting[0].desc
+        ? "default"
+        : "date_asc"
+      : "default";
 
-    const driverFilterValue =
-  role === "driver"
-    ? (user?.id ?? "all")
-    : (selectedDriverId ?? "all");
+  const driverFilterValue =
+    role === "driver" ? (user?.id ?? "all") : (selectedDriverId ?? "all");
 
   useEffect(() => {
     if (!companyId) return;
@@ -1822,13 +1929,13 @@ async function handleDeliveryStatusUpdate() {
     }
   };
 
-const handleFilter = (range: [Date | null, Date | null]) => {
-  setDateRange(range);
-};
+  const handleFilter = (range: [Date | null, Date | null]) => {
+    setDateRange(range);
+  };
 
-const clearFilter = () => {
-  setDateRange([null, null]);
-};
+  const clearFilter = () => {
+    setDateRange([null, null]);
+  };
 
   if (loading) {
     return <TableSkeleton />;
@@ -1863,7 +1970,7 @@ const clearFilter = () => {
       <div className="w-full flex justify-between items-start px-4 lg:px-6 my-2">
         <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3">
           <h2 className="text-xl font-bold">Vendas</h2>
-          {canViewFinancial(safeRole) &&  (
+          {canViewFinancial(safeRole) && (
             <Badge variant="secondary" className="text-sm w-fit">
               Total:{formattedFilteredSalesTotal}
             </Badge>
@@ -1901,44 +2008,54 @@ const clearFilter = () => {
             </DropdownMenuContent>
           </DropdownMenu>
 
-{canCreateOrder(safeRole) ? (
-  <Link href="/dashboard/orders/add">
-    <Button
-      variant="default"
-      size="sm"
-      className="min-w-[100px] bg-primary text-primary-foreground hover:bg-primary/90"
-    >
-      <IconPlus className="mr-1" />
-      <span className="hidden sm:inline">Venda</span>
-    </Button>
-  </Link>
-) : (
-  <TooltipProvider>
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span>
           <Button
-            variant="default"
+            variant="outline"
             size="sm"
-            disabled
-            className="min-w-[100px] bg-primary text-primary-foreground opacity-50 cursor-not-allowed"
+            onClick={exportToPDF}
+            className="min-w-[100px]"
           >
-            <IconPlus className="mr-1" />
-            <span className="hidden sm:inline">Venda</span>
+            <IconFileDescription className="mr-1 h-4 w-4" />
+            <span className="hidden sm:inline">Download PDF</span>
           </Button>
-        </span>
-      </TooltipTrigger>
-      <TooltipContent>
-        Apenas administradores podem criar vendas
-      </TooltipContent>
-    </Tooltip>
-  </TooltipProvider>
-)}
+
+          {canCreateOrder(safeRole) ? (
+            <Link href="/dashboard/orders/add">
+              <Button
+                variant="default"
+                size="sm"
+                className="min-w-[100px] bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                <IconPlus className="mr-1" />
+                <span className="hidden sm:inline">Venda</span>
+              </Button>
+            </Link>
+          ) : (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      disabled
+                      className="min-w-[100px] bg-primary text-primary-foreground opacity-50 cursor-not-allowed"
+                    >
+                      <IconPlus className="mr-1" />
+                      <span className="hidden sm:inline">Venda</span>
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  Apenas administradores podem criar vendas
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
         </div>
       </div>
-<div className="grid gap-2 px-4 lg:px-6 py-2 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 items-center">
+      <div className="grid gap-2 px-4 lg:px-6 py-2 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 items-center">
         {/* Filtro por data */}
-<div className="relative w-full min-w-0 z-50">
+        <div className="relative w-full min-w-0 z-50">
           <DatePicker
             selectsRange
             startDate={startDate}
@@ -2001,32 +2118,32 @@ const clearFilter = () => {
         </Select>
 
         {/* Filtro motorista */}
-<Select
-  value={driverFilterValue}
-  onValueChange={(value) => {
-    if (role === "driver") return;
-    setSelectedDriverId(value === "all" ? null : value);
-  }}
-  disabled={role === "driver"}
->
-  <SelectTrigger
-    className={`w-full ${
-      driverFilterValue === "all" ? "text-muted-foreground" : ""
-    }`}
-  >
-    <SelectValue placeholder="Motorista" />
-  </SelectTrigger>
+        <Select
+          value={driverFilterValue}
+          onValueChange={(value) => {
+            if (role === "driver") return;
+            setSelectedDriverId(value === "all" ? null : value);
+          }}
+          disabled={role === "driver"}
+        >
+          <SelectTrigger
+            className={`w-full ${
+              driverFilterValue === "all" ? "text-muted-foreground" : ""
+            }`}
+          >
+            <SelectValue placeholder="Motorista" />
+          </SelectTrigger>
 
-  <SelectContent>
-    <SelectItem value="all">Todos motoristas</SelectItem>
+          <SelectContent>
+            <SelectItem value="all">Todos motoristas</SelectItem>
 
-    {drivers.map((driver) => (
-      <SelectItem key={driver.id} value={driver.id}>
-        {driver.name}
-      </SelectItem>
-    ))}
-  </SelectContent>
-</Select>
+            {drivers.map((driver) => (
+              <SelectItem key={driver.id} value={driver.id}>
+                {driver.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
         {/* Tipo de pagamento */}
         <Select
@@ -2074,31 +2191,24 @@ const clearFilter = () => {
             <SelectItem value="Partial">Parcial</SelectItem>
           </SelectContent>
         </Select>
-        <Select
-  value={sortValue}
-  onValueChange={handleDateSortChange}
->
-  <SelectTrigger
-    className={`w-full ${
-      sortValue === "default" ? "text-muted-foreground" : ""
-    }`}
-  >
-    <SelectValue placeholder="Ordenar" />
-  </SelectTrigger>
+        <Select value={sortValue} onValueChange={handleDateSortChange}>
+          <SelectTrigger
+            className={`w-full ${
+              sortValue === "default" ? "text-muted-foreground" : ""
+            }`}
+          >
+            <SelectValue placeholder="Ordenar" />
+          </SelectTrigger>
 
-  <SelectContent>
-    <SelectItem value="default">Data decrescente</SelectItem>
-    <SelectItem value="date_asc">Data crescente</SelectItem>
-  </SelectContent>
-</Select>
-<Button
-  variant="outline"
-  className="w-full"
-  onClick={clearAllFilters}
->
-  <IconTrash className="mr-2 h-4 w-4" />
-  Limpar filtros
-</Button>
+          <SelectContent>
+            <SelectItem value="default">Data decrescente</SelectItem>
+            <SelectItem value="date_asc">Data crescente</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button variant="outline" className="w-full" onClick={clearAllFilters}>
+          <IconTrash className="mr-2 h-4 w-4" />
+          Limpar filtros
+        </Button>
       </div>
 
       <Tabs
@@ -2335,18 +2445,26 @@ const clearFilter = () => {
                             if (
                               selectedCustomer.delivery_status === "Entregar"
                             ) {
-                              const equipmentItems = await fetchEquipmentsForOrder(
-                                selectedCustomer.id,
-                                companyId,
-                              ); 
+                              const equipmentItems =
+                                await fetchEquipmentsForOrder(
+                                  selectedCustomer.id,
+                                  companyId,
+                                );
                               const customerQuery = selectedCustomer.customer_id
-                                ? supabase.from("customers").select("id, name").eq("id", selectedCustomer.customer_id)
-                                : supabase.from("customers").select("id, name").eq("name", selectedCustomer.customer).eq("company_id", companyId);
+                                ? supabase
+                                    .from("customers")
+                                    .select("id, name")
+                                    .eq("id", selectedCustomer.customer_id)
+                                : supabase
+                                    .from("customers")
+                                    .select("id, name")
+                                    .eq("name", selectedCustomer.customer)
+                                    .eq("company_id", companyId);
 
                               const {
                                 data: matchingCustomer,
                                 error: customerError,
-                              } = await customerQuery.maybeSingle(); 
+                              } = await customerQuery.maybeSingle();
 
                               if (!matchingCustomer || customerError) {
                                 toast.error(
@@ -2365,8 +2483,15 @@ const clearFilter = () => {
                               selectedCustomer.delivery_status === "Coletar"
                             ) {
                               const customerQuery = selectedCustomer.customer_id
-                                ? supabase.from("customers").select("id, name").eq("id", selectedCustomer.customer_id)
-                                : supabase.from("customers").select("id, name").eq("name", selectedCustomer.customer).eq("company_id", companyId);
+                                ? supabase
+                                    .from("customers")
+                                    .select("id, name")
+                                    .eq("id", selectedCustomer.customer_id)
+                                : supabase
+                                    .from("customers")
+                                    .select("id, name")
+                                    .eq("name", selectedCustomer.customer)
+                                    .eq("company_id", companyId);
 
                               const {
                                 data: matchingCustomer,
@@ -2387,7 +2512,7 @@ const clearFilter = () => {
                                 )
                                 .eq("customer_id", matchingCustomer.id)
                                 .eq("company_id", companyId)
-                                .eq("status", "active");  
+                                .eq("status", "active");
 
                               if (error || !loans) {
                                 toast.error(
@@ -2577,54 +2702,56 @@ const clearFilter = () => {
       )}
 
       <Dialog
-  open={isDeliveryStatusModalOpen}
-  onOpenChange={setIsDeliveryStatusModalOpen}
->
-  <DialogContent>
-    <DialogHeader>
-      <DialogTitle>Alterar status de entrega</DialogTitle>
-    </DialogHeader>
-
-    <div className="space-y-4">
-      <div className="text-sm text-muted-foreground">
-        Pedido: <strong>{deliveryStatusOrder?.note_number || "—"}</strong>
-        <br />
-        Cliente: <strong>{deliveryStatusOrder?.customer || "—"}</strong>
-      </div>
-
-      <Select
-        value={newDeliveryStatus}
-        onValueChange={(value) =>
-          setNewDeliveryStatus(value as "Entregar" | "Coletar" | "Coletado")
-        }
+        open={isDeliveryStatusModalOpen}
+        onOpenChange={setIsDeliveryStatusModalOpen}
       >
-        <SelectTrigger className="w-full">
-          <SelectValue placeholder="Selecione o status" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="Entregar">Entregar</SelectItem>
-          <SelectItem value="Coletar">Coletar</SelectItem>
-          <SelectItem value="Coletado">Coletado</SelectItem>
-        </SelectContent>
-      </Select>
-    </div>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Alterar status de entrega</DialogTitle>
+          </DialogHeader>
 
-    <DialogFooter>
-      <Button
-        variant="outline"
-        onClick={() => setIsDeliveryStatusModalOpen(false)}
-      >
-        Cancelar
-      </Button>
-      <Button
-        onClick={updateDeliveryStatusManually}
-        disabled={isUpdatingDeliveryStatus}
-      >
-        {isUpdatingDeliveryStatus ? "Salvando..." : "Salvar"}
-      </Button>
-    </DialogFooter>
-  </DialogContent>
-</Dialog>
+          <div className="space-y-4">
+            <div className="text-sm text-muted-foreground">
+              Pedido: <strong>{deliveryStatusOrder?.note_number || "—"}</strong>
+              <br />
+              Cliente: <strong>{deliveryStatusOrder?.customer || "—"}</strong>
+            </div>
+
+            <Select
+              value={newDeliveryStatus}
+              onValueChange={(value) =>
+                setNewDeliveryStatus(
+                  value as "Entregar" | "Coletar" | "Coletado",
+                )
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Selecione o status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Entregar">Entregar</SelectItem>
+                <SelectItem value="Coletar">Coletar</SelectItem>
+                <SelectItem value="Coletado">Coletado</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsDeliveryStatusModalOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={updateDeliveryStatusManually}
+              disabled={isUpdatingDeliveryStatus}
+            >
+              {isUpdatingDeliveryStatus ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

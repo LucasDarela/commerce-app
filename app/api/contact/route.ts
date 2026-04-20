@@ -47,7 +47,7 @@ export async function POST(req: Request) {
 
     // 2. Envia o e-mail via Resend
     const { data, error } = await resend.emails.send({
-      from: `Chopp Hub Contato <suporte@chopphub.com>`,
+      from: `${name} (${email}) <suporte@chopphub.com>`,
       to: [recipientEmail],
       subject: `Mensagem de ${name} - Contato Site`,
       replyTo: email,
