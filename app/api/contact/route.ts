@@ -5,7 +5,7 @@ import { Resend } from "resend";
 const resend = new Resend(process.env.RESEND_API_KEY);
 // Usamos uma variável específica para não dar conflito com o sistema de NFe/Boletos
 const recipientEmail =
-  process.env.CONTACT_FORM_RECIPIENT || "lucasdarela@live.com";
+  process.env.CONTACT_FORM_RECIPIENT || "suporte@chopphub.com";
 
 export async function POST(req: Request) {
   try {
