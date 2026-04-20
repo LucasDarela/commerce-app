@@ -58,23 +58,26 @@ export function SectionCards() {
         ordersCurrent,
         ordersLast,
         inputsCurrent,
+        outputsCurrent,
+        inputsLast,
+        outputsLast,
         customersRes,
       ] = await Promise.all([
-        // Pedidos do mês atual
+        // Pedidos do mês atual (vencimento)
         supabase
           .from("orders")
           .select("id, total, total_payed, payment_status, customer_id")
           .eq("company_id", companyId)
-          .gte("issue_date", fmt(startOfMonth))
-          .lt("issue_date", fmt(startOfNextMonth)),
+          .gte("due_date", fmt(startOfMonth))
+          .lt("due_date", fmt(startOfNextMonth)),
 
-        // Pedidos do mês anterior
+        // Pedidos do mês anterior (vencimento)
         supabase
           .from("orders")
           .select("total, total_payed, payment_status")
           .eq("company_id", companyId)
-          .gte("issue_date", fmt(startOfLastMonth))
-          .lt("issue_date", fmt(startOfMonth)),
+          .gte("due_date", fmt(startOfLastMonth))
+          .lt("due_date", fmt(startOfMonth)),
 
         // Despesas do mês (registros financeiros de entrada = custo)
         supabase
@@ -82,16 +85,43 @@ export function SectionCards() {
           .select("amount")
           .eq("company_id", companyId)
           .eq("type", "input")
-          .gte("issue_date", fmt(startOfMonth))
-          .lt("issue_date", fmt(startOfNextMonth)),
+          .gte("due_date", fmt(startOfMonth))
+          .lt("due_date", fmt(startOfNextMonth)),
+
+        // Receitas financeiras extras do mês (registros financeiros de saída = receita)
+        supabase
+          .from("financial_records")
+          .select("amount")
+          .eq("company_id", companyId)
+          .eq("type", "output")
+          .gte("due_date", fmt(startOfMonth))
+          .lt("due_date", fmt(startOfNextMonth)),
+
+        // Despesas do mês anterior
+        supabase
+          .from("financial_records")
+          .select("amount")
+          .eq("company_id", companyId)
+          .eq("type", "input")
+          .gte("due_date", fmt(startOfLastMonth))
+          .lt("due_date", fmt(startOfMonth)),
+
+        // Receitas financeiras extras do mês anterior
+        supabase
+          .from("financial_records")
+          .select("amount")
+          .eq("company_id", companyId)
+          .eq("type", "output")
+          .gte("due_date", fmt(startOfLastMonth))
+          .lt("due_date", fmt(startOfMonth)),
 
         // IDs dos pedidos do mês para buscar order_items
         supabase
           .from("orders")
           .select("customer_id")
           .eq("company_id", companyId)
-          .gte("issue_date", fmt(startOfMonth))
-          .lt("issue_date", fmt(startOfNextMonth))
+          .gte("due_date", fmt(startOfMonth))
+          .lt("due_date", fmt(startOfNextMonth))
           .not("customer_id", "is", null),
       ]);
 
@@ -145,13 +175,22 @@ export function SectionCards() {
       const orders = ordersCurrent.data ?? [];
       const ordersAnt = ordersLast.data ?? [];
       const inputs = inputsCurrent.data ?? [];
+      const outputs = outputsCurrent.data ?? [];
+      const inputsAnt = inputsLast.data ?? [];
+      const outputsAnt = outputsLast.data ?? [];
 
-      const totalReceber = orders.reduce((sum: number, o: any) => sum + Number(o.total ?? 0), 0);
+      const totalVendas = orders.reduce((sum: number, o: any) => sum + Number(o.total ?? 0), 0);
+      const totalFinanceiroSaida = outputs.reduce((sum: number, o: any) => sum + Number(o.amount ?? 0), 0);
+      const totalReceber = totalVendas + totalFinanceiroSaida;
+
       const totalPagar = inputs.reduce((sum: number, i: any) => sum + Number(i.amount ?? 0), 0);
       const receitaAtual = totalReceber - totalPagar;
 
-      const totalReceberAnt = ordersAnt.reduce((sum: number, o: any) => sum + Number(o.total ?? 0), 0);
-      const totalPagarAnt = 0; // não buscamos despesas anteriores para simplicidade
+      const totalVendasAnt = ordersAnt.reduce((sum: number, o: any) => sum + Number(o.total ?? 0), 0);
+      const totalFinanceiroSaidaAnt = outputsAnt.reduce((sum: number, o: any) => sum + Number(o.amount ?? 0), 0);
+      const totalReceberAnt = totalVendasAnt + totalFinanceiroSaidaAnt;
+
+      const totalPagarAnt = inputsAnt.reduce((sum: number, i: any) => sum + Number(i.amount ?? 0), 0);
       const receitaAnterior = totalReceberAnt - totalPagarAnt;
 
       // Clientes únicos
@@ -160,7 +199,7 @@ export function SectionCards() {
       );
 
       // Ticket médio
-      const ticketMedio = orders.length > 0 ? totalReceber / orders.length : 0;
+      const ticketMedio = orders.length > 0 ? totalVendas / orders.length : 0;
 
       // Pedidos mês anterior
       const pedidosMesAnterior = ordersAnt.length;

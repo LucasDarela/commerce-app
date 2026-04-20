@@ -105,7 +105,6 @@ useEffect(() => {
 }, [companyId, supabase]);
 
   // === 1. Auto-Polling: notas em processamento E notas autorizadas sem links ===
-  // Map: invoiceId → número de falhas consecutivas. Após MAX_RETRIES, para de tentar.
   const fetchLinksFailures = useRef<Map<string, number>>(new Map());
   const MAX_LINK_RETRIES = 3;
 
@@ -114,8 +113,6 @@ useEffect(() => {
 
     const processingInvoices = invoices.filter((i) => isProcessing(i.status));
 
-    // Notas mais antigas que 30 dias provavelmente não existirão mais na Focus NFe;
-    // só tentamos buscar links de notas recentes para evitar 502 em loop.
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -123,20 +120,17 @@ useEffect(() => {
       (i) =>
         isAuthorized(i.status) &&
         (!i.danfe_url || !i.xml_url) &&
-        // Só notas criadas nos últimos 30 dias
         new Date(i.created_at) >= thirtyDaysAgo &&
-        // Só inclui notas que ainda não esgotaram as tentativas
         (fetchLinksFailures.current.get(i.id) ?? 0) < MAX_LINK_RETRIES,
     );
 
     if (processingInvoices.length === 0 && authorizedWithoutLinks.length === 0)
       return;
 
-    // Ref para contrôle de chamadas em andamento (evita sobreposicao)
     const inFlight = new Set<string>();
 
-    const intervalId = setInterval(() => {
-      // Polling de status apenas para notas que REALMENTE estão processando
+    const checkStatuses = async () => {
+      // Polling de status para notas processando
       processingInvoices.forEach(async (inv) => {
         try {
           await fetch("/api/nfe/status", {
@@ -147,7 +141,7 @@ useEffect(() => {
         } catch (_) {}
       });
 
-      // Busca automática de links apenas para notas RECENTES e com poucas tentativas
+      // Busca automática de links para notas autorizadas sem links
       authorizedWithoutLinks.forEach(async (inv) => {
         if (inFlight.has(inv.id)) return;
         const fails = fetchLinksFailures.current.get(inv.id) ?? 0;
@@ -164,14 +158,19 @@ useEffect(() => {
               invoiceId: inv.id,
             }),
           });
-          // Nota: O Realtime se encarrega de atualizar a UI quando o banco mudar
         } catch (_) {
           fetchLinksFailures.current.set(inv.id, fails + 1);
         } finally {
           inFlight.delete(inv.id);
         }
       });
-    }, 20000); // Aumentado para 20 segundos (Redução de 60% nas chamadas de polling)
+    };
+
+    // Executa imediatamente a primeira vez
+    checkStatuses();
+
+    // Define o intervalo (reduzido para 8 segundos para maior agilidade)
+    const intervalId = setInterval(checkStatuses, 8000);
 
     return () => clearInterval(intervalId);
   }, [companyId, invoices]);

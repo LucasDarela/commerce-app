@@ -146,6 +146,7 @@ const isSN = crt === 1 || crt === 2 || crt === 4;
 
     presenca_comprador: invoiceData.presenca_comprador,
     serie: invoiceData.serie ?? "1",
+    url_notificacao: `${process.env.NEXT_PUBLIC_APP_URL || ""}/api/nfe/webhook`,
 
     // 👈 AQUI: envie o ARRAY completo
     itens: items.map((it, idx) => ({
