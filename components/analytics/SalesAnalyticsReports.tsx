@@ -16,6 +16,9 @@ import { Badge } from "@/components/ui/badge";
 import { format, parseISO, startOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
+import { PDFDownloadLink } from "@react-pdf/renderer";
+import { OverdueReceivablesPDF } from "@/components/pdf/OverdueReceivablesPDF";
+import { GenericReportPDF } from "@/components/pdf/GenericReportPDF";
 import {
   BarChart,
   Bar,
@@ -58,6 +61,19 @@ export function OverdueReceivablesReport({ companyId, startDate, endDate, custom
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<any[]>([]);
+  const [triggerDownload, setTriggerDownload] = useState(false);
+
+  useEffect(() => {
+    const handleDownload = () => {
+      setTriggerDownload(true);
+    };
+
+    window.addEventListener("download-overdue-receivables-report", handleDownload);
+
+    return () => {
+      window.removeEventListener("download-overdue-receivables-report", handleDownload);
+    };
+  }, []);
 
   useEffect(() => {
     async function fetchData() {
@@ -92,8 +108,36 @@ export function OverdueReceivablesReport({ companyId, startDate, endDate, custom
 
   if (loading) return <TableSkeleton />;
 
+  const totalPending = rows.reduce((acc, r) => acc + (Number(r.total || 0) - Number(r.total_payed || 0)), 0);
+
   return (
     <Card className="border-red-200">
+      {triggerDownload && (
+        <div className="hidden">
+          <PDFDownloadLink
+            document={
+              <OverdueReceivablesPDF
+                rows={rows}
+                startDate={startDate}
+                endDate={endDate}
+                summary={{
+                  totalPending,
+                  count: rows.length,
+                }}
+              />
+            }
+            fileName={`relatorio-contas-receber-vencidas-${startDate}${endDate ? `-ate-${endDate}` : ""}.pdf`}
+          >
+            {({ url }) => {
+              if (url) {
+                window.open(url, "_blank");
+                setTimeout(() => setTriggerDownload(false), 300);
+              }
+              return null;
+            }}
+          </PDFDownloadLink>
+        </div>
+      )}
       <CardHeader className="bg-red-50/50">
         <CardTitle className="text-red-700">Contas a Receber Vencidas ⚠️</CardTitle>
       </CardHeader>
@@ -137,6 +181,13 @@ export function ReceiptsByPeriodReport({ companyId, startDate, endDate, customer
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<any[]>([]);
+  const [triggerDownload, setTriggerDownload] = useState(false);
+
+  useEffect(() => {
+    const handleDownload = () => setTriggerDownload(true);
+    window.addEventListener("download-receipts-by-period-report", handleDownload);
+    return () => window.removeEventListener("download-receipts-by-period-report", handleDownload);
+  }, []);
 
   useEffect(() => {
     async function fetchData() {
@@ -173,6 +224,39 @@ export function ReceiptsByPeriodReport({ companyId, startDate, endDate, customer
 
   return (
     <div className="space-y-4">
+      {triggerDownload && (
+        <div className="hidden">
+          <PDFDownloadLink
+            document={
+              <GenericReportPDF
+                title="Recebimentos por Período"
+                subtitle={`Período: ${formatDate(startDate)} ${endDate ? `até ${formatDate(endDate)}` : ""}`}
+                summary={[{ label: "Total Recebido", value: formatCurrency(totalReceipts) }]}
+                columns={[
+                  { label: "Data", key: "dateFormatted", width: "15%" },
+                  { label: "Cliente", key: "customer", width: "45%" },
+                  { label: "Forma", key: "payment_method", width: "20%" },
+                  { label: "Valor Pago", key: "valueFormatted", width: "20%", align: "right" },
+                ]}
+                data={rows.map(r => ({
+                  ...r,
+                  dateFormatted: formatDate(r.appointment_date),
+                  valueFormatted: formatCurrency(r.total_payed),
+                }))}
+              />
+            }
+            fileName={`recebimentos-${startDate}${endDate ? `-ate-${endDate}` : ""}.pdf`}
+          >
+            {({ url }) => {
+              if (url) {
+                window.open(url, "_blank");
+                setTimeout(() => setTriggerDownload(false), 300);
+              }
+              return null;
+            }}
+          </PDFDownloadLink>
+        </div>
+      )}
       <Card>
         <CardContent className="py-5">
           <p className="text-sm text-muted-foreground">Total Recebido no Período</p>
@@ -216,6 +300,13 @@ export function CustomerDefaultReport({ companyId, startDate, endDate, customerI
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any[]>([]);
+  const [triggerDownload, setTriggerDownload] = useState(false);
+
+  useEffect(() => {
+    const handleDownload = () => setTriggerDownload(true);
+    window.addEventListener("download-customer-default-report", handleDownload);
+    return () => window.removeEventListener("download-customer-default-report", handleDownload);
+  }, []);
 
   useEffect(() => {
     async function fetchData() {
@@ -255,8 +346,40 @@ export function CustomerDefaultReport({ companyId, startDate, endDate, customerI
 
   if (loading) return <TableSkeleton />;
 
+  const totalUnpaid = data.reduce((acc, r) => acc + r.unpaid, 0);
+
   return (
     <Card>
+      {triggerDownload && (
+        <div className="hidden">
+          <PDFDownloadLink
+            document={
+              <GenericReportPDF
+                title="Inadimplência por Cliente"
+                subtitle={`Relatório gerado em ${format(new Date(), "dd/MM/yyyy")}`}
+                summary={[{ label: "Total em Aberto", value: formatCurrency(totalUnpaid) }]}
+                columns={[
+                  { label: "Cliente", key: "customer", width: "70%" },
+                  { label: "Valor em Aberto", key: "valueFormatted", width: "30%", align: "right" },
+                ]}
+                data={data.map(r => ({
+                  ...r,
+                  valueFormatted: formatCurrency(r.unpaid),
+                }))}
+              />
+            }
+            fileName={`inadimplencia-${format(new Date(), "yyyy-MM-dd")}.pdf`}
+          >
+            {({ url }) => {
+              if (url) {
+                window.open(url, "_blank");
+                setTimeout(() => setTriggerDownload(false), 300);
+              }
+              return null;
+            }}
+          </PDFDownloadLink>
+        </div>
+      )}
       <CardHeader>
         <CardTitle>Maiores Inadimplentes (Saldo em Aberto)</CardTitle>
       </CardHeader>
@@ -435,6 +558,13 @@ export function CustomerFullStatementReport({ companyId, startDate, endDate, cus
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [loading, setLoading] = useState(true);
   const [statement, setStatement] = useState<any[]>([]);
+  const [triggerDownload, setTriggerDownload] = useState(false);
+
+  useEffect(() => {
+    const handleDownload = () => setTriggerDownload(true);
+    window.addEventListener("download-customer-statement-report", handleDownload);
+    return () => window.removeEventListener("download-customer-statement-report", handleDownload);
+  }, []);
 
   useEffect(() => {
     async function fetchData() {
@@ -532,6 +662,13 @@ export function SalesByVolumeReport({ companyId, startDate, endDate, customerId 
   const [chartData, setChartData] = useState<any[]>([]);
   const [productSummary, setProductSummary] = useState<any[]>([]);
   const [totalLiters, setTotalLiters] = useState(0);
+  const [triggerDownload, setTriggerDownload] = useState(false);
+
+  useEffect(() => {
+    const handleDownload = () => setTriggerDownload(true);
+    window.addEventListener("download-sales-by-volume-report", handleDownload);
+    return () => window.removeEventListener("download-sales-by-volume-report", handleDownload);
+  }, []);
 
   useEffect(() => {
     async function fetchData() {
@@ -620,6 +757,37 @@ export function SalesByVolumeReport({ companyId, startDate, endDate, customerId 
 
   return (
     <div className="space-y-4">
+      {triggerDownload && (
+        <div className="hidden">
+          <PDFDownloadLink
+            document={
+              <GenericReportPDF
+                title="Vendas por Litragem"
+                subtitle={`Período: ${formatDate(startDate)} ${endDate ? `até ${formatDate(endDate)}` : ""}`}
+                summary={[{ label: "Volume Total", value: `${totalLiters.toLocaleString("pt-BR")} L` }]}
+                columns={[
+                  { label: "Produto", key: "name", width: "60%" },
+                  { label: "Qtd Itens", key: "count", width: "20%", align: "center" },
+                  { label: "Total Litragem", key: "valueFormatted", width: "20%", align: "right" },
+                ]}
+                data={productSummary.map(p => ({
+                  ...p,
+                  valueFormatted: `${p.liters.toLocaleString("pt-BR")} L`,
+                }))}
+              />
+            }
+            fileName={`vendas-litragem-${startDate}${endDate ? `-ate-${endDate}` : ""}.pdf`}
+          >
+            {({ url }) => {
+              if (url) {
+                window.open(url, "_blank");
+                setTimeout(() => setTriggerDownload(false), 300);
+              }
+              return null;
+            }}
+          </PDFDownloadLink>
+        </div>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="md:col-span-1">
           <CardContent className="py-5">

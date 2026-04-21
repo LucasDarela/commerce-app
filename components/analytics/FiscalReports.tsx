@@ -15,6 +15,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { PDFDownloadLink } from "@react-pdf/renderer";
+import { GenericReportPDF } from "@/components/pdf/GenericReportPDF";
 
 // ─────────────────────────────────────────────
 // Shared helpers
@@ -121,6 +123,13 @@ export function InvoicesByPeriodReport({ companyId, startDate, endDate }: BasePr
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<InvoiceRow[]>([]);
+  const [triggerDownload, setTriggerDownload] = useState(false);
+
+  useEffect(() => {
+    const handleDownload = () => setTriggerDownload(true);
+    window.addEventListener("download-invoices-by-period-report", handleDownload);
+    return () => window.removeEventListener("download-invoices-by-period-report", handleDownload);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -138,6 +147,46 @@ export function InvoicesByPeriodReport({ companyId, startDate, endDate }: BasePr
 
   return (
     <div className="space-y-4">
+      {triggerDownload && (
+        <div className="hidden">
+          <PDFDownloadLink
+            document={
+              <GenericReportPDF
+                title="NF-e Emitidas por Período"
+                subtitle={`Período: ${formatDate(startDate)} ${endDate ? `até ${formatDate(endDate)}` : ""}`}
+                summary={[
+                  { label: "Total Emitidas", value: String(rows.length) },
+                  { label: "Autorizadas", value: String(autorizadas) },
+                  { label: "Valor Total", value: formatCurrency(total) },
+                ]}
+                columns={[
+                  { label: "Nº", key: "numero", width: "10%" },
+                  { label: "Emissão", key: "dateFormatted", width: "15%" },
+                  { label: "Cliente", key: "customer_name", width: "35%" },
+                  { label: "Natureza", key: "natureza_operacao", width: "20%" },
+                  { label: "Valor", key: "valueFormatted", width: "10%", align: "right" },
+                  { label: "Status", key: "statusLabel", width: "10%", align: "center" },
+                ]}
+                data={rows.map(r => ({
+                  ...r,
+                  dateFormatted: formatDate(r.data_emissao ?? r.created_at),
+                  valueFormatted: formatCurrency(r.valor_total),
+                  statusLabel: statusLabel(r.status),
+                }))}
+              />
+            }
+            fileName={`nfe-emitidas-${startDate}${endDate ? `-ate-${endDate}` : ""}.pdf`}
+          >
+            {({ url }) => {
+              if (url) {
+                window.open(url, "_blank");
+                setTimeout(() => setTriggerDownload(false), 300);
+              }
+              return null;
+            }}
+          </PDFDownloadLink>
+        </div>
+      )}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: "Total Emitidas", value: String(rows.length) },
@@ -189,6 +238,13 @@ export function InvoicesStatusReport({ companyId, startDate, endDate }: BaseProp
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<InvoiceRow[]>([]);
+  const [triggerDownload, setTriggerDownload] = useState(false);
+
+  useEffect(() => {
+    const handleDownload = () => setTriggerDownload(true);
+    window.addEventListener("download-invoice-status-report", handleDownload);
+    return () => window.removeEventListener("download-invoice-status-report", handleDownload);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -248,8 +304,50 @@ export function InvoicesStatusReport({ companyId, startDate, endDate }: BaseProp
     </Card>
   );
 
+  if (loading) return <TableSkeleton />;
+
   return (
     <div className="space-y-4">
+      {triggerDownload && (
+        <div className="hidden">
+          <PDFDownloadLink
+            document={
+              <GenericReportPDF
+                title="Status de NF-e"
+                subtitle={`Relatório gerado em ${format(new Date(), "dd/MM/yyyy HH:mm")}`}
+                summary={[
+                  { label: "Autorizadas", value: String(autorizado.length) },
+                  { label: "Erro / Rejeitadas", value: String(erro.length) },
+                  { label: "Canceladas", value: String(cancelado.length) },
+                ]}
+                columns={[
+                  { label: "Nº", key: "numero", width: "10%" },
+                  { label: "Emissão", key: "dateFormatted", width: "15%" },
+                  { label: "Cliente", key: "customer_name", width: "35%" },
+                  { label: "Natureza", key: "natureza_operacao", width: "20%" },
+                  { label: "Valor", key: "valueFormatted", width: "10%", align: "right" },
+                  { label: "Status", key: "statusLabel", width: "10%", align: "center" },
+                ]}
+                data={rows.map(r => ({
+                  ...r,
+                  dateFormatted: formatDate(r.data_emissao ?? r.created_at),
+                  valueFormatted: formatCurrency(r.valor_total),
+                  statusLabel: statusLabel(r.status),
+                }))}
+              />
+            }
+            fileName={`status-nfe-${format(new Date(), "yyyy-MM-dd")}.pdf`}
+          >
+            {({ url }) => {
+              if (url) {
+                window.open(url, "_blank");
+                setTimeout(() => setTriggerDownload(false), 300);
+              }
+              return null;
+            }}
+          </PDFDownloadLink>
+        </div>
+      )}
       <div className="grid grid-cols-3 gap-4">
         {[
           { label: "Autorizadas", value: autorizado.length, color: "text-green-600" },
@@ -278,6 +376,13 @@ export function InvoicesByCustomerReport({ companyId, startDate, endDate, custom
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<InvoiceRow[]>([]);
+  const [triggerDownload, setTriggerDownload] = useState(false);
+
+  useEffect(() => {
+    const handleDownload = () => setTriggerDownload(true);
+    window.addEventListener("download-invoices-by-customer-report", handleDownload);
+    return () => window.removeEventListener("download-invoices-by-customer-report", handleDownload);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -303,6 +408,46 @@ export function InvoicesByCustomerReport({ companyId, startDate, endDate, custom
 
   return (
     <div className="space-y-4">
+      {triggerDownload && (
+        <div className="hidden">
+          <PDFDownloadLink
+            document={
+              <GenericReportPDF
+                title="NF-e por Cliente"
+                subtitle={`Relatório gerado em ${format(new Date(), "dd/MM/yyyy HH:mm")}`}
+                summary={[
+                  { label: "Clientes com NF-e", value: String(groups.length) },
+                  { label: "Total de Notas", value: String(rows.length) },
+                  { label: "Valor Total", value: formatCurrency(rows.reduce((s, r) => s + (r.valor_total ?? 0), 0)) },
+                ]}
+                columns={[
+                  { label: "Cliente", key: "customer_name", width: "35%" },
+                  { label: "Nº", key: "numero", width: "10%" },
+                  { label: "Emissão", key: "dateFormatted", width: "15%" },
+                  { label: "Natureza", key: "natureza_operacao", width: "20%" },
+                  { label: "Valor", key: "valueFormatted", width: "10%", align: "right" },
+                  { label: "Status", key: "statusLabel", width: "10%", align: "center" },
+                ]}
+                data={rows.map(r => ({
+                  ...r,
+                  dateFormatted: formatDate(r.data_emissao ?? r.created_at),
+                  valueFormatted: formatCurrency(r.valor_total),
+                  statusLabel: statusLabel(r.status),
+                }))}
+              />
+            }
+            fileName={`nfe-por-cliente-${format(new Date(), "yyyy-MM-dd")}.pdf`}
+          >
+            {({ url }) => {
+              if (url) {
+                window.open(url, "_blank");
+                setTimeout(() => setTriggerDownload(false), 300);
+              }
+              return null;
+            }}
+          </PDFDownloadLink>
+        </div>
+      )}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <Card><CardContent className="py-5">
           <p className="text-sm text-muted-foreground">Clientes com NF-e</p>
@@ -370,6 +515,13 @@ export function FiscalOperationSummaryReport({ companyId, startDate, endDate }: 
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<InvoiceRow[]>([]);
+  const [triggerDownload, setTriggerDownload] = useState(false);
+
+  useEffect(() => {
+    const handleDownload = () => setTriggerDownload(true);
+    window.addEventListener("download-fiscal-operation-summary-report", handleDownload);
+    return () => window.removeEventListener("download-fiscal-operation-summary-report", handleDownload);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -396,6 +548,45 @@ export function FiscalOperationSummaryReport({ companyId, startDate, endDate }: 
 
   return (
     <div className="space-y-4">
+      {triggerDownload && (
+        <div className="hidden">
+          <PDFDownloadLink
+            document={
+              <GenericReportPDF
+                title="Resumo Fiscal por Natureza de Operação"
+                subtitle={`Relatório gerado em ${format(new Date(), "dd/MM/yyyy HH:mm")}`}
+                summary={[
+                  { label: "Operações distintas", value: String(groups.length) },
+                  { label: "Valor Total Autorizado", value: formatCurrency(rows.reduce((s, r) => s + (r.valor_total ?? 0), 0)) },
+                ]}
+                columns={[
+                  { label: "Natureza da Operação", key: "natureza", width: "50%" },
+                  { label: "Qtd. Notas", key: "count", width: "15%", align: "center" },
+                  { label: "Valor Total", key: "totalFormatted", width: "20%", align: "right" },
+                  { label: "%", key: "pct", width: "15%", align: "right" },
+                ]}
+                data={(() => {
+                  const grandTotal = groups.reduce((s, g) => s + g.total, 0);
+                  return groups.map(g => ({
+                    ...g,
+                    totalFormatted: formatCurrency(g.total),
+                    pct: grandTotal > 0 ? ((g.total / grandTotal) * 100).toFixed(1) + "%" : "—",
+                  }));
+                })()}
+              />
+            }
+            fileName={`resumo-fiscal-operacao-${format(new Date(), "yyyy-MM-dd")}.pdf`}
+          >
+            {({ url }) => {
+              if (url) {
+                window.open(url, "_blank");
+                setTimeout(() => setTriggerDownload(false), 300);
+              }
+              return null;
+            }}
+          </PDFDownloadLink>
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-4">
         <Card><CardContent className="py-5">
           <p className="text-sm text-muted-foreground">Operações distintas</p>
@@ -445,6 +636,13 @@ export function PendingInvoicesReport({ companyId, startDate, endDate }: BasePro
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<InvoiceRow[]>([]);
+  const [triggerDownload, setTriggerDownload] = useState(false);
+
+  useEffect(() => {
+    const handleDownload = () => setTriggerDownload(true);
+    window.addEventListener("download-pending-invoice-issuance-report", handleDownload);
+    return () => window.removeEventListener("download-pending-invoice-issuance-report", handleDownload);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -465,6 +663,45 @@ export function PendingInvoicesReport({ companyId, startDate, endDate }: BasePro
 
   return (
     <div className="space-y-4">
+      {triggerDownload && (
+        <div className="hidden">
+          <PDFDownloadLink
+            document={
+              <GenericReportPDF
+                title="Notas Pendentes de Emissão"
+                subtitle={`Relatório gerado em ${format(new Date(), "dd/MM/yyyy HH:mm")}`}
+                summary={[
+                  { label: "Processando", value: String(processando.length) },
+                  { label: "Com Erro", value: String(erro.length) },
+                ]}
+                columns={[
+                  { label: "Ref / Nº", key: "refOrNumero", width: "20%" },
+                  { label: "Criada em", key: "dateFormatted", width: "20%" },
+                  { label: "Cliente", key: "customer_name", width: "30%" },
+                  { label: "Valor", key: "valueFormatted", width: "15%", align: "right" },
+                  { label: "Status", key: "statusLabel", width: "15%", align: "center" },
+                ]}
+                data={rows.map(r => ({
+                  ...r,
+                  refOrNumero: r.numero ?? r.ref,
+                  dateFormatted: formatDate(r.created_at),
+                  valueFormatted: formatCurrency(r.valor_total),
+                  statusLabel: statusLabel(r.status),
+                }))}
+              />
+            }
+            fileName={`notas-pendentes-${format(new Date(), "yyyy-MM-dd")}.pdf`}
+          >
+            {({ url }) => {
+              if (url) {
+                window.open(url, "_blank");
+                setTimeout(() => setTriggerDownload(false), 300);
+              }
+              return null;
+            }}
+          </PDFDownloadLink>
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-4">
         <Card><CardContent className="py-5">
           <p className="text-sm text-muted-foreground">Processando</p>
@@ -518,6 +755,13 @@ export function FiscalFieldIssuesReport({ companyId, startDate, endDate }: BaseP
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<(InvoiceRow & { issues: string[] })[]>([]);
+  const [triggerDownload, setTriggerDownload] = useState(false);
+
+  useEffect(() => {
+    const handleDownload = () => setTriggerDownload(true);
+    window.addEventListener("download-fiscal-field-issues-report", handleDownload);
+    return () => window.removeEventListener("download-fiscal-field-issues-report", handleDownload);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -544,6 +788,41 @@ export function FiscalFieldIssuesReport({ companyId, startDate, endDate }: BaseP
 
   return (
     <div className="space-y-4">
+      {triggerDownload && (
+        <div className="hidden">
+          <PDFDownloadLink
+            document={
+              <GenericReportPDF
+                title="Divergências Fiscais encontradas"
+                subtitle={`Relatório gerado em ${format(new Date(), "dd/MM/yyyy HH:mm")}`}
+                summary={[{ label: "Total Divergências", value: String(rows.length) }]}
+                columns={[
+                  { label: "Nº", key: "numero", width: "10%" },
+                  { label: "Emissão", key: "dateFormatted", width: "15%" },
+                  { label: "Cliente", key: "customer_name", width: "30%" },
+                  { label: "Status", key: "statusLabel", width: "15%" },
+                  { label: "Divergências", key: "issuesLabel", width: "30%" },
+                ]}
+                data={rows.map(r => ({
+                  ...r,
+                  dateFormatted: formatDate(r.data_emissao ?? r.created_at),
+                  statusLabel: statusLabel(r.status),
+                  issuesLabel: r.issues.join(", "),
+                }))}
+              />
+            }
+            fileName={`divergencias-fiscais-${format(new Date(), "yyyy-MM-dd")}.pdf`}
+          >
+            {({ url }) => {
+              if (url) {
+                window.open(url, "_blank");
+                setTimeout(() => setTriggerDownload(false), 300);
+              }
+              return null;
+            }}
+          </PDFDownloadLink>
+        </div>
+      )}
       <Card><CardContent className="py-5">
         <p className="text-sm text-muted-foreground">Notas com divergências encontradas</p>
         <p className="text-2xl font-bold text-destructive">{rows.length}</p>

@@ -15,6 +15,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { PDFDownloadLink } from "@react-pdf/renderer";
+import { GenericReportPDF } from "@/components/pdf/GenericReportPDF";
 
 interface Props {
   companyId: string;
@@ -56,6 +58,13 @@ export function EquipmentLoansHistoryReport({
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<LoanRow[]>([]);
+  const [triggerDownload, setTriggerDownload] = useState(false);
+
+  useEffect(() => {
+    const handleDownload = () => setTriggerDownload(true);
+    window.addEventListener("download-equipment-loans-history-report", handleDownload);
+    return () => window.removeEventListener("download-equipment-loans-history-report", handleDownload);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -141,6 +150,45 @@ export function EquipmentLoansHistoryReport({
 
   return (
     <div className="space-y-4">
+      {triggerDownload && (
+        <div className="hidden">
+          <PDFDownloadLink
+            document={
+              <GenericReportPDF
+                title="Histórico de Comodatos / Empréstimos"
+                subtitle={`Período: ${formatDate(startDate)} ${endDate ? `até ${formatDate(endDate)}` : ""} ${customerId ? `(Cliente específico)` : ""}`}
+                summary={[
+                  { label: "Total de Comodatos", value: String(summary.total) },
+                  { label: "Recolhidos", value: String(summary.returned) },
+                  { label: "Pendentes", value: String(summary.pending) },
+                  { label: "Unidades Entregues", value: String(summary.totalLoaned) },
+                ]}
+                columns={[
+                  { label: "Data Entrega", key: "dateFormatted", width: "15%" },
+                  { label: "Data Recolha", key: "returnDateFormatted", width: "15%" },
+                  { label: "Cliente", key: "customer_name", width: "30%" },
+                  { label: "Equipamento", key: "equipmentName", width: "30%" },
+                  { label: "Qtd", key: "quantity", width: "10%", align: "center" },
+                ]}
+                data={rows.map(r => ({
+                  ...r,
+                  dateFormatted: formatDate(r.loan_date),
+                  returnDateFormatted: formatDate(r.returnDateActual ?? r.return_date),
+                }))}
+              />
+            }
+            fileName={`historico-comodatos-${startDate}${endDate ? `-ate-${endDate}` : ""}.pdf`}
+          >
+            {({ url }) => {
+              if (url) {
+                window.open(url, "_blank");
+                setTimeout(() => setTriggerDownload(false), 300);
+              }
+              return null;
+            }}
+          </PDFDownloadLink>
+        </div>
+      )}
       {/* Cards de resumo */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[

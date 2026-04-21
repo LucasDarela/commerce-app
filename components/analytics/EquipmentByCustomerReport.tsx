@@ -15,6 +15,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { PDFDownloadLink } from "@react-pdf/renderer";
+import { GenericReportPDF } from "@/components/pdf/GenericReportPDF";
 
 interface Props {
   companyId: string;
@@ -57,6 +59,13 @@ export function EquipmentByCustomerReport({ companyId, startDate, endDate, custo
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [loading, setLoading] = useState(true);
   const [groups, setGroups] = useState<CustomerGroup[]>([]);
+  const [triggerDownload, setTriggerDownload] = useState(false);
+
+  useEffect(() => {
+    const handleDownload = () => setTriggerDownload(true);
+    window.addEventListener("download-equipment-by-customer-report", handleDownload);
+    return () => window.removeEventListener("download-equipment-by-customer-report", handleDownload);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -149,6 +158,46 @@ export function EquipmentByCustomerReport({ companyId, startDate, endDate, custo
 
   return (
     <div className="space-y-6">
+      {triggerDownload && (
+        <div className="hidden">
+          <PDFDownloadLink
+            document={
+              <GenericReportPDF
+                title="Comodatos Agrupados por Cliente"
+                subtitle={`Período: ${formatDate(startDate)} ${endDate ? `até ${formatDate(endDate)}` : ""} ${customerId ? `(Filtro ativo)` : ""}`}
+                summary={[
+                  { label: "Total de Clientes", value: String(totalCustomers) },
+                  { label: "Total de Comodatos", value: String(totalLoans) },
+                  { label: "Pendentes de Recolha", value: String(totalPending) },
+                ]}
+                columns={[
+                  { label: "Cliente", key: "customer_name", width: "25%" },
+                  { label: "Equipamento", key: "equipment_name", width: "25%" },
+                  { label: "Data Entrega", key: "dateFormatted", width: "15%" },
+                  { label: "Data Recolha", key: "returnDateFormatted", width: "15%" },
+                  { label: "Qtd", key: "quantity", width: "10%", align: "center" },
+                  { label: "Status", key: "statusLabel", width: "10%", align: "center" },
+                ]}
+                data={groups.flatMap(g => g.loans.map(l => ({
+                  ...l,
+                  dateFormatted: formatDate(l.loan_date),
+                  returnDateFormatted: formatDate(l.actual_return_date ?? l.return_date),
+                  statusLabel: (l.actual_return_date || l.return_date) ? "Recolhido" : "Em uso",
+                })))}
+              />
+            }
+            fileName={`comodatos-por-cliente-${startDate}${endDate ? `-ate-${endDate}` : ""}.pdf`}
+          >
+            {({ url }) => {
+              if (url) {
+                window.open(url, "_blank");
+                setTimeout(() => setTriggerDownload(false), 300);
+              }
+              return null;
+            }}
+          </PDFDownloadLink>
+        </div>
+      )}
       {/* Summary */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <Card>

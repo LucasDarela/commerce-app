@@ -16,6 +16,8 @@ import { Badge } from "@/components/ui/badge";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
+import { PDFDownloadLink } from "@react-pdf/renderer";
+import { GenericReportPDF } from "@/components/pdf/GenericReportPDF";
 import {
   PieChart,
   Pie,
@@ -46,6 +48,13 @@ export function EquipmentNotReturnedReport({ companyId, startDate, endDate }: Re
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<any[]>([]);
+  const [triggerDownload, setTriggerDownload] = useState(false);
+
+  useEffect(() => {
+    const handleDownload = () => setTriggerDownload(true);
+    window.addEventListener("download-unreturned-equipments-report", handleDownload);
+    return () => window.removeEventListener("download-unreturned-equipments-report", handleDownload);
+  }, []);
 
   useEffect(() => {
     async function fetchData() {
@@ -90,6 +99,38 @@ export function EquipmentNotReturnedReport({ companyId, startDate, endDate }: Re
 
   return (
     <Card className="border-amber-200">
+      {triggerDownload && (
+        <div className="hidden">
+          <PDFDownloadLink
+            document={
+              <GenericReportPDF
+                title="Equipamentos Não Retornados (Em Posse)"
+                subtitle={`Relatório gerado em ${format(new Date(), "dd/MM/yyyy")}`}
+                columns={[
+                  { label: "Data Entrega", key: "dateFormatted", width: "20%" },
+                  { label: "Cliente", key: "customer_name", width: "40%" },
+                  { label: "Equipamento", key: "equipmentLabel", width: "30%" },
+                  { label: "Qtd", key: "quantity", width: "10%", align: "center" },
+                ]}
+                data={rows.map(r => ({
+                  ...r,
+                  dateFormatted: formatDate(r.loan_date),
+                  equipmentLabel: r.equipments?.name,
+                }))}
+              />
+            }
+            fileName={`equipamentos-pendentes-${format(new Date(), "yyyy-MM-dd")}.pdf`}
+          >
+            {({ url }) => {
+              if (url) {
+                window.open(url, "_blank");
+                setTimeout(() => setTriggerDownload(false), 300);
+              }
+              return null;
+            }}
+          </PDFDownloadLink>
+        </div>
+      )}
       <CardHeader className="bg-amber-50/50">
         <CardTitle className="text-amber-700">Equipamentos em Posse de Clientes (Não Retornados)</CardTitle>
       </CardHeader>
@@ -130,6 +171,13 @@ export function EquipmentAvailableVsLoanedReport({ companyId }: ReportProps) {
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any[]>([]);
+  const [triggerDownload, setTriggerDownload] = useState(false);
+
+  useEffect(() => {
+    const handleDownload = () => setTriggerDownload(true);
+    window.addEventListener("download-available-vs-loaned-equipments-report", handleDownload);
+    return () => window.removeEventListener("download-available-vs-loaned-equipments-report", handleDownload);
+  }, []);
 
   useEffect(() => {
     async function fetchData() {
@@ -164,6 +212,32 @@ export function EquipmentAvailableVsLoanedReport({ companyId }: ReportProps) {
 
   return (
     <Card>
+      {triggerDownload && (
+        <div className="hidden">
+          <PDFDownloadLink
+            document={
+              <GenericReportPDF
+                title="Equipamentos Disponíveis x Emprestados"
+                subtitle={`Relatório gerado em ${format(new Date(), "dd/MM/yyyy HH:mm")}`}
+                columns={[
+                  { label: "Indicador", key: "name", width: "70%" },
+                  { label: "Valor (Unidades)", key: "value", width: "30%", align: "right" },
+                ]}
+                data={data}
+              />
+            }
+            fileName={`disponibilidade-equipamentos-${format(new Date(), "yyyy-MM-dd")}.pdf`}
+          >
+            {({ url }) => {
+              if (url) {
+                window.open(url, "_blank");
+                setTimeout(() => setTriggerDownload(false), 300);
+              }
+              return null;
+            }}
+          </PDFDownloadLink>
+        </div>
+      )}
       <CardHeader>
         <CardTitle>Equipamentos Disponíveis x Emprestados</CardTitle>
       </CardHeader>

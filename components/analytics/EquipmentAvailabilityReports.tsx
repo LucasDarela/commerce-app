@@ -16,6 +16,8 @@ import {
 } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { PDFDownloadLink } from "@react-pdf/renderer";
+import { GenericReportPDF } from "@/components/pdf/GenericReportPDF";
 
 function ProgressBar({ value }: { value: number }) {
   return (
@@ -63,6 +65,13 @@ export function UnreturnedEquipmentsReport({ companyId, startDate, endDate, cust
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<UnreturnedLoan[]>([]);
+  const [triggerDownload, setTriggerDownload] = useState(false);
+
+  useEffect(() => {
+    const handleDownload = () => setTriggerDownload(true);
+    window.addEventListener("download-unreturned-equipments-report", handleDownload);
+    return () => window.removeEventListener("download-unreturned-equipments-report", handleDownload);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -143,6 +152,43 @@ export function UnreturnedEquipmentsReport({ companyId, startDate, endDate, cust
 
   return (
     <div className="space-y-4">
+      {triggerDownload && (
+        <div className="hidden">
+          <PDFDownloadLink
+            document={
+              <GenericReportPDF
+                title="Equipamentos Não Retornados (Em Aberto)"
+                subtitle={`Período: ${formatDate(startDate)} ${endDate ? `até ${formatDate(endDate)}` : ""}`}
+                summary={[
+                  { label: "Comodatos em Aberto", value: String(rows.length) },
+                  { label: "Unidades Não Retornadas", value: String(totalUnits) },
+                  { label: "Média de Dias Fora", value: `${avgDays} dias` },
+                ]}
+                columns={[
+                  { label: "Data Entrega", key: "dateFormatted", width: "15%" },
+                  { label: "Cliente", key: "customer_name", width: "30%" },
+                  { label: "Equipamento", key: "equipmentName", width: "30%" },
+                  { label: "Qtd", key: "quantity", width: "10%", align: "center" },
+                  { label: "Dias", key: "days_out", width: "15%", align: "center" },
+                ]}
+                data={rows.map(r => ({
+                  ...r,
+                  dateFormatted: formatDate(r.loan_date),
+                }))}
+              />
+            }
+            fileName={`equipamentos-pendentes-${startDate}${endDate ? `-ate-${endDate}` : ""}.pdf`}
+          >
+            {({ url }) => {
+              if (url) {
+                window.open(url, "_blank");
+                setTimeout(() => setTriggerDownload(false), 300);
+              }
+              return null;
+            }}
+          </PDFDownloadLink>
+        </div>
+      )}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: "Comodatos em Aberto", value: String(rows.length) },
@@ -224,6 +270,13 @@ export function AvailableVsLoanedEquipmentsReport({ companyId, startDate, endDat
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<EquipmentStock[]>([]);
+  const [triggerDownload, setTriggerDownload] = useState(false);
+
+  useEffect(() => {
+    const handleDownload = () => setTriggerDownload(true);
+    window.addEventListener("download-available-vs-loaned-equipments-report", handleDownload);
+    return () => window.removeEventListener("download-available-vs-loaned-equipments-report", handleDownload);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -297,6 +350,43 @@ export function AvailableVsLoanedEquipmentsReport({ companyId, startDate, endDat
 
   return (
     <div className="space-y-4">
+      {triggerDownload && (
+        <div className="hidden">
+          <PDFDownloadLink
+            document={
+              <GenericReportPDF
+                title="Disponibilidade x Comodato de Equipamentos"
+                subtitle={`Relatório gerado em ${format(new Date(), "dd/MM/yyyy HH:mm")}`}
+                summary={[
+                  { label: "Estoque Total", value: String(totalStock) },
+                  { label: "Em Comodato", value: String(totalLoaned) },
+                  { label: "Disponíveis", value: String(totalAvailable) },
+                ]}
+                columns={[
+                  { label: "Equipamento", key: "name", width: "40%" },
+                  { label: "Estoque", key: "stock", width: "15%", align: "center" },
+                  { label: "Comodato", key: "loaned", width: "15%", align: "center" },
+                  { label: "Disponível", key: "available", width: "15%", align: "center" },
+                  { label: "Uso %", key: "pctLabel", width: "15%", align: "center" },
+                ]}
+                data={rows.map(r => ({
+                  ...r,
+                  pctLabel: (r.stock ?? 0) > 0 ? `${Math.round((r.loaned / (r.stock ?? 1)) * 100)}%` : "0%",
+                }))}
+              />
+            }
+            fileName={`disponibilidade-equipamentos-${format(new Date(), "yyyy-MM-dd")}.pdf`}
+          >
+            {({ url }) => {
+              if (url) {
+                window.open(url, "_blank");
+                setTimeout(() => setTriggerDownload(false), 300);
+              }
+              return null;
+            }}
+          </PDFDownloadLink>
+        </div>
+      )}
       {/* Cards resumo */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[

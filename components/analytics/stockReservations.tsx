@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PDFDownloadLink } from "@react-pdf/renderer";
+import { GenericReportPDF } from "@/components/pdf/GenericReportPDF";
 
 interface StockReservationReportProps {
   companyId: string;
@@ -41,6 +43,13 @@ export function StockReservationReport({
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [reservations, setReservations] = useState<ReservationItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [triggerDownload, setTriggerDownload] = useState(false);
+
+  useEffect(() => {
+    const handleDownload = () => setTriggerDownload(true);
+    window.addEventListener("download-stock-reservation-report", handleDownload);
+    return () => window.removeEventListener("download-stock-reservation-report", handleDownload);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -154,6 +163,33 @@ export function StockReservationReport({
 
   return (
     <div className="space-y-4">
+      {triggerDownload && (
+        <div className="hidden">
+          <PDFDownloadLink
+            document={
+              <GenericReportPDF
+                title="Reservas de Estoque"
+                subtitle={`Período: ${format(new Date(startDate), "dd/MM/yyyy")} ${endDate ? `até ${format(new Date(endDate), "dd/MM/yyyy")}` : ""}`}
+                columns={[
+                  { label: "Data", key: "appointment_date", width: "20%" },
+                  { label: "Produto", key: "product_name", width: "60%" },
+                  { label: "Quantidade", key: "quantity", width: "20%", align: "right" },
+                ]}
+                data={reservations}
+              />
+            }
+            fileName={`reservas-estoque-${startDate}${endDate ? `-ate-${endDate}` : ""}.pdf`}
+          >
+            {({ url }) => {
+              if (url) {
+                window.open(url, "_blank");
+                setTimeout(() => setTriggerDownload(false), 300);
+              }
+              return null;
+            }}
+          </PDFDownloadLink>
+        </div>
+      )}
       {Object.entries(groupedByDate).map(([date, items]) => (
         <div key={date}>
           <div className="p-4 space-y-1">

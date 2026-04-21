@@ -15,6 +15,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { PDFDownloadLink } from "@react-pdf/renderer";
+import { GenericReportPDF } from "@/components/pdf/GenericReportPDF";
 
 // ─────────────────────────────────────────────
 // Shared helpers
@@ -105,6 +107,13 @@ export function CustomerHistoryReport({ companyId, startDate, endDate, customerI
   const [loading, setLoading] = useState(true);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [orders, setOrders] = useState<OrderRow[]>([]);
+  const [triggerDownload, setTriggerDownload] = useState(false);
+
+  useEffect(() => {
+    const handleDownload = () => setTriggerDownload(true);
+    window.addEventListener("download-customer-statement-full-report", handleDownload);
+    return () => window.removeEventListener("download-customer-statement-full-report", handleDownload);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -154,6 +163,45 @@ export function CustomerHistoryReport({ companyId, startDate, endDate, customerI
 
   return (
     <div className="space-y-4">
+      {triggerDownload && (
+        <div className="hidden">
+          <PDFDownloadLink
+            document={
+              <GenericReportPDF
+                title="Histórico Completo por Cliente"
+                subtitle={`${customer?.name || "Cliente"} | Período: ${formatDate(startDate)} ${endDate ? `até ${formatDate(endDate)}` : ""}`}
+                summary={[
+                  { label: "Total Vendido", value: formatCurrency(totalVendas) },
+                  { label: "Total Pago", value: formatCurrency(totalPago) },
+                  { label: "Em Aberto", value: formatCurrency(totalAberto) },
+                ]}
+                columns={[
+                  { label: "Data", key: "dateFormatted", width: "15%" },
+                  { label: "Nota", key: "note_number", width: "15%" },
+                  { label: "Produtos", key: "products", width: "40%" },
+                  { label: "Total", key: "totalFormatted", width: "15%", align: "right" },
+                  { label: "Status", key: "statusLabel", width: "15%", align: "center" },
+                ]}
+                data={orders.map(o => ({
+                  ...o,
+                  dateFormatted: formatDate(o.appointment_date),
+                  totalFormatted: formatCurrency(o.total),
+                  statusLabel: paymentLabel(o.payment_status),
+                }))}
+              />
+            }
+            fileName={`historico-cliente-${customer?.name || "geral"}-${startDate}.pdf`}
+          >
+            {({ url }) => {
+              if (url) {
+                window.open(url, "_blank");
+                setTimeout(() => setTriggerDownload(false), 300);
+              }
+              return null;
+            }}
+          </PDFDownloadLink>
+        </div>
+      )}
       {/* Info do cliente */}
       {customer && (
         <Card>
@@ -252,6 +300,13 @@ export function ActiveInactiveCustomersReport({ companyId, startDate, endDate }:
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState<Customer[]>([]);
   const [inactive, setInactive] = useState<Customer[]>([]);
+  const [triggerDownload, setTriggerDownload] = useState(false);
+
+  useEffect(() => {
+    const handleDownload = () => setTriggerDownload(true);
+    window.addEventListener("download-active-inactive-customers-report", handleDownload);
+    return () => window.removeEventListener("download-active-inactive-customers-report", handleDownload);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -329,6 +384,42 @@ export function ActiveInactiveCustomersReport({ companyId, startDate, endDate }:
 
   return (
     <div className="space-y-4">
+      {triggerDownload && (
+        <div className="hidden">
+          <PDFDownloadLink
+            document={
+              <GenericReportPDF
+                title="Clientes Ativos e Inativos"
+                subtitle={`Baseado em pedidos de ${formatDate(startDate)} ${endDate ? `até ${formatDate(endDate)}` : ""}`}
+                summary={[
+                  { label: "Total de Clientes", value: String(active.length + inactive.length) },
+                  { label: "Ativos no Período", value: String(active.length) },
+                  { label: "Inativos no Período", value: String(inactive.length) },
+                ]}
+                columns={[
+                  { label: "Nome", key: "name", width: "40%" },
+                  { label: "Documento", key: "document", width: "20%" },
+                  { label: "Cidade", key: "cityFormatted", width: "20%" },
+                  { label: "Status", key: "statusLabel", width: "20%", align: "center" },
+                ]}
+                data={[
+                  ...active.map(c => ({ ...c, cityFormatted: c.city ? `${c.city}/${c.state}` : "", statusLabel: "Ativo" })),
+                  ...inactive.map(c => ({ ...c, cityFormatted: c.city ? `${c.city}/${c.state}` : "", statusLabel: "Inativo" })),
+                ]}
+              />
+            }
+            fileName={`ativos-inativos-${startDate}.pdf`}
+          >
+            {({ url }) => {
+              if (url) {
+                window.open(url, "_blank");
+                setTimeout(() => setTriggerDownload(false), 300);
+              }
+              return null;
+            }}
+          </PDFDownloadLink>
+        </div>
+      )}
       <div className="grid grid-cols-3 gap-4">
         {[
           { label: "Total de Clientes", value: active.length + inactive.length },
@@ -356,6 +447,13 @@ export function NewCustomersByPeriodReport({ companyId, startDate, endDate }: Ba
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<Customer[]>([]);
+  const [triggerDownload, setTriggerDownload] = useState(false);
+
+  useEffect(() => {
+    const handleDownload = () => setTriggerDownload(true);
+    window.addEventListener("download-new-customers-by-period-report", handleDownload);
+    return () => window.removeEventListener("download-new-customers-by-period-report", handleDownload);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -397,6 +495,41 @@ export function NewCustomersByPeriodReport({ companyId, startDate, endDate }: Ba
 
   return (
     <div className="space-y-4">
+      {triggerDownload && (
+        <div className="hidden">
+          <PDFDownloadLink
+            document={
+              <GenericReportPDF
+                title="Novos Clientes por Período"
+                subtitle={`Cadastrados em ${formatDate(startDate)} ${endDate ? `até ${formatDate(endDate)}` : ""}`}
+                summary={[
+                  { label: "Novos Clientes", value: String(rows.length) },
+                  { label: "Meses com cadastros", value: String(byMonth.length) },
+                ]}
+                columns={[
+                  { label: "Nome", key: "name", width: "40%" },
+                  { label: "Documento", key: "document", width: "20%" },
+                  { label: "Telefone", key: "phone", width: "20%" },
+                  { label: "Data Cadastro", key: "dateFormatted", width: "20%", align: "right" },
+                ]}
+                data={rows.map(c => ({
+                  ...c,
+                  dateFormatted: formatDate(c.created_at),
+                }))}
+              />
+            }
+            fileName={`novos-clientes-${startDate}.pdf`}
+          >
+            {({ url }) => {
+              if (url) {
+                window.open(url, "_blank");
+                setTimeout(() => setTriggerDownload(false), 300);
+              }
+              return null;
+            }}
+          </PDFDownloadLink>
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-4">
         <Card><CardContent className="py-5">
           <p className="text-sm text-muted-foreground">Novos Clientes no Período</p>
@@ -461,6 +594,13 @@ export function CustomersByPriceTableReport({ companyId, startDate, endDate }: B
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [loading, setLoading] = useState(true);
   const [groups, setGroups] = useState<{ tableName: string; customers: Customer[] }[]>([]);
+  const [triggerDownload, setTriggerDownload] = useState(false);
+
+  useEffect(() => {
+    const handleDownload = () => setTriggerDownload(true);
+    window.addEventListener("download-customer-price-tables-report", handleDownload);
+    return () => window.removeEventListener("download-customer-price-tables-report", handleDownload);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -504,6 +644,43 @@ export function CustomersByPriceTableReport({ companyId, startDate, endDate }: B
 
   return (
     <div className="space-y-4">
+      {triggerDownload && (
+        <div className="hidden">
+          <PDFDownloadLink
+            document={
+              <GenericReportPDF
+                title="Clientes por Tabela de Preço"
+                subtitle={`Relatório gerado em ${format(new Date(), "dd/MM/yyyy")}`}
+                summary={[
+                  { label: "Tabelas de Preço", value: String(groups.length) },
+                  { label: "Total de Clientes", value: String(groups.reduce((s, g) => s + g.customers.length, 0)) },
+                ]}
+                columns={[
+                  { label: "Cliente", key: "name", width: "40%" },
+                  { label: "Tabela", key: "tableName", width: "30%" },
+                  { label: "Cidade", key: "cityFormatted", width: "20%" },
+                  { label: "NF-e", key: "nfLabel", width: "10%", align: "center" },
+                ]}
+                data={groups.flatMap(g => g.customers.map(c => ({
+                  ...c,
+                  tableName: g.tableName,
+                  cityFormatted: c.city ? `${c.city}/${c.state}` : "",
+                  nfLabel: c.emit_nf ? "Sim" : "Não",
+                })))}
+              />
+            }
+            fileName={`clientes-por-tabela-${format(new Date(), "yyyy-MM-dd")}.pdf`}
+          >
+            {({ url }) => {
+              if (url) {
+                window.open(url, "_blank");
+                setTimeout(() => setTriggerDownload(false), 300);
+              }
+              return null;
+            }}
+          </PDFDownloadLink>
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-4">
         <Card><CardContent className="py-5">
           <p className="text-sm text-muted-foreground">Tabelas de Preço</p>

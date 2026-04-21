@@ -16,6 +16,8 @@ import { Badge } from "@/components/ui/badge";
 import { format, parseISO, isBefore, startOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
+import { PDFDownloadLink } from "@react-pdf/renderer";
+import { GenericReportPDF } from "@/components/pdf/GenericReportPDF";
 import {
   LineChart,
   Line,
@@ -59,6 +61,13 @@ export function CashFlowReport({ companyId, startDate, endDate }: FinancialRepor
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any[]>([]);
+  const [triggerDownload, setTriggerDownload] = useState(false);
+
+  useEffect(() => {
+    const handleDownload = () => setTriggerDownload(true);
+    window.addEventListener("download-cash-flow-report", handleDownload);
+    return () => window.removeEventListener("download-cash-flow-report", handleDownload);
+  }, []);
 
   useEffect(() => {
     async function fetchData() {
@@ -113,6 +122,39 @@ export function CashFlowReport({ companyId, startDate, endDate }: FinancialRepor
 
   return (
     <Card>
+      {triggerDownload && (
+        <div className="hidden">
+          <PDFDownloadLink
+            document={
+              <GenericReportPDF
+                title="Fluxo de Caixa (Saldo Acumulado)"
+                subtitle={`Período: ${formatDate(startDate)} ${endDate ? `até ${formatDate(endDate)}` : ""}`}
+                columns={[
+                  { label: "Data", key: "formattedDate", width: "25%" },
+                  { label: "Receita", key: "revenueFormatted", width: "25%", align: "right" },
+                  { label: "Despesa", key: "expenseFormatted", width: "25%", align: "right" },
+                  { label: "Acumulado", key: "cumulativeFormatted", width: "25%", align: "right" },
+                ]}
+                data={data.map(d => ({
+                  ...d,
+                  revenueFormatted: formatCurrency(d.revenue),
+                  expenseFormatted: formatCurrency(d.expense),
+                  cumulativeFormatted: formatCurrency(d.cumulative),
+                }))}
+              />
+            }
+            fileName={`fluxo-caixa-${startDate}${endDate ? `-ate-${endDate}` : ""}.pdf`}
+          >
+            {({ url }) => {
+              if (url) {
+                window.open(url, "_blank");
+                setTimeout(() => setTriggerDownload(false), 300);
+              }
+              return null;
+            }}
+          </PDFDownloadLink>
+        </div>
+      )}
       <CardHeader>
         <CardTitle>Fluxo de Caixa (Saldo Acumulado)</CardTitle>
       </CardHeader>
@@ -138,6 +180,13 @@ export function AccountsPayableReport({ companyId, startDate, endDate }: Financi
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<any[]>([]);
+  const [triggerDownload, setTriggerDownload] = useState(false);
+
+  useEffect(() => {
+    const handleDownload = () => setTriggerDownload(true);
+    window.addEventListener("download-accounts-payable-report", handleDownload);
+    return () => window.removeEventListener("download-accounts-payable-report", handleDownload);
+  }, []);
 
   useEffect(() => {
     async function fetchData() {
@@ -164,8 +213,43 @@ export function AccountsPayableReport({ companyId, startDate, endDate }: Financi
 
   if (loading) return <TableSkeleton />;
 
+  const totalAmount = rows.reduce((acc, r) => acc + Number(r.amount), 0);
+
   return (
     <Card>
+      {triggerDownload && (
+        <div className="hidden">
+          <PDFDownloadLink
+            document={
+              <GenericReportPDF
+                title="Contas a Pagar (Pendentes)"
+                subtitle={`Período: ${formatDate(startDate)} ${endDate ? `até ${formatDate(endDate)}` : ""}`}
+                summary={[{ label: "Total a Pagar", value: formatCurrency(totalAmount) }]}
+                columns={[
+                  { label: "Vencimento", key: "dateFormatted", width: "20%" },
+                  { label: "Fornecedor", key: "supplier", width: "40%" },
+                  { label: "Categoria", key: "category", width: "20%" },
+                  { label: "Valor", key: "valueFormatted", width: "20%", align: "right" },
+                ]}
+                data={rows.map(r => ({
+                  ...r,
+                  dateFormatted: formatDate(r.due_date),
+                  valueFormatted: formatCurrency(Number(r.amount)),
+                }))}
+              />
+            }
+            fileName={`contas-a-pagar-${startDate}${endDate ? `-ate-${endDate}` : ""}.pdf`}
+          >
+            {({ url }) => {
+              if (url) {
+                window.open(url, "_blank");
+                setTimeout(() => setTriggerDownload(false), 300);
+              }
+              return null;
+            }}
+          </PDFDownloadLink>
+        </div>
+      )}
       <CardHeader>
         <CardTitle>Contas a Pagar (Pendentes)</CardTitle>
       </CardHeader>
@@ -204,6 +288,13 @@ export function OverduePayablesReport({ companyId, startDate, endDate }: Financi
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<any[]>([]);
+  const [triggerDownload, setTriggerDownload] = useState(false);
+
+  useEffect(() => {
+    const handleDownload = () => setTriggerDownload(true);
+    window.addEventListener("download-overdue-payables-report", handleDownload);
+    return () => window.removeEventListener("download-overdue-payables-report", handleDownload);
+  }, []);
 
   useEffect(() => {
     async function fetchData() {
@@ -232,8 +323,42 @@ export function OverduePayablesReport({ companyId, startDate, endDate }: Financi
 
   if (loading) return <TableSkeleton />;
 
+  const totalOverdue = rows.reduce((acc, r) => acc + Number(r.amount), 0);
+
   return (
     <Card className="border-red-200">
+      {triggerDownload && (
+        <div className="hidden">
+          <PDFDownloadLink
+            document={
+              <GenericReportPDF
+                title="Contas a Pagar Vencidas"
+                subtitle={`Relatório gerado em ${format(new Date(), "dd/MM/yyyy")}`}
+                summary={[{ label: "Total Vencido", value: formatCurrency(totalOverdue) }]}
+                columns={[
+                  { label: "Vencimento", key: "dateFormatted", width: "20%" },
+                  { label: "Fornecedor", key: "supplier", width: "50%" },
+                  { label: "Valor", key: "valueFormatted", width: "30%", align: "right" },
+                ]}
+                data={rows.map(r => ({
+                  ...r,
+                  dateFormatted: formatDate(r.due_date),
+                  valueFormatted: formatCurrency(Number(r.amount)),
+                }))}
+              />
+            }
+            fileName={`contas-pagar-vencidas-${format(new Date(), "yyyy-MM-dd")}.pdf`}
+          >
+            {({ url }) => {
+              if (url) {
+                window.open(url, "_blank");
+                setTimeout(() => setTriggerDownload(false), 300);
+              }
+              return null;
+            }}
+          </PDFDownloadLink>
+        </div>
+      )}
       <CardHeader className="bg-red-50/50">
         <CardTitle className="text-red-700">Contas a Pagar Vencidas ⚠️</CardTitle>
       </CardHeader>
@@ -270,6 +395,13 @@ export function ExpensesByCategoryReport({ companyId, startDate, endDate }: Fina
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any[]>([]);
+  const [triggerDownload, setTriggerDownload] = useState(false);
+
+  useEffect(() => {
+    const handleDownload = () => setTriggerDownload(true);
+    window.addEventListener("download-expenses-category-report", handleDownload);
+    return () => window.removeEventListener("download-expenses-category-report", handleDownload);
+  }, []);
 
   const COLORS = ["#ef4444", "#f97316", "#f59e0b", "#84cc16", "#06b6d4", "#3b82f6", "#6366f1", "#a855f7", "#ec4899"];
 
@@ -299,8 +431,40 @@ export function ExpensesByCategoryReport({ companyId, startDate, endDate }: Fina
 
   if (loading) return <TableSkeleton />;
 
+  const totalExpenses = data.reduce((acc, r) => acc + r.value, 0);
+
   return (
     <Card>
+      {triggerDownload && (
+        <div className="hidden">
+          <PDFDownloadLink
+            document={
+              <GenericReportPDF
+                title="Despesas por Categoria"
+                subtitle={`Período: ${formatDate(startDate)} ${endDate ? `até ${formatDate(endDate)}` : ""}`}
+                summary={[{ label: "Total de Despesas", value: formatCurrency(totalExpenses) }]}
+                columns={[
+                  { label: "Categoria", key: "name", width: "70%" },
+                  { label: "Valor", key: "valueFormatted", width: "30%", align: "right" },
+                ]}
+                data={data.map(r => ({
+                  ...r,
+                  valueFormatted: formatCurrency(r.value),
+                }))}
+              />
+            }
+            fileName={`despesas-categoria-${startDate}${endDate ? `-ate-${endDate}` : ""}.pdf`}
+          >
+            {({ url }) => {
+              if (url) {
+                window.open(url, "_blank");
+                setTimeout(() => setTriggerDownload(false), 300);
+              }
+              return null;
+            }}
+          </PDFDownloadLink>
+        </div>
+      )}
       <CardHeader>
         <CardTitle>Despesas por Categoria</CardTitle>
       </CardHeader>
@@ -325,6 +489,13 @@ export function RevenueVsExpenseReport({ companyId, startDate, endDate }: Financ
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any[]>([]);
+  const [triggerDownload, setTriggerDownload] = useState(false);
+
+  useEffect(() => {
+    const handleDownload = () => setTriggerDownload(true);
+    window.addEventListener("download-revenue-expense-report", handleDownload);
+    return () => window.removeEventListener("download-revenue-expense-report", handleDownload);
+  }, []);
 
   useEffect(() => {
     async function fetchData() {
@@ -361,8 +532,46 @@ export function RevenueVsExpenseReport({ companyId, startDate, endDate }: Financ
 
   if (loading) return <TableSkeleton />;
 
+  const totalRevenue = data.reduce((acc, r) => acc + r.revenue, 0);
+  const totalExpense = data.reduce((acc, r) => acc + r.expense, 0);
+
   return (
     <Card>
+      {triggerDownload && (
+        <div className="hidden">
+          <PDFDownloadLink
+            document={
+              <GenericReportPDF
+                title="Receita x Despesa"
+                subtitle={`Período: ${formatDate(startDate)} ${endDate ? `até ${formatDate(endDate)}` : ""}`}
+                summary={[
+                  { label: "Total Receita", value: formatCurrency(totalRevenue) },
+                  { label: "Total Despesa", value: formatCurrency(totalExpense) },
+                ]}
+                columns={[
+                  { label: "Data", key: "formattedDate", width: "30%" },
+                  { label: "Receita", key: "revenueFormatted", width: "35%", align: "right" },
+                  { label: "Despesa", key: "expenseFormatted", width: "35%", align: "right" },
+                ]}
+                data={data.map(d => ({
+                  ...d,
+                  revenueFormatted: formatCurrency(d.revenue),
+                  expenseFormatted: formatCurrency(d.expense),
+                }))}
+              />
+            }
+            fileName={`receita-x-despesa-${startDate}${endDate ? `-ate-${endDate}` : ""}.pdf`}
+          >
+            {({ url }) => {
+              if (url) {
+                window.open(url, "_blank");
+                setTimeout(() => setTriggerDownload(false), 300);
+              }
+              return null;
+            }}
+          </PDFDownloadLink>
+        </div>
+      )}
       <CardHeader>
         <CardTitle>Receita x Despesa</CardTitle>
       </CardHeader>
@@ -390,6 +599,13 @@ export function MonthlyFinancialSummaryReport({ companyId, startDate, endDate }:
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [loading, setLoading] = useState(true);
   const [totals, setTotals] = useState({ revenue: 0, expense: 0, balance: 0, pendingPayable: 0, pendingReceivable: 0 });
+  const [triggerDownload, setTriggerDownload] = useState(false);
+
+  useEffect(() => {
+    const handleDownload = () => setTriggerDownload(true);
+    window.addEventListener("download-financial-summary-report", handleDownload);
+    return () => window.removeEventListener("download-financial-summary-report", handleDownload);
+  }, []);
 
   useEffect(() => {
     async function fetchData() {
@@ -429,33 +645,66 @@ export function MonthlyFinancialSummaryReport({ companyId, startDate, endDate }:
   if (loading) return <TableSkeleton />;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-      <Card>
-        <CardContent className="pt-6">
-          <p className="text-sm font-medium text-muted-foreground">Receita Total</p>
-          <p className="text-2xl font-bold text-green-600">{formatCurrency(totals.revenue)}</p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardContent className="pt-6">
-          <p className="text-sm font-medium text-muted-foreground">Despesa Total</p>
-          <p className="text-2xl font-bold text-red-600">{formatCurrency(totals.expense)}</p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardContent className="pt-6">
-          <p className="text-sm font-medium text-muted-foreground">Saldo Líquido</p>
-          <p className={`text-2xl font-bold ${totals.balance >= 0 ? "text-blue-600" : "text-red-600"}`}>
-            {formatCurrency(totals.balance)}
-          </p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardContent className="pt-6">
-          <p className="text-sm font-medium text-muted-foreground">Contas a Pagar (Em Aberto)</p>
-          <p className="text-2xl font-bold text-orange-600">{formatCurrency(totals.pendingPayable)}</p>
-        </CardContent>
-      </Card>
+    <div className="space-y-4">
+      {triggerDownload && (
+        <div className="hidden">
+          <PDFDownloadLink
+            document={
+              <GenericReportPDF
+                title="Resumo Financeiro Mensal"
+                subtitle={`Período: ${formatDate(startDate)} ${endDate ? `até ${formatDate(endDate)}` : ""}`}
+                columns={[
+                  { label: "Indicador", key: "label", width: "70%" },
+                  { label: "Valor", key: "value", width: "30%", align: "right" },
+                ]}
+                data={[
+                  { label: "Receita Total", value: formatCurrency(totals.revenue) },
+                  { label: "Despesa Total", value: formatCurrency(totals.expense) },
+                  { label: "Saldo Líquido", value: formatCurrency(totals.balance) },
+                  { label: "Contas a Pagar (Em Aberto)", value: formatCurrency(totals.pendingPayable) },
+                ]}
+              />
+            }
+            fileName={`resumo-financeiro-${startDate}${endDate ? `-ate-${endDate}` : ""}.pdf`}
+          >
+            {({ url }) => {
+              if (url) {
+                window.open(url, "_blank");
+                setTimeout(() => setTriggerDownload(false), 300);
+              }
+              return null;
+            }}
+          </PDFDownloadLink>
+        </div>
+      )}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm font-medium text-muted-foreground">Receita Total</p>
+            <p className="text-2xl font-bold text-green-600">{formatCurrency(totals.revenue)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm font-medium text-muted-foreground">Despesa Total</p>
+            <p className="text-2xl font-bold text-red-600">{formatCurrency(totals.expense)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm font-medium text-muted-foreground">Saldo Líquido</p>
+            <p className={`text-2xl font-bold ${totals.balance >= 0 ? "text-blue-600" : "text-red-600"}`}>
+              {formatCurrency(totals.balance)}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm font-medium text-muted-foreground">Contas a Pagar (Em Aberto)</p>
+            <p className="text-2xl font-bold text-orange-600">{formatCurrency(totals.pendingPayable)}</p>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

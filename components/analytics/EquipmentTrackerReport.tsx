@@ -15,6 +15,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { PDFDownloadLink } from "@react-pdf/renderer";
+import { GenericReportPDF } from "@/components/pdf/GenericReportPDF";
 
 interface Props {
   companyId: string;
@@ -62,6 +64,13 @@ export function EquipmentTrackerReport({
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [loading, setLoading] = useState(true);
   const [groups, setGroups] = useState<EquipmentGroup[]>([]);
+  const [triggerDownload, setTriggerDownload] = useState(false);
+
+  useEffect(() => {
+    const handleDownload = () => setTriggerDownload(true);
+    window.addEventListener("download-equipment-tracker-report", handleDownload);
+    return () => window.removeEventListener("download-equipment-tracker-report", handleDownload);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -208,6 +217,41 @@ export function EquipmentTrackerReport({
 
   return (
     <div className="space-y-6">
+      {triggerDownload && (
+        <div className="hidden">
+          <PDFDownloadLink
+            document={
+              <GenericReportPDF
+                title="Rastreabilidade de Equipamentos"
+                subtitle={`Filtro: "${equipmentFilter}" | Período: ${formatDate(startDate)} até ${endDate ? formatDate(endDate) : "Hoje"}`}
+                columns={[
+                  { label: "Equipamento", key: "equipment_name", width: "20%" },
+                  { label: "Cliente", key: "customer_name", width: "30%" },
+                  { label: "Data Entrega", key: "dateFormatted", width: "15%" },
+                  { label: "Data Recolha", key: "returnDateFormatted", width: "15%" },
+                  { label: "Qtd", key: "quantity", width: "10%", align: "center" },
+                  { label: "Status", key: "statusLabel", width: "10%", align: "center" },
+                ]}
+                data={groups.flatMap(g => g.history.map(h => ({
+                  ...h,
+                  dateFormatted: formatDate(h.loan_date),
+                  returnDateFormatted: formatDate(h.actual_return_date),
+                  statusLabel: h.is_current ? "Em uso" : "Recolhido",
+                })))}
+              />
+            }
+            fileName={`rastreamento-equipamento-${equipmentFilter}-${startDate}.pdf`}
+          >
+            {({ url }) => {
+              if (url) {
+                window.open(url, "_blank");
+                setTimeout(() => setTriggerDownload(false), 300);
+              }
+              return null;
+            }}
+          </PDFDownloadLink>
+        </div>
+      )}
       {groups.map((group) => (
         <Card key={group.equipment_name}>
           <CardHeader className="pb-3">

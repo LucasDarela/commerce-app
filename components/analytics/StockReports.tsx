@@ -16,6 +16,8 @@ import { Badge } from "@/components/ui/badge";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
+import { PDFDownloadLink } from "@react-pdf/renderer";
+import { GenericReportPDF } from "@/components/pdf/GenericReportPDF";
 
 type StockReportProps = {
   companyId: string;
@@ -50,6 +52,13 @@ export function StockMovementsReport({ companyId, startDate, endDate }: StockRep
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<any[]>([]);
+  const [triggerDownload, setTriggerDownload] = useState(false);
+
+  useEffect(() => {
+    const handleDownload = () => setTriggerDownload(true);
+    window.addEventListener("download-stock-movements-report", handleDownload);
+    return () => window.removeEventListener("download-stock-movements-report", handleDownload);
+  }, []);
 
   useEffect(() => {
     async function fetchData() {
@@ -89,6 +98,40 @@ export function StockMovementsReport({ companyId, startDate, endDate }: StockRep
 
   return (
     <Card>
+      {triggerDownload && (
+        <div className="hidden">
+          <PDFDownloadLink
+            document={
+              <GenericReportPDF
+                title="Histórico de Movimentações de Estoque"
+                subtitle={`Período: ${startDate || "Início"} ${endDate ? `até ${endDate}` : "Hoje"}`}
+                columns={[
+                  { label: "Data/Hora", key: "dateFormatted", width: "20%" },
+                  { label: "Produto", key: "productLabel", width: "40%" },
+                  { label: "Tipo", key: "typeLabel", width: "10%", align: "center" },
+                  { label: "Qtd", key: "quantity", width: "10%", align: "right" },
+                  { label: "Motivo", key: "reason", width: "20%" },
+                ]}
+                data={rows.map(r => ({
+                  ...r,
+                  dateFormatted: formatDate(r.created_at),
+                  productLabel: `${r.products?.name} (${r.products?.code})`,
+                  typeLabel: translateMovementType(r.type).label,
+                }))}
+              />
+            }
+            fileName={`movimentacoes-estoque-${startDate || "inicio"}-${endDate || "hoje"}.pdf`}
+          >
+            {({ url }) => {
+              if (url) {
+                window.open(url, "_blank");
+                setTimeout(() => setTriggerDownload(false), 300);
+              }
+              return null;
+            }}
+          </PDFDownloadLink>
+        </div>
+      )}
       <CardHeader>
         <CardTitle>Histórico de Movimentações de Estoque</CardTitle>
       </CardHeader>
@@ -136,6 +179,13 @@ export function CurrentStockPositionReport({ companyId }: StockReportProps) {
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<any[]>([]);
+  const [triggerDownload, setTriggerDownload] = useState(false);
+
+  useEffect(() => {
+    const handleDownload = () => setTriggerDownload(true);
+    window.addEventListener("download-current-stock-report", handleDownload);
+    return () => window.removeEventListener("download-current-stock-report", handleDownload);
+  }, []);
 
   useEffect(() => {
     async function fetchData() {
@@ -164,6 +214,34 @@ export function CurrentStockPositionReport({ companyId }: StockReportProps) {
 
   return (
     <Card>
+      {triggerDownload && (
+        <div className="hidden">
+          <PDFDownloadLink
+            document={
+              <GenericReportPDF
+                title="Posição Atual de Estoque"
+                subtitle={`Relatório gerado em ${format(new Date(), "dd/MM/yyyy HH:mm")}`}
+                columns={[
+                  { label: "Cód", key: "code", width: "15%" },
+                  { label: "Produto", key: "name", width: "45%" },
+                  { label: "Categoria", key: "material_class", width: "25%" },
+                  { label: "Estoque Atual", key: "stock", width: "15%", align: "right" },
+                ]}
+                data={rows}
+              />
+            }
+            fileName={`posicao-estoque-${format(new Date(), "yyyy-MM-dd")}.pdf`}
+          >
+            {({ url }) => {
+              if (url) {
+                window.open(url, "_blank");
+                setTimeout(() => setTriggerDownload(false), 300);
+              }
+              return null;
+            }}
+          </PDFDownloadLink>
+        </div>
+      )}
       <CardHeader>
         <CardTitle>Posição Atual de Estoque</CardTitle>
       </CardHeader>
@@ -200,7 +278,14 @@ export function LowStockProductsReport({ companyId }: StockReportProps) {
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<any[]>([]);
+  const [triggerDownload, setTriggerDownload] = useState(false);
   const LOW_STOCK_THRESHOLD = 5;
+
+  useEffect(() => {
+    const handleDownload = () => setTriggerDownload(true);
+    window.addEventListener("download-low-stock-report", handleDownload);
+    return () => window.removeEventListener("download-low-stock-report", handleDownload);
+  }, []);
 
   useEffect(() => {
     async function fetchData() {
@@ -230,6 +315,33 @@ export function LowStockProductsReport({ companyId }: StockReportProps) {
 
   return (
     <Card className="border-orange-200">
+      {triggerDownload && (
+        <div className="hidden">
+          <PDFDownloadLink
+            document={
+              <GenericReportPDF
+                title="Produtos com Estoque Baixo"
+                subtitle={`Limite: ${LOW_STOCK_THRESHOLD}`}
+                columns={[
+                  { label: "Cód", key: "code", width: "20%" },
+                  { label: "Produto", key: "name", width: "50%" },
+                  { label: "Estoque Atual", key: "stock", width: "30%", align: "right" },
+                ]}
+                data={rows}
+              />
+            }
+            fileName={`estoque-baixo-${format(new Date(), "yyyy-MM-dd")}.pdf`}
+          >
+            {({ url }) => {
+              if (url) {
+                window.open(url, "_blank");
+                setTimeout(() => setTriggerDownload(false), 300);
+              }
+              return null;
+            }}
+          </PDFDownloadLink>
+        </div>
+      )}
       <CardHeader className="bg-orange-50/50">
         <CardTitle className="text-orange-700">Produtos com Estoque Baixo (Limite: {LOW_STOCK_THRESHOLD})</CardTitle>
       </CardHeader>
@@ -272,6 +384,13 @@ export function ReturnsByProductReport({ companyId, startDate, endDate }: StockR
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any[]>([]);
+  const [triggerDownload, setTriggerDownload] = useState(false);
+
+  useEffect(() => {
+    const handleDownload = () => setTriggerDownload(true);
+    window.addEventListener("download-returns-product-report", handleDownload);
+    return () => window.removeEventListener("download-returns-product-report", handleDownload);
+  }, []);
 
   useEffect(() => {
     async function fetchData() {
@@ -313,10 +432,37 @@ export function ReturnsByProductReport({ companyId, startDate, endDate }: StockR
     fetchData();
   }, [companyId, startDate, endDate, supabase]);
 
-  if (loading) return <TableSkeleton />;
+  const totalReturned = data.reduce((acc, r) => acc + r.total, 0);
 
   return (
     <Card>
+      {triggerDownload && (
+        <div className="hidden">
+          <PDFDownloadLink
+            document={
+              <GenericReportPDF
+                title="Devoluções por Produto"
+                subtitle={`Período: ${startDate || "Início"} ${endDate ? `até ${endDate}` : "Hoje"}`}
+                summary={[{ label: "Total Devolvido", value: String(totalReturned) }]}
+                columns={[
+                  { label: "Produto", key: "name", width: "70%" },
+                  { label: "Total Devolvido", key: "total", width: "30%", align: "right" },
+                ]}
+                data={data}
+              />
+            }
+            fileName={`devolucoes-produto-${startDate || "inicio"}-${endDate || "hoje"}.pdf`}
+          >
+            {({ url }) => {
+              if (url) {
+                window.open(url, "_blank");
+                setTimeout(() => setTriggerDownload(false), 300);
+              }
+              return null;
+            }}
+          </PDFDownloadLink>
+        </div>
+      )}
       <CardHeader>
         <CardTitle>Devoluções por Produto</CardTitle>
       </CardHeader>

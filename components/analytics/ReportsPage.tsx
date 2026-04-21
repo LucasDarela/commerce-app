@@ -302,11 +302,7 @@ export default function ReportsPage() {
 
   const normalizedReportType = String(reportType || "").trim();
 
-  const showDownloadButton = [
-    "sales_by_period",
-    "sales_grouped_by_customer",
-    "equipment_movement_history",
-  ].includes(normalizedReportType);
+  const showDownloadButton = !!normalizedReportType && !!params;
 
   if (loading) return <TableSkeleton />;
 
@@ -328,13 +324,7 @@ export default function ReportsPage() {
             disabled={!params}
             onClick={() =>
               window.dispatchEvent(
-                new Event(
-                  normalizedReportType === "sales_grouped_by_customer"
-                    ? "download-sales-grouped-report"
-                    : normalizedReportType === "equipment_movement_history"
-                      ? "download-equipment-movement-report"
-                      : "download-sales-report",
-                ),
+                new Event(`download-${normalizedReportType.replace(/_/g, "-")}-report`),
               )
             }
           >
