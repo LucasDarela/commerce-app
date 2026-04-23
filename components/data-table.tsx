@@ -2038,7 +2038,7 @@ export function DataTable({ companyId, user, role }: DataTableProps) {
             variant="outline"
             size="sm"
             onClick={exportToPDF}
-            className="min-w-[100px]"
+            className="hidden sm:inline-flex min-w-[100px]"
           >
             <IconFileDescription className="mr-1 h-4 w-4" />
             <span className="hidden sm:inline">Download PDF</span>
