@@ -42,8 +42,20 @@ function limparNumero(valor: string | null | undefined): number | null {
   return limpo ? Number(limpo) : null;
 }
 
-function formatarTelefone(valor: string) {
+function formatarTelefone(valor: string, isInternational: boolean = false) {
+  if (!valor) return "";
+
+  if (isInternational) {
+    // Permite formatação livre (espaços, parênteses, traços), removendo apenas letras
+    let texto = valor.replace(/[a-zA-Z]/g, "");
+    if (texto && !texto.startsWith("+")) {
+      texto = "+" + texto.replace(/\+/g, "");
+    }
+    return texto;
+  }
+
   let numeros = valor.replace(/\D/g, "");
+  if (!numeros) return "";
 
   if (numeros.startsWith("550")) {
     numeros = "55" + numeros.substring(3);
@@ -51,7 +63,10 @@ function formatarTelefone(valor: string) {
     numeros = numeros.substring(1);
   }
 
-  if ((numeros.length === 10 || numeros.length === 11) && !numeros.startsWith("55")) {
+  if (
+    (numeros.length === 10 || numeros.length === 11) &&
+    !numeros.startsWith("55")
+  ) {
     numeros = "55" + numeros;
   }
 
@@ -82,6 +97,7 @@ export default function CreateClient() {
   const { companyId, loading } = useAuthenticatedCompany();
 
   const [cliente, setCliente] = useState(initialCliente);
+  const [isInternationalPhone, setIsInternationalPhone] = useState(false);
   const [emitNf, setEmitNf] = useState(false);
   const [catalogs, setCatalogs] = useState<{ id: string; name: string }[]>([]);
   const [selectedCatalog, setSelectedCatalog] = useState("");
@@ -111,7 +127,7 @@ export default function CreateClient() {
 
     const formattedValue =
       name === "phone"
-        ? formatarTelefone(rawValue)
+        ? formatarTelefone(rawValue, isInternationalPhone)
         : name === "email"
           ? rawValue.trim()
           : formatarMaiusculo(rawValue, name);
@@ -119,6 +135,14 @@ export default function CreateClient() {
     setCliente((prevCliente) => ({
       ...prevCliente,
       [name]: formattedValue,
+    }));
+  };
+
+  const handleInternationalPhoneChange = (checked: boolean) => {
+    setIsInternationalPhone(checked);
+    setCliente((prev) => ({
+      ...prev,
+      phone: formatarTelefone(prev.phone, checked),
     }));
   };
 
@@ -246,8 +270,14 @@ export default function CreateClient() {
       }
 
       const telefoneNumericoText = cliente.phone.replace(/\D/g, "");
-      if (telefoneNumericoText.length > 0 && telefoneNumericoText.length < 12) {
-        toast.error("Telefone inválido: o DDD e o número devem estar completos.");
+      if (
+        !isInternationalPhone &&
+        telefoneNumericoText.length > 0 &&
+        telefoneNumericoText.length < 12
+      ) {
+        toast.error(
+          "Telefone inválido: o DDD e o número devem estar completos.",
+        );
         return;
       }
 
@@ -386,26 +416,41 @@ export default function CreateClient() {
         }
 
         return (
-          <Input
-            key={campo}
-            type={campo === "email" ? "email" : "text"}
-            name={campo}
-            placeholder={placeholdersMap[campo]}
-            value={cliente[campo as keyof typeof cliente]}
-            onChange={handleChange}
-            onBlur={
-              campo === "zip_code"
-                ? buscarEndereco
-                : campo === "document" && cliente.type === "CNPJ"
-                  ? buscarCNPJ
-                  : undefined
-            }
-            onKeyDown={(e) => handleKeyDown(e, index)}
-            ref={(el) => {
-              if (el) inputRefs.current[index] = el;
-            }}
-            className="mt-2"
-          />
+          <div key={campo} className="mt-2">
+            <Input
+              type={campo === "email" ? "email" : "text"}
+              name={campo}
+              placeholder={placeholdersMap[campo]}
+              value={cliente[campo as keyof typeof cliente]}
+              onChange={handleChange}
+              onBlur={
+                campo === "zip_code"
+                  ? buscarEndereco
+                  : campo === "document" && cliente.type === "CNPJ"
+                    ? buscarCNPJ
+                    : undefined
+              }
+              onKeyDown={(e) => handleKeyDown(e, index)}
+              ref={(el) => {
+                if (el) inputRefs.current[index] = el;
+              }}
+            />
+            {campo === "phone" && (
+              <div className="flex items-center space-x-2 mt-2">
+                <Checkbox
+                  id="international_phone"
+                  checked={isInternationalPhone}
+                  onCheckedChange={handleInternationalPhoneChange}
+                />
+                <label
+                  htmlFor="international_phone"
+                  className="text-sm font-medium leading-none"
+                >
+                  Número Internacional
+                </label>
+              </div>
+            )}
+          </div>
         );
       })}
 

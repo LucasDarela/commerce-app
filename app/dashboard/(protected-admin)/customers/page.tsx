@@ -83,7 +83,10 @@ export default function ListCustomers() {
           const normalizedSearch = search.trim().toLowerCase();
           const numericSearch = search.replace(/\D/g, "");
 
-          const filters = [`name.ilike.%${normalizedSearch}%`];
+          const filters = [
+            `name.ilike.%${normalizedSearch}%`,
+            `fantasy_name.ilike.%${normalizedSearch}%`,
+          ];
           if (numericSearch) {
             filters.push(`document.ilike.%${numericSearch}%`);
             filters.push(`phone.ilike.%${numericSearch}%`);

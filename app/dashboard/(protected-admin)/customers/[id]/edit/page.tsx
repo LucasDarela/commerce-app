@@ -44,8 +44,19 @@ function limparNumero(valor: string | number | null | undefined) {
   return valor.replace(/\D/g, "");
 }
 
-function formatarTelefone(valor: string) {
+function formatarTelefone(valor: string, isInternational: boolean = false) {
+  if (!valor) return "";
+
+  if (isInternational) {
+    let texto = valor.replace(/[a-zA-Z]/g, "");
+    if (texto && !texto.startsWith("+")) {
+      texto = "+" + texto.replace(/\+/g, "");
+    }
+    return texto;
+  }
+
   let numeros = valor.replace(/\D/g, "");
+  if (!numeros) return "";
 
   if (numeros.startsWith("550")) {
     numeros = "55" + numeros.substring(3);
@@ -85,6 +96,7 @@ export default function EditClient() {
   const inputRefs = useRef<HTMLInputElement[]>([]);
   const [loading, setLoading] = useState(true);
   const [catalogs, setCatalogs] = useState<{ id: string; name: string }[]>([]);
+  const [isInternationalPhone, setIsInternationalPhone] = useState(false);
   const [cliente, setCliente] = useState<Cliente>({
     type: "CPF",
     document: "",
@@ -195,7 +207,7 @@ export default function EditClient() {
 
     const formattedValue =
       name === "phone"
-        ? formatarTelefone(rawValue)
+        ? formatarTelefone(rawValue, isInternationalPhone)
         : name === "email"
           ? rawValue.trim()
           : formatarMaiusculo(rawValue, name);
@@ -203,6 +215,14 @@ export default function EditClient() {
     setCliente((prevCliente) => ({
       ...prevCliente,
       [name]: formattedValue,
+    }));
+  };
+
+  const handleInternationalPhoneChange = (checked: boolean) => {
+    setIsInternationalPhone(checked);
+    setCliente((prev) => ({
+      ...prev,
+      phone: formatarTelefone(prev.phone || "", checked),
     }));
   };
 
@@ -265,7 +285,7 @@ export default function EditClient() {
     }
 
     const telefoneNumericoText = String(cliente.phone ?? "").replace(/\D/g, "");
-    if (telefoneNumericoText.length > 0 && telefoneNumericoText.length < 12) {
+    if (!isInternationalPhone && telefoneNumericoText.length > 0 && telefoneNumericoText.length < 12) {
       toast.error("Telefone inválido: o DDD e o número devem estar completos.");
       return;
     }
@@ -328,20 +348,35 @@ export default function EditClient() {
         }
 
         return (
-          <Input
-            key={campo}
-            ref={(el) => {
-              if (el) inputRefs.current[index] = el;
-            }}
-            type={campo === "email" ? "email" : "text"}
-            name={campo}
-            placeholder={placeholdersMap[campo]}
-            value={String(cliente[campo as keyof typeof cliente] ?? "")}
-            onChange={handleChange}
-            onBlur={campo === "zip_code" ? buscarEndereco : undefined}
-            onKeyDown={(e) => handleKeyDown(e, index)}
-            className="mt-2"
-          />
+          <div key={campo} className="mt-2">
+            <Input
+              ref={(el) => {
+                if (el) inputRefs.current[index] = el;
+              }}
+              type={campo === "email" ? "email" : "text"}
+              name={campo}
+              placeholder={placeholdersMap[campo]}
+              value={String(cliente[campo as keyof typeof cliente] ?? "")}
+              onChange={handleChange}
+              onBlur={campo === "zip_code" ? buscarEndereco : undefined}
+              onKeyDown={(e) => handleKeyDown(e, index)}
+            />
+            {campo === "phone" && (
+              <div className="flex items-center space-x-2 mt-2">
+                <Checkbox
+                  id="international_phone"
+                  checked={isInternationalPhone}
+                  onCheckedChange={handleInternationalPhoneChange}
+                />
+                <label
+                  htmlFor="international_phone"
+                  className="text-sm font-medium leading-none"
+                >
+                  Número Internacional
+                </label>
+              </div>
+            )}
+          </div>
         );
       })}
 

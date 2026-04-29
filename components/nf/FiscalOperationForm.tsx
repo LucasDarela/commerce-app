@@ -26,7 +26,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import { Pencil, Trash, Plus } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 
 /** ---------- Schema ---------- */
 const formSchema = z
@@ -64,7 +70,9 @@ const formSchema = z
   })
   .superRefine((val, ctx) => {
     if (val.icms_situacao_tributaria?.trim() === "60") {
-      (["vbc_st_ret", "pst", "vicms_substituto", "vicms_st_ret"] as const).forEach((k) => {
+      (
+        ["vbc_st_ret", "pst", "vicms_substituto", "vicms_st_ret"] as const
+      ).forEach((k) => {
         if (!val[k] || val[k]!.toString().trim() === "") {
           ctx.addIssue({
             path: [k],
@@ -179,8 +187,16 @@ export default function FiscalOperationForm() {
       setLoadingInitial(true);
       try {
         const [companyRes, operationsRes] = await Promise.all([
-          supabase.from("companies").select("regime_tributario").eq("id", companyId).maybeSingle(),
-          supabase.from("fiscal_operations").select("*").eq("company_id", companyId).order("operation_id", { ascending: true }),
+          supabase
+            .from("companies")
+            .select("regime_tributario")
+            .eq("id", companyId)
+            .maybeSingle(),
+          supabase
+            .from("fiscal_operations")
+            .select("*")
+            .eq("company_id", companyId)
+            .order("operation_id", { ascending: true }),
         ]);
 
         if (companyRes.error) {
@@ -190,7 +206,10 @@ export default function FiscalOperationForm() {
         }
 
         if (operationsRes.error) {
-          console.error("Erro ao carregar operações fiscais:", operationsRes.error);
+          console.error(
+            "Erro ao carregar operações fiscais:",
+            operationsRes.error,
+          );
           toast.error("Erro ao carregar operações fiscais");
         } else {
           setOperations((operationsRes.data as FiscalOperationRow[]) || []);
@@ -229,14 +248,33 @@ export default function FiscalOperationForm() {
       };
 
       const allow: (keyof typeof full)[] = [
-        "company_id", "operation_id", "natureza_operacao", "tipo_documento", "local_destino",
-        "finalidade_emissao", "consumidor_final", "presenca_comprador", "modalidade_frete", "icms_origem",
-        "cfop", "ncm", "pis", "cofins", "ipi", "state", "icms_situacao_tributaria",
-        "vbc_st_ret", "pst", "vicms_substituto", "vicms_st_ret", "cst_icms", "csosn_icms", "description", "group", "specification",
+        "company_id",
+        "operation_id",
+        "natureza_operacao",
+        "tipo_documento",
+        "local_destino",
+        "finalidade_emissao",
+        "consumidor_final",
+        "presenca_comprador",
+        "modalidade_frete",
+        "icms_origem",
+        "cfop",
+        "ncm",
+        "pis",
+        "cofins",
+        "ipi",
+        "state",
+        "icms_situacao_tributaria",
+        "vbc_st_ret",
+        "pst",
+        "vicms_substituto",
+        "vicms_st_ret",
+        "cst_icms",
+        "csosn_icms",
       ];
 
       const payload = Object.fromEntries(
-        Object.entries(full).filter(([k]) => allow.includes(k as any))
+        Object.entries(full).filter(([k]) => allow.includes(k as any)),
       );
 
       if (full.icms_situacao_tributaria?.trim() !== "60") {
@@ -253,7 +291,7 @@ export default function FiscalOperationForm() {
         .eq("operation_id", data.operation_id)
         .maybeSingle();
 
-      if (fetchError && fetchError.code !== 'PGRST116') {
+      if (fetchError && fetchError.code !== "PGRST116") {
         console.error("Erro ao verificar duplicidade:", fetchError);
         toast.error("Erro ao verificar duplicidade");
         return;
@@ -265,7 +303,11 @@ export default function FiscalOperationForm() {
           return;
         }
 
-        const { error } = await supabase.from("fiscal_operations").update(payload).eq("id", editId).eq("company_id", companyId);
+        const { error } = await supabase
+          .from("fiscal_operations")
+          .update(payload)
+          .eq("id", editId)
+          .eq("company_id", companyId);
 
         if (error) {
           toast.error(`Erro ao atualizar operação fiscal: ${error.message}`);
@@ -278,7 +320,9 @@ export default function FiscalOperationForm() {
           return;
         }
 
-        const { error } = await supabase.from("fiscal_operations").insert(payload);
+        const { error } = await supabase
+          .from("fiscal_operations")
+          .insert(payload);
 
         if (error) {
           toast.error(`Erro ao salvar operação fiscal: ${error.message}`);
@@ -329,7 +373,11 @@ export default function FiscalOperationForm() {
 
   const handleDelete = async (id: string) => {
     if (!companyId) return;
-    const { error } = await supabase.from("fiscal_operations").delete().eq("id", id).eq("company_id", companyId);
+    const { error } = await supabase
+      .from("fiscal_operations")
+      .delete()
+      .eq("id", id)
+      .eq("company_id", companyId);
 
     if (error) {
       toast.error("Erro ao excluir operação");
@@ -345,7 +393,9 @@ export default function FiscalOperationForm() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>{editId ? "Editar Operação Fiscal" : "Nova Operação Fiscal"}</CardTitle>
+          <CardTitle>
+            {editId ? "Editar Operação Fiscal" : "Nova Operação Fiscal"}
+          </CardTitle>
           <CardDescription>
             {crt == null
               ? "Buscando regime tributário..."
@@ -360,119 +410,491 @@ export default function FiscalOperationForm() {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                
-                <FormField control={form.control} name="operation_id" render={({ field }) => (
-                  <FormItem><FormLabel>Identificador</FormLabel><FormControl><Input placeholder="ex: 01" {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
+                <FormField
+                  control={form.control}
+                  name="operation_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Identificador</FormLabel>
+                      <FormControl>
+                        <Input placeholder="ex: 01" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-                <FormField control={form.control} name="natureza_operacao" render={({ field }) => (
-                  <FormItem><FormLabel>Natureza da Operação</FormLabel><FormControl><Input placeholder="ex: Venda de Produto" {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
+                <FormField
+                  control={form.control}
+                  name="natureza_operacao"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Natureza da Operação</FormLabel>
+                      <FormControl>
+                        <Input placeholder="ex: Venda de Produto" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-                <FormField control={form.control} name="tipo_documento" render={({ field }) => (
-                  <FormItem><FormLabel>Tipo de Documento</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger></FormControl><SelectContent><SelectItem value="0">Entrada</SelectItem><SelectItem value="1">Saída</SelectItem></SelectContent></Select><FormMessage /></FormItem>
-                )} />
+                <FormField
+                  control={form.control}
+                  name="tipo_documento"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tipo de Documento</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="0">Entrada</SelectItem>
+                          <SelectItem value="1">Saída</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-                <FormField control={form.control} name="finalidade_emissao" render={({ field }) => (
-                  <FormItem><FormLabel>Finalidade</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger></FormControl><SelectContent><SelectItem value="1">Normal</SelectItem><SelectItem value="2">Complementar</SelectItem><SelectItem value="3">Ajuste</SelectItem><SelectItem value="4">Devolução</SelectItem></SelectContent></Select><FormMessage /></FormItem>
-                )} />
+                <FormField
+                  control={form.control}
+                  name="finalidade_emissao"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Finalidade</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="1">Normal</SelectItem>
+                          <SelectItem value="2">Complementar</SelectItem>
+                          <SelectItem value="3">Ajuste</SelectItem>
+                          <SelectItem value="4">Devolução</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-                <FormField control={form.control} name="local_destino" render={({ field }) => (
-                  <FormItem><FormLabel>Local de Destino</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger></FormControl><SelectContent><SelectItem value="1">Interna</SelectItem><SelectItem value="2">Interestadual</SelectItem><SelectItem value="3">Exterior</SelectItem></SelectContent></Select><FormMessage /></FormItem>
-                )} />
+                <FormField
+                  control={form.control}
+                  name="local_destino"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Local de Destino</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="1">Interna</SelectItem>
+                          <SelectItem value="2">Interestadual</SelectItem>
+                          <SelectItem value="3">Exterior</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-                <FormField control={form.control} name="consumidor_final" render={({ field }) => (
-                  <FormItem><FormLabel>Consumidor Final</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger></FormControl><SelectContent><SelectItem value="0">Não</SelectItem><SelectItem value="1">Sim</SelectItem></SelectContent></Select><FormMessage /></FormItem>
-                )} />
+                <FormField
+                  control={form.control}
+                  name="consumidor_final"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Consumidor Final</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="0">Não</SelectItem>
+                          <SelectItem value="1">Sim</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-                <FormField control={form.control} name="presenca_comprador" render={({ field }) => (
-                  <FormItem><FormLabel>Presença do Comprador</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger></FormControl><SelectContent><SelectItem value="0">Não se aplica</SelectItem><SelectItem value="1">Operação presencial</SelectItem><SelectItem value="2">Internet</SelectItem><SelectItem value="3">Teleatendimento</SelectItem><SelectItem value="4">Entrega em domicílio</SelectItem><SelectItem value="9">Outros</SelectItem></SelectContent></Select><FormMessage /></FormItem>
-                )} />
+                <FormField
+                  control={form.control}
+                  name="presenca_comprador"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Presença do Comprador</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="0">Não se aplica</SelectItem>
+                          <SelectItem value="1">Operação presencial</SelectItem>
+                          <SelectItem value="2">Internet</SelectItem>
+                          <SelectItem value="3">Teleatendimento</SelectItem>
+                          <SelectItem value="4">
+                            Entrega em domicílio
+                          </SelectItem>
+                          <SelectItem value="9">Outros</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-                <FormField control={form.control} name="modalidade_frete" render={({ field }) => (
-                  <FormItem><FormLabel>Modalidade de Frete</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger></FormControl><SelectContent><SelectItem value="0">Por conta do emitente</SelectItem><SelectItem value="1">Por conta do destinatário</SelectItem><SelectItem value="2">Por conta de terceiros</SelectItem><SelectItem value="9">Sem frete</SelectItem></SelectContent></Select><FormMessage /></FormItem>
-                )} />
+                <FormField
+                  control={form.control}
+                  name="modalidade_frete"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Modalidade de Frete</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="0">
+                            Por conta do emitente
+                          </SelectItem>
+                          <SelectItem value="1">
+                            Por conta do destinatário
+                          </SelectItem>
+                          <SelectItem value="2">
+                            Por conta de terceiros
+                          </SelectItem>
+                          <SelectItem value="9">Sem frete</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-                <FormField control={form.control} name="icms_origem" render={({ field }) => (
-                  <FormItem><FormLabel>Origem (ICMS)</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger></FormControl><SelectContent><SelectItem value="0">Nacional</SelectItem><SelectItem value="1">Estrangeira (importação direta)</SelectItem><SelectItem value="2">Estrangeira (mercado interno)</SelectItem><SelectItem value="4">Nacional – PPB</SelectItem><SelectItem value="5">Nacional &lt; 40% importado</SelectItem><SelectItem value="6">Estrangeira s/ similar nacional</SelectItem><SelectItem value="7">Estrangeira MI s/ similar</SelectItem></SelectContent></Select>
-                  <FormDescription>Padrão se produto vazio.</FormDescription>
-                  <FormMessage /></FormItem>
-                )} />
+                <FormField
+                  control={form.control}
+                  name="icms_origem"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Origem (ICMS)</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="0">Nacional</SelectItem>
+                          <SelectItem value="1">
+                            Estrangeira (importação direta)
+                          </SelectItem>
+                          <SelectItem value="2">
+                            Estrangeira (mercado interno)
+                          </SelectItem>
+                          <SelectItem value="4">Nacional – PPB</SelectItem>
+                          <SelectItem value="5">
+                            Nacional &lt; 40% importado
+                          </SelectItem>
+                          <SelectItem value="6">
+                            Estrangeira s/ similar nacional
+                          </SelectItem>
+                          <SelectItem value="7">
+                            Estrangeira MI s/ similar
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        Padrão se produto vazio.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-                <FormField control={form.control} name="cfop" render={({ field }) => (
-                  <FormItem><FormLabel>CFOP Geral</FormLabel><FormControl><Input placeholder="ex: 5102" {...field} /></FormControl>
-                  <FormDescription>Fallback padrão da nota.</FormDescription>
-                  <FormMessage /></FormItem>
-                )} />
+                <FormField
+                  control={form.control}
+                  name="cfop"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>CFOP Geral</FormLabel>
+                      <FormControl>
+                        <Input placeholder="ex: 5102" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Fallback padrão da nota.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-                <FormField control={form.control} name="ncm" render={({ field }) => (
-                  <FormItem><FormLabel>NCM Geral</FormLabel><FormControl><Input placeholder="8 dígitos" {...field} /></FormControl>
-                  <FormDescription>Usado se vazio no produto.</FormDescription>
-                  <FormMessage /></FormItem>
-                )} />
+                <FormField
+                  control={form.control}
+                  name="ncm"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>NCM Geral</FormLabel>
+                      <FormControl>
+                        <Input placeholder="8 dígitos" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Usado se vazio no produto.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-                <FormField control={form.control} name="pis" render={({ field }) => (
-                  <FormItem><FormLabel>PIS</FormLabel><FormControl><Input placeholder="ex: 04" {...field} value={field.value || ""} /></FormControl>
-                  <FormDescription>Herdado se produto vazio.</FormDescription>
-                  <FormMessage /></FormItem>
-                )} />
+                <FormField
+                  control={form.control}
+                  name="pis"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>PIS</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="ex: 04"
+                          {...field}
+                          value={field.value || ""}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Herdado se produto vazio.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-                <FormField control={form.control} name="cofins" render={({ field }) => (
-                  <FormItem><FormLabel>COFINS</FormLabel><FormControl><Input placeholder="ex: 04" {...field} value={field.value || ""} /></FormControl>
-                  <FormDescription>Herdado se produto vazio.</FormDescription>
-                  <FormMessage /></FormItem>
-                )} />
+                <FormField
+                  control={form.control}
+                  name="cofins"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>COFINS</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="ex: 04"
+                          {...field}
+                          value={field.value || ""}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Herdado se produto vazio.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-                <FormField control={form.control} name="icms_situacao_tributaria" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>CST/CSOSN Geral</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder='Ex: 102, 500, 60...'
-                        {...field}
-                        onChange={(e) => field.onChange(e.target.value.replace(/\D/g, "").slice(0, 3))}
-                      />
-                    </FormControl>
-                    <FormDescription>Para ST use “60”. Regra fallback de ICMS.</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+                <FormField
+                  control={form.control}
+                  name="icms_situacao_tributaria"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>CST/CSOSN Geral</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Ex: 102, 500, 60..."
+                          {...field}
+                          onChange={(e) =>
+                            field.onChange(
+                              e.target.value.replace(/\D/g, "").slice(0, 3),
+                            )
+                          }
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Para ST use “60”. Regra fallback de ICMS.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 {icms === "60" && (
                   <>
-                    <FormField control={form.control} name="vbc_st_ret" render={({ field }) => (
-                      <FormItem><FormLabel>vBCSTRet (Base retida)</FormLabel><FormControl><Input inputMode="decimal" placeholder="100.00" {...field} onChange={e => field.onChange(e.target.value.replace(",", "."))} value={field.value || ""} /></FormControl><FormMessage /></FormItem>
-                    )} />
-                    <FormField control={form.control} name="pst" render={({ field }) => (
-                      <FormItem><FormLabel>pST (% ST)</FormLabel><FormControl><Input inputMode="decimal" placeholder="12" {...field} onChange={e => field.onChange(e.target.value.replace(",", "."))} value={field.value || ""} /></FormControl><FormMessage /></FormItem>
-                    )} />
-                    <FormField control={form.control} name="vicms_substituto" render={({ field }) => (
-                      <FormItem><FormLabel>vICMSSubstituto</FormLabel><FormControl><Input inputMode="decimal" placeholder="5.40" {...field} onChange={e => field.onChange(e.target.value.replace(",", "."))} value={field.value || ""} /></FormControl><FormMessage /></FormItem>
-                    )} />
-                    <FormField control={form.control} name="vicms_st_ret" render={({ field }) => (
-                      <FormItem><FormLabel>vICMSSTRet (Retido)</FormLabel><FormControl><Input inputMode="decimal" placeholder="4.80" {...field} onChange={e => field.onChange(e.target.value.replace(",", "."))} value={field.value || ""} /></FormControl><FormMessage /></FormItem>
-                    )} />
+                    <FormField
+                      control={form.control}
+                      name="vbc_st_ret"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>vBCSTRet (Base retida)</FormLabel>
+                          <FormControl>
+                            <Input
+                              inputMode="decimal"
+                              placeholder="100.00"
+                              {...field}
+                              onChange={(e) =>
+                                field.onChange(e.target.value.replace(",", "."))
+                              }
+                              value={field.value || ""}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="pst"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>pST (% ST)</FormLabel>
+                          <FormControl>
+                            <Input
+                              inputMode="decimal"
+                              placeholder="12"
+                              {...field}
+                              onChange={(e) =>
+                                field.onChange(e.target.value.replace(",", "."))
+                              }
+                              value={field.value || ""}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="vicms_substituto"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>vICMSSubstituto</FormLabel>
+                          <FormControl>
+                            <Input
+                              inputMode="decimal"
+                              placeholder="5.40"
+                              {...field}
+                              onChange={(e) =>
+                                field.onChange(e.target.value.replace(",", "."))
+                              }
+                              value={field.value || ""}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="vicms_st_ret"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>vICMSSTRet (Retido)</FormLabel>
+                          <FormControl>
+                            <Input
+                              inputMode="decimal"
+                              placeholder="4.80"
+                              {...field}
+                              onChange={(e) =>
+                                field.onChange(e.target.value.replace(",", "."))
+                              }
+                              value={field.value || ""}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </>
                 )}
 
-                <FormField control={form.control} name="ipi" render={({ field }) => (
-                  <FormItem><FormLabel>IPI Geral</FormLabel><FormControl><Input placeholder="ex: 53" {...field} value={field.value || ""} /></FormControl>
-                  <FormDescription>Herdado se produto vazio.</FormDescription>
-                  <FormMessage /></FormItem>
-                )} />
+                <FormField
+                  control={form.control}
+                  name="ipi"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>IPI Geral</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="ex: 53"
+                          {...field}
+                          value={field.value || ""}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Herdado se produto vazio.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-                <FormField control={form.control} name="state" render={({ field }) => (
-                  <FormItem><FormLabel>Estado (UF Opcional)</FormLabel><FormControl><Input maxLength={2} placeholder="ex: SC" {...field} value={field.value || ""} /></FormControl><FormMessage /></FormItem>
-                )} />
+                <FormField
+                  control={form.control}
+                  name="state"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Estado (UF Opcional)</FormLabel>
+                      <FormControl>
+                        <Input
+                          maxLength={2}
+                          placeholder="ex: SC"
+                          {...field}
+                          value={field.value || ""}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
 
               <div className="flex gap-2 pt-4">
                 <Button type="submit" disabled={saving || !companyId}>
-                  {saving ? "Salvando..." : editId ? "Atualizar Operação" : "Salvar Nova Operação"}
+                  {saving
+                    ? "Salvando..."
+                    : editId
+                      ? "Atualizar Operação"
+                      : "Salvar Nova Operação"}
                 </Button>
 
                 {editId && (
-                  <Button type="button" variant="outline" onClick={onCancelEdit} disabled={saving}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={onCancelEdit}
+                    disabled={saving}
+                  >
                     Cancelar Edição
                   </Button>
                 )}
@@ -485,43 +907,83 @@ export default function FiscalOperationForm() {
       <Card>
         <CardHeader>
           <CardTitle>Operações Salvas</CardTitle>
-          <CardDescription>Gerencie suas naturezas de operações já cadastradas.</CardDescription>
+          <CardDescription>
+            Gerencie suas naturezas de operações já cadastradas.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {loadingInitial ? (
-            <div className="text-sm text-muted-foreground py-4">Carregando dados...</div>
+            <div className="text-sm text-muted-foreground py-4">
+              Carregando dados...
+            </div>
           ) : operations.length === 0 ? (
             <div className="text-sm text-muted-foreground py-4 text-center border rounded-md bg-muted/20">
-              Nenhuma operação cadastrada. Utilize o formulário acima para criar a primeira.
+              Nenhuma operação cadastrada. Utilize o formulário acima para criar
+              a primeira.
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-3">
               {operations.map((row) => (
-                <div key={row.id} className="border flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-4 rounded-lg bg-card shadow-sm">
+                <div
+                  key={row.id}
+                  className="border flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-4 rounded-lg bg-card shadow-sm"
+                >
                   <div className="space-y-1">
                     <div className="font-semibold flex items-center gap-2">
-                       <span className="bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded">ID {row.operation_id}</span>
-                       <span>{row.tipo_documento === "0" ? "Entrada" : "Saída"} - {row.natureza_operacao}</span>
+                      <span className="bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded">
+                        ID {row.operation_id}
+                      </span>
+                      <span>
+                        {row.tipo_documento === "0" ? "Entrada" : "Saída"} -{" "}
+                        {row.natureza_operacao}
+                      </span>
                     </div>
                     <div className="text-sm text-muted-foreground flex flex-wrap gap-x-4 gap-y-1">
-                      <span><strong>CFOP:</strong> {row.cfop}</span>
-                      <span><strong>NCM:</strong> {row.ncm || "—"}</span>
+                      <span>
+                        <strong>CFOP:</strong> {row.cfop}
+                      </span>
+                      <span>
+                        <strong>NCM:</strong> {row.ncm || "—"}
+                      </span>
                       {row.csosn_icms ? (
-                        <span><strong>ICMS:</strong> CSOSN {row.csosn_icms}</span>
+                        <span>
+                          <strong>ICMS:</strong> CSOSN {row.csosn_icms}
+                        </span>
                       ) : (
-                        <span><strong>ICMS:</strong> CST {row.cst_icms ?? "—"}</span>
+                        <span>
+                          <strong>ICMS:</strong> CST {row.cst_icms ?? "—"}
+                        </span>
                       )}
-                      <span><strong>IPI:</strong> {row.ipi ?? "—"}</span>
-                      <span><strong>PIS/COF:</strong> {row.pis ?? "—"} / {row.cofins ?? "—"}</span>
-                      {row.state && <span><strong>UF:</strong> {row.state}</span>}
+                      <span>
+                        <strong>IPI:</strong> {row.ipi ?? "—"}
+                      </span>
+                      <span>
+                        <strong>PIS/COF:</strong> {row.pis ?? "—"} /{" "}
+                        {row.cofins ?? "—"}
+                      </span>
+                      {row.state && (
+                        <span>
+                          <strong>UF:</strong> {row.state}
+                        </span>
+                      )}
                     </div>
                   </div>
 
                   <div className="flex gap-2 self-end md:self-auto shrink-0 bg-muted/50 p-1 object-contain rounded border">
-                    <Button variant="ghost" size="sm" onClick={() => handleEdit(row)} className="h-8">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleEdit(row)}
+                      className="h-8"
+                    >
                       <Pencil className="w-4 h-4 mr-2" /> Editar
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => handleDelete(row.id)} className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDelete(row.id)}
+                      className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                    >
                       <Trash className="w-4 h-4" />
                     </Button>
                   </div>

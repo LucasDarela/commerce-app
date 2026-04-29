@@ -62,13 +62,14 @@ export default function NfePage() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-useEffect(() => {
-  if (!companyId) return;
+  useEffect(() => {
+    if (!companyId) return;
 
-  const fetchInvoices = async () => {
-    const { data, error } = await supabase
-      .from("invoices")
-      .select(`
+    const fetchInvoices = async () => {
+      const { data, error } = await supabase
+        .from("invoices")
+        .select(
+          `
         id,
         company_id,
         order_id,
@@ -84,25 +85,22 @@ useEffect(() => {
         xml_url,
         ref,
         created_at
-      `)
-      .eq("company_id", companyId)
-      .order("created_at", { ascending: false });
+      `,
+        )
+        .eq("company_id", companyId)
+        .order("created_at", { ascending: false });
 
-    console.log("companyId:", companyId);
-    console.log("invoices error:", error);
-    console.log("invoices data:", data);
+      if (error) {
+        console.error("Erro ao buscar notas fiscais:", error);
+        setInvoices([]);
+        return;
+      }
 
-    if (error) {
-      console.error("Erro ao buscar notas fiscais:", error);
-      setInvoices([]);
-      return;
-    }
+      setInvoices(data ?? []);
+    };
 
-    setInvoices(data ?? []);
-  };
-
-  fetchInvoices();
-}, [companyId, supabase]);
+    fetchInvoices();
+  }, [companyId, supabase]);
 
   // === 1. Auto-Polling: notas em processamento E notas autorizadas sem links ===
   const fetchLinksFailures = useRef<Map<string, number>>(new Map());
@@ -180,25 +178,33 @@ useEffect(() => {
     if (!companyId) return;
 
     const channel = supabase
-      .channel('custom-invoices-channel')
+      .channel("custom-invoices-channel")
       .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'invoices', filter: `company_id=eq.${companyId}` },
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "invoices",
+          filter: `company_id=eq.${companyId}`,
+        },
         (payload) => {
           setInvoices((prev) => {
-            if (payload.eventType === 'INSERT') {
-              if (!prev.find(i => i.id === payload.new.id)) return [payload.new, ...prev];
+            if (payload.eventType === "INSERT") {
+              if (!prev.find((i) => i.id === payload.new.id))
+                return [payload.new, ...prev];
               return prev;
             }
-            if (payload.eventType === 'UPDATE') {
-              return prev.map(inv => inv.id === payload.new.id ? { ...inv, ...payload.new } : inv);
+            if (payload.eventType === "UPDATE") {
+              return prev.map((inv) =>
+                inv.id === payload.new.id ? { ...inv, ...payload.new } : inv,
+              );
             }
-            if (payload.eventType === 'DELETE') {
-              return prev.filter(inv => inv.id !== payload.old.id);
+            if (payload.eventType === "DELETE") {
+              return prev.filter((inv) => inv.id !== payload.old.id);
             }
             return prev;
           });
-        }
+        },
       )
       .subscribe();
 
@@ -327,9 +333,12 @@ useEffect(() => {
                 <div>
                   Emissão:{" "}
                   {invoice.data_emissao
-                    ? new Date(invoice.data_emissao).toLocaleDateString("pt-BR", {
-                        timeZone: "UTC",
-                      })
+                    ? new Date(invoice.data_emissao).toLocaleDateString(
+                        "pt-BR",
+                        {
+                          timeZone: "UTC",
+                        },
+                      )
                     : "--"}
                 </div>
                 <div>
@@ -360,7 +369,6 @@ useEffect(() => {
                 />
               )}
 
-
               {canShowDanfe(invoice.status, invoice.danfe_url) && (
                 <>
                   <ViewDanfeButton
@@ -386,7 +394,6 @@ useEffect(() => {
                   />
                 </>
               )}
-              
 
               {isAuthorized(invoice.status) &&
                 (!invoice.danfe_url || !invoice.xml_url) && (

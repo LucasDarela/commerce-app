@@ -328,6 +328,29 @@ export function PriceTableManager() {
     const catalog = savedCatalogs[index];
     if (!catalog.id) return;
 
+    // Verificar se clientes estão usando este catálogo
+    const { count } = await supabase
+      .from("customers")
+      .select("id", { count: "exact", head: true })
+      .eq("price_table_id", catalog.id)
+      .eq("company_id", companyId);
+
+    if (count && count > 0) {
+      toast.error(`Não é possível deletar: existem ${count} cliente(s) vinculado(s) a este catálogo.`);
+      return;
+    }
+
+    // Deletar os itens (produtos) do catálogo antes, pois pode não haver ON DELETE CASCADE no banco
+    const { error: itemsError } = await supabase
+      .from("price_table_products")
+      .delete()
+      .eq("price_table_id", catalog.id);
+
+    if (itemsError) {
+      toast.error("Erro ao deletar os itens do catálogo.");
+      return;
+    }
+
     const { error } = await supabase
       .from("price_tables")
       .delete()
@@ -335,7 +358,7 @@ export function PriceTableManager() {
       .eq("company_id", companyId);
 
     if (error) {
-      toast.error("Erro ao deletar.");
+      toast.error("Erro ao deletar o catálogo principal.");
       return;
     }
 
@@ -345,7 +368,7 @@ export function PriceTableManager() {
       setEditingCatalog(null);
     }
 
-    toast.success("Deletado!");
+    toast.success("Catálogo deletado!");
   };
 
   if (loading) return <TableSkeleton />;
