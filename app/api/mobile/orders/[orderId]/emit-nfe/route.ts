@@ -306,8 +306,8 @@ export async function POST(_: Request, { params }: Params) {
         supabase,
         companyId,
         ref: result.ref,
-        poll: 2,
-        intervalMs: 1500,
+        poll: 15,
+        intervalMs: 2000,
       });
 
       if (!("error" in res) && res.data) {

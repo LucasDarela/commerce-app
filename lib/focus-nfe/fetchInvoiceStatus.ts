@@ -108,21 +108,26 @@ export async function fetchInvoiceStatus(
 
   let res = await once();
 
-  if (
-    poll > 0 &&
-    !("error" in res) &&
-    res.data &&
-    isAuthorized(res.data.status) &&
-    (!res.data.xml_url || !res.data.danfe_url)
-  ) {
+  const shouldPoll = (status?: string | null) => {
+    if (!status) return false;
+    const s = status.toString().toLowerCase();
+    // Poll se estiver processando OU se estiver autorizada mas sem links
+    const processing = s.includes("processando") || s === "pendente";
+    const authorizedNoLinks = s.includes("autorizad") && (!res.data?.xml_url || !res.data?.danfe_url);
+    return processing || authorizedNoLinks;
+  };
+
+  if (poll > 0 && !("error" in res) && shouldPoll(res.data?.status)) {
     for (let i = 0; i < poll; i++) {
       await sleep(intervalMs);
       const r = await once();
-      if (!("error" in r) && r.data && (r.data.xml_url || r.data.danfe_url)) {
+      if (!("error" in r) && r.data) {
         res = r;
-        break;
+        // Se parou de processar e já tem os links (se autorizada), podemos parar
+        if (!shouldPoll(r.data.status)) break;
+      } else {
+        res = r;
       }
-      res = r;
     }
   }
 
