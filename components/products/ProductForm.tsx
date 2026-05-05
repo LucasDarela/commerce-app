@@ -41,6 +41,10 @@ type ProductFormData = {
   pis: string;
   cofins: string;
   ipi: string;
+  vbc_st_ret: string;
+  pst: string;
+  vicms_substituto: string;
+  vicms_st_ret: string;
 };
 
 const defaultProductFormData: ProductFormData = {
@@ -66,6 +70,10 @@ const defaultProductFormData: ProductFormData = {
   pis: "",
   cofins: "",
   ipi: "",
+  vbc_st_ret: "",
+  pst: "",
+  vicms_substituto: "",
+  vicms_st_ret: "",
 };
 
 type ProductFormProps = {
@@ -186,6 +194,10 @@ export function ProductForm({
         pis: formData.pis || null,
         cofins: formData.cofins || null,
         ipi: formData.ipi || null,
+        vbc_st_ret: formData.vbc_st_ret ? Number(formData.vbc_st_ret.replace(",", ".")) : 0,
+        pst: formData.pst ? Number(formData.pst.replace(",", ".")) : 0,
+        vicms_substituto: formData.vicms_substituto ? Number(formData.vicms_substituto.replace(",", ".")) : 0,
+        vicms_st_ret: formData.vicms_st_ret ? Number(formData.vicms_st_ret.replace(",", ".")) : 0,
         company_id: companyId,
       };
 
@@ -553,6 +565,52 @@ return (
                 value={formData.ipi}
                 onChange={handleChange}
               />
+            </div>
+          </div>
+
+          <div className="pt-4 border-t border-dashed">
+            <h3 className="text-sm font-semibold mb-3">Dados de ST Retido (CST 60 / CSOSN 500)</h3>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="vbc_st_ret">vBCSTRet (Base de Cálculo ST Retido)</Label>
+                <Input
+                  id="vbc_st_ret"
+                  name="vbc_st_ret"
+                  placeholder="0,00"
+                  value={formData.vbc_st_ret}
+                  onChange={handleChange}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="pst">pST (Alíquota Suportada Final %)</Label>
+                <Input
+                  id="pst"
+                  name="pst"
+                  placeholder="0,00"
+                  value={formData.pst}
+                  onChange={handleChange}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="vicms_substituto">vICMSSubstituto (ICMS Substituto)</Label>
+                <Input
+                  id="vicms_substituto"
+                  name="vicms_substituto"
+                  placeholder="0,00"
+                  value={formData.vicms_substituto}
+                  onChange={handleChange}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="vicms_st_ret">vICMSSTRet (Valor ST Retido)</Label>
+                <Input
+                  id="vicms_st_ret"
+                  name="vicms_st_ret"
+                  placeholder="0,00"
+                  value={formData.vicms_st_ret}
+                  onChange={handleChange}
+                />
+              </div>
             </div>
           </div>
         </div>

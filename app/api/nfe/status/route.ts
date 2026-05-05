@@ -38,7 +38,7 @@ export async function POST(req: Request) {
   const supabase = await createSupabaseRouteClient();
 
   try {
-    const { ref, companyId: companyIdFromBody } = await req.json();
+    const { ref, companyId: bodyCompanyId } = await req.json();
 
     if (!ref) {
       return NextResponse.json(
@@ -47,36 +47,35 @@ export async function POST(req: Request) {
       );
     }
 
-    let companyId: string | undefined = companyIdFromBody;
+    const {
+      data: { user },
+      error: userErr,
+    } = await supabase.auth.getUser();
 
-    if (!companyId) {
-      const {
-        data: { user },
-        error: userErr,
-      } = await supabase.auth.getUser();
-
-      if (userErr || !user) {
-        return NextResponse.json(
-          { error: "Não autenticado" },
-          { status: 401, headers: { "Cache-Control": "no-store" } },
-        );
-      }
-
-      const { data: cu } = await supabase
-        .from("company_users")
-        .select("company_id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      companyId = cu?.company_id ?? undefined;
-    }
-
-    if (!companyId) {
+    if (userErr || !user) {
       return NextResponse.json(
-        { error: "companyId não encontrado" },
-        { status: 400, headers: { "Cache-Control": "no-store" } },
+        { error: "Não autenticado" },
+        { status: 401, headers: { "Cache-Control": "no-store" } },
       );
     }
+
+    // --- Multi-tenant fix: Verify company membership ---
+    let query = supabase.from("company_users").select("company_id").eq("user_id", user.id);
+    
+    if (bodyCompanyId) {
+      query = query.eq("company_id", bodyCompanyId);
+    }
+
+    const { data: membership, error: compErr } = await query.maybeSingle();
+
+    if (compErr || !membership?.company_id) {
+      return NextResponse.json(
+        { error: "Acesso negado ou empresa não encontrada" },
+        { status: 403, headers: { "Cache-Control": "no-store" } },
+      );
+    }
+
+    const companyId = membership.company_id;
 
     const res = await fetchInvoiceStatus({ supabase, companyId, ref });
 

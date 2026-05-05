@@ -9,7 +9,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import NotificationsBell from "@/components/notifications/NotificationsBell";
 import RefreshButton from "./nf/RefreshButton";
-import { RefreshWindowButton } from "./refrash-window-button";
+import { RefreshWindowButton } from "./refresh-window-button";
 import { Button } from "./ui/button";
 import { useBreadcrumbStore } from "@/hooks/useBreadcrumb";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
@@ -29,7 +29,10 @@ export function SiteHeader() {
       .replace(/-/g, " ")
       .replace(/\b\w/g, (l) => l.toUpperCase());
 
-    return { href, label };
+    // Detect if the segment is a UUID (common for IDs in this app)
+    const isId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(segment);
+
+    return { href, label, isId };
   });
 
   return (
@@ -58,7 +61,7 @@ export function SiteHeader() {
           {breadcrumbs.map((crumb, index) => (
             <span key={index} className="flex items-center gap-1">
               <span className="mx-1">/</span>
-              {index === breadcrumbs.length - 1 ? (
+              {index === breadcrumbs.length - 1 || crumb.isId ? (
                 <span className="text-foreground">{crumb.label}</span>
               ) : (
                 <Link href={crumb.href} className="hover:underline">

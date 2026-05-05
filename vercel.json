@@ -5,8 +5,8 @@
       "schedule": "30 11 * * *"
     },
     {
-      "path": "/api/nfe/cron/fetch-links",
-      "schedule": "0 * * * *"
+      "path": "/api/nfe/cron/check-status",
+      "schedule": "* * * * *"
     }
   ]
 }

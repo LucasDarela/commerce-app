@@ -23,7 +23,7 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { invoiceData } = body;
+    const { invoiceData, companyId: bodyCompanyId } = body;
 
     if (!invoiceData) {
       return NextResponse.json(
@@ -32,20 +32,22 @@ export async function POST(req: Request) {
       );
     }
 
-    const { data: companyRow, error: compErr } = await supabase
+    // --- Multi-tenant fix: Verify company membership ---
+    const { data: membership, error: compErr } = await supabase
       .from("company_users")
       .select("company_id")
       .eq("user_id", user.id)
+      .eq("company_id", bodyCompanyId || "")
       .maybeSingle();
 
-    if (compErr || !companyRow?.company_id) {
+    if (compErr || !membership?.company_id) {
       return NextResponse.json(
-        { error: "company_id não encontrado para o usuário" },
+        { error: "Você não tem permissão para esta empresa ou company_id inválido." },
         { status: 403 },
       );
     }
 
-    const companyId = companyRow.company_id;
+    const companyId = membership.company_id;
 
     const parse = invoiceSchema.safeParse(invoiceData);
     if (!parse.success) {

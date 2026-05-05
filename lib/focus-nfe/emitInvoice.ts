@@ -63,6 +63,12 @@ export async function emitInvoice({
   const token = String(cred.focus_token)
     .trim()
     .replace(/\r?\n|\r/g, "");
+
+  const maskedToken = `${token.substring(0, 4)}...${token.substring(token.length - 4)}`;
+  console.log(
+    `[Focus NFe] Usando ambiente: ${env} | Token (mascarado): ${maskedToken}`,
+  );
+
   const auth = `Basic ${Buffer.from(`${token}:`).toString("base64")}`;
 
   // 1 = Simples; 4 = MEI; 3 = Regime normal
@@ -73,7 +79,7 @@ export async function emitInvoice({
     .maybeSingle();
 
   const crt = Number(comp?.regime_tributario);
-const isSN = crt === 1 || crt === 2 || crt === 4;
+  const isSN = crt === 1 || crt === 2 || crt === 4;
 
   // 3) Normalizações de emitente/destinatário
   if (invoiceData?.emitente?.cpf_cnpj)
@@ -105,7 +111,7 @@ const isSN = crt === 1 || crt === 2 || crt === 4;
   const payload = {
     // envie apenas os campos aceitos pela Focus (opcional, mas limpo)
     ref: invoiceData.ref,
-    ambiente: invoiceData.ambiente,
+    ambiente: env === "producao" ? "1" : "2",
     // note_number: invoiceData.note_number,
     // order_id: invoiceData.order_id,
     data_emissao: invoiceData.data_emissao,
@@ -145,55 +151,71 @@ const isSN = crt === 1 || crt === 2 || crt === 4;
     pais_destinatario: invoiceData.pais_destinatario,
 
     presenca_comprador: invoiceData.presenca_comprador,
-    serie: invoiceData.serie ?? "1",
+    // Removido 'serie' para deixar o Painel da Focus assumir a série padrão configurada lá
     url_notificacao: `${
       process.env.NEXT_PUBLIC_APP_URL ||
       process.env.NEXT_PUBLIC_SITE_URL ||
       process.env.SITE_URL ||
-      ""
+      "https://www.chopphub.com"
     }/api/nfe/webhook`,
 
     // 👈 AQUI: envie o ARRAY completo
-    itens: items.map((it, idx) => ({
-      numero_item: it.numero_item,
-      codigo_produto: it.codigo_produto,
-      descricao: it.descricao,
-      cfop: it.cfop,
-      codigo_ncm: it.codigo_ncm,
-      codigo_cest: it.codigo_cest,
-      unidade_comercial: it.unidade_comercial,
-      quantidade_comercial: it.quantidade_comercial,
-      valor_unitario_comercial: it.valor_unitario_comercial,
-      unidade_tributavel: it.unidade_tributavel,
-      quantidade_tributavel: it.quantidade_tributavel,
-      valor_unitario_tributavel: it.valor_unitario_tributavel,
-      valor_bruto_produto: it.valor_bruto ?? it.valor_bruto_produto,
-      valor_frete: freightParts[idx] ?? 0,
-      icms_origem: String(it.icms_origem ?? "0"),
+    itens: items.map((it, idx) => {
+      const isCST60 =
+        String(it.icms_situacao_tributaria) === "60" ||
+        String(it.icms_situacao_tributaria) === "500";
 
-      icms_situacao_tributaria: String(
-        isSN
-          ? (it.icms_situacao_tributaria ?? "102")
-          : (it.icms_situacao_tributaria ?? "00")
-      ),  
+      return {
+        numero_item: it.numero_item,
+        codigo_produto: it.codigo_produto,
+        descricao: it.descricao,
+        cfop: it.cfop,
+        codigo_ncm: it.codigo_ncm,
+        codigo_cest: it.codigo_cest,
+        unidade_comercial: it.unidade_comercial,
+        quantidade_comercial: it.quantidade_comercial,
+        valor_unitario_comercial: it.valor_unitario_comercial,
+        unidade_tributavel: it.unidade_tributavel,
+        quantidade_tributavel: it.quantidade_tributavel,
+        valor_unitario_tributavel: it.valor_unitario_tributavel,
+        valor_bruto_produto: it.valor_bruto ?? it.valor_bruto_produto,
+        valor_frete: freightParts[idx] ?? 0,
+        icms_origem: String(it.icms_origem ?? "0"),
 
-      pis_situacao_tributaria: String(
-        it.pis_situacao_tributaria ?? "",
-      ).padStart(2, "0"),
-      cofins_situacao_tributaria: String(
-        it.cofins_situacao_tributaria ?? "",
-      ).padStart(2, "0"),
+        ...(isCST60
+          ? {
+              icms_situacao_tributaria: "60",
+              icms_base_calculo_retido_st: Number(it.vbc_st_ret ?? 0),
+              icms_aliquota_final: Number(it.pst ?? 0),
+              icms_valor_substituto: Number(it.vicms_substituto ?? 0),
+              icms_valor_retido_st: Number(it.vicms_st_ret ?? 0),
+            }
+          : {
+              icms_situacao_tributaria: isSN
+                ? String(it.icms_situacao_tributaria ?? "102")
+                : String(it.icms_situacao_tributaria ?? "00"),
+              valor_bc_icms: Number(it.valor_bc_icms ?? 0),
+              aliquota_icms: Number(it.aliquota_icms ?? 0),
+              valor_icms: Number(it.valor_icms ?? 0),
+            }),
 
-      // Campos ST (somente se houver)
-    ...((!isSN && String(it.icms_situacao_tributaria) === "60")
-      ? {
-          vbc_st_ret: Number(it.vbc_st_ret),
-          pst: Number(it.pst),
-          vicms_substituto: Number(it.vicms_substituto),
-          vicms_st_ret: Number(it.vicms_st_ret),
-        }
-      : {}),
-    })),
+        // PIS
+        pis_situacao_tributaria: String(
+          it.pis_situacao_tributaria ?? it.pis ?? "06",
+        ).padStart(2, "0"),
+        valor_bc_pis: 0,
+        aliquota_pis: 0,
+        valor_pis: 0,
+
+        // COFINS
+        cofins_situacao_tributaria: String(
+          it.cofins_situacao_tributaria ?? it.cofins ?? "06",
+        ).padStart(2, "0"),
+        valor_bc_cofins: 0,
+        aliquota_cofins: 0,
+        valor_cofins: 0,
+      };
+    }),
   };
 
   // 5) Referência que vai na query (?ref=)
@@ -203,22 +225,6 @@ const isSN = crt === 1 || crt === 2 || crt === 4;
 
   // 6) Sanitize: remove undefined/null
   const finalPayload = JSON.parse(JSON.stringify({ ...payload }));
-
-for (const it of payload.itens) {
-if (!isSN && String((it as any).icms_situacao_tributaria) === "60") {
-    const falta =
-      it.vbc_st_ret == null ||
-      it.pst == null ||
-      it.vicms_substituto == null ||
-      it.vicms_st_ret == null;
-
-    if (falta) {
-      throw new Error(
-        "ICMS 60 (ST) sem os campos obrigatórios: vbc_st_ret, pst, vicms_substituto, vicms_st_ret.",
-      );
-    }
-  }
-}
 
   const sumFreightItems = payload.itens.reduce(
     (s: number, it: any) => s + Number(it.valor_frete || 0),
@@ -236,11 +242,9 @@ if (!isSN && String((it as any).icms_situacao_tributaria) === "60") {
     payload: finalPayload,
   });
 
-  // opcional: log “flat” pra ficar mais fácil de ler
-  console.log("[FOCUS REQUEST JSON]", JSON.stringify(finalPayload, null, 2));
-
   // 7) Chamada Focus
   const url = `${baseURL}/nfe?ref=${encodeURIComponent(ref)}`;
+
   const resp = await fetch(url, {
     method: "POST",
     headers: {

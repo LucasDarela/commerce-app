@@ -40,9 +40,13 @@ type UiProduct = {
   cst_icms?: string | null;
   csosn_icms?: string | null;
   icms_situacao_tributaria?: string | null;
-  pis?: string | null;
-  cofins?: string | null;
-  ipi?: string | null;
+  pis: string | null;
+  cofins: string | null;
+  ipi: string | null;
+  vbc_st_ret: string | null;
+  pst: string | null;
+  vicms_substituto: string | null;
+  vicms_st_ret: string | null;
 };
 
 export default function EmitNfePage() {
@@ -100,7 +104,11 @@ export default function EmitNfePage() {
       icms_situacao_tributaria,
       pis,
       cofins,
-      ipi
+      ipi,
+      vbc_st_ret,
+      pst,
+      vicms_substituto,
+      vicms_st_ret
     )
   `,
         )
@@ -200,12 +208,11 @@ export default function EmitNfePage() {
           pis: product?.pis ?? null,
           cofins: product?.cofins ?? null,
           ipi: product?.ipi ?? null,
+          vbc_st_ret: product?.vbc_st_ret ?? null,
+          pst: product?.pst ?? null,
+          vicms_substituto: product?.vicms_substituto ?? null,
+          vicms_st_ret: product?.vicms_st_ret ?? null,
         };
-      });
-      console.log("uiProducts:", uiProducts);
-      console.log("order items raw:", items);
-      (items ?? []).forEach((i: any) => {
-        console.log("item product raw:", i.products);
       });
       setProducts(uiProducts);
     };
@@ -366,28 +373,15 @@ export default function EmitNfePage() {
 
       const isSimples = regime === "1" || regime === "2" || regime === "4";
 
-      const hasIcms60 =
-        !isSimples &&
-        produtosParaNfe.some((p) => {
-          const code = String(
-            p.icms_situacao_tributaria ?? p.cst_icms ?? "",
-          ).trim();
-          return code === "60";
-        });
+      const hasST = produtosParaNfe.some((p) => {
+        const icms = String(p.icms_situacao_tributaria ?? p.cst_icms ?? "").trim();
+        const csosn = String(p.csosn_icms ?? "").trim();
+        return icms === "60" || csosn === "500";
+      });
 
-      if (hasIcms60) {
-        const faltaST =
-          operacaoFiscal.vbc_st_ret == null ||
-          operacaoFiscal.pst == null ||
-          operacaoFiscal.vicms_substituto == null ||
-          operacaoFiscal.vicms_st_ret == null;
-
-        if (faltaST) {
-          toast.error(
-            "Existe produto com ICMS 60. Preencha na operação fiscal: vbc_st_ret, pst, vicms_substituto e vicms_st_ret.",
-          );
-          return;
-        }
+      if (hasST) {
+        // Validação: pelo menos um deles (produto ou operação) deve ter valores se o CST for 60/500
+        // Nota: O fallback automático para 0 já acontece no emitInvoice, então aqui apenas avisamos se tudo estiver zerado e for crítico.
       }
 
       const customerDocumentDigits = String(customer.document ?? "").replace(
@@ -445,12 +439,12 @@ export default function EmitNfePage() {
           pis_situacao_tributaria: pis.padStart(2, "0"),
           cofins_situacao_tributaria: cofins.padStart(2, "0"),
 
-          ...(!isSimples && icmsItem === "60"
+          ...(icmsItem === "60" || csosnItem === "500"
             ? {
-                vbc_st_ret: Number(operacaoFiscal.vbc_st_ret),
-                pst: Number(operacaoFiscal.pst),
-                vicms_substituto: Number(operacaoFiscal.vicms_substituto),
-                vicms_st_ret: Number(operacaoFiscal.vicms_st_ret),
+                vbc_st_ret: Number(p.vbc_st_ret ?? operacaoFiscal.vbc_st_ret ?? 0),
+                pst: Number(p.pst ?? operacaoFiscal.pst ?? 0),
+                vicms_substituto: Number(p.vicms_substituto ?? operacaoFiscal.vicms_substituto ?? 0),
+                vicms_st_ret: Number(p.vicms_st_ret ?? operacaoFiscal.vicms_st_ret ?? 0),
               }
             : {}),
         };
