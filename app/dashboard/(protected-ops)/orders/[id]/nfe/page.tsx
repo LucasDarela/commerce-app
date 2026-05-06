@@ -8,6 +8,16 @@ import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { Label } from "@/components/ui/label";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { emitInvoice } from "@/lib/focus-nfe/emitInvoice";
+import {
   Select,
   SelectTrigger,
   SelectValue,
@@ -62,6 +72,10 @@ export default function EmitNfePage() {
   const [operations, setOperations] = useState<any[]>([]);
   const [selectedOperation, setSelectedOperation] = useState<string>("");
   const [loading, setLoading] = useState(false);
+  const [showNumberModal, setShowNumberModal] = useState(false);
+  const [nextNumber, setNextNumber] = useState<string>("");
+  const [nextSerie, setNextSerie] = useState<string>("");
+  const [lastNfeStatus, setLastNfeStatus] = useState<string | null>(null);
 
   useEffect(() => {
     if (!companyId || !id) return;
@@ -101,7 +115,6 @@ export default function EmitNfePage() {
       icms_origem,
       cst_icms,
       csosn_icms,
-      icms_situacao_tributaria,
       pis,
       cofins,
       ipi,
@@ -215,6 +228,23 @@ export default function EmitNfePage() {
         };
       });
       setProducts(uiProducts);
+
+      // 6) Verificar se já existe nota (e se foi cancelada)
+      const { data: nfeData } = await supabase
+        .from("nfe")
+        .select("*")
+        .eq("order_id", id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (nfeData) {
+        setLastNfeStatus(nfeData.status);
+        if (nfeData.numero) {
+          setNextNumber(String(Number(nfeData.numero) + 1));
+          setNextSerie(String(nfeData.serie || ""));
+        }
+      }
     };
 
     fetchAll();
@@ -246,8 +276,14 @@ export default function EmitNfePage() {
     return Number(totalProdutosLiquido) + Number(freight);
   }, [totalProdutosLiquido, freight]);
 
-  const handleEmit = async () => {
+  const handleEmit = async (manualNumber?: string, manualSerie?: string) => {
     if (loading) return;
+
+    // Se já teve nota cancelada e NÃO estamos passando um número manual ainda, abre o modal
+    if (lastNfeStatus === "cancelado" && !manualNumber && !showNumberModal) {
+      setShowNumberModal(true);
+      return;
+    }
 
     if (!operacaoFiscal)
       return toast.error("Selecione um tipo de operação fiscal");
@@ -287,7 +323,7 @@ export default function EmitNfePage() {
 
     // 🔴 valida CFOP
     const invalidProductCfop = produtosParaNfe.find((p) => {
-      const cfop = String(p.cfop || operacaoFiscal.cfop || "").replace(
+      const cfop = String(p.cfop || "").replace(
         /\D/g,
         "",
       );
@@ -398,7 +434,7 @@ export default function EmitNfePage() {
       }
 
       const items = produtosParaNfe.map((p, index) => {
-        const cfop = String(p.cfop || operacaoFiscal.cfop || "").replace(
+        const cfop = String(p.cfop || "").replace(
           /\D/g,
           "",
         );
@@ -406,9 +442,7 @@ export default function EmitNfePage() {
         const cest = String(p.cest || "").replace(/\D/g, "");
         const pis = String(p.pis ?? "").replace(/\D/g, "");
         const cofins = String(p.cofins ?? "").replace(/\D/g, "");
-        const icmsItem = String(
-          p.icms_situacao_tributaria ?? p.cst_icms ?? "",
-        ).trim();
+        const icmsItem = String(p.cst_icms ?? p.csosn_icms ?? "").trim();
 
         const csosnItem = String(p.csosn_icms ?? "").trim();
 
@@ -434,10 +468,30 @@ export default function EmitNfePage() {
               }
             : {
                 icms_situacao_tributaria: icmsItem || "00",
+                valor_bc_icms: Number(p.price) * Number(p.netQty),
+                aliquota_icms: Number(operacaoFiscal.aliquota_icms || 17),
+                valor_icms: ((Number(p.price) * Number(p.netQty) * Number(operacaoFiscal.aliquota_icms || 17)) / 100),
               }),
 
           pis_situacao_tributaria: pis.padStart(2, "0"),
+          aliquota_pis: Number(operacaoFiscal.aliquota_pis || 1.65),
+          valor_bc_pis: Number(p.price) * Number(p.netQty),
+          valor_pis: ((Number(p.price) * Number(p.netQty) * Number(operacaoFiscal.aliquota_pis || 1.65)) / 100).toFixed(2),
           cofins_situacao_tributaria: cofins.padStart(2, "0"),
+          aliquota_cofins: Number(operacaoFiscal.aliquota_cofins || 7.6),
+          valor_bc_cofins: Number(p.price) * Number(p.netQty),
+          valor_cofins: ((Number(p.price) * Number(p.netQty) * Number(operacaoFiscal.aliquota_cofins || 7.6)) / 100).toFixed(2),
+
+          // Reforma Tributária 2026 (IBS / CBS)
+          ibs_situacao_tributaria: "01",
+          aliquota_ibs: Number(operacaoFiscal.aliquota_ibs || 17.7),
+          valor_bc_ibs: Number(p.price) * Number(p.netQty),
+          valor_ibs: ((Number(p.price) * Number(p.netQty) * Number(operacaoFiscal.aliquota_ibs || 17.7)) / 100).toFixed(2),
+
+          cbs_situacao_tributaria: "01",
+          aliquota_cbs: Number(operacaoFiscal.aliquota_cbs || 8.8),
+          valor_bc_cbs: Number(p.price) * Number(p.netQty),
+          valor_cbs: ((Number(p.price) * Number(p.netQty) * Number(operacaoFiscal.aliquota_cbs || 8.8)) / 100).toFixed(2),
 
           ...(icmsItem === "60" || csosnItem === "500"
             ? {
@@ -451,8 +505,9 @@ export default function EmitNfePage() {
       });
 
       const invoiceData = {
-        ambiente: "1",
-        note_number: order?.note_number,
+        ambiente: emissor.environment || "homologacao",
+        numero: manualNumber || undefined,
+        serie: manualSerie || undefined,
         order_id: id,
 
         data_emissao: hoje,
@@ -501,6 +556,10 @@ export default function EmitNfePage() {
         pais_destinatario: "Brasil",
 
         presenca_comprador: operacaoFiscal.presenca_comprador || "1",
+        id_dest: Number(operacaoFiscal.local_destino || 1),
+        consumidor_final: Number(operacaoFiscal.consumidor_final || 1),
+        indicador_inscricao_estadual_destinatario: 
+          customer.state_registration?.trim() && customer.state_registration !== "ISENTO" ? 1 : 9,
         items,
       };
 
@@ -613,16 +672,54 @@ export default function EmitNfePage() {
 
       <Button
         className="mt-4 flex items-center gap-2"
-        onClick={handleEmit}
+        onClick={() => handleEmit()}
         disabled={loading || !selectedOperation}
       >
         {loading && <Loader2 className="w-4 h-4 animate-spin" />}
         {loading ? "Emitindo NF-e..." : "Emitir NF-e"}
       </Button>
 
-      {/* <Button variant="outline" onClick={handleDebugNfe}>
-        Debug NF-e
-      </Button> */}
+      <Dialog open={showNumberModal} onOpenChange={setShowNumberModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nota Anterior Cancelada</DialogTitle>
+            <DialogDescription>
+              Detectamos que este pedido já possui uma nota cancelada. 
+              Para emitir uma nova, você deve informar o próximo número da sequência.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="number" className="text-right">Número</Label>
+              <Input
+                id="number"
+                value={nextNumber}
+                onChange={(e) => setNextNumber(e.target.value)}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="serie" className="text-right">Série</Label>
+              <Input
+                id="serie"
+                value={nextSerie}
+                onChange={(e) => setNextSerie(e.target.value)}
+                className="col-span-3"
+                placeholder="Ex: 1"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowNumberModal(false)}>Cancelar</Button>
+            <Button onClick={() => {
+              setShowNumberModal(false);
+              handleEmit(nextNumber, nextSerie);
+            }}>
+              Emitir com Novo Número
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -71,8 +71,6 @@ export async function POST(req: Request) {
       "processando_autorizacao",
       "autorizado",
       "autorizada",
-      "cancelado",
-      "cancelada",
     ];
 
     const { data: ativa } = await supabase
@@ -100,7 +98,10 @@ export async function POST(req: Request) {
 
     const prev = previous?.[0];
     const isRetry =
-      prev?.status === "nota_rejeitada" || prev?.status === "erro_autorizacao";
+      prev?.status === "nota_rejeitada" || 
+      prev?.status === "erro_autorizacao" ||
+      prev?.status === "cancelado" ||
+      prev?.status === "cancelada";
 
     invoiceData.serie = invoiceData.serie || prev?.serie || "1";
 
@@ -141,9 +142,14 @@ export async function POST(req: Request) {
     }
 
     const baseRef = `${invoiceData.note_number}`;
+    const numSuffix = invoiceData.numero ? `_n${invoiceData.numero}` : "";
+
+    const isActuallyCancelled = prev?.status === "cancelado" || prev?.status === "cancelada";
 
     invoiceData.ref =
-      isRetry && prev?.ref ? prev.ref : `${baseRef}_s${invoiceData.serie}`;
+      (isRetry && !isActuallyCancelled && prev?.ref) 
+        ? prev.ref 
+        : `${baseRef}${numSuffix}_s${invoiceData.serie}`;
 
     console.log("[NFe create] ref gerada:", invoiceData.ref, {
       isRetry,
@@ -153,16 +159,11 @@ export async function POST(req: Request) {
       userId: user.id,
     });
 
-    if (isRetry && prev?.numero && Number(prev.numero) > 0) {
+    if (!invoiceData.numero && isRetry && prev?.numero && Number(prev.numero) > 0) {
       invoiceData.numero = Number(prev.numero);
-    } else if ("numero" in invoiceData) {
-      delete invoiceData.numero;
     }
 
-    const numeroParaBanco =
-      isRetry && prev?.numero && Number(prev.numero) > 0
-        ? Number(prev.numero)
-        : null;
+    const numeroParaBanco = invoiceData.numero ? Number(invoiceData.numero) : null;
 
     const result = await emitInvoice({
       companyId,

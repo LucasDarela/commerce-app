@@ -124,6 +124,8 @@ export async function emitInvoice({
     valor_seguro: invoiceData.valor_seguro,
     valor_produtos: invoiceData.valor_produtos,
     valor_total: invoiceData.valor_total,
+    id_dest: invoiceData.id_dest || 1,
+    consumidor_final: invoiceData.consumidor_final || 1,
     nome_emitente: invoiceData.nome_emitente,
     nome_fantasia_emitente: invoiceData.nome_fantasia_emitente,
     cnpj_emitente: invoiceData.cnpj_emitente,
@@ -149,15 +151,22 @@ export async function emitInvoice({
     uf_destinatario: invoiceData.uf_destinatario,
     cep_destinatario: invoiceData.cep_destinatario,
     pais_destinatario: invoiceData.pais_destinatario,
-
+    indicador_inscricao_estadual_destinatario: invoiceData.indicador_inscricao_estadual_destinatario || 9,
+ 
     presenca_comprador: invoiceData.presenca_comprador,
-    // Removido 'serie' para deixar o Painel da Focus assumir a série padrão configurada lá
+ 
+    // Manual numbering (optional)
+    ...(invoiceData.numero ? { numero: invoiceData.numero } : {}),
+    ...(invoiceData.serie ? { serie: invoiceData.serie } : {}),
+ 
     url_notificacao: `${
       process.env.NEXT_PUBLIC_APP_URL ||
       process.env.NEXT_PUBLIC_SITE_URL ||
       process.env.SITE_URL ||
       "https://www.chopphub.com"
     }/api/nfe/webhook`,
+
+
 
     // 👈 AQUI: envie o ARRAY completo
     itens: items.map((it, idx) => {
@@ -199,24 +208,49 @@ export async function emitInvoice({
               valor_icms: Number(it.valor_icms ?? 0),
             }),
 
+        // Reforma Tributária 2026 - Padrão Focus Oficial
+        ibs_cbs_situacao_tributaria: it.ibs_cbs_situacao_tributaria || "01",
+        ibs_uf_aliquota: Number(it.aliquota_ibs ?? 0),
+        ibs_uf_valor: Number(it.valor_ibs ?? 0),
+        cbs_aliquota: Number(it.aliquota_cbs ?? 0),
+        cbs_valor: Number(it.cbs_valor ?? it.valor_cbs ?? 0),
+
+        // Mantém legados/duplicidade segura para garantir o texto nas informações adicionais
+        ibs_situacao_tributaria: String(it.ibs_situacao_tributaria ?? "01").padStart(2, "0"),
+        aliquota_ibs: Number(it.aliquota_ibs ?? 0),
+        valor_ibs: Number(it.valor_ibs ?? 0),
+        cbs_situacao_tributaria: String(it.cbs_situacao_tributaria ?? "01").padStart(2, "0"),
+        aliquota_cbs: Number(it.aliquota_cbs ?? 0),
+        valor_cbs: Number(it.valor_cbs ?? 0),
+
         // PIS
         pis_situacao_tributaria: String(
           it.pis_situacao_tributaria ?? it.pis ?? "06",
         ).padStart(2, "0"),
-        valor_bc_pis: 0,
-        aliquota_pis: 0,
-        valor_pis: 0,
+        valor_bc_pis: Number(it.valor_bc_pis ?? 0),
+        aliquota_pis: Number(it.aliquota_pis ?? 0),
+        valor_pis: Number(it.valor_pis ?? 0),
 
         // COFINS
         cofins_situacao_tributaria: String(
           it.cofins_situacao_tributaria ?? it.cofins ?? "06",
         ).padStart(2, "0"),
-        valor_bc_cofins: 0,
-        aliquota_cofins: 0,
-        valor_cofins: 0,
+        valor_bc_cofins: Number(it.valor_bc_cofins ?? 0),
+        aliquota_cofins: Number(it.aliquota_cofins ?? 0),
+        valor_cofins: Number(it.valor_cofins ?? 0),
+
+        informacoes_adicionais_item: `IBS: R$ ${Number(it.valor_ibs || 0).toFixed(2)} (${it.aliquota_ibs}%) | CBS: R$ ${Number(it.valor_cbs || 0).toFixed(2)} (${it.aliquota_cbs}%)`,
       };
     }),
+
+    informacoes_adicionais_contribuinte: [
+      invoiceData.informacoes_adicionais_contribuinte,
+      `Trib. Reforma 2026: IBS Total R$ ${items.reduce((acc, it) => acc + Number(it.valor_ibs || 0), 0).toFixed(2)} | CBS Total R$ ${items.reduce((acc, it) => acc + Number(it.valor_cbs || 0), 0).toFixed(2)}`,
+      "Emitido por ChoppHub - Tecnologia para Distribuidores"
+    ].filter(Boolean).join(" | ")
   };
+
+  console.log("Focus NFe - Itens Mapeados:", JSON.stringify(payload.itens, null, 2));
 
   // 5) Referência que vai na query (?ref=)
   const ref =
@@ -225,6 +259,8 @@ export async function emitInvoice({
 
   // 6) Sanitize: remove undefined/null
   const finalPayload = JSON.parse(JSON.stringify({ ...payload }));
+
+  console.log("Focus NFe - Payload:", JSON.stringify(finalPayload, null, 2));
 
   const sumFreightItems = payload.itens.reduce(
     (s: number, it: any) => s + Number(it.valor_frete || 0),

@@ -22,20 +22,46 @@ const itemSchema = z
     icms_situacao_tributaria: z
       .string()
       .regex(/^\d{2,3}$/),  
+    valor_bc_icms: z.number().optional(),
+    aliquota_icms: z.number().optional(),
+    valor_icms: z.number().optional(),
 
     pis_situacao_tributaria: z
       .string()
       .regex(/^\d{2}$/, "PIS deve ter 2 dígitos"),
+    valor_bc_pis: z.number().optional(),
+    aliquota_pis: z.number().optional(),
+    valor_pis: z.union([z.number(), z.string()]).optional(),
 
     cofins_situacao_tributaria: z
       .string()
       .regex(/^\d{2}$/, "COFINS deve ter 2 dígitos"),
+    valor_bc_cofins: z.number().optional(),
+    aliquota_cofins: z.number().optional(),
+    valor_cofins: z.union([z.number(), z.string()]).optional(),
 
     // ST – opcionais
     vbc_st_ret: z.number().optional(),
     pst: z.number().optional(),
     vicms_substituto: z.number().optional(),
     vicms_st_ret: z.number().optional(),
+
+    // Reforma 2026 - Padrão Focus
+    ibs_cbs_situacao_tributaria: z.string().optional(),
+    ibs_uf_aliquota: z.union([z.number(), z.string()]).optional(),
+    ibs_uf_valor: z.union([z.number(), z.string()]).optional(),
+    cbs_aliquota: z.union([z.number(), z.string()]).optional(),
+    cbs_valor: z.union([z.number(), z.string()]).optional(),
+
+    // Reforma 2026 - Legados
+    ibs_situacao_tributaria: z.string().optional(),
+    aliquota_ibs: z.number().optional(),
+    valor_bc_ibs: z.number().optional(),
+    valor_ibs: z.union([z.number(), z.string()]).optional(),
+    cbs_situacao_tributaria: z.string().optional(),
+    aliquota_cbs: z.number().optional(),
+    valor_bc_cbs: z.number().optional(),
+    valor_cbs: z.union([z.number(), z.string()]).optional(),
   })
   .superRefine((it, ctx) => {
 
@@ -61,10 +87,13 @@ const itemSchema = z
 export const invoiceSchema = z
   .object({
     ref: z.string().optional(),
-    ambiente: z.enum(["1", "2"]),
+    ambiente: z.enum(["1", "2", "homologacao", "producao"]),
     order_id: z.string().uuid(),
-    numero: z.number().int().positive().optional(),
+    numero: z.union([z.number(), z.string()]).optional(),
     serie: z.string().optional(),
+    id_dest: z.number().optional(),
+    consumidor_final: z.number().optional(),
+    indicador_inscricao_estadual_destinatario: z.number().optional(),
     natureza_operacao: z.string().min(1, "Obrigatório"),
     data_emissao: z.string(),
     data_entrada_saida: z.string(),
@@ -74,6 +103,8 @@ export const invoiceSchema = z
       z.literal(2),
       z.literal(3),
       z.literal(4),
+      z.literal(5),
+      z.literal(6),
     ]),
 
     cnpj_emitente: z.string(),
@@ -115,6 +146,12 @@ export const invoiceSchema = z
       z.literal(4),
       z.literal(9),
     ]),
+
+    // Reforma 2026 Totais
+    ibs_valor_total: z.number().optional(),
+    cbs_valor_total: z.number().optional(),
+    ibs_cbs_base_calculo: z.number().optional(),
+    ibs_cbs_is_valor_total: z.number().optional(),
 
     items: z.array(itemSchema).min(1, "A nota precisa ter pelo menos 1 item"),
   })

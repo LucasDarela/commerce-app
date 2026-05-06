@@ -23,7 +23,6 @@ type ProductFormData = {
   name: string;
   manufacturer: string;
   standard_price: string;
-  percentage_taxes: string;
   material_class: string;
   submaterial_class: string;
   material_origin: string;
@@ -52,7 +51,6 @@ const defaultProductFormData: ProductFormData = {
   name: "",
   manufacturer: "",
   standard_price: "",
-  percentage_taxes: "",
   material_class: "",
   submaterial_class: "",
   material_origin: "National",
@@ -177,7 +175,6 @@ export function ProductForm({
         name: formData.name,
         manufacturer: formData.manufacturer || null,
         standard_price: Number(formData.standard_price.replace(",", ".")),
-        percentage_taxes: formData.percentage_taxes || null,
         material_class: formData.material_class || null,
         submaterial_class: formData.submaterial_class || null,
         material_origin: formData.material_origin || null,
@@ -190,7 +187,6 @@ export function ProductForm({
         icms_origem: formData.icms_origem || null,
         cst_icms: formData.cst_icms || null,
         csosn_icms: formData.csosn_icms || null,
-        icms_situacao_tributaria: formData.icms_situacao_tributaria || null,
         pis: formData.pis || null,
         cofins: formData.cofins || null,
         ipi: formData.ipi || null,
@@ -211,7 +207,8 @@ export function ProductForm({
           .single();
 
         if (error || !createdProduct) {
-          throw new Error("Erro ao criar produto.");
+          console.error("Erro detalhado do Supabase (insert):", error);
+          throw new Error(`Erro ao criar produto: ${error?.message || "Desconhecido"}`);
         }
 
         savedProductId = createdProduct.id;
@@ -223,7 +220,8 @@ export function ProductForm({
           .eq("company_id", companyId);
 
         if (error) {
-          throw new Error("Erro ao atualizar produto.");
+          console.error("Erro detalhado do Supabase:", error);
+          throw new Error(`Erro ao atualizar produto: ${error.message}`);
         }
       }
 
@@ -414,18 +412,8 @@ return (
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-1">
             <div className="space-y-2">
-              <Label htmlFor="percentage_taxes">Tributos (%)</Label>
-              <Input
-                id="percentage_taxes"
-                name="percentage_taxes"
-                value={formData.percentage_taxes}
-                onChange={handleChange}
-              />
-            </div>
-
-            <div className="space-y-2 md:col-span-2">
               <Label>Aplicação do Material</Label>
               <Select
                 value={formData.aplication}
