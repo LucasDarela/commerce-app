@@ -209,19 +209,13 @@ export async function emitInvoice({
             }),
 
         // Reforma Tributária 2026 - Padrão Focus Oficial
-        ibs_cbs_situacao_tributaria: it.ibs_cbs_situacao_tributaria || "01",
+        ibs_cbs_situacao_tributaria: String(it.ibs_cbs_situacao_tributaria || "000").padStart(3, "0"),
+        ibs_cbs_classificacao_tributaria: it.ibs_cbs_classificacao_tributaria || "000001",
+        ibs_cbs_base_calculo: Number(it.valor_bc_ibs ?? it.valor_bruto ?? 0),
         ibs_uf_aliquota: Number(it.aliquota_ibs ?? 0),
         ibs_uf_valor: Number(it.valor_ibs ?? 0),
         cbs_aliquota: Number(it.aliquota_cbs ?? 0),
-        cbs_valor: Number(it.cbs_valor ?? it.valor_cbs ?? 0),
-
-        // Mantém legados/duplicidade segura para garantir o texto nas informações adicionais
-        ibs_situacao_tributaria: String(it.ibs_situacao_tributaria ?? "01").padStart(2, "0"),
-        aliquota_ibs: Number(it.aliquota_ibs ?? 0),
-        valor_ibs: Number(it.valor_ibs ?? 0),
-        cbs_situacao_tributaria: String(it.cbs_situacao_tributaria ?? "01").padStart(2, "0"),
-        aliquota_cbs: Number(it.aliquota_cbs ?? 0),
-        valor_cbs: Number(it.valor_cbs ?? 0),
+        cbs_valor: Number(it.valor_cbs ?? 0),
 
         // PIS
         pis_situacao_tributaria: String(

@@ -44,6 +44,8 @@ type ProductFormData = {
   pst: string;
   vicms_substituto: string;
   vicms_st_ret: string;
+  ibs_cbs_situacao_tributaria: string;
+  ibs_cbs_classificacao_tributaria: string;
 };
 
 const defaultProductFormData: ProductFormData = {
@@ -72,6 +74,8 @@ const defaultProductFormData: ProductFormData = {
   pst: "",
   vicms_substituto: "",
   vicms_st_ret: "",
+  ibs_cbs_situacao_tributaria: "000",
+  ibs_cbs_classificacao_tributaria: "000001",
 };
 
 type ProductFormProps = {
@@ -194,6 +198,8 @@ export function ProductForm({
         pst: formData.pst ? Number(formData.pst.replace(",", ".")) : 0,
         vicms_substituto: formData.vicms_substituto ? Number(formData.vicms_substituto.replace(",", ".")) : 0,
         vicms_st_ret: formData.vicms_st_ret ? Number(formData.vicms_st_ret.replace(",", ".")) : 0,
+        ibs_cbs_situacao_tributaria: formData.ibs_cbs_situacao_tributaria || "000",
+        ibs_cbs_classificacao_tributaria: formData.ibs_cbs_classificacao_tributaria || "000001",
         company_id: companyId,
       };
 
@@ -596,6 +602,32 @@ return (
                   name="vicms_st_ret"
                   placeholder="0,00"
                   value={formData.vicms_st_ret}
+                  onChange={handleChange}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-4 border-t border-dashed">
+            <h3 className="text-sm font-semibold mb-3">Reforma Tributária 2026 (IBS / CBS)</h3>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="ibs_cbs_situacao_tributaria">CST Reforma (v2026)</Label>
+                <Input
+                  id="ibs_cbs_situacao_tributaria"
+                  name="ibs_cbs_situacao_tributaria"
+                  placeholder="101"
+                  value={formData.ibs_cbs_situacao_tributaria}
+                  onChange={handleChange}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ibs_cbs_classificacao_tributaria">Classificação Tributária (v2026)</Label>
+                <Input
+                  id="ibs_cbs_classificacao_tributaria"
+                  name="ibs_cbs_classificacao_tributaria"
+                  placeholder="010101"
+                  value={formData.ibs_cbs_classificacao_tributaria}
                   onChange={handleChange}
                 />
               </div>

@@ -153,8 +153,8 @@ const defaultValuesForm = {
   aliquota_pis: "",
   aliquota_cofins: "",
   aliquota_icms: "17.0",
-  ibs_cbs_situacao_tributaria: "01",
-  ibs_cbs_classificacao_tributaria: "010101",
+  ibs_cbs_situacao_tributaria: "000",
+  ibs_cbs_classificacao_tributaria: "000001",
 };
 
 /** ---------- Componente ---------- */
@@ -377,8 +377,8 @@ export default function FiscalOperationForm() {
         ? String(row.aliquota_cofins)
         : "",
       aliquota_icms: row.aliquota_icms ? String(row.aliquota_icms) : "17.0",
-      ibs_cbs_situacao_tributaria: row.ibs_cbs_situacao_tributaria || "01",
-      ibs_cbs_classificacao_tributaria: row.ibs_cbs_classificacao_tributaria || "010101",
+      ibs_cbs_situacao_tributaria: row.ibs_cbs_situacao_tributaria || "000",
+      ibs_cbs_classificacao_tributaria: row.ibs_cbs_classificacao_tributaria || "000001",
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -620,7 +620,7 @@ export default function FiscalOperationForm() {
                     <FormItem>
                       <FormLabel>CST Reforma (v2026)</FormLabel>
                       <FormControl>
-                        <Input placeholder="01" {...field} />
+                        <Input placeholder="101" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

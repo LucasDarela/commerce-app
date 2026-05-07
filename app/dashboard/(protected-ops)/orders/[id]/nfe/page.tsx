@@ -57,6 +57,8 @@ type UiProduct = {
   pst: string | null;
   vicms_substituto: string | null;
   vicms_st_ret: string | null;
+  ibs_cbs_situacao_tributaria?: string | null;
+  ibs_cbs_classificacao_tributaria?: string | null;
 };
 
 export default function EmitNfePage() {
@@ -225,6 +227,10 @@ export default function EmitNfePage() {
           pst: product?.pst ?? null,
           vicms_substituto: product?.vicms_substituto ?? null,
           vicms_st_ret: product?.vicms_st_ret ?? null,
+          ibs_cbs_situacao_tributaria:
+            product?.ibs_cbs_situacao_tributaria ?? null,
+          ibs_cbs_classificacao_tributaria:
+            product?.ibs_cbs_classificacao_tributaria ?? null,
         };
       });
       setProducts(uiProducts);
@@ -323,10 +329,7 @@ export default function EmitNfePage() {
 
     // 🔴 valida CFOP
     const invalidProductCfop = produtosParaNfe.find((p) => {
-      const cfop = String(p.cfop || "").replace(
-        /\D/g,
-        "",
-      );
+      const cfop = String(p.cfop || "").replace(/\D/g, "");
       return cfop.length !== 4;
     });
 
@@ -410,7 +413,9 @@ export default function EmitNfePage() {
       const isSimples = regime === "1" || regime === "2" || regime === "4";
 
       const hasST = produtosParaNfe.some((p) => {
-        const icms = String(p.icms_situacao_tributaria ?? p.cst_icms ?? "").trim();
+        const icms = String(
+          p.icms_situacao_tributaria ?? p.cst_icms ?? "",
+        ).trim();
         const csosn = String(p.csosn_icms ?? "").trim();
         return icms === "60" || csosn === "500";
       });
@@ -434,10 +439,7 @@ export default function EmitNfePage() {
       }
 
       const items = produtosParaNfe.map((p, index) => {
-        const cfop = String(p.cfop || "").replace(
-          /\D/g,
-          "",
-        );
+        const cfop = String(p.cfop || "").replace(/\D/g, "");
         const ncm = String(p.ncm || "").replace(/\D/g, "");
         const cest = String(p.cest || "").replace(/\D/g, "");
         const pis = String(p.pis ?? "").replace(/\D/g, "");
@@ -470,42 +472,78 @@ export default function EmitNfePage() {
                 icms_situacao_tributaria: icmsItem || "00",
                 valor_bc_icms: Number(p.price) * Number(p.netQty),
                 aliquota_icms: Number(operacaoFiscal.aliquota_icms || 17),
-                valor_icms: ((Number(p.price) * Number(p.netQty) * Number(operacaoFiscal.aliquota_icms || 17)) / 100),
+                valor_icms:
+                  (Number(p.price) *
+                    Number(p.netQty) *
+                    Number(operacaoFiscal.aliquota_icms || 17)) /
+                  100,
               }),
 
           pis_situacao_tributaria: pis.padStart(2, "0"),
           aliquota_pis: Number(operacaoFiscal.aliquota_pis || 1.65),
           valor_bc_pis: Number(p.price) * Number(p.netQty),
-          valor_pis: ((Number(p.price) * Number(p.netQty) * Number(operacaoFiscal.aliquota_pis || 1.65)) / 100).toFixed(2),
+          valor_pis: (
+            (Number(p.price) *
+              Number(p.netQty) *
+              Number(operacaoFiscal.aliquota_pis || 1.65)) /
+            100
+          ).toFixed(2),
           cofins_situacao_tributaria: cofins.padStart(2, "0"),
           aliquota_cofins: Number(operacaoFiscal.aliquota_cofins || 7.6),
           valor_bc_cofins: Number(p.price) * Number(p.netQty),
-          valor_cofins: ((Number(p.price) * Number(p.netQty) * Number(operacaoFiscal.aliquota_cofins || 7.6)) / 100).toFixed(2),
+          valor_cofins: (
+            (Number(p.price) *
+              Number(p.netQty) *
+              Number(operacaoFiscal.aliquota_cofins || 7.6)) /
+            100
+          ).toFixed(2),
 
-          // Reforma Tributária 2026 (IBS / CBS)
-          ibs_situacao_tributaria: "01",
+          // Reforma Tributária 2026 (IBS / CBS) - CST 3 dígitos obrigatório
+          ibs_cbs_situacao_tributaria: String(
+            p.ibs_cbs_situacao_tributaria ??
+              operacaoFiscal.ibs_cbs_situacao_tributaria ??
+              "000",
+          ).padStart(3, "0"),
+          ibs_cbs_classificacao_tributaria:
+            p.ibs_cbs_classificacao_tributaria ??
+            operacaoFiscal.ibs_cbs_classificacao_tributaria ??
+            "000001",
           aliquota_ibs: Number(operacaoFiscal.aliquota_ibs || 17.7),
           valor_bc_ibs: Number(p.price) * Number(p.netQty),
-          valor_ibs: ((Number(p.price) * Number(p.netQty) * Number(operacaoFiscal.aliquota_ibs || 17.7)) / 100).toFixed(2),
-
-          cbs_situacao_tributaria: "01",
+          valor_ibs: (
+            (Number(p.price) *
+              Number(p.netQty) *
+              Number(operacaoFiscal.aliquota_ibs || 17.7)) /
+            100
+          ).toFixed(2),
           aliquota_cbs: Number(operacaoFiscal.aliquota_cbs || 8.8),
           valor_bc_cbs: Number(p.price) * Number(p.netQty),
-          valor_cbs: ((Number(p.price) * Number(p.netQty) * Number(operacaoFiscal.aliquota_cbs || 8.8)) / 100).toFixed(2),
+          valor_cbs: (
+            (Number(p.price) *
+              Number(p.netQty) *
+              Number(operacaoFiscal.aliquota_cbs || 8.8)) /
+            100
+          ).toFixed(2),
 
           ...(icmsItem === "60" || csosnItem === "500"
             ? {
-                vbc_st_ret: Number(p.vbc_st_ret ?? operacaoFiscal.vbc_st_ret ?? 0),
+                vbc_st_ret: Number(
+                  p.vbc_st_ret ?? operacaoFiscal.vbc_st_ret ?? 0,
+                ),
                 pst: Number(p.pst ?? operacaoFiscal.pst ?? 0),
-                vicms_substituto: Number(p.vicms_substituto ?? operacaoFiscal.vicms_substituto ?? 0),
-                vicms_st_ret: Number(p.vicms_st_ret ?? operacaoFiscal.vicms_st_ret ?? 0),
+                vicms_substituto: Number(
+                  p.vicms_substituto ?? operacaoFiscal.vicms_substituto ?? 0,
+                ),
+                vicms_st_ret: Number(
+                  p.vicms_st_ret ?? operacaoFiscal.vicms_st_ret ?? 0,
+                ),
               }
             : {}),
         };
       });
 
       const invoiceData = {
-        ambiente: emissor.environment || "homologacao",
+        ambiente: emissor.environment || "producao", // Produção restaurada ✅
         numero: manualNumber || undefined,
         serie: manualSerie || undefined,
         order_id: id,
@@ -558,8 +596,11 @@ export default function EmitNfePage() {
         presenca_comprador: operacaoFiscal.presenca_comprador || "1",
         id_dest: Number(operacaoFiscal.local_destino || 1),
         consumidor_final: Number(operacaoFiscal.consumidor_final || 1),
-        indicador_inscricao_estadual_destinatario: 
-          customer.state_registration?.trim() && customer.state_registration !== "ISENTO" ? 1 : 9,
+        indicador_inscricao_estadual_destinatario:
+          customer.state_registration?.trim() &&
+          customer.state_registration !== "ISENTO"
+            ? 1
+            : 9,
         items,
       };
 
@@ -684,13 +725,15 @@ export default function EmitNfePage() {
           <DialogHeader>
             <DialogTitle>Nota Anterior Cancelada</DialogTitle>
             <DialogDescription>
-              Detectamos que este pedido já possui uma nota cancelada. 
-              Para emitir uma nova, você deve informar o próximo número da sequência.
+              Detectamos que este pedido já possui uma nota cancelada. Para
+              emitir uma nova, você deve informar o próximo número da sequência.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="number" className="text-right">Número</Label>
+              <Label htmlFor="number" className="text-right">
+                Número
+              </Label>
               <Input
                 id="number"
                 value={nextNumber}
@@ -699,7 +742,9 @@ export default function EmitNfePage() {
               />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="serie" className="text-right">Série</Label>
+              <Label htmlFor="serie" className="text-right">
+                Série
+              </Label>
               <Input
                 id="serie"
                 value={nextSerie}
@@ -710,11 +755,15 @@ export default function EmitNfePage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowNumberModal(false)}>Cancelar</Button>
-            <Button onClick={() => {
-              setShowNumberModal(false);
-              handleEmit(nextNumber, nextSerie);
-            }}>
+            <Button variant="outline" onClick={() => setShowNumberModal(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                setShowNumberModal(false);
+                handleEmit(nextNumber, nextSerie);
+              }}
+            >
               Emitir com Novo Número
             </Button>
           </DialogFooter>

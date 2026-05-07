@@ -75,7 +75,8 @@ export async function buildInvoiceDataFromOrder({
 }: BuildInvoiceDataParams) {
   const { data: order, error: orderErr } = await supabase
     .from("orders")
-    .select(`
+    .select(
+      `
       id,
       company_id,
       customer_id,
@@ -88,7 +89,8 @@ export async function buildInvoiceDataFromOrder({
       created_at,
       payment_method,
       payment_status
-    `)
+    `,
+    )
     .eq("id", orderId)
     .eq("company_id", companyId)
     .maybeSingle();
@@ -103,7 +105,8 @@ export async function buildInvoiceDataFromOrder({
 
   const { data: customer, error: customerErr } = await supabase
     .from("customers")
-    .select(`
+    .select(
+      `
       id,
       company_id,
       name,
@@ -121,7 +124,8 @@ export async function buildInvoiceDataFromOrder({
       city,
       state,
       emit_nf
-    `)
+    `,
+    )
     .eq("id", order.customer_id)
     .eq("company_id", companyId)
     .maybeSingle();
@@ -142,7 +146,8 @@ export async function buildInvoiceDataFromOrder({
 
   const { data: company, error: companyErr } = await supabase
     .from("companies")
-    .select(`
+    .select(
+      `
       id,
       name,
       document,
@@ -160,7 +165,8 @@ export async function buildInvoiceDataFromOrder({
       state_registration,
       cpf_emitente,
       regime_tributario
-    `)
+    `,
+    )
     .eq("id", companyId)
     .maybeSingle();
 
@@ -206,7 +212,8 @@ export async function buildInvoiceDataFromOrder({
 
   const { data: orderItems, error: itemsErr } = await supabase
     .from("order_items")
-    .select(`
+    .select(
+      `
       id,
       order_id,
       product_id,
@@ -229,7 +236,8 @@ export async function buildInvoiceDataFromOrder({
         cofins,
         ipi
       )
-    `)
+    `,
+    )
     .eq("order_id", orderId);
 
   if (itemsErr) {
@@ -252,11 +260,12 @@ export async function buildInvoiceDataFromOrder({
     const unitPrice = toNumber(item.price);
     const total = Number((quantity * unitPrice).toFixed(2));
 
-    const productCfop =
-      toText(product?.cfop) || toText(fiscalOperation.cfop);
+    const productCfop = toText(product?.cfop) || toText(fiscalOperation.cfop);
 
     const icmsOrigem =
-      toText(product?.icms_origem) || toText(fiscalOperation.icms_origem) || "0";
+      toText(product?.icms_origem) ||
+      toText(fiscalOperation.icms_origem) ||
+      "0";
 
     const cstIcms =
       toText(product?.cst_icms) || toText(fiscalOperation.cst_icms);
@@ -268,17 +277,14 @@ export async function buildInvoiceDataFromOrder({
       toText(product?.icms_situacao_tributaria) ||
       toText(fiscalOperation.icms_situacao_tributaria);
 
-    const pis =
-      toText(product?.pis) || toText(fiscalOperation.pis) || "04";
+    const pis = toText(product?.pis) || toText(fiscalOperation.pis) || "04";
 
     const cofins =
       toText(product?.cofins) || toText(fiscalOperation.cofins) || "04";
 
-    const ipi =
-      toText(product?.ipi) || toText(fiscalOperation.ipi);
+    const ipi = toText(product?.ipi) || toText(fiscalOperation.ipi);
 
-    const ncm =
-      toText(product?.ncm) || toText(fiscalOperation.ncm);
+    const ncm = toText(product?.ncm) || toText(fiscalOperation.ncm);
 
     return {
       numero_item: index + 1,
@@ -318,7 +324,7 @@ export async function buildInvoiceDataFromOrder({
     throw new Error("O pedido não possui note_number.");
   }
 
-   const valorProdutos = Number(
+  const valorProdutos = Number(
     orderItems
       .reduce((acc: number, item: any) => {
         return acc + toNumber(item.quantity) * toNumber(item.price);
@@ -335,7 +341,7 @@ export async function buildInvoiceDataFromOrder({
     numero: undefined,
     serie,
 
-    ambiente: "2",
+    ambiente: "1", // Produção ✅ (1 = produção, 2 = homologação)
     data_emissao: order.appointment_date || order.created_at,
     data_entrada_saida: order.appointment_date || order.created_at,
 
@@ -374,15 +380,9 @@ export async function buildInvoiceDataFromOrder({
       ? toText(fiscalOperation.consumidor_final, "1")
       : "1",
 
-    presenca_comprador: [
-      "0",
-      "1",
-      "2",
-      "3",
-      "4",
-      "5",
-      "9",
-    ].includes(toText(fiscalOperation.presenca_comprador, "1"))
+    presenca_comprador: ["0", "1", "2", "3", "4", "5", "9"].includes(
+      toText(fiscalOperation.presenca_comprador, "1"),
+    )
       ? toText(fiscalOperation.presenca_comprador, "1")
       : "1",
 
@@ -401,10 +401,12 @@ export async function buildInvoiceDataFromOrder({
     nome_fantasia_emitente: toText(company.trade_name) || undefined,
     cnpj_emitente: onlyDigits(company.document),
     cpf_emitente: onlyDigits(company.cpf_emitente) || undefined,
-    inscricao_estadual_emitente: toText(company.state_registration) || undefined,
+    inscricao_estadual_emitente:
+      toText(company.state_registration) || undefined,
     ie_emitente: toText(company.state_registration) || undefined,
     crt_emitente:
-      company.regime_tributario !== null && company.regime_tributario !== undefined
+      company.regime_tributario !== null &&
+      company.regime_tributario !== undefined
         ? String(company.regime_tributario)
         : undefined,
 
@@ -432,7 +434,8 @@ export async function buildInvoiceDataFromOrder({
     cep_destinatario: customerAddress.zip_code,
     complemento_destinatario: customerAddress.complement || undefined,
     pais_destinatario: "Brasil",
-    telefone_destinatario: onlyDigits(customer.phone || order.phone) || undefined,
+    telefone_destinatario:
+      onlyDigits(customer.phone || order.phone) || undefined,
     email_destinatario: toText(customer.email) || undefined,
 
     items,
