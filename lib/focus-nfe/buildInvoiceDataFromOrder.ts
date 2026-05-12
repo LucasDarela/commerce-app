@@ -337,9 +337,25 @@ export async function buildInvoiceDataFromOrder({
         fiscalOperation.aliquota_ibs != null
           ? toNumber(fiscalOperation.aliquota_ibs)
           : undefined,
+      valor_ibs:
+        fiscalOperation.aliquota_ibs != null
+          ? Number(
+              (total * (toNumber(fiscalOperation.aliquota_ibs) / 100)).toFixed(
+                2,
+              ),
+            )
+          : undefined,
       aliquota_cbs:
         fiscalOperation.aliquota_cbs != null
           ? toNumber(fiscalOperation.aliquota_cbs)
+          : undefined,
+      valor_cbs:
+        fiscalOperation.aliquota_cbs != null
+          ? Number(
+              (total * (toNumber(fiscalOperation.aliquota_cbs) / 100)).toFixed(
+                2,
+              ),
+            )
           : undefined,
       aliquota_pis:
         fiscalOperation.aliquota_pis != null
