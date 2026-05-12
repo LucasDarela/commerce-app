@@ -13,11 +13,17 @@ type Params = {
   params: Promise<{ orderId: string }>;
 };
 
-export async function POST(_: Request, { params }: Params) {
+export async function POST(request: Request, { params }: Params) {
   try {
     const { orderId } = await params;
+    let body: { state_registration?: string } = {};
+    try {
+      body = await request.json();
+    } catch {
+      body = {};
+    }
 
-    const ctx = await getAuthenticatedContext(_);
+    const ctx = await getAuthenticatedContext(request);
     if (ctx.error) {
       return NextResponse.json(
         { error: ctx.error.error },
@@ -29,13 +35,15 @@ export async function POST(_: Request, { params }: Params) {
 
     const { data: order, error: orderErr } = await supabase
       .from("orders")
-      .select(`
+      .select(
+        `
         id,
         company_id,
         customer_id,
         customer,
         note_number
-      `)
+      `,
+      )
       .eq("id", orderId)
       .eq("company_id", companyId)
       .maybeSingle();
@@ -53,22 +61,22 @@ export async function POST(_: Request, { params }: Params) {
 
     const { data: customer, error: customerErr } = await supabase
       .from("customers")
-      .select(`
+      .select(
+        `
         id,
         company_id,
         name,
         state,
-        emit_nf
-      `)
+        emit_nf,
+        state_registration
+      `,
+      )
       .eq("id", order.customer_id)
       .eq("company_id", companyId)
       .maybeSingle();
 
     if (customerErr) {
-      return NextResponse.json(
-        { error: customerErr.message },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: customerErr.message }, { status: 400 });
     }
 
     if (!customer) {
@@ -90,10 +98,12 @@ export async function POST(_: Request, { params }: Params) {
 
     const { data: company, error: companyErr } = await supabase
       .from("companies")
-      .select(`
+      .select(
+        `
         id,
         state
-      `)
+      `,
+      )
       .eq("id", companyId)
       .maybeSingle();
 
@@ -150,7 +160,8 @@ export async function POST(_: Request, { params }: Params) {
     if (!parse.success) {
       return NextResponse.json(
         {
-          error: "Dados da nota inválidos",
+          error:
+            "Erro de validação na NFE: " + JSON.stringify(parse.error.format()),
           details: parse.error.format(),
         },
         { status: 422 },
