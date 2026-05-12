@@ -318,18 +318,45 @@ export async function buildInvoiceDataFromOrder({
       cofins_situacao_tributaria: cofins,
       ipi_situacao_tributaria: ipi || undefined,
 
-      vbc_st_ret: fiscalOperation.vbc_st_ret != null ? toNumber(fiscalOperation.vbc_st_ret) : undefined,
-      pst: fiscalOperation.pst != null ? toNumber(fiscalOperation.pst) : undefined,
-      vicms_substituto: fiscalOperation.vicms_substituto != null ? toNumber(fiscalOperation.vicms_substituto) : undefined,
-      vicms_st_ret: fiscalOperation.vicms_st_ret != null ? toNumber(fiscalOperation.vicms_st_ret) : undefined,
+      vbc_st_ret:
+        fiscalOperation.vbc_st_ret != null
+          ? toNumber(fiscalOperation.vbc_st_ret)
+          : undefined,
+      pst:
+        fiscalOperation.pst != null ? toNumber(fiscalOperation.pst) : undefined,
+      vicms_substituto:
+        fiscalOperation.vicms_substituto != null
+          ? toNumber(fiscalOperation.vicms_substituto)
+          : undefined,
+      vicms_st_ret:
+        fiscalOperation.vicms_st_ret != null
+          ? toNumber(fiscalOperation.vicms_st_ret)
+          : undefined,
 
-      aliquota_ibs: fiscalOperation.aliquota_ibs != null ? toNumber(fiscalOperation.aliquota_ibs) : undefined,
-      aliquota_cbs: fiscalOperation.aliquota_cbs != null ? toNumber(fiscalOperation.aliquota_cbs) : undefined,
-      aliquota_pis: fiscalOperation.aliquota_pis != null ? toNumber(fiscalOperation.aliquota_pis) : undefined,
-      aliquota_cofins: fiscalOperation.aliquota_cofins != null ? toNumber(fiscalOperation.aliquota_cofins) : undefined,
-      aliquota_icms: fiscalOperation.aliquota_icms != null ? toNumber(fiscalOperation.aliquota_icms) : undefined,
-      ibs_cbs_situacao_tributaria: toText(fiscalOperation.ibs_cbs_situacao_tributaria) || undefined,
-      ibs_cbs_classificacao_tributaria: toText(fiscalOperation.ibs_cbs_classificacao_tributaria) || undefined,
+      aliquota_ibs:
+        fiscalOperation.aliquota_ibs != null
+          ? toNumber(fiscalOperation.aliquota_ibs)
+          : undefined,
+      aliquota_cbs:
+        fiscalOperation.aliquota_cbs != null
+          ? toNumber(fiscalOperation.aliquota_cbs)
+          : undefined,
+      aliquota_pis:
+        fiscalOperation.aliquota_pis != null
+          ? toNumber(fiscalOperation.aliquota_pis)
+          : undefined,
+      aliquota_cofins:
+        fiscalOperation.aliquota_cofins != null
+          ? toNumber(fiscalOperation.aliquota_cofins)
+          : undefined,
+      aliquota_icms:
+        fiscalOperation.aliquota_icms != null
+          ? toNumber(fiscalOperation.aliquota_icms)
+          : undefined,
+      ibs_cbs_situacao_tributaria:
+        toText(fiscalOperation.ibs_cbs_situacao_tributaria) || undefined,
+      ibs_cbs_classificacao_tributaria:
+        toText(fiscalOperation.ibs_cbs_classificacao_tributaria) || undefined,
     };
   });
 
@@ -390,11 +417,11 @@ export async function buildInvoiceDataFromOrder({
       1,
     ),
 
-    consumidor_final: ["0", "1"].includes(
-      toText(fiscalOperation.consumidor_final, "1"),
-    )
-      ? toText(fiscalOperation.consumidor_final, "1")
-      : "1",
+    consumidor_final: Number(
+      ["0", "1"].includes(toText(fiscalOperation.consumidor_final, "1"))
+        ? toText(fiscalOperation.consumidor_final, "1")
+        : "1",
+    ),
 
     presenca_comprador: ["0", "1", "2", "3", "4", "5", "9"].includes(
       toText(fiscalOperation.presenca_comprador, "1"),
