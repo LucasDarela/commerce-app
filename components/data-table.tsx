@@ -1786,11 +1786,12 @@ export function DataTable({ companyId, user, role }: DataTableProps) {
     setIsProductReturnModalOpen(true);
   }
 
-  async function fetchReturnedProducts(orderId: string) {
+  async function fetchReturnedProducts(orderId: string, companyId: string) {
     const { data, error } = await supabase
       .from("stock_movements")
       .select("product_id, quantity, products(name)")
       .eq("note_id", orderId)
+      .eq("company_id", companyId)
       .eq("type", "return");
 
     if (error || !data) {
@@ -1799,7 +1800,7 @@ export function DataTable({ companyId, user, role }: DataTableProps) {
     }
 
     return data.map((item) => ({
-      name: (item as any).products.name,
+      name: (item as any).products?.name || "Produto",
       quantity: item.quantity,
     }));
   }
@@ -1826,14 +1827,17 @@ export function DataTable({ companyId, user, role }: DataTableProps) {
 
   useEffect(() => {
     async function loadReturns() {
-      if (selectedCustomer?.id) {
-        const products = await fetchReturnedProducts(selectedCustomer.id);
+      if (selectedCustomer?.id && companyId) {
+        const products = await fetchReturnedProducts(
+          selectedCustomer.id,
+          companyId,
+        );
         setReturnedProducts(products);
       }
     }
 
     loadReturns();
-  }, [selectedCustomer]);
+  }, [selectedCustomer, companyId]);
 
   useEffect(() => {
     const [start, end] = dateRange;
