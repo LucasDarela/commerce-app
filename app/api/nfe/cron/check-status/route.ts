@@ -14,7 +14,10 @@ import { fetchAndStoreNfeFiles } from "@/lib/focus-nfe/fetchAndStoreNfeFiles";
  */
 export async function GET(req: Request) {
   const authHeader = req.headers.get("authorization");
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (
+    process.env.CRON_SECRET &&
+    authHeader !== `Bearer ${process.env.CRON_SECRET}`
+  ) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -35,7 +38,7 @@ export async function GET(req: Request) {
     const results = {
       statusUpdated: 0,
       filesDownloaded: 0,
-      emailsSent: 0
+      emailsSent: 0,
     };
 
     // --- PARTE 1: Atualizar Status de Notas Pendentes ---
@@ -47,10 +50,39 @@ export async function GET(req: Request) {
 
     if (pendingStatus && pendingStatus.length > 0) {
       for (const inv of pendingStatus) {
-        const res = await fetchInvoiceStatus({ supabase, companyId: inv.company_id, ref: inv.ref });
-        if (!("error" in res)) {
-          results.statusUpdated++;
-          // Se autorizou agora, o próximo passo (Parte 2) vai pegar ela no mesmo ciclo
+        const res = await fetchInvoiceStatus({
+          supabase,
+          companyId: inv.company_id,
+          ref: inv.ref,
+        });
+        if (!("error" in res) && res.data) {
+          const payloadToUpdate: any = { status: res.data.status };
+          if (res.data.numero) payloadToUpdate.numero = res.data.numero;
+          if (res.data.serie) payloadToUpdate.serie = res.data.serie;
+          if (res.data.chave) payloadToUpdate.chave_nfe = res.data.chave;
+          if (res.data.xml_url) payloadToUpdate.xml_url = res.data.xml_url;
+          if (res.data.danfe_url)
+            payloadToUpdate.danfe_url = res.data.danfe_url;
+          if (res.data.data_emissao)
+            payloadToUpdate.data_emissao = res.data.data_emissao;
+
+          const { error: updateErr } = await supabase
+            .from("invoices")
+            .update(payloadToUpdate)
+            .eq("id", inv.id);
+
+          if (!updateErr) {
+            results.statusUpdated++;
+            const isAuth = (res.data.status ?? "")
+              .toLowerCase()
+              .includes("autorizad");
+            if (isAuth) {
+              await sendNfeEmailIfReady(inv.id, inv.company_id, supabase).catch(
+                () => null,
+              );
+              results.emailsSent++;
+            }
+          }
         }
       }
     }
@@ -69,11 +101,17 @@ export async function GET(req: Request) {
 
     if (pendingFiles && pendingFiles.length > 0) {
       for (const inv of pendingFiles) {
-        const stored = await fetchAndStoreNfeFiles(inv.ref, inv.id, inv.company_id);
+        const stored = await fetchAndStoreNfeFiles(
+          inv.ref,
+          inv.id,
+          inv.company_id,
+        );
         if (stored.success) {
           results.filesDownloaded++;
           // Tentar enviar e-mail
-          await sendNfeEmailIfReady(inv.id, inv.company_id, supabase).catch(() => null);
+          await sendNfeEmailIfReady(inv.id, inv.company_id, supabase).catch(
+            () => null,
+          );
           results.emailsSent++;
         }
       }
@@ -81,7 +119,6 @@ export async function GET(req: Request) {
 
     console.log("[NFe Caretaker] Ciclo concluído:", results);
     return NextResponse.json({ success: true, results });
-
   } catch (err: any) {
     console.error("[NFe Caretaker] Erro fatal:", err);
     return NextResponse.json({ error: err.message }, { status: 500 });

@@ -7,6 +7,14 @@ import { createClient } from "@supabase/supabase-js";
 import { sendNfeEmailIfReady } from "@/lib/nfe/sendNfeEmail";
 
 export async function POST(req: Request) {
+  const authHeader = req.headers.get("authorization");
+  if (
+    process.env.FOCUS_WEBHOOK_SECRET &&
+    authHeader !== `Bearer ${process.env.FOCUS_WEBHOOK_SECRET}`
+  ) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   console.log("[NFe Webhook] Recebendo notificação...");
 
   try {
@@ -20,20 +28,30 @@ export async function POST(req: Request) {
       serie,
       chave_nfe,
       links,
+      caminho_xml_nota_fiscal,
+      caminho_danfe,
       data_emissao,
       mensagem_sefaz,
     } = body;
 
     if (!referencia) {
-      return NextResponse.json({ error: "Referência não informada" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Referência não informada" },
+        { status: 400 },
+      );
     }
 
     const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!SUPABASE_URL || !SERVICE_ROLE) {
-      console.error("[NFe Webhook] SUPABASE_URL ou SERVICE_ROLE não configurados");
-      return NextResponse.json({ error: "Configuração do servidor incompleta" }, { status: 500 });
+      console.error(
+        "[NFe Webhook] SUPABASE_URL ou SERVICE_ROLE não configurados",
+      );
+      return NextResponse.json(
+        { error: "Configuração do servidor incompleta" },
+        { status: 500 },
+      );
     }
 
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, {
@@ -48,8 +66,15 @@ export async function POST(req: Request) {
       .maybeSingle();
 
     if (fetchErr || !invoice) {
-      console.warn("[NFe Webhook] Invoice não encontrada para ref:", referencia, fetchErr);
-      return NextResponse.json({ error: "Nota não encontrada" }, { status: 404 });
+      console.warn(
+        "[NFe Webhook] Invoice não encontrada para ref:",
+        referencia,
+        fetchErr,
+      );
+      return NextResponse.json(
+        { error: "Nota não encontrada" },
+        { status: 404 },
+      );
     }
 
     // 2) Preparar atualização
@@ -62,6 +87,9 @@ export async function POST(req: Request) {
     if (chave_nfe) payloadToUpdate.chave_nfe = chave_nfe;
     if (links?.xml) payloadToUpdate.xml_url = links.xml;
     if (links?.danfe) payloadToUpdate.danfe_url = links.danfe;
+    if (caminho_xml_nota_fiscal)
+      payloadToUpdate.caminho_xml_nota_fiscal = caminho_xml_nota_fiscal;
+    if (caminho_danfe) payloadToUpdate.caminho_danfe = caminho_danfe;
     if (data_emissao) payloadToUpdate.data_emissao = data_emissao;
 
     const { error: updateErr } = await supabase
@@ -92,6 +120,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true });
   } catch (err: any) {
     console.error("[NFe Webhook] Erro interno:", err);
-    return NextResponse.json({ error: err.message || "Erro interno" }, { status: 500 });
+    return NextResponse.json(
+      { error: err.message || "Erro interno" },
+      { status: 500 },
+    );
   }
 }
