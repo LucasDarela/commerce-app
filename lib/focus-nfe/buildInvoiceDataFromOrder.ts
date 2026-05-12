@@ -231,7 +231,6 @@ export async function buildInvoiceDataFromOrder({
         icms_origem,
         cst_icms,
         csosn_icms,
-        icms_situacao_tributaria,
         pis,
         cofins,
         ipi
@@ -273,9 +272,13 @@ export async function buildInvoiceDataFromOrder({
     const csosnIcms =
       toText(product?.csosn_icms) || toText(fiscalOperation.csosn_icms);
 
-    const icmsSituacaoTributaria =
-      toText(product?.icms_situacao_tributaria) ||
-      toText(fiscalOperation.icms_situacao_tributaria);
+    let icmsSituacaoTributaria =
+      toText(fiscalOperation.icms_situacao_tributaria) || "";
+
+    const isSimplesNacional = String(company.regime_tributario) === "1";
+    if (!icmsSituacaoTributaria) {
+      icmsSituacaoTributaria = isSimplesNacional ? csosnIcms : cstIcms;
+    }
 
     const pis = toText(product?.pis) || toText(fiscalOperation.pis) || "04";
 
@@ -314,6 +317,19 @@ export async function buildInvoiceDataFromOrder({
       pis_situacao_tributaria: pis,
       cofins_situacao_tributaria: cofins,
       ipi_situacao_tributaria: ipi || undefined,
+
+      vbc_st_ret: fiscalOperation.vbc_st_ret != null ? toNumber(fiscalOperation.vbc_st_ret) : undefined,
+      pst: fiscalOperation.pst != null ? toNumber(fiscalOperation.pst) : undefined,
+      vicms_substituto: fiscalOperation.vicms_substituto != null ? toNumber(fiscalOperation.vicms_substituto) : undefined,
+      vicms_st_ret: fiscalOperation.vicms_st_ret != null ? toNumber(fiscalOperation.vicms_st_ret) : undefined,
+
+      aliquota_ibs: fiscalOperation.aliquota_ibs != null ? toNumber(fiscalOperation.aliquota_ibs) : undefined,
+      aliquota_cbs: fiscalOperation.aliquota_cbs != null ? toNumber(fiscalOperation.aliquota_cbs) : undefined,
+      aliquota_pis: fiscalOperation.aliquota_pis != null ? toNumber(fiscalOperation.aliquota_pis) : undefined,
+      aliquota_cofins: fiscalOperation.aliquota_cofins != null ? toNumber(fiscalOperation.aliquota_cofins) : undefined,
+      aliquota_icms: fiscalOperation.aliquota_icms != null ? toNumber(fiscalOperation.aliquota_icms) : undefined,
+      ibs_cbs_situacao_tributaria: toText(fiscalOperation.ibs_cbs_situacao_tributaria) || undefined,
+      ibs_cbs_classificacao_tributaria: toText(fiscalOperation.ibs_cbs_classificacao_tributaria) || undefined,
     };
   });
 

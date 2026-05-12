@@ -48,6 +48,7 @@ const itemSchema = z
 
     // Reforma 2026 - Padrão Focus
     ibs_cbs_situacao_tributaria: z.string().optional(),
+    ibs_cbs_classificacao_tributaria: z.string().optional(),
     ibs_uf_aliquota: z.union([z.number(), z.string()]).optional(),
     ibs_uf_valor: z.union([z.number(), z.string()]).optional(),
     cbs_aliquota: z.union([z.number(), z.string()]).optional(),
