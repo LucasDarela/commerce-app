@@ -483,6 +483,7 @@ export async function buildInvoiceDataFromOrder({
     nome_destinatario: toText(customer.name || order.customer),
     ...customerDoc,
     ie_destinatario: toText(customer.state_registration) || undefined,
+    indIEDest: toText(customer.state_registration) ? "1" : "9",
 
     logradouro_destinatario: customerAddress.address,
     endereco_destinatario: customerAddress.address,
