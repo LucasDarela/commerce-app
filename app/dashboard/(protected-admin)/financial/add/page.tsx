@@ -155,6 +155,14 @@ export default function AddFinancialRecord() {
   const [recurrenceCount, setRecurrenceCount] = useState<number>(1);
   const [customCategories, setCustomCategories] = useState<string[]>([]);
 
+  // Parcelamento
+  const [isInstallment, setIsInstallment] = useState(false);
+  const [installmentCount, setInstallmentCount] = useState<number>(2);
+  const [installmentFrequency, setInstallmentFrequency] = useState<
+    "daily" | "weekly" | "biweekly" | "monthly"
+  >("monthly");
+  const [installmentValues, setInstallmentValues] = useState<number[]>([]);
+
   const [productComboboxOpen, setProductComboboxOpen] = useState<
   Record<number, boolean>
 >({});
@@ -197,6 +205,32 @@ export default function AddFinancialRecord() {
         };
       }),
     );
+  };
+
+  // Calcula as datas de vencimento de cada parcela
+  const getInstallmentDueDates = (): Date[] => {
+    if (!dueDate) return [];
+    const [dd, mm, yyyy] = dueDate.split("/").map(Number);
+    const baseDate = new Date(yyyy, mm - 1, dd);
+    return Array.from({ length: installmentCount }, (_, i) => {
+      const d = new Date(baseDate);
+      if (installmentFrequency === "monthly") d.setMonth(baseDate.getMonth() + i);
+      if (installmentFrequency === "weekly") d.setDate(baseDate.getDate() + i * 7);
+      if (installmentFrequency === "biweekly") d.setDate(baseDate.getDate() + i * 14);
+      if (installmentFrequency === "daily") d.setDate(baseDate.getDate() + i);
+      return d;
+    });
+  };
+
+  // Recalcula parcelas iguais quando muda o total ou a quantidade de parcelas
+  const recalcInstallments = (total: number, count: number) => {
+    if (count < 1) return;
+    const base = Math.floor((total / count) * 100) / 100;
+    const diff = Math.round((total - base * count) * 100) / 100;
+    const vals = Array.from({ length: count }, (_, i) =>
+      i === count - 1 ? Math.round((base + diff) * 100) / 100 : base
+    );
+    setInstallmentValues(vals);
   };
 
   const handleSubmit = async () => {
@@ -245,14 +279,15 @@ if (selectedCategory === "others" && !customCategory.trim()) {
   return;
 }
 const recurrenceGroupId =
-  isRecurring && recurrenceCount > 1 ? crypto.randomUUID() : null;
+  (isRecurring && recurrenceCount > 1) || (isInstallment && installmentCount > 1)
+    ? crypto.randomUUID()
+    : null;
 
-const record = {
+const baseRecord = {
   company_id: companyId,
   issue_date: issueDate
     ? toISODate(issueDate)
     : new Date().toISOString().split("T")[0],
-  due_date: dueDate ? toISODate(dueDate) : null,
   invoice_number: invoiceNumber || null,
   supplier: selectedSupplier.trim(),
   description: description || null,
@@ -260,12 +295,22 @@ const record = {
     selectedCategory === "others"
       ? customCategory.trim() || "others"
       : selectedCategory || "others",
-  amount: calculatedAmount,
   notes: notes || null,
   bank_account_id: selectedAccount || null,
   type: noteType,
   payment_method: paymentMethod || null,
   recurrence_group_id: recurrenceGroupId,
+};
+
+// Para parcelamento: 1ª parcela usa dueDate do formulário, o amount vem de installmentValues[0]
+const firstInstallmentAmount = isInstallment && installmentValues.length > 0
+  ? installmentValues[0]
+  : calculatedAmount;
+
+const record = {
+  ...baseRecord,
+  due_date: dueDate ? toISODate(dueDate) : null,
+  amount: isInstallment ? firstInstallmentAmount : calculatedAmount,
 };
 
     setLoading(true);
@@ -283,6 +328,7 @@ const record = {
       return;
     }
 
+    // --- RECORRÊNCIA ---
     if (isRecurring && recurrenceCount > 1) {
       const entriesToInsert = [];
       const [dd, mm, yyyy] = dueDate.split("/").map(Number);
@@ -314,6 +360,33 @@ const record = {
       }
       // Notas recorrentes de compra de produto/equipamento NÃO atualizam estoque
       // nem salvam itens — apenas registram o compromisso financeiro futuro.
+    }
+
+    // --- PARCELAMENTO ---
+    if (isInstallment && installmentCount > 1 && installmentValues.length >= installmentCount) {
+      const installmentDates = getInstallmentDueDates();
+      const entriesToInsert = [];
+
+      // Parcelas 2..N (a 1ª já foi inserida como `record` acima)
+      for (let i = 1; i < installmentCount; i++) {
+        entriesToInsert.push({
+          ...baseRecord,
+          due_date: installmentDates[i].toISOString().split("T")[0],
+          amount: installmentValues[i],
+          created_at: new Date().toISOString(),
+          invoice_number: `${invoiceNumber || "parc"}-${i + 1}`,
+          recurrence_group_id: recurrenceGroupId,
+        });
+      }
+
+      const { error: installmentError } = await supabase
+        .from("financial_records")
+        .insert(entriesToInsert);
+
+      if (installmentError) {
+        console.error("Erro ao salvar parcelas:", installmentError);
+      }
+      // Parcelas 2..N de compra NÃO atualizam estoque — são compromissos futuros.
     }
 
     if (selectedCategory === "compra_produto") {
@@ -863,53 +936,200 @@ const record = {
         />
       </div>
 
-      <div className="mt-4">
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={isRecurring}
-            onChange={(e) => setIsRecurring(e.target.checked)}
-          />
-          Adicionar recorrência
-        </label>
-
-        {isRecurring &&
-          (selectedCategory === "compra_produto" ||
-            selectedCategory === "compra_equipamento") && (
-          <p className="text-sm text-amber-600 dark:text-amber-400 italic ml-1 mt-1">
-            ⚠️ A 1ª nota atualizará o estoque e os itens. As notas seguintes serão
-            criadas como compromissos financeiros futuros, sem alterar o estoque.
-          </p>
-        )}
-
-        {isRecurring && (
-          <div className="flex gap-4 mt-2">
-            <Select
-              value={recurrenceType}
-              onValueChange={(val) => setRecurrenceType(val as any)}
-            >
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Frequência" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="daily">Diária</SelectItem>
-                <SelectItem value="weekly">Semanal</SelectItem>
-                <SelectItem value="biweekly">Quinzenal</SelectItem>
-                <SelectItem value="monthly">Mensal</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Label className="flex items-center">Repetir:</Label>
-            <Input
-              type="number"
-              min={1}
-              placeholder="Quantas vezes?"
-              value={recurrenceCount}
-              onChange={(e) => setRecurrenceCount(Number(e.target.value))}
-              className="w-[100px]"
+      <div className="mt-4 space-y-4">
+        {/* RECORRÊNCIA */}
+        <div>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={isRecurring}
+              onChange={(e) => {
+                setIsRecurring(e.target.checked);
+                if (e.target.checked) setIsInstallment(false);
+              }}
+              disabled={isInstallment}
             />
-          </div>
-        )}
+            <span className={isInstallment ? "text-muted-foreground" : ""}>Adicionar recorrência</span>
+          </label>
+
+          {isRecurring &&
+            (selectedCategory === "compra_produto" ||
+              selectedCategory === "compra_equipamento") && (
+            <p className="text-sm text-amber-600 dark:text-amber-400 italic ml-1 mt-1">
+              ⚠️ A 1ª nota atualizará o estoque e os itens. As notas seguintes serão
+              criadas como compromissos financeiros futuros, sem alterar o estoque.
+            </p>
+          )}
+
+          {isRecurring && (
+            <div className="flex gap-4 mt-2">
+              <Select
+                value={recurrenceType}
+                onValueChange={(val) => setRecurrenceType(val as any)}
+              >
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Frequência" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="daily">Diária</SelectItem>
+                  <SelectItem value="weekly">Semanal</SelectItem>
+                  <SelectItem value="biweekly">Quinzenal</SelectItem>
+                  <SelectItem value="monthly">Mensal</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Label className="flex items-center">Repetir:</Label>
+              <Input
+                type="number"
+                min={1}
+                placeholder="Quantas vezes?"
+                value={recurrenceCount}
+                onChange={(e) => setRecurrenceCount(Number(e.target.value))}
+                className="w-[100px]"
+              />
+            </div>
+          )}
+        </div>
+
+        {/* PARCELAMENTO */}
+        <div>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={isInstallment}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                setIsInstallment(checked);
+                if (checked) {
+                  setIsRecurring(false);
+                  const total =
+                    selectedCategory === "compra_produto" ||
+                    selectedCategory === "compra_equipamento"
+                      ? productEntries.reduce((s, it) => s + it.quantity * it.unitPrice, 0)
+                      : Number(amount) || 0;
+                  recalcInstallments(total, installmentCount);
+                }
+              }}
+              disabled={isRecurring}
+            />
+            <span className={isRecurring ? "text-muted-foreground" : ""}>Adicionar parcelamento</span>
+          </label>
+
+          {isInstallment && (
+            <div className="mt-3 space-y-3">
+              <div className="flex gap-4 items-center">
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1 block">Nº de parcelas</Label>
+                  <Input
+                    type="number"
+                    min={2}
+                    placeholder="Parcelas"
+                    value={installmentCount}
+                    onChange={(e) => {
+                      const n = Math.max(2, Number(e.target.value) || 2);
+                      setInstallmentCount(n);
+                      const total =
+                        selectedCategory === "compra_produto" ||
+                        selectedCategory === "compra_equipamento"
+                          ? productEntries.reduce((s, it) => s + it.quantity * it.unitPrice, 0)
+                          : Number(amount) || 0;
+                      recalcInstallments(total, n);
+                    }}
+                    className="w-[100px]"
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-1 block">Frequência</Label>
+                  <Select
+                    value={installmentFrequency}
+                    onValueChange={(val) => setInstallmentFrequency(val as any)}
+                  >
+                    <SelectTrigger className="w-[160px]">
+                      <SelectValue placeholder="Frequência" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="daily">Diária</SelectItem>
+                      <SelectItem value="weekly">Semanal</SelectItem>
+                      <SelectItem value="biweekly">Quinzenal</SelectItem>
+                      <SelectItem value="monthly">Mensal</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="mt-5"
+                  onClick={() => {
+                    const total =
+                      selectedCategory === "compra_produto" ||
+                      selectedCategory === "compra_equipamento"
+                        ? productEntries.reduce((s, it) => s + it.quantity * it.unitPrice, 0)
+                        : Number(amount) || 0;
+                    recalcInstallments(total, installmentCount);
+                  }}
+                >
+                  Redistribuir igualmente
+                </Button>
+              </div>
+
+              {/* Inputs por parcela */}
+              {installmentValues.length > 0 && (() => {
+                const dates = getInstallmentDueDates();
+                const total =
+                  selectedCategory === "compra_produto" ||
+                  selectedCategory === "compra_equipamento"
+                    ? productEntries.reduce((s, it) => s + it.quantity * it.unitPrice, 0)
+                    : Number(amount) || 0;
+                const sumParcelas = installmentValues.reduce((s, v) => s + v, 0);
+                const diff = Math.round((total - sumParcelas) * 100) / 100;
+
+                return (
+                  <div className="space-y-2">
+                    {diff !== 0 && (
+                      <p className="text-xs text-amber-600 dark:text-amber-400">
+                        ⚠️ Soma das parcelas (R$ {sumParcelas.toFixed(2)}) difere do total (R$ {total.toFixed(2)}) em R$ {Math.abs(diff).toFixed(2)}.
+                      </p>
+                    )}
+                    {installmentValues.map((val, i) => (
+                      <div key={i} className="flex items-center gap-3">
+                        <span className="text-sm font-medium w-20 shrink-0">
+                          Parcela {i + 1}
+                        </span>
+                        <span className="text-xs text-muted-foreground w-24 shrink-0">
+                          {dates[i]
+                            ? dates[i].toLocaleDateString("pt-BR")
+                            : "—"}
+                        </span>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min={0}
+                          value={val}
+                          onChange={(e) => {
+                            const newVals = [...installmentValues];
+                            newVals[i] = Number(e.target.value) || 0;
+                            setInstallmentValues(newVals);
+                          }}
+                          className="w-[140px]"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+
+              {(selectedCategory === "compra_produto" ||
+                selectedCategory === "compra_equipamento") && (
+                <p className="text-sm text-amber-600 dark:text-amber-400 italic">
+                  ⚠️ A 1ª parcela atualizará o estoque e os itens. As demais são compromissos financeiros futuros.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       <textarea
