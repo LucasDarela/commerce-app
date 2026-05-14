@@ -183,6 +183,7 @@ export function ProductForm({
         submaterial_class: formData.submaterial_class || null,
         material_origin: formData.material_origin || null,
         aplication: formData.aplication || null,
+        loan_product_code: formData.loan_product_code || null,
         unit: formData.unit || null,
         description: formData.description || null,
         ncm: formData.ncm || null,

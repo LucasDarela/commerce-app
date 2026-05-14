@@ -215,14 +215,6 @@ export default function AddFinancialRecord() {
       return;
     }
 
-    if (
-      isRecurring &&
-      (selectedCategory === "compra_produto" ||
-        selectedCategory === "compra_equipamento")
-    ) {
-      toast.error("Recorrência não é permitida para este tipo de nota.");
-      return;
-    }
 
     if (!isValidBrazilianDate(issueDate) || !isValidBrazilianDate(dueDate)) {
       toast.error("Preencha as datas corretamente (dd/mm/aaaa).");
@@ -320,6 +312,8 @@ const record = {
       if (recurrenceError) {
         console.error("Erro ao salvar notas recorrentes:", recurrenceError);
       }
+      // Notas recorrentes de compra de produto/equipamento NÃO atualizam estoque
+      // nem salvam itens — apenas registram o compromisso financeiro futuro.
     }
 
     if (selectedCategory === "compra_produto") {
@@ -870,23 +864,21 @@ const record = {
       </div>
 
       <div className="mt-4">
-        <label className="flex items-center gap-2">
+        <label className="flex items-center gap-2 cursor-pointer">
           <input
             type="checkbox"
             checked={isRecurring}
             onChange={(e) => setIsRecurring(e.target.checked)}
-            disabled={
-              selectedCategory === "compra_produto" ||
-              selectedCategory === "compra_equipamento"
-            }
           />
           Adicionar recorrência
         </label>
 
-        {(selectedCategory === "compra_produto" ||
-          selectedCategory === "compra_equipamento") && (
-          <p className="text-sm text-muted-foreground italic ml-1">
-            Recorrência não disponível para compras de produto ou equipamento.
+        {isRecurring &&
+          (selectedCategory === "compra_produto" ||
+            selectedCategory === "compra_equipamento") && (
+          <p className="text-sm text-amber-600 dark:text-amber-400 italic ml-1 mt-1">
+            ⚠️ A 1ª nota atualizará o estoque e os itens. As notas seguintes serão
+            criadas como compromissos financeiros futuros, sem alterar o estoque.
           </p>
         )}
 

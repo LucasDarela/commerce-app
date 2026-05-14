@@ -27,7 +27,6 @@ export default function EditProductPage() {
           name: data.name ?? "",
           manufacturer: data.manufacturer ?? "",
           standard_price: data.standard_price?.toString() ?? "",
-          percentage_taxes: data.percentage_taxes ?? "",
           material_class: data.material_class ?? "",
           submaterial_class: data.submaterial_class ?? "",
           material_origin: data.material_origin ?? "National",
@@ -45,6 +44,12 @@ export default function EditProductPage() {
           pis: data.pis ?? "",
           cofins: data.cofins ?? "",
           ipi: data.ipi ?? "",
+          vbc_st_ret: data.vbc_st_ret?.toString() ?? "",
+          pst: data.pst?.toString() ?? "",
+          vicms_substituto: data.vicms_substituto?.toString() ?? "",
+          vicms_st_ret: data.vicms_st_ret?.toString() ?? "",
+          ibs_cbs_situacao_tributaria: data.ibs_cbs_situacao_tributaria ?? "000",
+          ibs_cbs_classificacao_tributaria: data.ibs_cbs_classificacao_tributaria ?? "000001",
         });
       }
 
