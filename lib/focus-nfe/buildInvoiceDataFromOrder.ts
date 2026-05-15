@@ -413,19 +413,21 @@ export async function buildInvoiceDataFromOrder({
 
     tipo_documento: toIntEnum(fiscalOperation.tipo_documento, [0, 1], 1),
 
-    local_destino: ["1", "2", "3"].includes(
+    id_dest: ["1", "2", "3"].includes(
       toText(
         fiscalOperation.local_destino,
         operationScope === "inside_state" ? "1" : "2",
       ),
     )
-      ? toText(
-          fiscalOperation.local_destino,
-          operationScope === "inside_state" ? "1" : "2",
+      ? Number(
+          toText(
+            fiscalOperation.local_destino,
+            operationScope === "inside_state" ? "1" : "2",
+          ),
         )
       : operationScope === "inside_state"
-        ? "1"
-        : "2",
+        ? 1
+        : 2,
 
     finalidade_emissao: toIntEnum(
       fiscalOperation.finalidade_emissao,
@@ -482,8 +484,13 @@ export async function buildInvoiceDataFromOrder({
 
     nome_destinatario: toText(customer.name || order.customer),
     ...customerDoc,
-    ie_destinatario: toText(customer.state_registration) || undefined,
-    indIEDest: toText(customer.state_registration) ? "1" : "9",
+    inscricao_estadual_destinatario:
+      toText(customer.state_registration) || "ISENTO",
+    indicador_inscricao_estadual_destinatario:
+      toText(customer.state_registration) &&
+      toText(customer.state_registration).toUpperCase() !== "ISENTO"
+        ? 1
+        : 9,
 
     logradouro_destinatario: customerAddress.address,
     endereco_destinatario: customerAddress.address,
