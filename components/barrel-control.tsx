@@ -18,11 +18,12 @@ interface Supplier {
   id: string;
   name: string;
   isAvulso?: boolean;
+  email?: string;
 }
 
 interface BarrelRecord {
   supplier_id: string;
-  suppliers?: { name: string } | null;
+  suppliers?: { name: string; email?: string } | null;
   id: string;
   date: string;
   note?: string | null;
@@ -42,7 +43,7 @@ type SupplierTab = {
 };
 
 type BarrelRecordRaw = Omit<BarrelRecord, "suppliers"> & {
-  suppliers?: { name: string }[] | { name: string } | null;
+  suppliers?: { name: string; email?: string }[] | { name: string; email?: string } | null;
 };
 
 export default function BarrelControl() {
@@ -60,10 +61,13 @@ export default function BarrelControl() {
   const [tabToDelete, setTabToDelete] = useState<string | null>(null);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
 
+  const [supplierToDeleteFromSearch, setSupplierToDeleteFromSearch] = useState<Supplier | null>(null);
+  const [showDeleteAvulsoConfirm, setShowDeleteAvulsoConfirm] = useState(false);
+
   const getTodayDate = () => {
     const today = new Date();
-    const day = String(today.getDate()).padStart(2, '0');
-    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, "0");
+    const month = String(today.getMonth() + 1).padStart(2, "0");
     const year = today.getFullYear();
     return `${day}/${month}/${year}`;
   };
@@ -85,9 +89,10 @@ export default function BarrelControl() {
 
     const { data, error } = await supabase
       .from("barrel_controls")
-      .select(`
+      .select(
+        `
         supplier_id,
-        suppliers:suppliers!inner(name),
+        suppliers:suppliers!inner(name, email),
         id,
         date,
         note,
@@ -99,7 +104,8 @@ export default function BarrelControl() {
         returned_50,
         total_30,
         total_50
-      `)
+      `,
+      )
       .eq("company_id", companyId)
       .order("date", { ascending: true });
 
@@ -117,43 +123,46 @@ export default function BarrelControl() {
 
     const suppliersMap: Record<string, SupplierTab> = {};
 
-const normalizedData = ((data ?? []) as BarrelRecordRaw[]).map((record) => ({
-  ...record,
-  suppliers: Array.isArray(record.suppliers)
-    ? record.suppliers[0] ?? null
-    : record.suppliers,
-})) as BarrelRecord[];
+    const normalizedData = ((data ?? []) as BarrelRecordRaw[]).map(
+      (record) => ({
+        ...record,
+        suppliers: Array.isArray(record.suppliers)
+          ? (record.suppliers[0] ?? null)
+          : record.suppliers,
+      }),
+    ) as BarrelRecord[];
 
-normalizedData.forEach((record) => {
-  const supplierId = record.supplier_id;
+    normalizedData.forEach((record) => {
+      const supplierId = record.supplier_id;
 
-  if (!suppliersMap[supplierId]) {
-    suppliersMap[supplierId] = {
-      supplier: {
-        id: supplierId,
-        name: record.suppliers?.name || "Fornecedor desconhecido",
-      },
-      rows: [],
-    };
-  }
+      if (!suppliersMap[supplierId]) {
+        suppliersMap[supplierId] = {
+          supplier: {
+            id: supplierId,
+            name: record.suppliers?.name || "Fornecedor desconhecido",
+            isAvulso: record.suppliers?.email === "avulso@sistema.local",
+          },
+          rows: [],
+        };
+      }
 
-  suppliersMap[supplierId].rows.push({
-    id: record.id,
-    date: formatDateFromDB(record.date),
-    note: record.note || "",
-    had_30: record.had_30 || 0,
-    had_50: record.had_50 || 0,
-    arrived_30: record.arrived_30 || 0,
-    arrived_50: record.arrived_50 || 0,
-    returned_30: record.returned_30 || 0,
-    returned_50: record.returned_50 || 0,
-    total_30: record.total_30 || 0,
-    total_50: record.total_50 || 0,
-  });
-});
+      suppliersMap[supplierId].rows.push({
+        id: record.id,
+        date: formatDateFromDB(record.date),
+        note: record.note || "",
+        had_30: record.had_30 || 0,
+        had_50: record.had_50 || 0,
+        arrived_30: record.arrived_30 || 0,
+        arrived_50: record.arrived_50 || 0,
+        returned_30: record.returned_30 || 0,
+        returned_50: record.returned_50 || 0,
+        total_30: record.total_30 || 0,
+        total_50: record.total_50 || 0,
+      });
+    });
 
-    const loadedTabs = Object.values(suppliersMap).sort((a, b) => 
-      a.supplier.name.localeCompare(b.supplier.name)
+    const loadedTabs = Object.values(suppliersMap).sort((a, b) =>
+      a.supplier.name.localeCompare(b.supplier.name),
     );
     setTabs(loadedTabs);
     setSelectedTab((prev) => prev ?? loadedTabs[0]?.supplier.id);
@@ -172,6 +181,11 @@ normalizedData.forEach((record) => {
     return () => clearTimeout(timeoutId);
   }, [tabs, isInitialLoad]);
 
+  // Handle manual saves specifically
+  const triggerManualSave = async () => {
+    await handleSave(false);
+  };
+
   const handleSearchSupplier = async (value: string) => {
     setSearchSupplier(value);
 
@@ -184,7 +198,7 @@ normalizedData.forEach((record) => {
 
     const { data, error } = await supabase
       .from("suppliers")
-      .select("id, name")
+      .select("id, name, email")
       .eq("company_id", companyId)
       .ilike("name", `%${value.trim()}%`)
       .order("name", { ascending: true })
@@ -208,58 +222,79 @@ normalizedData.forEach((record) => {
       return;
     }
 
-    setTabs((prev) => {
-      const nextTabs = [
-        ...prev,
+    const newTab = {
+      supplier,
+      rows: [
         {
-          supplier,
-          rows: [
-            {
-              date: getTodayDate(),
-              note: "",
-              had_30: 0,
-              had_50: 0,
-              arrived_30: 0,
-              arrived_50: 0,
-              returned_30: 0,
-              returned_50: 0,
-              total_30: 0,
-              total_50: 0,
-            },
-          ],
+          date: getTodayDate(),
+          note: "",
+          had_30: 0,
+          had_50: 0,
+          arrived_30: 0,
+          arrived_50: 0,
+          returned_30: 0,
+          returned_50: 0,
+          total_30: 0,
+          total_50: 0,
         },
-      ];
-      return nextTabs.sort((a, b) => a.supplier.name.localeCompare(b.supplier.name));
-    });
+      ],
+    };
+
+    const nextTabs = [...tabs, newTab].sort((a, b) =>
+      a.supplier.name.localeCompare(b.supplier.name),
+    );
+    setTabs(nextTabs);
     setSelectedTab(supplier.id);
     setSearchSupplier("");
     setFoundSuppliers([]);
+
+    // Save immediately so the supplier doesn't disappear on refresh
+    // Placed outside setTabs to avoid React Strict Mode calling it twice
+    setTimeout(() => handleSave(true, nextTabs), 0);
   };
 
-  const handleSave = async (silent: boolean | React.MouseEvent<HTMLButtonElement> = false) => {
+  const handleSave = async (
+    silent: boolean | React.MouseEvent<HTMLButtonElement> = false,
+    tabsToSave?: SupplierTab[],
+  ) => {
     if (!companyId) {
       if (silent !== true) toast.error("Empresa não identificada.");
       return;
     }
 
-    for (const tab of tabs) {
+    const activeTabs = tabsToSave || tabs;
+
+    for (const tab of activeTabs) {
       if (tab.supplier.isAvulso) {
         // Geração de um "documento" falso (14 dígitos) para evitar colisão Unique ou máscara
-        const fakeDocument = String(Math.floor(Math.random() * 89999999999999) + 10000000000000);
-        
-        const { error: sErr } = await supabase.from("suppliers").insert({
-          id: tab.supplier.id,
-          company_id: companyId,
-          name: tab.supplier.name,
-          type: "CNPJ",
-          document: fakeDocument,
-        });
-        
+        const fakeDocument = String(
+          Math.floor(Math.random() * 89999999999999) + 10000000000000,
+        );
+
+        const { error: sErr } = await supabase.from("suppliers").upsert(
+          {
+            id: tab.supplier.id,
+            company_id: companyId,
+            name: tab.supplier.name,
+            type: "CNPJ",
+            document: fakeDocument,
+            email: "avulso@sistema.local",
+          },
+          { onConflict: "id", ignoreDuplicates: true },
+        );
+
         if (sErr) {
-            console.error("Erro banco:", sErr.message, sErr.details, sErr.hint, sErr.code);
-            if (silent !== true) toast.error(`Falha no banco ao salvar aba avulsa: ${sErr.message}`);
+          console.error(
+            "Erro banco:",
+            sErr.message,
+            sErr.details,
+            sErr.hint,
+            sErr.code,
+          );
+          if (silent !== true)
+            toast.error(`Falha no banco ao salvar aba avulsa: ${sErr.message}`);
         }
-        
+
         tab.supplier.isAvulso = false; // evitar re-inserção
       }
 
@@ -275,7 +310,9 @@ normalizedData.forEach((record) => {
         return;
       }
 
-      const validRows = tab.rows.filter(r => r.date && formatDateToYMD(r.date) !== null);
+      const validRows = tab.rows.filter(
+        (r) => r.date && formatDateToYMD(r.date) !== null,
+      );
 
       const insertPayload = validRows.map((row) => ({
         company_id: companyId,
@@ -299,7 +336,10 @@ normalizedData.forEach((record) => {
 
         if (insertError) {
           console.error(insertError);
-          if (silent !== true) toast.error(`Erro ao salvar dados do fornecedor ${tab.supplier.name}`);
+          if (silent !== true)
+            toast.error(
+              `Erro ao salvar dados do fornecedor ${tab.supplier.name}`,
+            );
           return;
         }
       }
@@ -340,6 +380,48 @@ normalizedData.forEach((record) => {
     setShowConfirmDelete(false);
     setTabToDelete(null);
     toast.success("Fornecedor removido!");
+  };
+
+  const handleDeleteAvulsoFromSearch = async () => {
+    if (!companyId || !supplierToDeleteFromSearch) return;
+
+    const supplierId = supplierToDeleteFromSearch.id;
+
+    // Delete from barrel_controls first
+    await supabase
+      .from("barrel_controls")
+      .delete()
+      .eq("company_id", companyId)
+      .eq("supplier_id", supplierId);
+
+    // Delete from suppliers
+    const { error } = await supabase
+      .from("suppliers")
+      .delete()
+      .eq("company_id", companyId)
+      .eq("id", supplierId);
+
+    if (error) {
+      console.error(error);
+      toast.error("Erro ao apagar fornecedor avulso.");
+    } else {
+      toast.success("Aba avulsa apagada com sucesso!");
+      
+      // Remove from search results
+      setFoundSuppliers((prev) => prev.filter((s) => s.id !== supplierId));
+      
+      // Remove from open tabs if present
+      const remainingTabs = tabs.filter((tab) => tab.supplier.id !== supplierId);
+      if (remainingTabs.length !== tabs.length) {
+        setTabs(remainingTabs);
+        if (selectedTab === supplierId) {
+          setSelectedTab(remainingTabs[0]?.supplier.id);
+        }
+      }
+    }
+
+    setShowDeleteAvulsoConfirm(false);
+    setSupplierToDeleteFromSearch(null);
   };
 
   function downloadCSV(filename: string, rows: BarrelEntry[]) {
@@ -397,7 +479,7 @@ normalizedData.forEach((record) => {
       <div className="w-full">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4">
           <div className="space-y-1">
-            <h2 className="text-2xl font-bold">Mapeamento de Barris</h2>
+            <h2 className="text-2xl font-bold">Controle de Barris</h2>
             <p className="text-sm text-muted-foreground">
               Controle de vasilhames e comodatos com fornecedores
             </p>
@@ -415,29 +497,60 @@ normalizedData.forEach((record) => {
             {searchSupplier && (
               <div className="absolute z-20 mt-1 w-full rounded-md bg-background shadow-lg border max-h-60 overflow-y-auto custom-scrollbar">
                 {loadingSuppliers ? (
-                  <div className="p-3 text-center text-sm text-muted-foreground">Buscando...</div>
+                  <div className="p-3 text-center text-sm text-muted-foreground">
+                    Buscando...
+                  </div>
                 ) : foundSuppliers.length > 0 ? (
                   <>
                     {foundSuppliers.map((supplier) => (
                       <div
                         key={supplier.id}
-                        onClick={() => handleAddSupplier(supplier)}
-                        className="cursor-pointer px-4 py-3 hover:bg-muted border-b last:border-0 transition-colors"
+                        className="flex items-center justify-between px-4 py-3 hover:bg-muted border-b last:border-0 transition-colors group"
                       >
-                        {supplier.name}
+                        <div
+                          className="cursor-pointer flex-1"
+                          onClick={() => handleAddSupplier(supplier)}
+                        >
+                          {supplier.name}
+                        </div>
+                        {supplier.email === "avulso@sistema.local" && (
+                          <span
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSupplierToDeleteFromSearch(supplier);
+                              setShowDeleteAvulsoConfirm(true);
+                            }}
+                            className="text-muted-foreground/50 hover:text-destructive transition-colors cursor-pointer p-2 rounded-full hover:bg-destructive/10"
+                            title="Apagar aba avulsa definitivamente"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </span>
+                        )}
                       </div>
                     ))}
                     <div
-                      onClick={() => handleAddSupplier({ id: crypto.randomUUID(), name: searchSupplier, isAvulso: true })}
+                      onClick={() =>
+                        handleAddSupplier({
+                          id: crypto.randomUUID(),
+                          name: searchSupplier,
+                          isAvulso: true,
+                        })
+                      }
                       className="cursor-pointer px-4 py-3 hover:bg-muted text-primary text-sm font-medium border-t bg-muted/30 transition-colors"
                     >
                       + Criar aba avulsa "{searchSupplier}"
                     </div>
                   </>
                 ) : (
-                  <div 
+                  <div
                     className="p-3 text-center text-primary text-sm cursor-pointer hover:bg-muted transition-colors font-medium"
-                    onClick={() => handleAddSupplier({ id: crypto.randomUUID(), name: searchSupplier, isAvulso: true })}
+                    onClick={() =>
+                      handleAddSupplier({
+                        id: crypto.randomUUID(),
+                        name: searchSupplier,
+                        isAvulso: true,
+                      })
+                    }
                   >
                     + Criar aba avulsa "{searchSupplier}"
                   </div>
@@ -450,13 +563,21 @@ normalizedData.forEach((record) => {
         <div className="mt-4 space-y-6">
           {tabs.length === 0 && (
             <div className="rounded-xl border-2 border-dashed border-muted p-12 sm:p-20 text-center text-muted-foreground my-8 hover:bg-muted/10 transition-colors cursor-default">
-              <p className="text-lg font-medium mb-1">Nenhum fornecedor monitorado</p>
-              <p className="text-sm">Use o campo de busca acima para adicionar uma aba</p>
+              <p className="text-lg font-medium mb-1">
+                Nenhum fornecedor monitorado
+              </p>
+              <p className="text-sm">
+                Use o campo de busca acima para adicionar uma aba
+              </p>
             </div>
           )}
 
           {tabs.length > 0 && (
-            <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
+            <Tabs
+              value={selectedTab}
+              onValueChange={setSelectedTab}
+              className="w-full"
+            >
               <ScrollArea className="w-full mb-4">
                 <TabsList className="inline-flex h-10 items-center justify-start rounded-md bg-muted p-1 text-muted-foreground w-max sm:w-auto overflow-x-auto whitespace-nowrap mb-2 custom-scrollbar">
                   {tabs.map((tab) => (
@@ -482,7 +603,11 @@ normalizedData.forEach((record) => {
               </ScrollArea>
 
               {tabs.map((tab) => (
-                <TabsContent key={tab.supplier.id} value={tab.supplier.id} className="mt-0 outline-none">
+                <TabsContent
+                  key={tab.supplier.id}
+                  value={tab.supplier.id}
+                  className="mt-0 outline-none"
+                >
                   <div className="w-full overflow-hidden">
                     <BarrelTable
                       rows={tab.rows}
@@ -506,7 +631,9 @@ normalizedData.forEach((record) => {
             <div className="flex flex-col sm:flex-row justify-end gap-3 pt-6 w-full border-t border-muted/50 mt-4">
               <Button
                 onClick={() => {
-                  const currentTab = tabs.find((tab) => tab.supplier.id === selectedTab);
+                  const currentTab = tabs.find(
+                    (tab) => tab.supplier.id === selectedTab,
+                  );
                   if (currentTab) {
                     downloadCSV(
                       `controle-barris-${currentTab.supplier.name}.csv`,
@@ -520,6 +647,13 @@ normalizedData.forEach((record) => {
                 <Download className="h-4 w-4 mr-2" />
                 Exportar CSV
               </Button>
+              <Button
+                onClick={triggerManualSave}
+                className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                <Save className="h-4 w-4 mr-2" />
+                Salvar Alterações
+              </Button>
             </div>
           )}
         </div>
@@ -530,7 +664,8 @@ normalizedData.forEach((record) => {
           <div className="bg-white dark:bg-zinc-900 p-6 rounded-lg shadow-lg space-y-4 w-[300px]">
             <h2 className="text-lg font-bold">Remover Fornecedor?</h2>
             <p className="text-sm text-muted-foreground">
-              Essa ação irá excluir todas as linhas do fornecedor. Deseja continuar?
+              Essa ação irá excluir todas as linhas do fornecedor. Deseja
+              continuar?
             </p>
 
             <div className="flex justify-end gap-2">
@@ -552,6 +687,36 @@ normalizedData.forEach((record) => {
                 }}
               >
                 Confirmar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDeleteAvulsoConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-zinc-900 p-6 rounded-lg shadow-lg space-y-4 w-[320px]">
+            <h2 className="text-lg font-bold text-destructive">Apagar Aba Avulsa?</h2>
+            <p className="text-sm text-muted-foreground">
+              Não será possível recuperar a aba avulsa <strong>"{supplierToDeleteFromSearch?.name}"</strong> depois de remover. Confirma a exclusão definitiva?
+            </p>
+
+            <div className="flex justify-end gap-2 mt-4">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setShowDeleteAvulsoConfirm(false);
+                  setSupplierToDeleteFromSearch(null);
+                }}
+              >
+                Cancelar
+              </Button>
+
+              <Button
+                variant="destructive"
+                onClick={handleDeleteAvulsoFromSearch}
+              >
+                Sim, apagar
               </Button>
             </div>
           </div>

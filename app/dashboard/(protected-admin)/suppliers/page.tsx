@@ -53,12 +53,11 @@ export default function ListSuppliers() {
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const { companyId, loading } = useAuthenticatedCompany();
 
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [allSuppliers, setAllSuppliers] = useState<Supplier[]>([]);
   const [search, setSearch] = useState<string>("");
-  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(
-    null,
-  );
+  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   useEffect(() => {
     if (loading || !companyId) return;
@@ -67,31 +66,11 @@ export default function ListSuppliers() {
 
     const fetchSuppliers = async () => {
       try {
-        let query = supabase
+        const query = supabase
           .from("suppliers")
           .select("*")
           .eq("company_id", companyId)
           .order("name", { ascending: true });
-
-        if (search.trim()) {
-          const raw = search.trim();
-          const cleaned = raw.replace(/\D/g, "");
-
-          const filters: string[] = [];
-
-          if (raw) {
-            filters.push(`name.ilike.%${raw}%`);
-          }
-
-          if (cleaned) {
-            filters.push(`document.ilike.%${cleaned}%`);
-            filters.push(`phone.ilike.%${cleaned}%`);
-          }
-
-          if (filters.length > 0) {
-            query = query.or(filters.join(","));
-          }
-        }
 
         const { data, error } = await query;
 
@@ -102,7 +81,7 @@ export default function ListSuppliers() {
         }
 
         if (isMounted) {
-          setSuppliers((data as Supplier[]) ?? []);
+          setAllSuppliers((data as Supplier[]) ?? []);
         }
       } catch (error) {
         console.error("Erro inesperado:", error);
@@ -115,7 +94,34 @@ export default function ListSuppliers() {
     return () => {
       isMounted = false;
     };
-  }, [companyId, loading, search, supabase]);
+  }, [companyId, loading, supabase]);
+
+  const normalizeText = (text: string) => {
+    return text
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/\s+/g, " ")
+      .replace(/\n/g, "")
+      .trim();
+  };
+
+  const filteredSuppliers = useMemo(() => {
+    if (!search.trim()) return allSuppliers;
+    const searchNormalized = normalizeText(search);
+    const numericSearch = search.replace(/\D/g, "");
+
+    return allSuppliers.filter(s => {
+      const name = normalizeText(s.name || "");
+      const fantasy = normalizeText(s.fantasy_name || "");
+      const doc = s.document || "";
+      const phone = s.phone || "";
+
+      return name.includes(searchNormalized) || 
+             fantasy.includes(searchNormalized) || 
+             (numericSearch && (doc.includes(numericSearch) || phone.includes(numericSearch)));
+    });
+  }, [allSuppliers, search]);
 
   const openModal = (supplier: Supplier) => {
     setSelectedSupplier(supplier);
@@ -133,13 +139,13 @@ export default function ListSuppliers() {
     closeModal();
   };
 
-  const handleDelete = async (id: string) => {
-    if (!companyId) {
-      toast.error("Empresa não identificada.");
+  const handleDelete = async () => {
+    if (!companyId || !selectedSupplier) {
+      toast.error("Empresa ou fornecedor não identificado.");
       return;
     }
-
-    if (!confirm("Are you sure you want to delete this supplier?")) return;
+    
+    const id = selectedSupplier.id;
 
     const { error } = await supabase
       .from("suppliers")
@@ -152,12 +158,11 @@ export default function ListSuppliers() {
       return;
     }
 
-    toast.success("Supplier deleted successfully!");
-    setSuppliers((prev) => prev.filter((s) => s.id !== id));
+    toast.success("Fornecedor removido com sucesso!");
+    setAllSuppliers((prev) => prev.filter((s) => s.id !== id));
 
-    if (selectedSupplier?.id === id) {
-      closeModal();
-    }
+    setIsDeleteDialogOpen(false);
+    closeModal();
   };
 
   if (loading) {
@@ -202,8 +207,8 @@ export default function ListSuppliers() {
           </TableHeader>
 
           <TableBody>
-            {suppliers.length > 0 ? (
-              suppliers.map((supplier) => (
+            {filteredSuppliers.length > 0 ? (
+              filteredSuppliers.map((supplier) => (
                 <TableRow
                   key={supplier.id}
                   onClick={() => openModal(supplier)}
@@ -312,7 +317,7 @@ export default function ListSuppliers() {
 
                 <Button
                   variant="destructive"
-                  onClick={() => handleDelete(selectedSupplier.id)}
+                  onClick={() => setIsDeleteDialogOpen(true)}
                   className="col-span-1"
                 >
                   <Trash className="h-4 w-4" />
@@ -322,6 +327,34 @@ export default function ListSuppliers() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="max-w-md w-full">
+          <DialogHeader>
+            <DialogTitle className="text-destructive">Excluir Fornecedor?</DialogTitle>
+            <DialogDescription>
+              Você está prestes a excluir o fornecedor <strong>{selectedSupplier?.name}</strong>.
+              <br /><br />
+              Esta ação é definitiva e não poderá ser desfeita. Tem certeza que deseja continuar?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex justify-end gap-2 mt-4">
+            <Button
+              variant="secondary"
+              onClick={() => setIsDeleteDialogOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+            >
+              Sim, Excluir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

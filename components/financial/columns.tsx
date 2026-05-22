@@ -185,7 +185,19 @@ export function financialColumns({
           );
         return "—";
       },
-      filterFn: "includesString",
+      filterFn: (row, columnId, filterValue) => {
+        const normalize = (str: string) =>
+          str
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase();
+
+        const search = normalize(String(filterValue ?? "").trim());
+        if (!search) return true;
+
+        const value = normalize(String(row.getValue(columnId) ?? ""));
+        return value.includes(search);
+      },
       meta: { className: "w-[200px] truncate uppercase" },
       cell: ({ row }) => {
         const record = row.original;

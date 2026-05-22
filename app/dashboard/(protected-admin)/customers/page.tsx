@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {  
@@ -59,11 +59,12 @@ export default function ListCustomers() {
   const supabase = createBrowserSupabaseClient();
   const router = useRouter();
   const { user, companyId, loading } = useAuthenticatedCompany();
-  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [allClientes, setAllClientes] = useState<Cliente[]>([]);
   const [search, setSearch] = useState<string>("");
   const [debouncedSearch, setDebouncedSearch] = useState<string>("");
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [catalogName, setCatalogName] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -73,27 +74,11 @@ export default function ListCustomers() {
 
     const fetchCustomers = async () => {
       try {
-        let query = supabase
+        const query = supabase
           .from("customers")
           .select("*")
           .eq("company_id", companyId)
           .order("name", { ascending: true });
-
-        if (search.trim()) {
-          const normalizedSearch = search.trim().toLowerCase();
-          const numericSearch = search.replace(/\D/g, "");
-
-          const filters = [
-            `name.ilike.%${normalizedSearch}%`,
-            `fantasy_name.ilike.%${normalizedSearch}%`,
-          ];
-          if (numericSearch) {
-            filters.push(`document.ilike.%${numericSearch}%`);
-            filters.push(`phone.ilike.%${numericSearch}%`);
-          }
-
-          query = query.or(filters.join(","));
-        }
 
         const { data: clientes, error } = await query;
 
@@ -103,7 +88,7 @@ export default function ListCustomers() {
           return;
         }
 
-        setClientes(clientes || []);
+        setAllClientes(clientes || []);
         setCurrentPage(1);
       } catch (err) {
         console.error("❌ Erro inesperado ao buscar clientes:", err);
@@ -112,7 +97,7 @@ export default function ListCustomers() {
     };
 
     fetchCustomers();
-  }, [companyId, loading, debouncedSearch]);
+  }, [companyId, loading, supabase]);
 
   // Debounce effect
   useEffect(() => {
@@ -134,12 +119,29 @@ export default function ListCustomers() {
       .trim(); // remove espaços no começo e fim
   };
 
-  const paginatedClientes = clientes.slice(
+  const filteredClientes = useMemo(() => {
+    if (!debouncedSearch.trim()) return allClientes;
+    const searchNormalized = normalizeText(debouncedSearch);
+    const numericSearch = debouncedSearch.replace(/\D/g, "");
+
+    return allClientes.filter(c => {
+      const name = normalizeText(c.name || "");
+      const fantasy = normalizeText(c.fantasy_name || "");
+      const doc = c.document || "";
+      const phone = c.phone || "";
+
+      return name.includes(searchNormalized) || 
+             fantasy.includes(searchNormalized) || 
+             (numericSearch && (doc.includes(numericSearch) || phone.includes(numericSearch)));
+    });
+  }, [allClientes, debouncedSearch]);
+
+  const paginatedClientes = filteredClientes.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage,
   );
 
-  const totalPages = Math.ceil(clientes.length / itemsPerPage);
+  const totalPages = Math.ceil(filteredClientes.length / itemsPerPage) || 1;
 
   const openModal = async (cliente: Cliente) => {
     setSelectedCliente(cliente);
@@ -177,21 +179,22 @@ export default function ListCustomers() {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (confirm("Tem certeza que deseja excluir este cliente?")) {
-      const { error } = await supabase
-        .from("customers")
-        .delete()
-        .eq("id", id)
-        .eq("company_id", companyId); 
+  const handleDelete = async () => {
+    if (!selectedCliente) return;
 
-      if (error) {
-        toast.error("Erro ao excluir cliente: " + error.message);
-      } else {
-        toast.success("Cliente excluído com sucesso!");
-        setClientes(clientes.filter((cliente) => cliente.id !== id));
-        closeModal();
-      }
+    const { error } = await supabase
+      .from("customers")
+      .delete()
+      .eq("id", selectedCliente.id)
+      .eq("company_id", companyId); 
+
+    if (error) {
+      toast.error("Erro ao excluir cliente: " + error.message);
+    } else {
+      toast.success("Cliente excluído com sucesso!");
+      setAllClientes(allClientes.filter((cliente) => cliente.id !== selectedCliente.id));
+      setIsDeleteDialogOpen(false);
+      closeModal();
     }
   };
 
@@ -238,7 +241,7 @@ export default function ListCustomers() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {clientes.length > 0 ? (
+            {filteredClientes.length > 0 ? (
               paginatedClientes.map((cliente) => (
                 <TableRow
                   key={cliente.id}
@@ -389,7 +392,7 @@ export default function ListCustomers() {
                 </Button>
                 <Button
                   variant="destructive"
-                  onClick={() => handleDelete(selectedCliente.id)}
+                  onClick={() => setIsDeleteDialogOpen(true)}
                   className="col-span-1"
                 >
                   <Trash className="h-4 w-4" />
@@ -399,6 +402,34 @@ export default function ListCustomers() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="max-w-md w-full">
+          <DialogHeader>
+            <DialogTitle className="text-destructive">Excluir Cliente?</DialogTitle>
+            <DialogDescription>
+              Você está prestes a excluir o cliente <strong>{selectedCliente?.name}</strong>.
+              <br /><br />
+              Esta ação é definitiva e não poderá ser desfeita. Tem certeza que deseja continuar?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex justify-end gap-2 mt-4">
+            <Button
+              variant="secondary"
+              onClick={() => setIsDeleteDialogOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+            >
+              Sim, Excluir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

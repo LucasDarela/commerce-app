@@ -36,18 +36,18 @@ export default function EditSupplier() {
 
   const placeholdersMap: Record<string, string> = {
     document: "CPF/CNPJ",
-    name: "Business Name",
-    fantasy_name: "Trade Name",
-    zip_code: "ZIP Code",
-    address: "Address",
-    neighborhood: "Neighborhood",
-    city: "City",
-    state: "State",
-    number: "Number",
-    complement: "Complement",
-    phone: "Phone",
-    email: "Email (Optional)",
-    state_registration: "State Registration",
+    name: "Nome",
+    fantasy_name: "Razão Social",
+    zip_code: "CEP",
+    address: "Endereço",
+    neighborhood: "Bairro",
+    city: "Cidade",
+    state: "Estado",
+    number: "Número",
+    complement: "Complemento",
+    phone: "Telefone",
+    email: "Email (Opcional)",
+    state_registration: "IE",
   };
 
   const sanitizeDigits = (value: string) => value.replace(/\D/g, "");
@@ -103,16 +103,10 @@ export default function EditSupplier() {
       setSupplier({
         document: data.document ?? "",
         name: formatUppercase(data.name || "", "name"),
-        fantasy_name: formatUppercase(
-          data.fantasy_name || "",
-          "fantasy_name",
-        ),
+        fantasy_name: formatUppercase(data.fantasy_name || "", "fantasy_name"),
         zip_code: sanitizeDigits(data.zip_code || ""),
         address: formatUppercase(data.address || "", "address"),
-        neighborhood: formatUppercase(
-          data.neighborhood || "",
-          "neighborhood",
-        ),
+        neighborhood: formatUppercase(data.neighborhood || "", "neighborhood"),
         city: formatUppercase(data.city || "", "city"),
         state: formatUppercase(data.state || "", "state"),
         number: data.number ? String(data.number) : "",
@@ -256,7 +250,7 @@ export default function EditSupplier() {
   return (
     <div className="max-w-3xl mx-auto w-full px-4 py-6 rounded-lg shadow-md">
       <div className="flex gap-2 items-center justify-center">
-        <h1 className="text-2xl font-bold mb-4">Edit Supplier</h1>
+        <h1 className="text-2xl font-bold mb-4">Editar Fornecedor</h1>
       </div>
 
       {Object.keys(placeholdersMap).map((field, index) => (

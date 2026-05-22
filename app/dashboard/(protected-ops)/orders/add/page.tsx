@@ -555,16 +555,26 @@ const handleEditPrice = (index: number, price: string) => {
     );
   });
 
-const customersFiltered = searchCustomer.trim()
-  ? customers.filter(
-      (customer) =>
-        customer.name.toLowerCase().includes(searchCustomer.toLowerCase()) ||
-        (customer.fantasy_name &&
-          customer.fantasy_name
-            .toLowerCase()
-            .includes(searchCustomer.toLowerCase())) ||
-        (customer.document ?? "").includes(searchCustomer),
-    )
+const normalize = (str: string) =>
+  str
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+const searchCustomerNormalized = normalize(searchCustomer.trim());
+
+const customersFiltered = searchCustomerNormalized
+  ? customers.filter((customer) => {
+      const name = normalize(customer.name);
+      const fantasyName = customer.fantasy_name ? normalize(customer.fantasy_name) : "";
+      const document = customer.document ?? "";
+
+      return (
+        name.includes(searchCustomerNormalized) ||
+        fantasyName.includes(searchCustomerNormalized) ||
+        document.includes(searchCustomerNormalized)
+      );
+    })
   : customers;
 
 const dropdownRef = useRef<HTMLDivElement>(null);

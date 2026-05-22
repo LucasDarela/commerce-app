@@ -978,16 +978,18 @@ export function DataTable({ companyId, user, role }: DataTableProps) {
         size: 200,
         meta: { className: "w-[220px] truncate uppercase" },
         filterFn: (row, columnId, filterValue) => {
-          const search = String(filterValue ?? "")
-            .trim()
-            .toLowerCase();
+          const normalize = (str: string) =>
+            str
+              .normalize("NFD")
+              .replace(/[\u0300-\u036f]/g, "")
+              .toLowerCase();
+
+          const search = normalize(String(filterValue ?? "").trim());
 
           if (!search) return true;
 
-          const customer = String(row.original.customer ?? "").toLowerCase();
-          const noteNumber = String(
-            row.original.note_number ?? "",
-          ).toLowerCase();
+          const customer = normalize(String(row.original.customer ?? ""));
+          const noteNumber = normalize(String(row.original.note_number ?? ""));
 
           return customer.includes(search) || noteNumber.includes(search);
         },
