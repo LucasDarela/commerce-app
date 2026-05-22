@@ -93,7 +93,9 @@ export function LoanEquipmentModal({
       .from("equipment_loans")
       .select("note_number")
       .eq("company_id", companyId)
-      .order("note_number", { ascending: false })
+      .not("note_number", "is", null)
+      .neq("note_number", "")
+      .order("created_at", { ascending: false })
       .limit(1);
 
     if (error) {
