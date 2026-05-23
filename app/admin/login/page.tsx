@@ -75,8 +75,8 @@ export default function AdminLoginPage() {
         return;
       }
 
-      // Verifica se é super admin nos metadados
-      const isSuperAdmin = user.user_metadata?.is_super_admin || user.app_metadata?.is_super_admin;
+      // Verifica se é super admin puxando da tabela auth.users via RPC
+      const { data: isSuperAdmin } = await supabase.rpc("is_super_admin");
 
       if (!isSuperAdmin) {
         toast.error("Acesso negado. Você não é um Super Admin.");
@@ -95,8 +95,8 @@ export default function AdminLoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-slate-50 dark:bg-slate-950">
-      <div className="w-full max-w-[400px] space-y-6 bg-white dark:bg-slate-900 p-8 rounded-xl shadow-lg border border-slate-100 dark:border-slate-800">
+    <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-neutral-50 dark:bg-neutral-950">
+      <div className="w-full max-w-[400px] space-y-6 bg-white dark:bg-neutral-900 p-8 rounded-xl shadow-lg border border-neutral-100 dark:border-neutral-800">
         <div className="flex flex-col items-center space-y-2 text-center">
           <div className="bg-orange-100 dark:bg-orange-950/30 p-3 rounded-full mb-2">
             <ShieldCheck className="h-8 w-8 text-orange-600 dark:text-orange-500" />
@@ -146,7 +146,11 @@ export default function AdminLoginPage() {
               )}
             />
 
-            <Button type="submit" className="w-full bg-orange-600 hover:bg-orange-700 text-white" disabled={isLoading}>
+            <Button
+              type="submit"
+              className="w-full bg-orange-600 hover:bg-orange-700 text-white"
+              disabled={isLoading}
+            >
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isLoading ? "Autenticando..." : "Acessar Painel"}
             </Button>

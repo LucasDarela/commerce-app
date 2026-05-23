@@ -16,8 +16,10 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className={cn(inter.className, "min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col")}>
-      {children}
+    <div className={cn(inter.className, "dark bg-black text-neutral-50 min-h-screen flex flex-col")}>
+      <div className="flex-1">
+        {children}
+      </div>
     </div>
   );
 }

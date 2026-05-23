@@ -63,7 +63,8 @@ export async function middleware(req: NextRequest) {
   }
 
   // --- LÓGICA DO SUBDOMÍNIO ADMIN ---
-  const isAdminSubdomain = hostname === "admin.chopphub.com" || hostname.startsWith("admin.localhost");
+  const host = req.headers.get("host") || "";
+  const isAdminSubdomain = host.startsWith("admin.chopphub.com") || host.startsWith("admin.localhost");
 
   if (isAdminSubdomain) {
     // Evita loop se a URL interna já for /admin
@@ -76,9 +77,10 @@ export async function middleware(req: NextRequest) {
       return NextResponse.redirect(new URL("/login", req.url));
     }
 
-    // Se o usuário está logado, verificamos se ele é super admin (usando os metadados do auth.users)
+    // Se o usuário está logado, verificamos se ele é super admin
     if (user && pathname !== "/login") {
-      const isSuperAdmin = user.user_metadata?.is_super_admin || user.app_metadata?.is_super_admin;
+      // Como is_super_admin é uma coluna customizada física em auth.users, precisamos de uma RPC para ler
+      const { data: isSuperAdmin } = await supabase.rpc("is_super_admin");
 
       if (!isSuperAdmin) {
         // Se não for admin, derruba o acesso
