@@ -62,6 +62,35 @@ export async function middleware(req: NextRequest) {
     );
   }
 
+  // --- LÓGICA DO SUBDOMÍNIO ADMIN ---
+  const isAdminSubdomain = hostname === "admin.chopphub.com" || hostname.startsWith("admin.localhost");
+
+  if (isAdminSubdomain) {
+    // Evita loop se a URL interna já for /admin
+    if (pathname.startsWith("/admin")) {
+      return res; 
+    }
+
+    // Se o usuário não está logado e está tentando acessar qualquer coisa no admin, manda pro login
+    if (!user && pathname !== "/login") {
+      return NextResponse.redirect(new URL("/login", req.url));
+    }
+
+    // Se o usuário está logado, verificamos se ele é super admin (usando os metadados do auth.users)
+    if (user && pathname !== "/login") {
+      const isSuperAdmin = user.user_metadata?.is_super_admin || user.app_metadata?.is_super_admin;
+
+      if (!isSuperAdmin) {
+        // Se não for admin, derruba o acesso
+        return NextResponse.redirect(new URL("/login?error=unauthorized", req.url));
+      }
+    }
+
+    // Reescreve a URL visível (admin.chopphub.com/) para a pasta interna (/app/admin/)
+    return NextResponse.rewrite(new URL(`/admin${pathname === "/" ? "" : pathname}${search}`, req.url));
+  }
+  // --- FIM LÓGICA ADMIN ---
+
   if (pathname.startsWith("/dashboard")) {
     if (!user) {
       return NextResponse.redirect(new URL("/login-signin", req.url));
