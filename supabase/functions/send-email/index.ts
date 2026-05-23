@@ -100,7 +100,7 @@ html = `
         Para começar a explorar todas as nossas ferramentas, otimizar suas rotas de entrega e gerenciar seus barris, por favor, confirme seu endereço de e-mail clicando no botão abaixo:
       </p>
 
-      <a href="\${confirmUrl}" style="display: inline-block; background-color: #ea580c; color: #ffffff; padding: 14px 32px; font-size: 16px; font-weight: bold; border-radius: 8px; text-decoration: none; box-shadow: 0 2px 4px rgba(234, 88, 12, 0.2);">
+      <a href="${confirmUrl}" style="display: inline-block; background-color: #ea580c; color: #ffffff; padding: 14px 32px; font-size: 16px; font-weight: bold; border-radius: 8px; text-decoration: none; box-shadow: 0 2px 4px rgba(234, 88, 12, 0.2);">
         Confirmar meu Cadastro e Acessar
       </a>
 
@@ -110,12 +110,12 @@ html = `
         Se o botão acima não funcionar, você pode copiar e colar o link abaixo diretamente no seu navegador:
       </p>
       <p style="font-size: 12px; color: #9ca3af; text-align: left; word-break: break-all;">
-        \${confirmUrl}
+        ${confirmUrl}
       </p>
     </div>
 
     <p style="text-align: center; font-size: 12px; color: #9ca3af; margin-top: 24px;">
-      © \${new Date().getFullYear()} Chopp Hub. Todos os direitos reservados.
+      © ${new Date().getFullYear()} Chopp Hub. Todos os direitos reservados.
     </p>
   </div>
 `;

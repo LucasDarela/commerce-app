@@ -48,6 +48,10 @@ export interface Database {
           email: string | null;
           avatar: string | null;
           phone: string | null;
+          created_at?: string;
+          abandon_step_1_sent_at?: string | null;
+          abandon_step_2_sent_at?: string | null;
+          abandon_step_3_sent_at?: string | null;
         };
         Insert: Partial<Database["public"]["Tables"]["profiles"]["Row"]>;
         Update: Partial<Database["public"]["Tables"]["profiles"]["Row"]>;
