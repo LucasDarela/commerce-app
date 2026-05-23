@@ -178,7 +178,10 @@ export default function BillingPage() {
       const res = await fetch("/api/stripe/customer-portal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ companyId, subscriptionIdLocal: subscriptionData?.id }),
+        body: JSON.stringify({
+          companyId,
+          subscriptionIdLocal: subscriptionData?.id,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -350,7 +353,7 @@ export default function BillingPage() {
         <p className="text-muted-foreground text-lg">
           {isSubscribed
             ? "O upgrade é aplicado instantaneamente com rateio de valores."
-            : "Comece hoje mesmo com 30 dias de teste gratuito nos planos Essential e Pro."}
+            : "Comece hoje mesmo com 30 dias de teste gratuito nos planos Essential e Pro. Você só paga quando decidir usar de verdade!"}
         </p>
 
         <div className="flex flex-col items-center gap-4 pt-4">

@@ -50,6 +50,9 @@ export async function GET(req: Request) {
       const { data: userAuth } = await admin.auth.admin.getUserById(profile.id);
       if (!userAuth || !userAuth.user) continue;
 
+      // Se o usuário foi convidado para a empresa (tem invited_role), ele não é o dono que abandonou o checkout
+      if (userAuth.user.user_metadata?.invited_role) continue;
+
       const createdAt = new Date(userAuth.user.created_at);
       const hoursSinceCreation = Math.abs(now.getTime() - createdAt.getTime()) / 36e5;
 
