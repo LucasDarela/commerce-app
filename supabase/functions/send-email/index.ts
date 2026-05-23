@@ -85,27 +85,37 @@ Deno.serve(async (req) => {
         next: "/marketing/registration-confirmed",
       });
 
-subject = "Confirme seu cadastro";
+subject = "Bem-vindo(a) ao Chopp Hub - Confirme seu cadastro";
 html = `
-  <div style="font-family: Arial, sans-serif; padding: 24px;">
-    <h1>Bem-vindo ao Chopp Hub</h1>
-    <p>Olá${user?.user_metadata?.name ? `, ${user.user_metadata.name}` : ""}!</p>
-    <p>Clique no botão abaixo para confirmar seu cadastro:</p>
-    <p>
-      <a
-        href="${confirmUrl}"
-        style="
-          display:inline-block;
-          background:#2563eb;
-          color:#ffffff;
-          padding:12px 20px;
-          border-radius:8px;
-          text-decoration:none;
-          font-weight:bold;
-        "
-      >
-        Confirmar cadastro
+  <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px; background-color: #f9fafb; color: #1f2937;">
+    <div style="background-color: #ffffff; border-radius: 12px; padding: 40px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); text-align: center;">
+      <h1 style="margin-top: 0; color: #111827; font-size: 24px; font-weight: 700;">Bem-vindo(a) ao Chopp Hub! 🍻</h1>
+      
+      <p style="font-size: 16px; line-height: 1.6; color: #4b5563; margin-bottom: 24px; text-align: left;">
+        Olá${user?.user_metadata?.name ? `, <strong>${user.user_metadata.name}</strong>` : ""}!<br><br>
+        Ficamos muito felizes em ter você conosco. O <strong>Chopp Hub</strong> é a plataforma definitiva e completa para a gestão eficiente do seu negócio de chopp e bebidas.
+      </p>
+
+      <p style="font-size: 16px; line-height: 1.6; color: #4b5563; margin-bottom: 32px; text-align: left;">
+        Para começar a explorar todas as nossas ferramentas, otimizar suas rotas de entrega e gerenciar seus barris, por favor, confirme seu endereço de e-mail clicando no botão abaixo:
+      </p>
+
+      <a href="\${confirmUrl}" style="display: inline-block; background-color: #ea580c; color: #ffffff; padding: 14px 32px; font-size: 16px; font-weight: bold; border-radius: 8px; text-decoration: none; box-shadow: 0 2px 4px rgba(234, 88, 12, 0.2);">
+        Confirmar meu Cadastro e Acessar
       </a>
+
+      <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 40px 0 24px 0;">
+
+      <p style="font-size: 14px; color: #6b7280; text-align: left; margin-bottom: 8px;">
+        Se o botão acima não funcionar, você pode copiar e colar o link abaixo diretamente no seu navegador:
+      </p>
+      <p style="font-size: 12px; color: #9ca3af; text-align: left; word-break: break-all;">
+        \${confirmUrl}
+      </p>
+    </div>
+
+    <p style="text-align: center; font-size: 12px; color: #9ca3af; margin-top: 24px;">
+      © \${new Date().getFullYear()} Chopp Hub. Todos os direitos reservados.
     </p>
   </div>
 `;

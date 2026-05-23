@@ -35,9 +35,22 @@ export interface Database {
         Row: {
           user_id: string;
           company_id: string;
+          role?: string;
         };
         Insert: Partial<Database["public"]["Tables"]["company_users"]["Row"]>;
         Update: Partial<Database["public"]["Tables"]["company_users"]["Row"]>;
+      };
+
+      profiles: {
+        Row: {
+          id: string;
+          name: string | null;
+          email: string | null;
+          avatar: string | null;
+          phone: string | null;
+        };
+        Insert: Partial<Database["public"]["Tables"]["profiles"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["profiles"]["Row"]>;
       };
 
       companies: {

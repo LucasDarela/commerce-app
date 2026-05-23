@@ -53,6 +53,21 @@ export default function AuthCallbackPage() {
         }
       };
 
+      async function syncPhoneIfNeeded() {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user && user.user_metadata?.phone && !user.phone) {
+            await fetch("/api/auth/sync-phone", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ userId: user.id, phone: user.user_metadata.phone }),
+            });
+          }
+        } catch (err) {
+          console.error("[callback] sync phone erro:", err);
+        }
+      }
+
       try {
         // 2) verifyOtp (fluxo token_hash + type)
         const token_hash =
@@ -62,7 +77,10 @@ export default function AuthCallbackPage() {
             type: typeParam,
             token_hash,
           });
-          if (!error) return router.replace(computedNext);
+          if (!error) {
+            await syncPhoneIfNeeded();
+            return router.replace(computedNext);
+          }
           console.error("[callback] verifyOtp erro:", error.message);
         }
 
@@ -76,6 +94,7 @@ export default function AuthCallbackPage() {
               refresh_token,
             });
             if (!error) {
+              await syncPhoneIfNeeded();
               // limpa o hash da URL
               history.replaceState(
                 null,
@@ -92,7 +111,10 @@ export default function AuthCallbackPage() {
         const code = search.get("code");
         if (code && hasPkce()) {
           const { error } = await supabase.auth.exchangeCodeForSession(code);
-          if (!error) return router.replace(computedNext);
+          if (!error) {
+            await syncPhoneIfNeeded();
+            return router.replace(computedNext);
+          }
           console.error(
             "[callback] exchangeCodeForSession erro:",
             error.message,
@@ -105,7 +127,10 @@ export default function AuthCallbackPage() {
 
         // 5) Já tem sessão?
         const { data } = await supabase.auth.getSession();
-        if (data.session) return router.replace(computedNext);
+        if (data.session) {
+          await syncPhoneIfNeeded();
+          return router.replace(computedNext);
+        }
 
         // 6) Fallback
         router.replace("/login-signin");

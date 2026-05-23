@@ -44,6 +44,9 @@ const formSchema = z
     email: z
       .string({ required_error: "O e-mail é obrigatório." })
       .email("Deve ser um e-mail válido."),
+    phone: z
+      .string({ required_error: "O telefone é obrigatório." })
+      .min(14, "Informe um telefone válido completo com DDD."),
     password: z
       .string({ required_error: "A senha é obrigatória." })
       .min(8, "A senha deve ter pelo menos 8 caracteres.")
@@ -94,7 +97,7 @@ export function CreateAccountForm() {
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: { email: "", password: "", confirmPassword: "" },
+    defaultValues: { email: "", phone: "", password: "", confirmPassword: "" },
   });
 
   // Observa o valor do campo senha em tempo real
@@ -105,7 +108,7 @@ export function CreateAccountForm() {
       setLoading(true);
 
       const supabase = createBrowserSupabaseClient();
-      const { email, password } = values;
+      const { email, phone, password } = values;
 
       const siteUrl =
         process.env.NEXT_PUBLIC_SITE_URL ||
@@ -115,6 +118,7 @@ export function CreateAccountForm() {
         email,
         password,
         options: {
+          data: { phone },
           emailRedirectTo: `${siteUrl}/auth/callback?type=signup&next=/marketing/registration-confirmed`,
         },
       });
@@ -175,6 +179,36 @@ export function CreateAccountForm() {
                     autoComplete="email"
                     placeholder="E-mail"
                     {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="phone"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Telefone</FormLabel>
+                <FormControl>
+                  <Input
+                    type="tel"
+                    autoComplete="tel"
+                    placeholder="(11) 9 9999-9999"
+                    {...field}
+                    onChange={(e) => {
+                      let v = e.target.value.replace(/\D/g, "");
+                      let formatted = "";
+                      if (v.length > 0) {
+                        if (v.length <= 2) formatted = `(${v}`;
+                        else if (v.length <= 6) formatted = `(${v.slice(0, 2)}) ${v.slice(2)}`;
+                        else if (v.length <= 10) formatted = `(${v.slice(0, 2)}) ${v.slice(2, 6)}-${v.slice(6)}`;
+                        else formatted = `(${v.slice(0, 2)}) ${v.slice(2, 3)} ${v.slice(3, 7)}-${v.slice(7, 11)}`;
+                      }
+                      field.onChange(formatted);
+                    }}
                   />
                 </FormControl>
                 <FormMessage />
