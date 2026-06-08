@@ -16,71 +16,56 @@ interface Driver {
   username: string;
 }
 
-export default function DriverSelect() {
-  const supabase = createBrowserSupabaseClient(); 
-  const { companyId, loading: authLoading } = useAuthenticatedCompany();
+interface DriverSelectProps {
+  value: string;
+  onChange: (val: string) => void;
+}
+
+export default function DriverSelect({ value, onChange }: DriverSelectProps) {
   const [drivers, setDrivers] = useState<Driver[]>([]);
-  const [selectedDriver, setSelectedDriver] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    if (authLoading) return;
-
-    if (!companyId) {
-      setDrivers([]);
-      setLoading(false);
-      return;
-    }
-
     async function fetchDrivers() {
       setLoading(true);
 
-      const { data: companyUsers, error: companyUsersError } = await supabase
-        .from("company_users")
-        .select("user_id")
-        .eq("company_id", companyId)
-        .eq("role", "driver");
-
-      if (companyUsersError) {
-        console.error("Erro ao buscar drivers da empresa:", companyUsersError);
+      try {
+        const response = await fetch('/api/users/team');
+        if (!response.ok) {
+          throw new Error('Failed to fetch team');
+        }
+        
+        const data = await response.json();
+        
+        if (data && data.members) {
+          // You can filter by role === "driver" here if needed. 
+          // For now, listing all members to ensure it works.
+          const formattedDrivers = data.members.map((m: any) => ({
+            id: m.id,
+            username: m.username || m.email || "Usuário Desconhecido"
+          }));
+          
+          setDrivers(formattedDrivers);
+        } else {
+          setDrivers([]);
+        }
+      } catch (error) {
+        console.error("Erro ao buscar equipe:", error);
         setDrivers([]);
+      } finally {
         setLoading(false);
-        return;
       }
-
-      const userIds = (companyUsers ?? []).map((item) => item.user_id);
-
-      if (userIds.length === 0) {
-        setDrivers([]);
-        setLoading(false);
-        return;
-      }
-
-      const { data: profiles, error: profilesError } = await supabase
-        .from("profiles")
-        .select("id, username")
-        .in("id", userIds);
-
-      if (profilesError) {
-        console.error("Erro ao buscar profiles dos drivers:", profilesError);
-        setDrivers([]);
-        setLoading(false);
-        return;
-      }
-
-      setDrivers(profiles ?? []);
-      setLoading(false);
     }
 
     fetchDrivers();
-  }, [companyId, authLoading]);
+  }, []);
 
   if (loading) {
     return <p>Carregando motoristas...</p>;
   }
 
   return (
-    <Select value={selectedDriver} onValueChange={setSelectedDriver}>
+    <Select value={value} onValueChange={onChange}>
       <SelectTrigger className="w-full">
         <SelectValue placeholder="Selecione o motorista" />
       </SelectTrigger>

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectTrigger,
@@ -1076,49 +1077,72 @@ if (typeof catalogPrice !== "number") {
           </div>
 
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center mt-4">
-  <Input
-    type="text"
-    placeholder="Local da Entrega"
-    value={appointment.location}
-    onChange={(e) =>
-      setAppointment({ ...appointment, location: e.target.value })
-    }
-  />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start mt-4">
+            <Input
+              type="number"
+              placeholder="Frete"
+              value={freight === 0 ? "" : freight}
+              onChange={(e) => {
+                const value = e.target.value;
+                setFreight(value === "" ? 0 : Number(value));
+              }}
+            />
 
-  <Input
-    type="number"
-    placeholder="Frete"
-    value={freight === 0 ? "" : freight}
-    onChange={(e) => {
-      const value = e.target.value;
-      setFreight(value === "" ? 0 : Number(value));
-    }}
-  />
+            <Select
+              value={driverValue}
+              onValueChange={(value) =>
+                setSelectedDriverId(value === "none" ? null : value)
+              }
+            >
+              <SelectTrigger
+                className={`w-full ${driverValue === "none" ? "text-muted-foreground" : ""}`}
+              >
+                <SelectValue placeholder="Selecione o Motorista" />
+              </SelectTrigger>
 
-<Select
-  value={driverValue}
-  onValueChange={(value) =>
-    setSelectedDriverId(value === "none" ? null : value)
-  }
->
-  <SelectTrigger
-    className={`w-full ${driverValue === "none" ? "text-muted-foreground" : ""}`}
-  >
-    <SelectValue />
-  </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Selecione o Motorista</SelectItem>
+                {drivers.map((driver) => (
+                  <SelectItem key={driver.id} value={driver.id}>
+                    {driver.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-  <SelectContent>
-    <SelectItem value="none">Selecione o Motorista</SelectItem>
-
-    {drivers.map((driver) => (
-      <SelectItem key={driver.id} value={driver.id}>
-        {driver.name}
-      </SelectItem>
-    ))}
-  </SelectContent>
-</Select>
-</div>
+          <div className="flex flex-col gap-2 w-full mt-4">
+            <Input
+              type="text"
+              placeholder="Local da Entrega"
+              value={appointment.location}
+              onChange={(e) =>
+                setAppointment({ ...appointment, location: e.target.value })
+              }
+            />
+            <div className="flex items-center gap-2 px-1">
+              <Checkbox
+                id="use-customer-address"
+                disabled={!selectedCustomer}
+                onCheckedChange={(checked) => {
+                  if (checked && selectedCustomer) {
+                    const addr = [
+                      selectedCustomer.address,
+                      selectedCustomer.number,
+                      selectedCustomer.neighborhood,
+                      selectedCustomer.city,
+                      selectedCustomer.state,
+                      selectedCustomer.zip_code
+                    ].filter(Boolean).join(", ");
+                    setAppointment({ ...appointment, location: addr });
+                  }
+                }}
+              />
+              <label htmlFor="use-customer-address" className="text-xs font-medium cursor-pointer text-muted-foreground select-none">
+                Localização do cadastro
+              </label>
+            </div>
+          </div>
 
           <div className="flex mt-4">
             <Textarea

@@ -33,6 +33,7 @@ import {
   IconFileDots,
   IconTruckDelivery,
   IconDeviceMobile,
+  IconMapPin,
 } from "@tabler/icons-react";
 
 import { NavDocuments } from "@/components/nav-documents";
@@ -103,7 +104,7 @@ const data = {
     // {
     //   title: "Rotas",
     //   url: "/dashboard/routes-delivery",
-    //   icon: IconTruckDelivery,
+    //   icon: IconMapPin,
     // },
     {
       title: "Comodatos",

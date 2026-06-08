@@ -295,6 +295,73 @@ async function parseProductsWithIds(
     .filter((p) => p.id !== 0);
 }
 
+function EditableTableCell({
+  initialValue,
+  displayValue,
+  orderId,
+  field,
+  type = "text",
+  onSave,
+}: {
+  initialValue: string;
+  displayValue?: string;
+  orderId: string;
+  field: "text_note" | "appointment_local" | "appointment_date" | "appointment_hour";
+  type?: "text" | "date" | "time";
+  onSave: (
+    orderId: string,
+    field: "text_note" | "appointment_local" | "appointment_date" | "appointment_hour",
+    value: string,
+  ) => Promise<void>;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [value, setValue] = useState(initialValue || "");
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (value === initialValue) {
+      setIsEditing(false);
+      return;
+    }
+    setIsSaving(true);
+    await onSave(orderId, field, value);
+    setIsSaving(false);
+    setIsEditing(false);
+  };
+
+  if (isEditing) {
+    return (
+      <Input
+        type={type}
+        autoFocus
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={handleSave}
+        disabled={isSaving}
+        className="h-7 text-xs w-full px-1.5 min-w-0 max-w-full"
+        onKeyDown={(e) => {
+          if (e.key === "Enter") handleSave();
+          if (e.key === "Escape") {
+            setValue(initialValue);
+            setIsEditing(false);
+          }
+        }}
+      />
+    );
+  }
+
+  return (
+    <div
+      onClick={() => setIsEditing(true)}
+      className="cursor-text hover:bg-muted p-1 -m-1 rounded min-h-[24px] w-full flex items-center"
+    >
+      {displayValue || initialValue || (
+        <span className="opacity-50 italic text-[10px]">clique para editar</span>
+      )}
+    </div>
+  );
+}
+
 export function DataTable({ companyId, user, role }: DataTableProps) {
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const safeRole: UserRole | null =
@@ -900,6 +967,24 @@ export function DataTable({ companyId, user, role }: DataTableProps) {
     };
   }, [companyId, supabase]);
 
+  const handleInlineUpdate = React.useCallback(async (orderId: string, field: "text_note" | "appointment_local" | "appointment_date" | "appointment_hour", value: string) => {
+    const { error } = await supabase
+      .from("orders")
+      .update({ [field]: value })
+      .eq("id", orderId)
+      .eq("company_id", companyId);
+
+    if (error) {
+      toast.error(`Erro ao atualizar campo.`);
+      return;
+    }
+
+    setOrders((prev) =>
+      prev.map((o) => (o.id === orderId ? { ...o, [field]: value } : o))
+    );
+    toast.success("Atualizado com sucesso!");
+  }, [companyId, supabase]);
+
   const columns = React.useMemo<CustomColumnDef<Order>[]>(
     () => [
       {
@@ -949,17 +1034,33 @@ export function DataTable({ companyId, user, role }: DataTableProps) {
         },
         cell: ({ row }) => {
           const rawDate = row.original.appointment_date;
-          if (!rawDate) return "—";
-          const [year, month, day] = rawDate.split("-");
-          return `${day}/${month}/${year}`;
+          const displayDate = rawDate ? `${rawDate.split("-")[2]}/${rawDate.split("-")[1]}/${rawDate.split("-")[0]}` : "";
+          return (
+            <EditableTableCell
+              initialValue={rawDate || ""}
+              displayValue={displayDate}
+              orderId={row.original.id}
+              field="appointment_date"
+              type="date"
+              onSave={handleInlineUpdate}
+            />
+          );
         },
       },
       {
         accessorKey: "appointment_hour",
         header: "Hora",
-        size: 55,
-        meta: { className: "w-[55px]" },
-        cell: ({ row }) => row.original.appointment_hour,
+        size: 70,
+        meta: { className: "w-[70px]" },
+        cell: ({ row }) => (
+          <EditableTableCell
+            initialValue={row.original.appointment_hour || ""}
+            orderId={row.original.id}
+            field="appointment_hour"
+            type="time"
+            onSave={handleInlineUpdate}
+          />
+        ),
       },
       {
         id: "nfe",
@@ -1123,10 +1224,15 @@ export function DataTable({ companyId, user, role }: DataTableProps) {
         accessorKey: "text_note",
         header: "Observação",
         size: 250,
-        meta: { className: "w-[250px] truncate" },
+        meta: { className: "w-[250px]" },
         cell: ({ row }) => (
           <div className="whitespace-pre-wrap lowercase text-muted-foreground">
-            {row.original.text_note || ""}
+            <EditableTableCell
+              initialValue={row.original.text_note || ""}
+              orderId={row.original.id}
+              field="text_note"
+              onSave={handleInlineUpdate}
+            />
           </div>
         ),
       },
@@ -1137,7 +1243,12 @@ export function DataTable({ companyId, user, role }: DataTableProps) {
         meta: { className: "w-[250px]" },
         cell: ({ row }) => (
           <div className="whitespace-pre-wrap lowercase text-muted-foreground">
-            {row.original.appointment_local || ""}
+            <EditableTableCell
+              initialValue={row.original.appointment_local || ""}
+              orderId={row.original.id}
+              field="appointment_local"
+              onSave={handleInlineUpdate}
+            />
           </div>
         ),
       },
@@ -1387,7 +1498,7 @@ export function DataTable({ companyId, user, role }: DataTableProps) {
         },
       },
     ],
-    [orders, drivers, nfeStatusByOrderId],
+    [orders, drivers, nfeStatusByOrderId, handleInlineUpdate],
   );
 
   const [rowSelection, setRowSelection] = React.useState({});
@@ -1783,7 +1894,6 @@ export function DataTable({ companyId, user, role }: DataTableProps) {
       name: (item as any).products.name,
       quantity: item.quantity,
     }));
-
     setReturnProductItems(formatted);
     setIsProductReturnModalOpen(true);
   }

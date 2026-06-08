@@ -64,17 +64,17 @@ function formatarTelefone(valor: string, isInternational: boolean = false) {
     numeros = numeros.substring(1);
   }
 
-  if ((numeros.length === 10 || numeros.length === 11) && !numeros.startsWith("55")) {
+  if (
+    (numeros.length === 10 || numeros.length === 11) &&
+    !numeros.startsWith("55")
+  ) {
     numeros = "55" + numeros;
   }
 
   numeros = numeros.slice(0, 13);
 
   if (numeros.length >= 12) {
-    return numeros.replace(
-      /^(\d{2})(\d{2})(\d{5})(\d{4})$/,
-      "+$1 ($2) $3-$4",
-    );
+    return numeros.replace(/^(\d{2})(\d{2})(\d{5})(\d{4})$/, "+$1 ($2) $3-$4");
   }
 
   if (numeros.length >= 11) {
@@ -88,7 +88,7 @@ function formatarTelefone(valor: string, isInternational: boolean = false) {
 }
 
 export default function EditClient() {
-  const supabase = createBrowserSupabaseClient();     
+  const supabase = createBrowserSupabaseClient();
   const router = useRouter();
   const { id } = useParams();
   const { companyId, loading: authLoading } = useAuthenticatedCompany();
@@ -240,11 +240,12 @@ export default function EditClient() {
   };
 
   const buscarEndereco = async () => {
-    if (!cliente.zip_code || cliente.zip_code.length !== 8) return;
+    const cepLimpo = cliente.zip_code?.replace(/\D/g, "");
+    if (!cepLimpo || cepLimpo.length !== 8) return;
 
     try {
       const { data } = await axios.get(
-        `https://viacep.com.br/ws/${cliente.zip_code}/json/`,
+        `https://viacep.com.br/ws/${cepLimpo}/json/`,
       );
 
       if (data.erro) {
@@ -285,7 +286,11 @@ export default function EditClient() {
     }
 
     const telefoneNumericoText = String(cliente.phone ?? "").replace(/\D/g, "");
-    if (!isInternationalPhone && telefoneNumericoText.length > 0 && telefoneNumericoText.length < 12) {
+    if (
+      !isInternationalPhone &&
+      telefoneNumericoText.length > 0 &&
+      telefoneNumericoText.length < 12
+    ) {
       toast.error("Telefone inválido: o DDD e o número devem estar completos.");
       return;
     }
@@ -321,7 +326,7 @@ export default function EditClient() {
   return (
     <div className="max-w-3xl mx-auto w-full px-4 py-6 rounded-lg shadow-md">
       <div className="flex gap-2 items-center justify-center">
-        <h1 className="text-2xl font-bold mb-4">Edit Customer</h1>
+        <h1 className="text-2xl font-bold mb-4">Editar Cliente</h1>
       </div>
 
       <div className="flex gap-2 mb-6 items-center justify-center">
