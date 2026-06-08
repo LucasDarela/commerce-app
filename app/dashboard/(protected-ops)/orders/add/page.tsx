@@ -158,14 +158,10 @@ const issueDate = order?.issue_date ?? getLocalDateString();
 
     let due: string;
 
-    if (["pix", "dinheiro", "cartao"].includes(method)) {
-      due = format(appointment.date, "yyyy-MM-dd");
-    } else {
-      const calculatedDate = new Date(
-        appointment.date.getTime() + days * 24 * 60 * 60 * 1000,
-      );
-      due = format(calculatedDate, "yyyy-MM-dd");
-    }
+    const calculatedDate = new Date(
+      appointment.date.getTime() + days * 24 * 60 * 60 * 1000,
+    );
+    due = format(calculatedDate, "yyyy-MM-dd");
 
     setOrder((prev) => ({
       ...prev,
@@ -477,20 +473,15 @@ const handleEditPrice = (index: number, price: string) => {
         company_id: companyId,
         created_at: new Date().toISOString(),
         issue_date: getLocalDateString(),
-        due_date:
-          ["Pix", "Dinheiro", "Cartao"].includes(
-            capitalize(order?.payment_method || ""),
-          ) && appointment.date
-            ? format(appointment.date, "yyyy-MM-dd")
-            : appointment.date
-              ? format(
-                  new Date(
-                    appointment.date.getTime() +
-                      Number(order?.days_ticket || 12) * 24 * 60 * 60 * 1000,
-                  ),
-                  "yyyy-MM-dd",
-                )
-              : null,
+        due_date: appointment.date
+          ? format(
+              new Date(
+                appointment.date.getTime() +
+                  Number(order?.days_ticket || 0) * 24 * 60 * 60 * 1000,
+              ),
+              "yyyy-MM-dd",
+            )
+          : null,
         text_note,
       };
 
@@ -723,16 +714,7 @@ useEffect(() => {
               onChange={(e) =>
                 setOrder((prev) => ({ ...prev, days_ticket: e.target.value }))
               }
-              disabled={["pix", "dinheiro"].includes(
-                order?.payment_method?.toLowerCase() || "",
-              )}
-              className={`w-full border rounded-md shadow-sm ${
-                ["pix", "dinheiro"].includes(
-                  order?.payment_method?.toLowerCase() || "",
-                )
-                  ? "cursor-not-allowed bg-gray-100 text-gray-500"
-                  : ""
-              }`}
+              className="w-full border rounded-md shadow-sm"
             />
 
             <div className="flex items-center gap-2 w-full">

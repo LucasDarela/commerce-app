@@ -182,14 +182,10 @@ export default function EditOrderPage() {
 
     let due: string;
 
-    if (["pix", "dinheiro", "cartao"].includes(method)) {
-      due = format(appointment.date, "yyyy-MM-dd");
-    } else {
-      const calculatedDate = new Date(
-        appointment.date.getTime() + days * 24 * 60 * 60 * 1000,
-      );
-      due = format(calculatedDate, "yyyy-MM-dd");
-    }
+    const calculatedDate = new Date(
+      appointment.date.getTime() + days * 24 * 60 * 60 * 1000,
+    );
+    due = format(calculatedDate, "yyyy-MM-dd");
 
     setOrder((prev) => (prev ? { ...prev, due_date: due } : prev));
   }, [appointment.date, order?.payment_method, order?.days_ticket]);
@@ -683,16 +679,7 @@ const handleEditPrice = (index: number, value: string) => {
               onChange={(e) =>
                 setOrder((prev) => ({ ...prev, days_ticket: e.target.value }))
               }
-              disabled={["pix", "dinheiro"].includes(
-                order?.payment_method?.toLowerCase() || "",
-              )}
-              className={`w-full border rounded-md shadow-sm ${
-                ["pix", "dinheiro"].includes(
-                  order?.payment_method?.toLowerCase() || "",
-                )
-                  ? "cursor-not-allowed bg-gray-100 text-gray-500"
-                  : ""
-              }`}
+              className="w-full border rounded-md shadow-sm"
             />
 
             <div className="flex items-center gap-2 w-full">
