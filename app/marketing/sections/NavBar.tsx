@@ -16,7 +16,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { LoginAccountForm } from "@/components/auth/login-account-form";
+import dynamic from "next/dynamic";
+import { Loader2 } from "lucide-react";
+
+const LoginAccountForm = dynamic(
+  () => import("@/components/auth/login-account-form").then((mod) => mod.LoginAccountForm),
+  {
+    loading: () => (
+      <div className="flex flex-col items-center justify-center py-10 space-y-3">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground">Carregando...</p>
+      </div>
+    ),
+  }
+);
 
 const navLinks = [
   { label: "Funcionalidades", href: "#features" },

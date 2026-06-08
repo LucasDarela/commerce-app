@@ -18,7 +18,15 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { PasswordInput } from "../ui/password-input";
 import { useState } from "react";
-import { CheckCircle2, XCircle } from "lucide-react";
+import { CheckCircle2, XCircle, Mail, ArrowRight } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 // ─── Regras de senha ──────────────────────────────────────────────────────────
 const passwordRules = [
@@ -94,6 +102,7 @@ function PasswordChecklist({ value }: { value: string }) {
 export function CreateAccountForm() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -145,9 +154,8 @@ export function CreateAccountForm() {
       }
 
       if (data.user) {
-        toast.success("Verifique seu e-mail para confirmar sua inscrição.");
         form.reset();
-        router.push("/login-signin");
+        setShowSuccessModal(true);
       }
     } catch (err) {
       console.error("CreateAccountForm", err);
@@ -157,9 +165,15 @@ export function CreateAccountForm() {
     }
   };
 
+  const handleCloseModal = () => {
+    setShowSuccessModal(false);
+    router.push("/login-signin");
+  };
+
   return (
-    <div className="flex flex-col justify-center items-center space-y-2 px-6">
-      <span className="text-base pt-3 pb-1 text-muted-foreground">
+    <>
+      <div className="flex flex-col justify-center items-center space-y-2 px-6">
+        <span className="text-base pt-3 pb-1 text-muted-foreground">
         Crie sua conta para iniciar o teste grátis.
       </span>
       <Form {...form}>
@@ -260,5 +274,36 @@ export function CreateAccountForm() {
         </form>
       </Form>
     </div>
+
+      <Dialog open={showSuccessModal} onOpenChange={handleCloseModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader className="flex flex-col items-center justify-center pt-4">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 mb-4">
+              <Mail className="h-6 w-6 text-primary" />
+            </div>
+            <DialogTitle className="text-xl text-center">
+              Confirme seu e-mail
+            </DialogTitle>
+            <DialogDescription className="text-center pt-2">
+              Falta pouco! Enviamos um link de confirmação para o seu e-mail.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center space-y-4 py-4 text-sm text-muted-foreground">
+            <p className="text-center">
+              Para começar a usar o Chopp Hub, por favor, clique no link que enviamos para sua caixa de entrada.
+            </p>
+            <ul className="list-disc pl-4 space-y-2 text-left w-full">
+              <li>Verifique também a pasta de spam ou lixo eletrônico.</li>
+              <li>O link de confirmação pode demorar alguns minutos para chegar.</li>
+            </ul>
+          </div>
+          <DialogFooter className="sm:justify-center">
+            <Button onClick={handleCloseModal} className="w-full sm:w-auto gap-2">
+              Ir para o Login <ArrowRight className="h-4 w-4" />
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

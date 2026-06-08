@@ -66,4 +66,7 @@ export type OrderDetails = {
 
   // fallback para helpers
   products: string;
+  delivery_photo_url?: string | null;
+  location_photo_url?: string | null;
+  collection_photo_url?: string | null;
 };

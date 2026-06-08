@@ -92,6 +92,9 @@ export async function fetchOrderDetails(
       payment_status,
       products,
       stock_updated,
+      delivery_photo_url,
+      location_photo_url,
+      collection_photo_url,
       customers:customers(
         id,
         name,
@@ -215,5 +218,8 @@ if (error) {
     ),
     products: String(data.products ?? ""),
     stock_updated: data.stock_updated ?? undefined,
+    delivery_photo_url: data.delivery_photo_url ?? null,
+    location_photo_url: data.location_photo_url ?? null,
+    collection_photo_url: data.collection_photo_url ?? null,
   };
 }

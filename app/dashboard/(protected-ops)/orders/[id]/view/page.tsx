@@ -29,6 +29,7 @@ import {
 import type { OrderItem } from "@/components/types/orders";
 import type { OrderDetails } from "@/components/types/orderDetails";
 import { ReturnProductModal } from "@/components/products/ReturnProductModal";
+import { OrderPhotoCard } from "@/components/orders/OrderPhotoCard";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 // --------- helpers de cliente/botão ----------
@@ -441,6 +442,45 @@ export default function ViewOrderPage() {
       .update({ stock_updated: true })
       .eq("id", id)
       .eq("company_id", order.company?.id ?? "");
+  };
+
+  const handlePhotoUpload = async (file: File, type: "delivery" | "location" | "collection") => {
+    if (!order || !order.id || !order.company?.id) return;
+    
+    const filePath = `${order.company.id}/${order.id}/${type}_photo_${Date.now()}.webp`;
+    
+    const { error: uploadError } = await supabase.storage
+      .from("order-photos")
+      .upload(filePath, file, { upsert: true, contentType: "image/webp" });
+
+    if (uploadError) {
+      toast.error("Erro ao fazer upload da imagem.");
+      console.error(uploadError);
+      return;
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from("order-photos")
+      .getPublicUrl(filePath);
+
+    const publicUrl = publicUrlData.publicUrl;
+
+    const column = `${type}_photo_url`;
+
+    const { error: dbError } = await supabase
+      .from("orders")
+      .update({ [column]: publicUrl })
+      .eq("id", order.id)
+      .eq("company_id", order.company.id);
+
+    if (dbError) {
+      toast.error("Erro ao salvar a imagem no banco.");
+      console.error(dbError);
+      return;
+    }
+
+    toast.success("Foto salva com sucesso!");
+    setOrder((prev: any) => (prev ? { ...prev, [column]: publicUrl } : prev));
   };
 
   const markOrderStatus = async (next: "Coletar" | "Coletado") => {
@@ -907,6 +947,24 @@ export default function ViewOrderPage() {
           />
         </div>
       )}
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8 mb-4">
+        <OrderPhotoCard
+          title="Foto da Entrega"
+          url={order.delivery_photo_url ?? null}
+          onUpload={(f) => handlePhotoUpload(f, "delivery")}
+        />
+        <OrderPhotoCard
+          title="Foto do Local"
+          url={order.location_photo_url ?? null}
+          onUpload={(f) => handlePhotoUpload(f, "location")}
+        />
+        <OrderPhotoCard
+          title="Foto da Recolha"
+          url={order.collection_photo_url ?? null}
+          onUpload={(f) => handlePhotoUpload(f, "collection")}
+        />
+      </div>
 
       <LoanEquipmentModal
         open={isLoanModalOpen}

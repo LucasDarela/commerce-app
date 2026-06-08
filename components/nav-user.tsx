@@ -50,7 +50,7 @@ export function NavUser({
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    router.push("/login-signin");
+    router.push("/marketing");
   };
 
   return (
