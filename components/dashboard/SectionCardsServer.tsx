@@ -23,6 +23,11 @@ import {
   Droplets,
   Users,
   Receipt,
+  Truck,
+  Calendar,
+  AlertTriangle,
+  CreditCard,
+  Package,
 } from "lucide-react";
 
 type DashboardStats = {
@@ -35,6 +40,15 @@ type DashboardStats = {
   litrosMes: number;
   clientesAtivos: number;
   ticketMedio: number;
+  pedidosEntreguesMes: number;
+  litrosEntreguesMes: number;
+  agendadosFuturo: number;
+  litrosAgendadosFuturo: number;
+  inadimplentesTotal: number;
+  inadimplentesValor: number;
+  aPagarHoje: number;
+  aPagarHojeQtd: number;
+  emprestimosAtivos: number;
 };
 
 export function SectionCards() {
@@ -53,6 +67,7 @@ export function SectionCards() {
       const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
 
       const fmt = (d: Date) => format(d, "yyyy-MM-dd");
+      const fmtToday = fmt(now);
 
       const [
         ordersCurrent,
@@ -62,6 +77,11 @@ export function SectionCards() {
         inputsLast,
         outputsLast,
         customersRes,
+        entreguesRes,
+        agendadosRes,
+        vencidosRes,
+        aPagarHojeRes,
+        emprestimosRes,
       ] = await Promise.all([
         // Pedidos do mês atual (vencimento)
         supabase
@@ -123,25 +143,67 @@ export function SectionCards() {
           .gte("due_date", fmt(startOfMonth))
           .lt("due_date", fmt(startOfNextMonth))
           .not("customer_id", "is", null),
+
+        // Pedidos entregues no mês
+        supabase
+          .from("orders")
+          .select("id")
+          .eq("company_id", companyId)
+          .in("delivery_status", ["Coletar", "Coletado"])
+          .gte("delivered_at", startOfMonth.toISOString())
+          .lt("delivered_at", startOfNextMonth.toISOString()),
+
+        // Agendados (Futuro)
+        supabase
+          .from("orders")
+          .select("id")
+          .eq("company_id", companyId)
+          .gte("appointment_date", fmtToday)
+          .in("delivery_status", ["Entregar", "Pendente"]),
+
+        // Boletos Vencidos
+        supabase
+          .from("orders")
+          .select("total")
+          .eq("company_id", companyId)
+          .eq("payment_method", "Boleto")
+          .eq("payment_status", "pendente")
+          .lt("due_date", fmtToday),
+
+        // A Pagar Hoje
+        supabase
+          .from("financial_records")
+          .select("amount")
+          .eq("company_id", companyId)
+          .eq("type", "input")
+          .in("status", ["Unpaid", "pendente"])
+          .eq("due_date", fmtToday),
+
+        // Empréstimos Ativos
+        supabase
+          .from("equipment_loans")
+          .select("id", { count: "exact" })
+          .eq("company_id", companyId)
+          .eq("status", "active"),
       ]);
 
-      // IDs dos pedidos do mês
       const orderIds = (ordersCurrent.data ?? []).map((o: any) => o.id);
+      const entreguesIds = (entreguesRes.data ?? []).map((o: any) => o.id);
+      const agendadosIds = (agendadosRes.data ?? []).map((o: any) => o.id);
+      const allRelevantIds = [...new Set([...orderIds, ...entreguesIds, ...agendadosIds])];
 
       let litrosMes = 0;
-      if (orderIds.length > 0) {
+      let litrosEntreguesMes = 0;
+      let litrosAgendadosFuturo = 0;
+
+      if (allRelevantIds.length > 0) {
         // Busca todos os produtos da empresa para filtrar client-side
         const { data: allProducts } = await supabase
           .from("products")
           .select("id, name")
           .eq("company_id", companyId);
 
-        // Regex: captura número + LTS | LT | L no nome do produto
-        // Ex: "CHOPP LAGER HEINEKEN 30LTS" → 30
-        //     "BARRIL 50LT" → 50 | "CHOPP 30L" → 30
         const litroRegex = /(\d+(?:[.,]\d+)?)\s*(LTS|LT|L)\b/i;
-
-        // Mapa product_id → litros por unidade
         const litrosPorUnidade = new Map<string, number>();
         for (const p of allProducts ?? []) {
           const match = litroRegex.exec(p.name ?? "");
@@ -151,24 +213,26 @@ export function SectionCards() {
           }
         }
 
-        // Busca os order_items do mês
+        // Busca os order_items relevantes
         const { data: itemsData, error: itemsError } = await supabase
           .from("order_items")
-          .select("product_id, quantity")
-          .in("order_id", orderIds);
+          .select("order_id, product_id, quantity")
+          .in("order_id", allRelevantIds);
 
         if (itemsError) {
           console.error("[Dashboard] Erro ao buscar order_items:", itemsError);
         }
 
-        // Litros reais = soma de (volume_por_unidade × quantidade)
-        litrosMes = (itemsData ?? []).reduce((sum: number, item: any) => {
+        // Calcula litragens
+        for (const item of itemsData ?? []) {
           const volume = litrosPorUnidade.get(String(item.product_id));
           if (volume) {
-            return sum + volume * Number(item.quantity ?? 0);
+            const added = volume * Number(item.quantity ?? 0);
+            if (orderIds.includes(item.order_id)) litrosMes += added;
+            if (entreguesIds.includes(item.order_id)) litrosEntreguesMes += added;
+            if (agendadosIds.includes(item.order_id)) litrosAgendadosFuturo += added;
           }
-          return sum;
-        }, 0);
+        }
       }
 
       // Receita e cálculos
@@ -193,16 +257,19 @@ export function SectionCards() {
       const totalPagarAnt = inputsAnt.reduce((sum: number, i: any) => sum + Number(i.amount ?? 0), 0);
       const receitaAnterior = totalReceberAnt - totalPagarAnt;
 
-      // Clientes únicos
       const uniqueCustomers = new Set(
         (customersRes.data ?? []).map((o: any) => o.customer_id).filter(Boolean),
       );
 
-      // Ticket médio
       const ticketMedio = orders.length > 0 ? totalVendas / orders.length : 0;
-
-      // Pedidos mês anterior
       const pedidosMesAnterior = ordersAnt.length;
+
+      // NOVOS CALCULOS
+      const inadimplentesValor = (vencidosRes.data ?? []).reduce((sum: number, o: any) => sum + Number(o.total ?? 0), 0);
+      const inadimplentesTotal = (vencidosRes.data ?? []).length;
+
+      const aPagarHojeValor = (aPagarHojeRes.data ?? []).reduce((sum: number, i: any) => sum + Number(i.amount ?? 0), 0);
+      const aPagarHojeQtd = (aPagarHojeRes.data ?? []).length;
 
       setStats({
         receitaLiquida: receitaAtual,
@@ -214,6 +281,15 @@ export function SectionCards() {
         litrosMes,
         clientesAtivos: uniqueCustomers.size,
         ticketMedio,
+        pedidosEntreguesMes: entreguesIds.length,
+        litrosEntreguesMes,
+        agendadosFuturo: agendadosIds.length,
+        litrosAgendadosFuturo,
+        inadimplentesTotal,
+        inadimplentesValor,
+        aPagarHoje: aPagarHojeValor,
+        aPagarHojeQtd,
+        emprestimosAtivos: emprestimosRes.count ?? 0,
       });
 
       setLoading(false);
@@ -237,7 +313,7 @@ export function SectionCards() {
 
   if (loading || !stats) {
     return (
-      <div className="grid grid-cols-1 gap-4 px-4 lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 px-4 lg:px-6 md:grid-cols-3 @xl/main:grid-cols-3 lg:grid-cols-3">
         {Array.from({ length: 6 }).map((_, i) => (
           <Skeleton key={i} className="h-[130px] rounded-xl" />
         ))}
@@ -259,7 +335,7 @@ export function SectionCards() {
     },
     {
       icon: Receipt,
-      label: "A Receber",
+      label: "A Receber (Mês)",
       value: formatCurrency(stats.aReceber),
       footer: `Total em vendas de ${monthName}`,
       badge: null,
@@ -267,40 +343,41 @@ export function SectionCards() {
     },
     {
       icon: TrendingUp,
-      label: "A Pagar",
+      label: "A Pagar (Mês)",
       value: formatCurrency(stats.aPagar),
       footer: "Despesas lançadas no mês",
       badge: null,
       up: false,
     },
+
     {
       icon: ShoppingCart,
       label: "Pedidos no Mês",
       value: String(stats.pedidosMes),
-      footer: `${stats.pedidosMesAnterior} no mês anterior`,
+      footer: `${stats.litrosMes.toLocaleString("pt-BR")} L previstos no total`,
       badge: formatPercent(pedidosGrowth),
       up: pedidosGrowth >= 0,
     },
     {
-      icon: Droplets,
-      label: "Litros Vendidos",
-      value: `${stats.litrosMes.toLocaleString("pt-BR")} L`,
-      footer: `Chopp vendido em ${monthName}`,
+      icon: Truck,
+      label: "Entregues no Mês",
+      value: String(stats.pedidosEntreguesMes),
+      footer: `${stats.litrosEntreguesMes.toLocaleString("pt-BR")} L concluídos`,
       badge: null,
       up: true,
     },
     {
-      icon: Users,
-      label: "Clientes Ativos",
-      value: String(stats.clientesAtivos),
-      footer: `Clientes com pedido em ${monthName}`,
+      icon: Calendar,
+      label: "Agendados (Futuro)",
+      value: String(stats.agendadosFuturo),
+      footer: `${stats.litrosAgendadosFuturo.toLocaleString("pt-BR")} L pendentes`,
       badge: null,
       up: true,
     },
   ];
 
   return (
-    <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-3">
+    <div className="*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs lg:px-6 md:grid-cols-3 @xl/main:grid-cols-3 lg:grid-cols-3">
       {cards.map((card) => {
         const Icon = card.icon;
         return (

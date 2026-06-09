@@ -223,7 +223,7 @@ export default function ManualStockAdjustment() {
     <div className="mt-8">
       <div className="flex flex-row items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold">Ajuste Manual de Estoque</h2>
+          <h2 className="text-xl font-bold">Ajuste Manual de Estoque</h2>
           <p className="text-sm text-muted-foreground mt-1">
             Corrija ou ajuste as quantidades de produtos manualmente (balanço,
             perdas, etc).

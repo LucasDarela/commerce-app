@@ -289,8 +289,41 @@ const columns = useMemo(
 
 useEffect(() => {
   if (!companyId) return;
+  
   fetchAll();
-}, [companyId]);
+
+  const channel = supabase
+    .channel("financial_realtime")
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "financial_records",
+        filter: `company_id=eq.${companyId}`,
+      },
+      () => {
+        fetchAll();
+      }
+    )
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "orders",
+        filter: `company_id=eq.${companyId}`,
+      },
+      () => {
+        fetchAll();
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, [companyId, supabase, fetchAll]);
 
   useEffect(() => {
     persistColumnVisibility(columnVisibility);

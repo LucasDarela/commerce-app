@@ -117,7 +117,7 @@ export function ReturnProductModal({
 
       const { data: orderData, error: orderError } = await supabase
         .from("orders")
-        .select("id, total, amount, products, company_id")
+        .select("id, total, amount, products, company_id, total_payed")
         .eq("id", orderId)
         .eq("company_id", companyId)
         .maybeSingle();
@@ -132,6 +132,17 @@ export function ReturnProductModal({
 
       const currentAmount = Number(orderData.amount ?? 0);
       const newAmount = Math.max(0, currentAmount - totalDiscount);
+
+      const totalPayed = Number(orderData.total_payed ?? 0);
+
+      let newPaymentStatus = "Unpaid";
+      if (newTotal === 0) {
+        newPaymentStatus = "Paid";
+      } else if (totalPayed >= newTotal - 0.01) {
+        newPaymentStatus = "Paid";
+      } else if (totalPayed > 0) {
+        newPaymentStatus = "Partial";
+      }
 
       let newProductsText = orderData.products || "";
       if (newProductsText) {
@@ -167,7 +178,8 @@ export function ReturnProductModal({
         .update({ 
           total: newTotal,
           amount: newAmount,
-          products: newProductsText 
+          products: newProductsText,
+          payment_status: newPaymentStatus
         })
         .eq("id", orderId)
         .eq("company_id", companyId);

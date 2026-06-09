@@ -2,6 +2,8 @@ export const runtime = "nodejs";
 
 import { SectionCards } from "@/components/dashboard/SectionCardsServer";
 import ClientChart from "./ClientChart";
+import { InactiveCustomersCard } from "@/components/dashboard/InactiveCustomersCard";
+import { PayablesTodayCard } from "@/components/dashboard/PayablesTodayCard";
 
 export default async function DashboardPage() {
   return (
@@ -11,6 +13,10 @@ export default async function DashboardPage() {
           <SectionCards />
           <div className="px-4 lg:px-6">
             <ClientChart />
+          </div>
+          <div className="grid grid-cols-1 gap-4 px-4 lg:px-6 lg:grid-cols-2">
+            <InactiveCustomersCard />
+            <PayablesTodayCard />
           </div>
         </div>
       </div>
