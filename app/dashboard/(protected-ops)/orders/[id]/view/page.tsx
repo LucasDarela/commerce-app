@@ -370,6 +370,39 @@ export default function ViewOrderPage() {
     unit_price: item.unitPrice ?? 0,
   }));
 
+  const processStockReduction = async () => {
+    if (order?.stock_updated || !order?.id || !order?.company?.id) return;
+
+    const { data: orderItems, error: itemsError } = await supabase
+      .from("order_items")
+      .select("product_id, quantity")
+      .eq("order_id", order.id);
+
+    if (itemsError) {
+      console.error("Erro ao buscar itens da venda:", itemsError);
+      return;
+    }
+
+    for (const item of orderItems ?? []) {
+      const { data: product, error: productError } = await supabase
+        .from("products")
+        .select("stock")
+        .eq("id", item.product_id)
+        .eq("company_id", order.company.id)
+        .single();
+
+      if (productError || product?.stock == null) continue;
+
+      const novoEstoque = Number(product.stock ?? 0) - Number(item.quantity ?? 0);
+
+      await supabase
+        .from("products")
+        .update({ stock: novoEstoque })
+        .eq("id", item.product_id)
+        .eq("company_id", order.company.id);
+    }
+  };
+
   const handleSaveSignature = async (dataUrl: string) => {
     if (!dataUrl) return;
 
@@ -398,50 +431,6 @@ export default function ViewOrderPage() {
     );
     setSignatureData(dataUrl);
     setOpenSignature(false);
-
-    const { data: orderItems, error: itemsError } = await supabase
-      .from("order_items")
-      .select("product_id, quantity")
-      .eq("order_id", id);
-
-    if (itemsError) {
-      console.error("Erro ao buscar itens da venda:", itemsError);
-      toast.error("Erro ao buscar itens para atualizar estoque.");
-      return;
-    }
-
-    for (const item of orderItems ?? []) {
-      const { data: product, error: productError } = await supabase
-        .from("products")
-        .select("stock")
-        .eq("id", item.product_id)
-        .eq("company_id", order.company?.id ?? "")
-        .single();
-
-      if (productError || product?.stock == null) {
-        console.error("Erro ao buscar produto:", productError);
-        continue;
-      }
-
-      const novoEstoque =
-        Number(product.stock ?? 0) - Number(item.quantity ?? 0);
-
-      const { error: updateError } = await supabase
-        .from("products")
-        .update({ stock: novoEstoque })
-        .eq("id", item.product_id)
-        .eq("company_id", order.company?.id ?? "");
-
-      if (updateError) {
-        console.error("Erro ao atualizar estoque:", updateError);
-      }
-    }
-
-    await supabase
-      .from("orders")
-      .update({ stock_updated: true })
-      .eq("id", id)
-      .eq("company_id", order.company?.id ?? "");
   };
 
   const handlePhotoUpload = async (file: File, type: "delivery" | "location" | "collection") => {
@@ -489,6 +478,10 @@ export default function ViewOrderPage() {
 
     if (next === "Coletar") {
       updates.delivered_at = nowISO;
+      if (!order.stock_updated) {
+        await processStockReduction();
+        updates.stock_updated = true;
+      }
     } else if (next === "Coletado") {
       updates.collected_at = nowISO;
     }
@@ -593,6 +586,10 @@ export default function ViewOrderPage() {
 
       if (next === "Coletar") {
         updates.delivered_at = nowISO;
+        if (!order.stock_updated) {
+          await processStockReduction();
+          updates.stock_updated = true;
+        }
       } else if (next === "Coletado") {
         updates.collected_at = nowISO;
       }
