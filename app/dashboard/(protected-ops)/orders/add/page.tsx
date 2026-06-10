@@ -42,6 +42,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { generateNextNoteNumber } from "@/lib/generate-next-note-number";
 import { Textarea } from "@/components/ui/textarea";
 import { orderSchema, type Order } from "@/components/types/orderSchema";
+import { type PaymentSettings, defaultSettings } from "@/components/settings/PaymentSettingsCard";
 import React, { useMemo } from "react";
 import { useOverdueCheck } from "@/components/billing/useOverdueCheck";
 import { OverdueModal } from "@/components/billing/OverdueModal";
@@ -116,6 +117,9 @@ export default function AddOrder() {
     {},
   );
   const [reservedStock, setReservedStock] = useState<number>(0);
+  const [paymentSettings, setPaymentSettings] = useState<PaymentSettings>(defaultSettings);
+  const [installmentProfile, setInstallmentProfile] = useState<string>("none");
+  const [customInstallments, setCustomInstallments] = useState<{value: number, dueDate: string}[]>([]);
   const addCustomerUrl = `/dashboard/customers/add?redirect=/dashboard/orders/add&fromOrder=true`;
   const searchParams = useSearchParams();
   const newCustomerId = searchParams.get("newCustomerId");
@@ -180,8 +184,11 @@ useEffect(() => {
   }
 
   const fetchData = async () => {
-    const [{ data: customersData, error: customersError }, { data: productsData, error: productsError }] =
-      await Promise.all([
+    const [
+      { data: customersData, error: customersError },
+      { data: productsData, error: productsError },
+      { data: companyData, error: companyError }
+    ] = await Promise.all([
         supabase
           .from("customers")
           .select("*")
@@ -191,6 +198,11 @@ useEffect(() => {
           .from("products")
           .select("id, code, name, standard_price, stock")
           .eq("company_id", companyId),
+        supabase
+          .from("companies")
+          .select("payment_settings")
+          .eq("id", companyId)
+          .maybeSingle(),
       ]);
 
     if (customersError) {
@@ -203,6 +215,22 @@ useEffect(() => {
       console.error("Erro ao buscar produtos:", productsError);
     } else {
       setProducts(productsData || []);
+    }
+
+    if (companyError) {
+      console.error("Erro ao buscar companyData:", companyError);
+    }
+    console.log("AddOrder fetched companyData:", companyData);
+
+    if (companyData?.payment_settings) {
+      const fetchedSettings = companyData.payment_settings as Partial<PaymentSettings>;
+      setPaymentSettings({
+        acceptedMethods: { ...defaultSettings.acceptedMethods, ...fetchedSettings.acceptedMethods },
+        boletoProfiles: fetchedSettings.boletoProfiles || defaultSettings.boletoProfiles,
+      });
+    } else {
+      console.log("No payment_settings found in companyData, using defaults");
+      setPaymentSettings(defaultSettings);
     }
   };
 
@@ -363,6 +391,23 @@ const handleEditPrice = (index: number, price: string) => {
       0,
     ) + freight;
 
+  useEffect(() => {
+    if (order?.payment_method !== "Boleto") return;
+    if (installmentProfile === "none" || installmentProfile === "custom") return;
+
+    const currentTotal = getTotal();
+
+    const profile = paymentSettings?.boletoProfiles?.find(p => p.id === installmentProfile);
+    if (profile) {
+      const instCount = profile.days.length;
+      const instValue = Number((currentTotal / instCount).toFixed(2));
+      setCustomInstallments(profile.days.map((days, idx) => ({
+        value: idx === instCount - 1 ? Number((currentTotal - (instValue * (instCount - 1))).toFixed(2)) : instValue,
+        dueDate: format(new Date((appointment.date || new Date()).getTime() + days * 24 * 60 * 60 * 1000), "yyyy-MM-dd")
+      })));
+    }
+  }, [orderItems, freight, installmentProfile, paymentSettings, appointment.date, order?.payment_method]);
+
   const generateNoteNumber = (type: string) => {
     const timestamp = Date.now().toString().slice(-6);
     return type === "invoice" ? `${timestamp}` : `${timestamp}`;
@@ -388,6 +433,21 @@ const handleEditPrice = (index: number, price: string) => {
         toast.error("Informe uma data de agendamento.");
         isSubmittingRef.current = false;
         return;
+      }
+
+      if (order.payment_method === "Boleto" && installmentProfile !== "none" && customInstallments.length > 0) {
+        const sum = customInstallments.reduce((acc, inst) => acc + inst.value, 0);
+        const currentTotal = getTotal();
+        if (Math.abs(sum - currentTotal) > 0.05) {
+          toast.error(`A soma das parcelas (R$ ${sum.toFixed(2)}) deve ser igual ao valor total do pedido (R$ ${currentTotal.toFixed(2)}).`);
+          isSubmittingRef.current = false;
+          return;
+        }
+        if (customInstallments.some(inst => inst.value <= 0)) {
+          toast.error("O valor de cada parcela deve ser maior que zero.");
+          isSubmittingRef.current = false;
+          return;
+        }
       }
 
             if (selectedCustomer?.price_table_id) {
@@ -483,6 +543,12 @@ const handleEditPrice = (index: number, price: string) => {
             )
           : null,
         text_note,
+        installments_config: 
+          capitalize(order?.payment_method || "") === "Boleto" && 
+          installmentProfile !== "none" && 
+          customInstallments.length > 0
+            ? customInstallments
+            : null,
       };
 
       const { data: insertedOrder, error } = await supabase
@@ -700,22 +766,58 @@ useEffect(() => {
                 <SelectValue placeholder="Pagamento" />
               </SelectTrigger>
               <SelectContent className="w-full shadow-md rounded-md">
-                <SelectItem value="Pix">Pix</SelectItem>
-                <SelectItem value="Dinheiro">Dinheiro</SelectItem>
-                <SelectItem value="Cartao">Cartão</SelectItem>
-                <SelectItem value="Boleto">Boleto</SelectItem>
+                {(!paymentSettings || paymentSettings.acceptedMethods.pix) && <SelectItem value="Pix">Pix</SelectItem>}
+                {(!paymentSettings || paymentSettings.acceptedMethods.dinheiro) && <SelectItem value="Dinheiro">Dinheiro</SelectItem>}
+                {(!paymentSettings || paymentSettings.acceptedMethods.cartao) && <SelectItem value="Cartao">Cartão</SelectItem>}
+                {(!paymentSettings || paymentSettings.acceptedMethods.boleto) && <SelectItem value="Boleto">Boleto</SelectItem>}
               </SelectContent>
             </Select>
 
-            <Input
-              type="number"
-              placeholder="Prazo"
-              value={order?.days_ticket || ""}
-              onChange={(e) =>
-                setOrder((prev) => ({ ...prev, days_ticket: e.target.value }))
-              }
-              className="w-full border rounded-md shadow-sm"
-            />
+            {order?.payment_method === "Boleto" ? (
+              <Select value={installmentProfile} onValueChange={(val) => {
+                setInstallmentProfile(val);
+                const currentTotal = getTotal();
+                if (val === "custom") {
+                  setCustomInstallments([{ value: currentTotal, dueDate: format(new Date(new Date().getTime() + 30 * 24 * 60 * 60 * 1000), "yyyy-MM-dd") }]);
+                  setOrder(prev => ({ ...prev, days_ticket: "30" }));
+                } else if (val !== "none") {
+                  const profile = paymentSettings?.boletoProfiles?.find(p => p.id === val);
+                  if (profile) {
+                    const instCount = profile.days.length;
+                    const instValue = Number((currentTotal / instCount).toFixed(2));
+                    setCustomInstallments(profile.days.map((days, idx) => ({
+                      value: idx === instCount - 1 ? Number((currentTotal - (instValue * (instCount - 1))).toFixed(2)) : instValue,
+                      dueDate: format(new Date(new Date().getTime() + days * 24 * 60 * 60 * 1000), "yyyy-MM-dd")
+                    })));
+                    setOrder(prev => ({ ...prev, days_ticket: profile.days[0].toString() }));
+                  }
+                } else {
+                  setCustomInstallments([]);
+                  setOrder(prev => ({ ...prev, days_ticket: "0" }));
+                }
+              }}>
+                <SelectTrigger className="w-full border rounded-md shadow-sm">
+                  <SelectValue placeholder="Opção de Boleto" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Selecione...</SelectItem>
+                  {paymentSettings?.boletoProfiles?.map(p => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))}
+                  <SelectItem value="custom">Personalizado</SelectItem>
+                </SelectContent>
+              </Select>
+            ) : (
+              <Input
+                type="number"
+                placeholder="Prazo"
+                value={order?.days_ticket || ""}
+                onChange={(e) =>
+                  setOrder((prev) => ({ ...prev, days_ticket: e.target.value }))
+                }
+                className="w-full border rounded-md shadow-sm"
+              />
+            )}
 
             <div className="flex items-center gap-2 w-full">
               <span className="text-sm text-muted-foreground font-medium hidden sm:inline">
@@ -723,12 +825,57 @@ useEffect(() => {
               </span>
               <Input
                 id="due_date"
-                value={dueDate}
+                value={order?.payment_method === "Boleto" && customInstallments.length > 1 ? "Múltiplos Vencimentos" : dueDate}
                 readOnly
                 className="cursor-not-allowed bg-muted w-full"
               />
             </div>
           </div>
+
+          {order?.payment_method === "Boleto" && installmentProfile === "custom" && customInstallments.length > 0 && (
+            <div className="mt-4 p-4 border rounded-md space-y-4">
+              <h4 className="font-semibold text-sm">Vencimentos Personalizados</h4>
+              <div className="space-y-3">
+                {customInstallments.map((inst, idx) => (
+                  <div key={idx} className="flex gap-3 items-center">
+                    <span className="text-sm font-medium w-8">{idx + 1}x</span>
+                    <Input 
+                      type="date" 
+                      value={inst.dueDate}
+                      className="w-40"
+                      onChange={(e) => {
+                        const updated = [...customInstallments];
+                        updated[idx].dueDate = e.target.value;
+                        setCustomInstallments(updated);
+                      }}
+                    />
+                    <Input 
+                      type="number" 
+                      step="0.01"
+                      value={inst.value}
+                      className="w-32"
+                      onChange={(e) => {
+                        const updated = [...customInstallments];
+                        updated[idx].value = Number(e.target.value);
+                        setCustomInstallments(updated);
+                      }}
+                    />
+                    {customInstallments.length > 1 && (
+                       <Button variant="ghost" size="icon" onClick={() => {
+                         const updated = customInstallments.filter((_, i) => i !== idx);
+                         setCustomInstallments(updated);
+                       }}><Trash className="h-4 w-4 text-destructive" /></Button>
+                    )}
+                  </div>
+                ))}
+                <Button variant="outline" size="sm" onClick={() => {
+                  const updated = [...customInstallments];
+                  updated.push({ value: 0, dueDate: format(new Date(new Date().getTime() + 30 * 24 * 60 * 60 * 1000), "yyyy-MM-dd") });
+                  setCustomInstallments(updated);
+                }}>+ Adicionar Parcela</Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

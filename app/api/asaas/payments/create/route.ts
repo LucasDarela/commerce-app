@@ -18,6 +18,12 @@ const bodySchema = z.object({
   finePercent: z.number().nonnegative().max(2).optional(),
   interestPercentMonth: z.number().nonnegative().max(1).optional(),
   orderId: z.string().uuid().optional(),
+  installments: z.array(
+    z.object({
+      value: z.number().positive(),
+      dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "dueDate deve ser YYYY-MM-DD")
+    })
+  ).optional(),
 });
 
 export async function POST(req: Request) {
@@ -48,6 +54,7 @@ export async function POST(req: Request) {
       finePercent,
       interestPercentMonth,
       orderId,
+      installments,
     } = bodySchema.parse(await req.json());
 
     const base = new Date(`${appointmentDate}T00:00:00`);
@@ -123,6 +130,100 @@ export async function POST(req: Request) {
         type: "FIXED",
         dueDateLimitDays: discountDueDateLimitDays ?? 0,
       };
+    }
+
+    // If installments is provided, we create multiple independent payments linked by externalReference
+    if (installments && installments.length > 0) {
+      const createdPayments = [];
+      let firstDigitableLine: string | null = null;
+      let firstBarcode: string | null = null;
+      let firstBoletoUrl: string | null = null;
+      let firstPaymentId: string | null = null;
+
+      for (let i = 0; i < installments.length; i++) {
+        const inst = installments[i];
+        const instPayload = {
+          ...payload,
+          value: inst.value,
+          dueDate: inst.dueDate,
+          externalReference: orderId ?? undefined, // LINK TO ORDER
+          description: payload.description ? `${payload.description} (Parcela ${i + 1}/${installments.length})` : `Parcela ${i + 1}/${installments.length}`,
+        };
+
+        const created = await asaasFetch<any>(
+          supabase,
+          companyId,
+          "/payments",
+          {
+            method: "POST",
+            body: JSON.stringify(instPayload),
+          },
+        );
+
+        createdPayments.push(created);
+
+        if (i === 0) {
+          firstDigitableLine = created.identificationField ?? created.digitableLine ?? null;
+          firstBarcode = created.bankSlipBarcode ?? null;
+          firstBoletoUrl = created.bankSlipUrl ?? created.invoiceUrl ?? null;
+          firstPaymentId = created.id;
+        }
+      }
+
+      if (orderId) {
+        const { data: orderRow } = await supabase
+          .from("orders")
+          .select("id")
+          .eq("id", orderId)
+          .eq("company_id", companyId)
+          .maybeSingle();
+
+        if (!orderRow) {
+          return NextResponse.json(
+            { error: "Pedido inválido para este usuário/empresa" },
+            { status: 403 },
+          );
+        }
+
+        const issueDate = appointmentDate;
+
+        const update: Record<string, any> = {
+          boleto_id: firstPaymentId, // Just store the first one for reference
+          boleto_url: firstBoletoUrl,
+          boleto_digitable_line: firstDigitableLine,
+          boleto_barcode_number: firstBarcode,
+          due_date: installments[0].dueDate, // Due date of first installment
+          issue_date: issueDate,
+          payment_status: "Unpaid",
+        };
+
+        const { error: updErr } = await supabase
+          .from("orders")
+          .update(update)
+          .eq("id", orderId);
+
+        if (updErr) {
+          console.error("❌ Falha ao atualizar order com dados do boleto parcelado:", updErr.message);
+        } else {
+          sendBoletoEmailIfReady(orderId, companyId, supabase).catch((err) =>
+            console.error("[asaas/payments/create] Erro ao disparar email:", err),
+          );
+        }
+      }
+
+      return NextResponse.json({
+        ok: true,
+        asaasPaymentId: firstPaymentId,
+        digitableLine: firstDigitableLine,
+        barcode: firstBarcode,
+        boletoUrl: firstBoletoUrl,
+        payments: createdPayments, // array of all created payments
+      });
+    }
+
+    // Default flow: Single Payment
+    if (orderId) {
+      payload.externalReference = orderId; // Always pass externalReference
     }
 
     const created = await asaasFetch<any>(

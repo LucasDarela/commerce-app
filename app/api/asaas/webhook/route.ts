@@ -8,6 +8,8 @@ type AsaasPayment = {
   netValue?: number;
   originalValue?: number;
   status?: string;
+  installment?: string;
+  externalReference?: string;
 };
 
 type AsaasWebhook = {
@@ -103,12 +105,18 @@ export async function POST(req: Request) {
   const paid = isPaidStatus(payment.status);
   const overdueLike = isOverdueLikeStatus(payment.status);
 
-  const { data: order, error: orderErr } = await supabase
+  let orderQuery = supabase
     .from("orders")
     .select("id, total, total_payed, note_number, customer_id, customer")
-    .eq("company_id", companyId)
-    .eq("boleto_id", payment.id)
-    .maybeSingle();
+    .eq("company_id", companyId);
+
+  if (payment.externalReference) {
+    orderQuery = orderQuery.eq("id", payment.externalReference);
+  } else {
+    orderQuery = orderQuery.eq("boleto_id", payment.id);
+  }
+
+  const { data: order, error: orderErr } = await orderQuery.maybeSingle();
 
   if (orderErr) {
     console.error("webhook asaas: erro ao buscar order:", orderErr);
@@ -124,9 +132,13 @@ export async function POST(req: Request) {
     });
   }
 
-  const updateOrder: Record<string, any> = {
-    payment_status: paymentStatus,
-  };
+  const updateOrder: Record<string, any> = {};
+  
+  // Se for parcelado (ou tivermos externalReference), não vamos forçar o payment_status global apenas por causa do status de UMA parcela,
+  // a não ser que o valor total_payed atinja o total do pedido.
+  if (!payment.externalReference && !payment.installment) {
+    updateOrder.payment_status = paymentStatus;
+  }
 
   /**
    * REGRA CRÍTICA:
@@ -154,8 +166,10 @@ export async function POST(req: Request) {
 
     updateOrder.total_payed = nextPaid;
 
-    if (orderTotal > 0 && nextPaid >= orderTotal) {
+    if (orderTotal > 0 && nextPaid >= orderTotal - 0.01) {
       updateOrder.payment_status = "Paid";
+    } else if (nextPaid > 0) {
+      updateOrder.payment_status = "Partial";
     }
   }
 
@@ -165,7 +179,7 @@ export async function POST(req: Request) {
    * - NÃO faz baixa
    * - NÃO altera total_payed
    */
-  if (overdueLike) {
+  if (overdueLike && !payment.externalReference && !payment.installment) {
     updateOrder.payment_status = "Unpaid";
   }
 

@@ -251,17 +251,23 @@ function GenerateBoletoAsaasButton({
       const value = Number(order.total || 0);
       const cliente = order.customers;
 
+      const payload: any = {
+        orderId,
+        customerId: cliente.id,
+        value,
+        appointmentDate: appt,
+        daysTicket: Number(order.days_ticket || 0),
+        description: `Pedido #${order.note_number}`,
+      };
+
+      if (order.installments_config && Array.isArray(order.installments_config)) {
+        payload.installments = order.installments_config;
+      }
+
       const res = await fetch("/api/asaas/payments/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          orderId,
-          customerId: cliente.id,
-          value,
-          appointmentDate: appt,
-          daysTicket: Number(order.days_ticket || 0),
-          description: `Pedido #${order.note_number}`,
-        }),
+        body: JSON.stringify(payload),
       });
       const json = await res.json();
       console.log("🔎 Asaas /payments/create:", json);

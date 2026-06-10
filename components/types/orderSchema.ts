@@ -37,6 +37,7 @@ fantasy_name: z.string().optional().nullable(),
   boleto_id: z.string().nullable().optional(),
   source: z.enum(["order", "financial"]).optional(),
   driver_id: z.string().uuid().nullable().optional(),
+  installments_config: z.any().optional(),
   order_items: z
     .array(
       z.object({

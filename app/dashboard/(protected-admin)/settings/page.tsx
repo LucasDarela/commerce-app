@@ -45,10 +45,8 @@ export default function SettingsPage() {
         />
       )}
       <ManualStockAdjustment />
-
       <RegisterBankAccount />
-      {/* Em desenvolvimento */}
-      {/* <PaymentSettingsCard /> */}
+      <PaymentSettingsCard />
     </div>
   );
 }
