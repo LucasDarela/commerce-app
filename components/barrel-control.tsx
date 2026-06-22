@@ -43,7 +43,10 @@ type SupplierTab = {
 };
 
 type BarrelRecordRaw = Omit<BarrelRecord, "suppliers"> & {
-  suppliers?: { name: string; email?: string }[] | { name: string; email?: string } | null;
+  suppliers?:
+    | { name: string; email?: string }[]
+    | { name: string; email?: string }
+    | null;
 };
 
 export default function BarrelControl() {
@@ -61,7 +64,8 @@ export default function BarrelControl() {
   const [tabToDelete, setTabToDelete] = useState<string | null>(null);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
 
-  const [supplierToDeleteFromSearch, setSupplierToDeleteFromSearch] = useState<Supplier | null>(null);
+  const [supplierToDeleteFromSearch, setSupplierToDeleteFromSearch] =
+    useState<Supplier | null>(null);
   const [showDeleteAvulsoConfirm, setShowDeleteAvulsoConfirm] = useState(false);
 
   const getTodayDate = () => {
@@ -406,12 +410,14 @@ export default function BarrelControl() {
       toast.error("Erro ao apagar fornecedor avulso.");
     } else {
       toast.success("Aba avulsa apagada com sucesso!");
-      
+
       // Remove from search results
       setFoundSuppliers((prev) => prev.filter((s) => s.id !== supplierId));
-      
+
       // Remove from open tabs if present
-      const remainingTabs = tabs.filter((tab) => tab.supplier.id !== supplierId);
+      const remainingTabs = tabs.filter(
+        (tab) => tab.supplier.id !== supplierId,
+      );
       if (remainingTabs.length !== tabs.length) {
         setTabs(remainingTabs);
         if (selectedTab === supplierId) {
@@ -611,6 +617,7 @@ export default function BarrelControl() {
                   <div className="w-full overflow-hidden">
                     <BarrelTable
                       rows={tab.rows}
+                      supplierName={tab.supplier.name}
                       setRows={(newRows) => {
                         setTabs((prevTabs) =>
                           prevTabs.map((t) =>
@@ -628,7 +635,41 @@ export default function BarrelControl() {
           )}
 
           {tabs.length > 0 && (
-            <div className="flex flex-col sm:flex-row justify-end gap-3 pt-6 w-full border-t border-muted/50 mt-4">
+            <div className="flex flex-col sm:flex-row justify-end gap-3 p-6 pb-20 mb-10 w-full border-t border-muted/50 mt-4">
+              <Button
+                onClick={() => {
+                  setTabs((prevTabs) =>
+                    prevTabs.map((t) => {
+                      if (t.supplier.id === selectedTab) {
+                        const lastEntry = t.rows[t.rows.length - 1];
+                        return {
+                          ...t,
+                          rows: [
+                            ...t.rows,
+                            {
+                              date: getTodayDate(),
+                              note: "",
+                              had_30: lastEntry ? lastEntry.total_30 : 0,
+                              had_50: lastEntry ? lastEntry.total_50 : 0,
+                              arrived_30: 0,
+                              arrived_50: 0,
+                              returned_30: 0,
+                              returned_50: 0,
+                              total_30: lastEntry ? lastEntry.total_30 : 0,
+                              total_50: lastEntry ? lastEntry.total_50 : 0,
+                            },
+                          ],
+                        };
+                      }
+                      return t;
+                    }),
+                  );
+                }}
+                variant="secondary"
+                className="w-full sm:w-auto font-semibold"
+              >
+                + Adicionar Linha
+              </Button>
               <Button
                 onClick={() => {
                   const currentTab = tabs.find(
@@ -696,9 +737,13 @@ export default function BarrelControl() {
       {showDeleteAvulsoConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-zinc-900 p-6 rounded-lg shadow-lg space-y-4 w-[320px]">
-            <h2 className="text-lg font-bold text-destructive">Apagar Aba Avulsa?</h2>
+            <h2 className="text-lg font-bold text-destructive">
+              Apagar Aba Avulsa?
+            </h2>
             <p className="text-sm text-muted-foreground">
-              Não será possível recuperar a aba avulsa <strong>"{supplierToDeleteFromSearch?.name}"</strong> depois de remover. Confirma a exclusão definitiva?
+              Não será possível recuperar a aba avulsa{" "}
+              <strong>"{supplierToDeleteFromSearch?.name}"</strong> depois de
+              remover. Confirma a exclusão definitiva?
             </p>
 
             <div className="flex justify-end gap-2 mt-4">

@@ -132,8 +132,14 @@ export function LoginAccountForm() {
       if (sessionUpdateError) {
         console.error("Erro ao registrar sessão:", sessionUpdateError);
       } else {
-        // ✅ Salva o marcador localmente para o middleware validar
-        document.cookie = `session_marker=${sessionMarker}; path=/; max-age=2592000; SameSite=Lax`;
+        // ✅ Salva o marcador localmente para o middleware validar.
+        // Se estivermos em chopphub.com, garantimos que o cookie abranja os subdomínios (.chopphub.com)
+        let domainStr = "";
+        const hostname = window.location.hostname;
+        if (hostname.includes("chopphub.com")) {
+          domainStr = "domain=.chopphub.com; ";
+        }
+        document.cookie = `session_marker=${sessionMarker}; path=/; max-age=2592000; SameSite=Lax; ${domainStr}`;
       }
 
       const { data: companyUser, error: companyUserError } = await supabase
@@ -147,7 +153,9 @@ export function LoginAccountForm() {
         return;
       }
 
-      form.reset();
+      // Adicionamos um pequeno delay para garantir que a atualização no banco (Supabase)
+      // seja propagada antes que o middleware verifique a sessão na próxima rota.
+      await new Promise((resolve) => setTimeout(resolve, 400));
 
       if (companyUser?.role === "admin") {
         window.location.href = "/dashboard";

@@ -94,17 +94,18 @@ export function LoanEquipmentModal({
       .select("note_number")
       .eq("company_id", companyId)
       .not("note_number", "is", null)
-      .neq("note_number", "")
-      .order("created_at", { ascending: false })
-      .limit(1);
+      .neq("note_number", "");
 
     if (error) {
       console.error("Erro ao buscar último número de nota:", error);
       return "";
     }
 
-    const last = parseInt(data?.[0]?.note_number || "0", 10);
-    return (last + 1).toString().padStart(4, "0");
+    const maxNote = data?.length 
+      ? Math.max(0, ...data.map(d => parseInt(d.note_number || "0", 10)).filter(n => !isNaN(n)))
+      : 0;
+      
+    return (maxNote + 1).toString().padStart(4, "0");
   }, [companyId, supabase]);
 
   const fetchBaseData = useCallback(async () => {

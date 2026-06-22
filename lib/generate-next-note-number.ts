@@ -8,9 +8,8 @@ export async function generateNextNoteNumber(companyId: string) {
     .select("note_number")
     .eq("company_id", companyId)
     .eq("document_type", "internal")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .not("note_number", "is", null)
+    .neq("note_number", "");
 
   if (error) {
     console.error("Erro ao gerar próximo número de nota:", {
@@ -23,11 +22,17 @@ export async function generateNextNoteNumber(companyId: string) {
     return "000001";
   }
 
-  const lastNumber = Number(data?.note_number ?? 0);
-
-  if (!Number.isFinite(lastNumber) || lastNumber <= 0) {
+  if (!data || data.length === 0) {
     return "000001";
   }
+
+  const lastNumber = data.reduce((max, record) => {
+    const num = Number(record.note_number);
+    if (Number.isFinite(num) && num > max) {
+      return num;
+    }
+    return max;
+  }, 0);
 
   return String(lastNumber + 1).padStart(6, "0");
 }

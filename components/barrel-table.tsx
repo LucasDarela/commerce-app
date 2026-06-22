@@ -30,9 +30,11 @@ export type BarrelEntry = {
 export function BarrelTable({
   rows,
   setRows,
+  supplierName,
 }: {
   rows: BarrelEntry[];
   setRows: (rows: BarrelEntry[]) => void;
+  supplierName?: string;
 }) {
   useEffect(() => {
     if (rows.length === 0) {
@@ -89,13 +91,13 @@ export function BarrelTable({
       }
 
       updated[i].total_30 =
-        (updated[i].had_30 || 0) +
-        (updated[i].arrived_30 || 0) -
+        (updated[i].had_30 || 0) -
+        (updated[i].arrived_30 || 0) +
         (updated[i].returned_30 || 0);
 
       updated[i].total_50 =
-        (updated[i].had_50 || 0) +
-        (updated[i].arrived_50 || 0) -
+        (updated[i].had_50 || 0) -
+        (updated[i].arrived_50 || 0) +
         (updated[i].returned_50 || 0);
     }
 
@@ -141,12 +143,12 @@ export function BarrelTable({
       }
 
       updated[i].total_30 =
-        (updated[i].had_30 || 0) +
-        (updated[i].arrived_30 || 0) -
+        (updated[i].had_30 || 0) -
+        (updated[i].arrived_30 || 0) +
         (updated[i].returned_30 || 0);
       updated[i].total_50 =
-        (updated[i].had_50 || 0) +
-        (updated[i].arrived_50 || 0) -
+        (updated[i].had_50 || 0) -
+        (updated[i].arrived_50 || 0) +
         (updated[i].returned_50 || 0);
     }
 
@@ -174,67 +176,127 @@ export function BarrelTable({
   };
 
   return (
-    <div className="w-full space-y-4">
-      <div className="border rounded-xl shadow-sm bg-card overflow-hidden">
-        {/* Header Action */}
-        <div className="flex w-full items-center justify-between p-3 sm:p-4 border-b bg-muted/30">
-          <h3 className="font-semibold text-foreground/80 text-sm sm:text-base">
-            Controle
-          </h3>
-          <Button
-            size="sm"
-            onClick={handleAddRow}
-            className="h-8 text-xs sm:text-sm"
-          >
-            + Adicionar
-          </Button>
-        </div>
+    <div className="w-full space-y-6">
+      <div className="flex w-full items-start sm:items-end justify-between flex-col sm:flex-row gap-4 px-1">
+        <h3 
+          className="font-bold text-xl sm:text-2xl text-foreground uppercase truncate max-w-[200px] sm:max-w-[400px]"
+          title={supplierName || "Controle"}
+        >
+          {supplierName || "Controle"}
+        </h3>
 
-        {/* Scrollable Container for Mobile */}
+        <div className="border border-border/50 rounded-lg overflow-hidden bg-card shadow-sm text-center min-w-[220px]">
+          <div className="bg-muted text-muted-foreground text-[11px] font-bold py-1.5 px-3 border-b border-border/50 uppercase tracking-wider">
+            Saldo de Barril
+          </div>
+          <div className="grid grid-cols-2 divide-x divide-border/50 bg-background">
+            <div className="flex flex-col items-center justify-center p-2">
+              <div className="text-[10px] text-muted-foreground font-bold uppercase mb-1">
+                50 Litros
+              </div>
+              <div className="font-bold text-lg leading-none text-foreground">
+                {rows.length > 0 ? rows[rows.length - 1].total_50 : 0}
+              </div>
+            </div>
+            <div className="flex flex-col items-center justify-center p-2">
+              <div className="text-[10px] text-muted-foreground font-bold uppercase mb-1">
+                30 Litros
+              </div>
+              <div
+                className={`font-bold text-lg leading-none ${rows.length > 0 && rows[rows.length - 1].total_30 < 0 ? "text-destructive" : "text-foreground"}`}
+              >
+                {rows.length > 0 ? rows[rows.length - 1].total_30 : 0}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="border border-border/50 rounded-xl bg-card shadow-sm overflow-hidden">
         <div className="w-full overflow-x-auto custom-scrollbar">
-          <table className="w-full text-xs sm:text-sm min-w-[700px]">
-            <thead className="bg-muted/50 border-b">
-              <tr>
-                {[
-                  { key: "Data", w: "min-w-[95px]" },
-                  { key: "Nº Nota", w: "min-w-[100px]" },
-                  { key: "Tinha 30", w: "min-w-[70px]" },
-                  { key: "Tinha 50", w: "min-w-[70px]" },
-                  { key: "Chegou 30", w: "min-w-[85px]" },
-                  { key: "Chegou 50", w: "min-w-[85px]" },
-                  { key: "Dev. 30", w: "min-w-[75px]" },
-                  { key: "Dev. 50", w: "min-w-[75px]" },
-                  { key: "Total 30", w: "min-w-[75px]" },
-                  { key: "Total 50", w: "min-w-[75px]" },
-                  { key: "", w: "w-[40px]" },
-                ].map((col, idx) => (
-                  <th
-                    key={idx}
-                    className={`font-medium text-muted-foreground p-2 text-left align-middle ${col.w}`}
-                  >
-                    {col.key}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
+          <table className="w-full text-xs sm:text-sm min-w-[800px] border-collapse">
+          <thead className="bg-muted/30 text-muted-foreground border-b border-border/40">
+            <tr>
+              <th
+                rowSpan={2}
+                className="p-3 text-center align-middle font-bold min-w-[95px] uppercase border-r border-border/30"
+              >
+                Data
+              </th>
+              <th
+                rowSpan={2}
+                className="p-3 text-center align-middle font-bold min-w-[120px] uppercase border-r border-border/30"
+              >
+                Observação
+              </th>
+              <th
+                colSpan={4}
+                className="p-2 text-center font-bold uppercase text-foreground/80 border-r border-border/30 bg-muted/20"
+              >
+                Barril 50 Litros
+              </th>
+              <th
+                colSpan={4}
+                className="p-2 text-center font-bold uppercase text-foreground/80 bg-muted/20"
+              >
+                Barril 30 Litros
+              </th>
+              <th
+                rowSpan={2}
+                className="p-3 w-[40px]"
+              ></th>
+            </tr>
+            <tr className="text-muted-foreground text-[11px] border-t border-border/30">
+              <th className="p-2 text-center font-semibold w-[70px] uppercase border-r border-border/30">
+                Tinha
+              </th>
+              <th className="p-2 text-center font-semibold w-[80px] uppercase border-r border-border/30">
+                Pedido
+              </th>
+              <th className="p-2 text-center font-semibold w-[80px] uppercase border-r border-border/30">
+                Devolução
+              </th>
+              <th className="p-2 text-center font-semibold w-[70px] uppercase border-r border-border/30 bg-muted/20">
+                Saldo
+              </th>
+              <th className="p-2 text-center font-semibold w-[70px] uppercase border-r border-border/30">
+                Tinha
+              </th>
+              <th className="p-2 text-center font-semibold w-[80px] uppercase border-r border-border/30">
+                Pedido
+              </th>
+              <th className="p-2 text-center font-semibold w-[80px] uppercase border-r border-border/30">
+                Devolução
+              </th>
+              <th className="p-2 text-center font-semibold w-[70px] uppercase bg-muted/20">
+                Saldo
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border/30">
               {rows.map((entry, index) => (
-                <tr key={index}>
+                <tr
+                  key={index}
+                  className="hover:bg-muted/50 transition-colors group even:bg-muted/20 odd:bg-background"
+                >
                   {(
                     [
                       "date",
                       "note",
-                      "had_30",
                       "had_50",
-                      "arrived_30",
                       "arrived_50",
-                      "returned_30",
                       "returned_50",
-                      "total_30",
                       "total_50",
+                      "had_30",
+                      "arrived_30",
+                      "returned_30",
+                      "total_30",
                     ] as (keyof BarrelEntry)[]
                   ).map((field) => (
-                    <td key={field} className="p-1 align-middle">
+                    <td
+                      key={field}
+                      className={`p-0 align-middle ${(field === "total_50" || field === "date" || field === "note" || field === "returned_50" || field === "arrived_50" || field === "had_50" || field === "total_30" || field === "returned_30" || field === "arrived_30" || field === "had_30") && field !== "total_30" ? "border-r border-border/30" : ""} ${field === "total_30" || field === "total_50" ? "bg-muted/30" : ""}`}
+                    >
                       <Input
                         type={
                           field === "date" || field === "note"
@@ -246,20 +308,20 @@ export function BarrelTable({
                         onChange={(e) =>
                           handleInputChange(index, field, e.target.value)
                         }
-                        className={`h-8 font-medium ${
+                        className={`h-11 font-medium border-0 rounded-none w-full text-center focus-visible:ring-1 focus-visible:ring-primary shadow-none ${
                           field === "total_30" || field === "total_50"
-                            ? "bg-transparent border-transparent px-1 focus-visible:ring-0 text-foreground/80 cursor-default font-bold pointer-events-none"
-                            : "bg-background"
-                        }`}
-                        placeholder={field === "note" ? "—" : "0"}
+                            ? "bg-transparent text-foreground font-bold pointer-events-none"
+                            : "bg-transparent hover:bg-muted/30"
+                        } ${field === "note" ? "text-left px-3" : ""}`}
+                        placeholder={field === "note" ? "" : "0"}
                       />
                     </td>
                   ))}
-                  <td className="p-1 px-2 text-center align-middle">
+                  <td className="p-1 text-center align-middle">
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                      className="h-8 w-8 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-destructive hover:bg-destructive/10 transition-opacity"
                       onClick={() => confirmDeleteRow(index)}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -270,6 +332,7 @@ export function BarrelTable({
             </tbody>
           </table>
         </div>
+      </div>
 
         {rowToDelete !== null && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -295,7 +358,6 @@ export function BarrelTable({
             </div>
           </div>
         )}
-      </div>
     </div>
   );
 }

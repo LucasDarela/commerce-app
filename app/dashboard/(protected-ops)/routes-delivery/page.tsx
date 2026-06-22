@@ -65,6 +65,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { CreatedRoutesList } from "@/components/routes/CreatedRoutesList";
 
 const mapContainerStyle = {
   width: "100%",
@@ -88,6 +89,7 @@ type OrderForRoute = {
   text_note?: string;
   lat?: number;
   lng?: number;
+  driver_id?: string | null;
 };
 
 type CompanyInfo = {
@@ -313,6 +315,7 @@ export default function CreateRoutePage() {
   );
   const [leftPanelWidth, setLeftPanelWidth] = useState(70);
   const isDragging = useRef(false);
+  const [editingRoute, setEditingRoute] = useState<any>(null);
 
   useEffect(() => {
     const now = new Date();
@@ -377,6 +380,7 @@ export default function CreateRoutePage() {
           appointment_local,
           text_note,
           products,
+          driver_id,
           customers (
             name, address, number, neighborhood, city, state, zip_code
           ),
@@ -388,6 +392,7 @@ export default function CreateRoutePage() {
         )
         .eq("company_id", companyId)
         .in("delivery_status", ["Entregar", "Coletar"])
+        .or(editingRoute ? `route_number.is.null,route_number.eq.${editingRoute.route_number}` : `route_number.is.null`)
         .order("appointment_date", { ascending: true });
 
       if (ordError) {
@@ -427,6 +432,7 @@ export default function CreateRoutePage() {
               city: o.customers?.city || "",
               state: o.customers?.state || "",
               zip_code: o.customers?.zip_code || "",
+              driver_id: o.driver_id,
             };
           })
           .filter((o: any) => o.address || o.appointment_local);
@@ -436,7 +442,23 @@ export default function CreateRoutePage() {
     }
 
     fetchData();
-  }, [companyId, supabase]);
+  }, [companyId, supabase, editingRoute]);
+
+  const handleEditRoute = (route: any) => {
+    setEditingRoute(route);
+    setDirectionsResponse(null);
+    setOptimizedRoute([]);
+    setSelectedDriver(route.driver_id);
+    
+    // Select the orders that are already in this route
+    if (route.stops) {
+      const orderIds = route.stops.map((s: any) => s.orderId).filter((id: string) => !id.startsWith("depot"));
+      setSelectedOrderIds(new Set(orderIds));
+    }
+    
+    // Scroll to top smoothly
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   const handleInlineUpdate = async (
     orderId: string,
@@ -763,9 +785,13 @@ export default function CreateRoutePage() {
       )
         return false;
 
+      if (selectedDriver && o.driver_id && o.driver_id !== selectedDriver) {
+        return false;
+      }
+
       return true;
     });
-  }, [orders, dateRange, filterStatus, searchName]);
+  }, [orders, dateRange, filterStatus, searchName, selectedDriver]);
 
   if (companyLoading) {
     return (
@@ -778,25 +804,25 @@ export default function CreateRoutePage() {
   return (
     <div className="flex h-[calc(100vh-4rem)] flex-col lg:flex-row overflow-hidden relative flex-1 min-w-0 w-full">
       <div
-        className="flex flex-col bg-background overflow-hidden h-full z-10 shrink-0 transition-all duration-300 min-w-0 max-w-full"
-        style={
-          typeof window !== "undefined" &&
-          window.innerWidth >= 1024 &&
-          directionsResponse
-            ? { width: `${leftPanelWidth}%` }
-            : { flex: 1 }
-        }
-      >
-        <div className="p-4 border-b">
-          <h1 className="text-xl font-bold flex items-center gap-2">
-            <RouteIcon className="w-6 h-6 text-primary" /> Planejador de Rotas
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Selecione as entregas pendentes para criar uma rota otimizada.
-          </p>
-        </div>
+        className="flex flex-col bg-background overflow-hidden h-full z-10 shrink-0 transition-all duration-300 min-w-0 lg:max-w-full"
+          style={
+            typeof window !== "undefined" &&
+            window.innerWidth >= 1024 &&
+            directionsResponse
+              ? { width: `${leftPanelWidth}%`, flex: 'none' }
+              : { width: '100%', flex: 'none' }
+          }
+        >
+          <div className="p-4 border-b">
+            <h1 className="text-xl font-bold flex items-center gap-2">
+              <RouteIcon className="w-6 h-6 text-primary" /> Planejador de Rotas
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Selecione as entregas pendentes para criar uma rota otimizada.
+            </p>
+          </div>
 
-        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-6 min-w-0 w-full max-w-full">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-6 min-w-0 w-full max-w-full">
           {!directionsResponse ? (
             <div className="space-y-4 min-w-0 w-full max-w-full">
               <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 w-full min-w-0">
@@ -1245,20 +1271,27 @@ export default function CreateRoutePage() {
                     const deliveryIds = deliveries.map(d => d.orderId);
 
                     const res = await fetch("/api/routes/generate", {
-                      method: "POST",
+                      method: editingRoute ? "PUT" : "POST",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({
+                        routeId: editingRoute?.id,
+                        routeNumber: editingRoute?.route_number,
                         deliveryIds,
                         driverId: selectedDriver,
                         date: departureDate || new Date().toISOString().split("T")[0],
                         type: filterStatus === "Todos" ? "Entregar" : filterStatus,
+                        companyId: companyId,
+                        stops: optimizedRoute
                       })
                     });
 
-                    if (!res.ok) throw new Error("Falha ao gerar o número da rota.");
-
+                    if (!res.ok) {
+                      const errBody = await res.json().catch(() => ({}));
+                      throw new Error(errBody.error || "Falha ao salvar a rota.");
+                    }
                     toast.dismiss();
-                    toast.success("Rota salva e atribuída com sucesso ao motorista!");
+                    toast.success(editingRoute ? "Rota atualizada com sucesso!" : "Rota salva e atribuída com sucesso ao motorista!");
+                    setEditingRoute(null);
                   } catch (error) {
                     console.error(error);
                     toast.dismiss();
@@ -1270,6 +1303,11 @@ export default function CreateRoutePage() {
               </Button>
             </div>
           )}
+
+          {/* ROTAS CRIADAS - Section at the bottom of the left panel */}
+          <div className="mt-12 pt-6 border-t w-full">
+            <CreatedRoutesList onEditRoute={handleEditRoute} />
+          </div>
         </div>
       </div>
 
@@ -1288,7 +1326,7 @@ export default function CreateRoutePage() {
           />
 
           {/* PAINEL DIREITO: Mapa */}
-          <div className="flex-1 h-[50vh] lg:h-full bg-muted relative min-w-0">
+          <div className="flex-1 h-[50vh] lg:h-full bg-muted relative min-w-0 flex flex-col">
             {!isLoaded ? (
               <div className="flex h-full items-center justify-center flex-col gap-4 text-muted-foreground">
                 <Loader2 className="h-8 w-8 animate-spin" />

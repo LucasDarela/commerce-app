@@ -109,7 +109,7 @@ export async function middleware(req: NextRequest) {
 
     if (profile?.current_session_id && profile.current_session_id !== sessionMarker) {
       // Sessão foi invalidada por um login mais recente
-      console.log(`[Middleware] Sessão invalidada para o usuário ${user.id}.`);
+      console.log(`[Middleware] Sessão invalidada para o usuário ${user.id}. DB: ${profile.current_session_id}, Cookie: ${sessionMarker}`);
       
       const response = NextResponse.redirect(new URL("/login-signin?error=multiple_sessions", req.url));
       
