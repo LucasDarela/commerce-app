@@ -25,12 +25,14 @@ type Props = {
   deleteRecurring?: boolean;
   recurrenceGroupId?: string | null;
 }) => void | Promise<void>;
+  setIsResetPaymentOpen?: (open: boolean) => void;
 };
 
 export function ActionsCell({
   row,
   setSelectedOrder,
   setIsPaymentOpen,
+  setIsResetPaymentOpen,
   onDelete,
 }: Props) {
   const isFinancial = row.original.source === "financial";
@@ -65,10 +67,24 @@ export function ActionsCell({
         <DropdownMenuItem
           onClick={() => {
             setSelectedOrder(row.original);
-            setIsPaymentOpen(true);
+            
+            const isFinancialPaid =
+              isFinancial && (row.original as any).status === "Paid";
+            const isOrderPaid =
+              !isFinancial && (row.original as any).payment_status === "Paid";
+            const isPaid = isFinancialPaid || isOrderPaid;
+
+            if (isPaid && setIsResetPaymentOpen) {
+              setIsResetPaymentOpen(true);
+            } else {
+              setIsPaymentOpen(true);
+            }
           }}
         >
-          Pagar
+          {(isFinancial && (row.original as any).status === "Paid") ||
+          (!isFinancial && (row.original as any).payment_status === "Paid")
+            ? "Resetar Pagamento"
+            : "Pagar"}
         </DropdownMenuItem>
 
         <DropdownMenuItem asChild>

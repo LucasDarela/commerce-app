@@ -24,11 +24,9 @@ import {
 import { financialColumns } from "./columns";
 import type { SortingState, ColumnFiltersState } from "@tanstack/react-table";
 import { isOrder } from "./utils";
-import {
-  getInitialColumnVisibility,
-  persistColumnVisibility,
-} from "./table-config";
+import { getInitialColumnVisibility, persistColumnVisibility } from "./table-config";
 import { FinancialPaymentModal } from "./PaymentModal";
+import { ResetFinancialPaymentModal } from "./ResetPaymentModal";
 import { exportTableToCSV } from "@/lib/exportCsv";
 import { Button } from "../ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../ui/tabs";
@@ -81,6 +79,7 @@ const [selectedOrder, setSelectedOrder] = useState<CombinedRecord | null>(null);
   const [selectedFinancial, setSelectedFinancial] =
     useState<FinancialRecord | null>(null);
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+  const [isResetPaymentOpen, setIsResetPaymentOpen] = useState(false);
   const [isFinancialPaymentOpen, setIsFinancialPaymentOpen] = useState(false);
   const [columnVisibility, setColumnVisibility] = useState(
     getInitialColumnVisibility,
@@ -274,6 +273,7 @@ const columns = useMemo(
       onDelete: deleteOrderById,
       setSelectedOrder,
       setIsPaymentOpen,
+      setIsResetPaymentOpen,
       nfeStatusByOrderId,
       boletoStatusByOrderId,
     }),
@@ -642,6 +642,25 @@ const combinedData: CombinedRecord[] = useMemo(() => {
           record.id === id ? { ...record, status: "Paid" } : record,
         ),
       );
+    }}
+  />
+)}
+
+{selectedOrder?.source === "financial" && companyId && (
+  <ResetFinancialPaymentModal
+    order={selectedOrder as FinancialRecord}
+    open={isResetPaymentOpen}
+    onClose={() => {
+      setIsResetPaymentOpen(false);
+      setSelectedOrder(null);
+    }}
+    onSuccess={(id) => {
+      setFinancialRecords((prev) =>
+        prev.map((record) =>
+          record.id === id ? { ...record, status: "Unpaid", total_payed: 0 } : record,
+        ),
+      );
+      fetchAll();
     }}
   />
 )}

@@ -93,6 +93,7 @@ export function financialColumns({
   onDelete,
   setSelectedOrder,
   setIsPaymentOpen,
+  setIsResetPaymentOpen,
   nfeStatusByOrderId,
   boletoStatusByOrderId,
 }: {
@@ -107,6 +108,7 @@ export function financialColumns({
     React.SetStateAction<CombinedRecord | null>
   >;
   setIsPaymentOpen: (open: boolean) => void;
+  setIsResetPaymentOpen?: (open: boolean) => void;
   nfeStatusByOrderId: Record<string, InvoiceStatus | null>;
   boletoStatusByOrderId: Record<string, boolean>;
 }): CustomColumnDef<CombinedRecord>[] {
@@ -398,6 +400,7 @@ return status === "Paid" ? "Pago" : "Pendente";
             onDelete={onDelete}
             setSelectedOrder={setSelectedOrder}
             setIsPaymentOpen={setIsPaymentOpen}
+            setIsResetPaymentOpen={setIsResetPaymentOpen}
           />
         );
       },

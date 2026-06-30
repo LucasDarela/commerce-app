@@ -109,6 +109,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { PaymentModal } from "@/components/payment-modal";
+import { ResetFinancialPaymentModal } from "@/components/financial/ResetPaymentModal";
 import { LoanEquipmentModal } from "@/components/equipment-loan/LoanEquipmentModal";
 import { fetchEquipmentsForOrder } from "@/lib/fetch-equipments-for-order";
 import { ReturnEquipmentModal } from "@/components/equipment-loan/ReturnEquipmentModal";
@@ -376,6 +377,7 @@ export function DataTable({ companyId, user, role }: DataTableProps) {
   const [loading, setLoading] = useState(true);
   const [isSavingOrder, setIsSavingOrder] = useState(false);
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+  const [isResetPaymentOpen, setIsResetPaymentOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [dateInput, setDateInput] = useState("");
   const [returnedProducts, setReturnedProducts] = useState<
@@ -1414,10 +1416,14 @@ export function DataTable({ companyId, user, role }: DataTableProps) {
                 <DropdownMenuItem
                   onClick={() => {
                     setSelectedOrder(row.original);
-                    setIsPaymentOpen(true);
+                    if (row.original.payment_status === "Paid") {
+                      setIsResetPaymentOpen(true);
+                    } else {
+                      setIsPaymentOpen(true);
+                    }
                   }}
                 >
-                  Pagar
+                  {row.original.payment_status === "Paid" ? "Resetar Pagamento" : "Pagar"}
                 </DropdownMenuItem>
                 <EmitNfeMenuItem
                   orderId={row.original.id}
@@ -2790,6 +2796,21 @@ export function DataTable({ companyId, user, role }: DataTableProps) {
           onSuccess={async () => {
             await refreshOrders();
             setIsPaymentOpen(false);
+          }}
+        />
+      )}
+      {selectedOrder && (
+        <ResetFinancialPaymentModal
+          order={{ ...selectedOrder, source: "order" } as any}
+          open={isResetPaymentOpen}
+          onClose={() => {
+            setIsResetPaymentOpen(false);
+            setSelectedOrder(null);
+          }}
+          onSuccess={(id) => {
+            refreshOrders();
+            setIsResetPaymentOpen(false);
+            setSelectedOrder(null);
           }}
         />
       )}
