@@ -9,7 +9,14 @@ export function cn(...inputs: ClassValue[]) {
 export function formatDate(date: string | Date | null | undefined) {
   if (!date) return "-";
 
-  const d = typeof date === "string" ? new Date(date) : date;
+  let d: Date;
+  if (typeof date === "string") {
+    const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(date);
+    d = new Date(isDateOnly ? `${date}T12:00:00` : date);
+  } else {
+    d = date;
+  }
+  
   if (isNaN(d.getTime())) return "-";
 
   return d.toLocaleDateString("pt-BR", {

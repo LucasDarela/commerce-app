@@ -865,6 +865,7 @@ const record = {
               <div className="col-span-2">
                 <Input
                   type="number"
+                  step="0.01"
                   placeholder="Quantidade"
                   value={entry.quantity}
                   onChange={(e) =>
@@ -876,6 +877,7 @@ const record = {
               <div className="col-span-3">
                 <Input
                   type="number"
+                  step="0.01"
                   placeholder="Valor Unitário"
                   value={entry.unitPrice}
                   onChange={(e) =>
@@ -912,6 +914,7 @@ const record = {
         <Input
           placeholder="Valor Total"
           type="number"
+          step="0.01"
           value={
             selectedCategory === "compra_produto" ||
             selectedCategory === "compra_equipamento"

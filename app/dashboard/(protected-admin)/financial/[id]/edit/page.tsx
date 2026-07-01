@@ -956,6 +956,7 @@ setPaymentDays("");
         <Input
           placeholder="Valor Total"
           type="number"
+          step="0.01"
           value={totalAmount}
           onChange={(e) => {
             if (
