@@ -482,7 +482,7 @@ const handleEditPrice = (index: number, price: string) => {
         }
 
         if (dupOrder) {
-          const next = await generateNextNoteNumber(companyId);
+          const next = await generateNextNoteNumber(companyId!);
           setOrder((prev) => ({ ...prev, note_number: next }));
           toast.error(`A nota ${order.note_number} já existe. Uma nova nota (${next}) foi gerada. Clique em Salvar novamente.`);
           isSubmittingRef.current = false;
