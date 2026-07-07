@@ -743,6 +743,7 @@ export function DataTable({ companyId, user, role }: DataTableProps) {
       text_note,
       boleto_id,
       driver_id,
+      stock_updated,
       customer_rel:customers!sales_customer_id_fkey (
         id,
         name,
@@ -862,6 +863,7 @@ export function DataTable({ companyId, user, role }: DataTableProps) {
         text_note,
         boleto_id,
         driver_id,
+        stock_updated,
         customer_rel:customers!sales_customer_id_fkey (
           id,
           name,
@@ -922,7 +924,7 @@ export function DataTable({ companyId, user, role }: DataTableProps) {
               .from("orders")
               .select(
                 `
-              id, customer_id, note_number, document_type, appointment_date, appointment_hour, appointment_local, customer, phone, products, freight, amount, total, total_payed, delivery_status, payment_status, payment_method, order_index, issue_date, due_date, customer_signature, text_note, boleto_id, driver_id,
+              id, customer_id, note_number, document_type, appointment_date, appointment_hour, appointment_local, customer, phone, products, freight, amount, total, total_payed, delivery_status, payment_status, payment_method, order_index, issue_date, due_date, customer_signature, text_note, boleto_id, driver_id, stock_updated,
               customer_rel:customers!sales_customer_id_fkey(fantasy_name)
             `,
               )
@@ -1856,6 +1858,30 @@ export function DataTable({ companyId, user, role }: DataTableProps) {
 
       if (nextStatus === "Coletar") {
         updates.delivered_at = nowISO;
+        if (!selectedCustomer.stock_updated) {
+          updates.stock_updated = true;
+          
+          const { data: orderItems } = await supabase
+            .from("order_items")
+            .select("product_id, quantity")
+            .eq("order_id", selectedCustomer.id);
+            
+          for (const item of orderItems ?? []) {
+            await fetch("/api/stock-movements/register", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                companyId: companyId,
+                productId: item.product_id,
+                quantity: Number(item.quantity ?? 0),
+                type: "exit",
+                reason: "Venda entregue",
+                noteId: selectedCustomer.id,
+                createdBy: null,
+              }),
+            });
+          }
+        }
       } else if (nextStatus === "Coletado") {
         updates.collected_at = nowISO;
       }

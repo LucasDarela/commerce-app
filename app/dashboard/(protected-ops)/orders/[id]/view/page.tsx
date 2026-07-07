@@ -384,22 +384,24 @@ export default function ViewOrderPage() {
     }
 
     for (const item of orderItems ?? []) {
-      const { data: product, error: productError } = await supabase
-        .from("products")
-        .select("stock")
-        .eq("id", item.product_id)
-        .eq("company_id", order.company.id)
-        .single();
+      const movementRes = await fetch("/api/stock-movements/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyId: order.company.id,
+          productId: item.product_id,
+          quantity: Number(item.quantity ?? 0),
+          type: "exit",
+          reason: "Venda entregue",
+          noteId: order.id,
+          createdBy: currentUserId ?? null,
+        }),
+      });
 
-      if (productError || product?.stock == null) continue;
-
-      const novoEstoque = Number(product.stock ?? 0) - Number(item.quantity ?? 0);
-
-      await supabase
-        .from("products")
-        .update({ stock: novoEstoque })
-        .eq("id", item.product_id)
-        .eq("company_id", order.company.id);
+      if (!movementRes.ok) {
+        const movementData = await movementRes.json().catch(() => null);
+        console.error("Erro ao registrar redução de estoque:", movementData);
+      }
     }
   };
 
