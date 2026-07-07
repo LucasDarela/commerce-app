@@ -24,6 +24,8 @@ type GroupedByCustomer = {
     loanId: string;
     equipmentName: string;
     quantity: number;
+    originalQuantity?: number;
+    returnedQuantity?: number;
   }[];
 };
 
@@ -36,6 +38,7 @@ type LoanRow = {
   id: string;
   equipment_id: string;
   quantity: number | string | null;
+  returned_quantity: number | string | null;
   customer_id: string;
   customer_name: string | null;
   company_id?: string;
@@ -62,7 +65,7 @@ export default function LoanByCustomerPage() {
     const [loansRes, equipmentsRes] = await Promise.all([
       supabase
         .from("equipment_loans")
-        .select("id, equipment_id, quantity, customer_id, customer_name, company_id")
+        .select("id, equipment_id, quantity, returned_quantity, customer_id, customer_name, company_id")
         .eq("company_id", companyId)
         .eq("status", "active"),
       supabase
@@ -94,6 +97,12 @@ export default function LoanByCustomerPage() {
       const customerName = loan.customer_name ?? "Desconhecido";
       const equipmentName = equipmentsMap.get(loan.equipment_id) || "Equipamento";
 
+      const qty = Number(loan.quantity) || 0;
+      const returnedQty = Number(loan.returned_quantity) || 0;
+      const remainingQty = Math.max(0, qty - returnedQty);
+
+      if (remainingQty <= 0) continue;
+
       if (!grouped[customerId]) {
         grouped[customerId] = { customerId, customerName, items: [] };
       }
@@ -101,7 +110,9 @@ export default function LoanByCustomerPage() {
       grouped[customerId].items.push({
         loanId: loan.id,
         equipmentName,
-        quantity: Number(loan.quantity) || 1,
+        quantity: remainingQty,
+        originalQuantity: qty,
+        returnedQuantity: returnedQty,
       });
     }
 
