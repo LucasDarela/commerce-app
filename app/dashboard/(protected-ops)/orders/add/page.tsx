@@ -466,6 +466,30 @@ const handleEditPrice = (index: number, price: string) => {
         }
       }
 
+      // Verificação anti-duplicação de nota
+      if (order.note_number) {
+        const { data: dupOrder, error: checkError } = await supabase
+          .from("orders")
+          .select("id")
+          .eq("company_id", companyId)
+          .eq("note_number", order.note_number)
+          .maybeSingle();
+
+        if (checkError) {
+          toast.error("Erro ao verificar duplicidade de nota no banco.");
+          isSubmittingRef.current = false;
+          return;
+        }
+
+        if (dupOrder) {
+          const next = await generateNextNoteNumber(companyId);
+          setOrder((prev) => ({ ...prev, note_number: next }));
+          toast.error(`A nota ${order.note_number} já existe. Uma nova nota (${next}) foi gerada. Clique em Salvar novamente.`);
+          isSubmittingRef.current = false;
+          return;
+        }
+      }
+
       setLoading(true);
 
       const amount = orderItems.reduce((acc, item) => acc + item.quantity, 0);

@@ -94,19 +94,22 @@ export function LoanEquipmentModal({
       .select("note_number")
       .eq("company_id", companyId)
       .not("note_number", "is", null)
-      .neq("note_number", "")
-      .order("note_number", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .neq("note_number", "");
 
     if (error) {
       console.error("Erro ao buscar último número de nota:", error);
       return "";
     }
 
-    const maxNote = data?.note_number ? parseInt(data.note_number.replace(/\D/g, ""), 10) : 0;
+    const maxNote = (data || []).reduce((max, record) => {
+      const parsed = parseInt(record.note_number.replace(/\D/g, ""), 10);
+      if (Number.isFinite(parsed) && parsed > max) {
+        return parsed;
+      }
+      return max;
+    }, 0);
       
-    return (isNaN(maxNote) ? 1 : maxNote + 1).toString().padStart(4, "0");
+    return "E" + (isNaN(maxNote) ? 1 : maxNote + 1).toString().padStart(4, "0");
   }, [companyId, supabase]);
 
   const fetchBaseData = useCallback(async () => {
