@@ -90,8 +90,7 @@ export function UnreturnedEquipmentsReport({ companyId, startDate, endDate, cust
             customer_id,
             quantity,
             note_number,
-            equipments(name),
-            equipment_loan_returns(id)
+            equipments(name)
           `)
           .eq("company_id", companyId)
           .gte("loan_date", startDate)
@@ -107,7 +106,7 @@ export function UnreturnedEquipmentsReport({ companyId, startDate, endDate, cust
         const today = new Date();
 
         const parsed: UnreturnedLoan[] = (data ?? [])
-          .filter((r: any) => !(r.equipment_loan_returns?.length > 0))
+          .filter((r: any) => r.status !== "returned")
           .map((r: any) => {
             const loanDate = new Date(`${r.loan_date}T12:00:00`);
             const days = Math.floor((today.getTime() - loanDate.getTime()) / (1000 * 60 * 60 * 24));
@@ -297,7 +296,7 @@ export function AvailableVsLoanedEquipmentsReport({ companyId, startDate, endDat
         // Busca comodatos não retornados para calcular quantos estão emprestados
         const { data: loanData } = await supabase
           .from("equipment_loans")
-          .select("equipment_id, quantity, return_date, equipment_loan_returns(id)")
+          .select("equipment_id, quantity, return_date, status")
           .eq("company_id", companyId)
           .is("return_date", null);
 
@@ -306,7 +305,7 @@ export function AvailableVsLoanedEquipmentsReport({ companyId, startDate, endDat
         // Calcula quantidade emprestada por equipamento
         const loanedMap = new Map<string, number>();
         for (const loan of (loanData ?? []) as any[]) {
-          const hasReturn = (loan.equipment_loan_returns ?? []).length > 0;
+          const hasReturn = loan.status === "returned" || !!loan.return_date;
           if (!hasReturn && loan.equipment_id) {
             const cur = loanedMap.get(loan.equipment_id) ?? 0;
             loanedMap.set(loan.equipment_id, cur + (loan.quantity ?? 0));

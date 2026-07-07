@@ -15,6 +15,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { PDFDownloadLink } from "@react-pdf/renderer";
 import { GenericReportPDF } from "@/components/pdf/GenericReportPDF";
 
@@ -59,6 +61,7 @@ export function EquipmentByCustomerReport({ companyId, startDate, endDate, custo
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const [loading, setLoading] = useState(true);
   const [groups, setGroups] = useState<CustomerGroup[]>([]);
+  const [filterPending, setFilterPending] = useState(false);
   const [triggerDownload, setTriggerDownload] = useState(false);
 
   useEffect(() => {
@@ -84,10 +87,10 @@ export function EquipmentByCustomerReport({ companyId, startDate, endDate, custo
             customer_name,
             customer_id,
             quantity,
+            returned_quantity,
             note_number,
             status,
-            equipments(name),
-            equipment_loan_returns(return_date, returned_quantity, remaining_quantity)
+            equipments(name)
           `)
           .eq("company_id", companyId)
           .gte("loan_date", startDate)
@@ -98,13 +101,25 @@ export function EquipmentByCustomerReport({ companyId, startDate, endDate, custo
 
         const { data, error } = await query;
 
-        if (error || cancelled) { if (!cancelled) setGroups([]); return; }
+        if (error) {
+          console.error("Supabase Query Error:", error);
+          if (!cancelled) setGroups([]);
+          return;
+        }
+        
+        if (cancelled) return;
 
         const loans: LoanRecord[] = (data ?? []).map((r: any) => {
-          const returns: any[] = r.equipment_loan_returns ?? [];
-          const lastReturn = returns.sort(
-            (a: any, b: any) => new Date(b.return_date).getTime() - new Date(a.return_date).getTime()
-          )[0] ?? null;
+          let qty = r.quantity ?? 0;
+          let returned = r.returned_quantity ?? 0;
+          
+          // Tratamento para dados antigos onde quantity foi zerado na devolução
+          if (r.status === "returned" && qty === 0 && returned === 0) {
+            qty = 1;
+            returned = 1;
+          }
+
+          const remaining = Math.max(0, qty - returned);
 
           return {
             id: r.id,
@@ -112,12 +127,12 @@ export function EquipmentByCustomerReport({ companyId, startDate, endDate, custo
             return_date: r.return_date,
             customer_name: r.customer_name ?? "—",
             equipment_name: r.equipments?.name ?? "—",
-            quantity: r.quantity ?? 0,
+            quantity: qty,
             note_number: r.note_number ?? null,
             status: r.status ?? null,
-            returned_qty: lastReturn?.returned_quantity ?? null,
-            remaining_qty: lastReturn?.remaining_quantity ?? null,
-            actual_return_date: lastReturn?.return_date ?? null,
+            returned_qty: returned,
+            remaining_qty: remaining,
+            actual_return_date: r.return_date ?? null,
           };
         });
 
@@ -134,7 +149,7 @@ export function EquipmentByCustomerReport({ companyId, startDate, endDate, custo
             customer_name,
             loans: lns,
             total_items: lns.reduce((s, l) => s + l.quantity, 0),
-            pending: lns.filter((l) => !l.actual_return_date && !l.return_date).length,
+            pending: lns.filter((l) => l.status === "active").length,
           }))
           .sort((a, b) => a.customer_name.localeCompare(b.customer_name));
 
@@ -150,14 +165,32 @@ export function EquipmentByCustomerReport({ companyId, startDate, endDate, custo
     return () => { cancelled = true; };
   }, [companyId, startDate, endDate, customerId, supabase]);
 
-  const totalCustomers = groups.length;
-  const totalPending = groups.reduce((s, g) => s + g.pending, 0);
-  const totalLoans = groups.reduce((s, g) => s + g.loans.length, 0);
+  const displayedGroups = useMemo(() => {
+    if (!filterPending) return groups;
+    return groups
+      .map(g => ({
+        ...g,
+        loans: g.loans.filter(l => l.status === "active")
+      }))
+      .filter(g => g.loans.length > 0);
+  }, [groups, filterPending]);
+
+  const totalCustomers = displayedGroups.length;
+  const totalPending = displayedGroups.reduce((s, g) => s + g.pending, 0);
+  const totalLoans = displayedGroups.reduce((s, g) => s + g.loans.length, 0);
 
   if (loading) return <TableSkeleton />;
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-end space-x-2">
+        <Switch 
+          id="filter-pending" 
+          checked={filterPending} 
+          onCheckedChange={setFilterPending} 
+        />
+        <Label htmlFor="filter-pending">Somente a recolher</Label>
+      </div>
       {triggerDownload && (
         <div className="hidden">
           <PDFDownloadLink
@@ -178,11 +211,11 @@ export function EquipmentByCustomerReport({ companyId, startDate, endDate, custo
                   { label: "Qtd", key: "quantity", width: "10%", align: "center" },
                   { label: "Status", key: "statusLabel", width: "10%", align: "center" },
                 ]}
-                data={groups.flatMap(g => g.loans.map(l => ({
+                data={displayedGroups.flatMap(g => g.loans.map(l => ({
                   ...l,
                   dateFormatted: formatDate(l.loan_date),
                   returnDateFormatted: formatDate(l.actual_return_date ?? l.return_date),
-                  statusLabel: (l.actual_return_date || l.return_date) ? "Recolhido" : "Em uso",
+                  statusLabel: l.status === "returned" ? "Recolhido" : "Em uso",
                 })))}
               />
             }
@@ -221,14 +254,14 @@ export function EquipmentByCustomerReport({ companyId, startDate, endDate, custo
       </div>
 
       {/* Por cliente */}
-      {groups.length === 0 ? (
+      {displayedGroups.length === 0 ? (
         <Card>
           <CardContent className="py-10 text-center text-muted-foreground">
             Nenhum comodato encontrado para os filtros informados.
           </CardContent>
         </Card>
       ) : (
-        groups.map((group) => (
+        displayedGroups.map((group) => (
           <Card key={group.customer_name}>
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center justify-between text-base">
@@ -259,7 +292,7 @@ export function EquipmentByCustomerReport({ companyId, startDate, endDate, custo
                   </TableHeader>
                   <TableBody>
                     {group.loans.map((loan) => {
-                      const hasReturn = !!(loan.actual_return_date || loan.return_date);
+                      const hasReturn = loan.status === "returned";
                       return (
                         <TableRow key={loan.id}>
                           <TableCell className="font-medium">{loan.equipment_name}</TableCell>

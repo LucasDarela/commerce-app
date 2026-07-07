@@ -69,8 +69,7 @@ export function EquipmentNotReturnedReport({ companyId, startDate, endDate }: Re
             customer_name,
             quantity,
             note_number,
-            equipments (name),
-            equipment_loan_returns (returned_quantity)
+            equipments (name)
           `)
           .eq("company_id", companyId)
           .is("return_date", null) // Ou baseado no histórico de retorno
@@ -80,8 +79,7 @@ export function EquipmentNotReturnedReport({ companyId, startDate, endDate }: Re
         if (error) throw error;
 
         const filtered = (data || []).filter((r: any) => {
-          const returned = r.equipment_loan_returns?.reduce((acc: number, ret: any) => acc + (ret.returned_quantity || 0), 0) || 0;
-          return (r.quantity || 0) > returned;
+          return r.status !== "returned";
         });
 
         setRows(filtered);
@@ -186,13 +184,13 @@ export function EquipmentAvailableVsLoanedReport({ companyId }: ReportProps) {
       try {
         const [equipRes, loansRes] = await Promise.all([
           supabase.from("equipments").select("stock").eq("company_id", companyId),
-          supabase.from("equipment_loans").select("quantity, equipment_loan_returns(returned_quantity)").eq("company_id", companyId)
+          supabase.from("equipment_loans").select("quantity, status, return_date").eq("company_id", companyId)
         ]);
 
         const totalStock = equipRes.data?.reduce((acc, e) => acc + (e.stock || 0), 0) || 0;
         const totalLoaned = loansRes.data?.reduce((acc, l: any) => {
-          const returned = l.equipment_loan_returns?.reduce((s: number, r: any) => s + (r.returned_quantity || 0), 0) || 0;
-          return acc + (Number(l.quantity || 0) - returned);
+          const isReturned = l.status === "returned" || !!l.return_date;
+          return acc + (isReturned ? 0 : Number(l.quantity || 0));
         }, 0) || 0;
 
         const available = Math.max(0, totalStock - totalLoaned);

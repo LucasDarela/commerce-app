@@ -16,7 +16,9 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 export type EquipmentItem = {
   loanId: string;
   equipmentName: string;
-  quantity: number;
+  quantity: number; // This is the active/remaining quantity
+  originalQuantity?: number;
+  returnedQuantity?: number;
 };
 
 type Props = {
@@ -161,17 +163,18 @@ export function ReturnEquipmentModal({
           if (remainingToReturn <= 0) break;
 
           const returnQty = Math.min(original.quantity, remainingToReturn);
-          const remaining = Math.max(0, original.quantity - returnQty);
+          const newReturnedQty = (original.returnedQuantity || 0) + returnQty;
+          const isFullyReturned = newReturnedQty >= (original.originalQuantity || original.quantity);
 
           const payload =
-            remaining > 0
+            !isFullyReturned
               ? {
-                  quantity: remaining,
+                  returned_quantity: newReturnedQty,
                   status: "active",
                   return_date: today,
                 }
               : {
-                  quantity: 0,
+                  returned_quantity: newReturnedQty,
                   status: "returned",
                   return_date: today,
                 };

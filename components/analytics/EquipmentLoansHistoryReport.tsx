@@ -85,12 +85,7 @@ export function EquipmentLoansHistoryReport({
             quantity,
             note_number,
             status,
-            equipments(name),
-            equipment_loan_returns(
-              return_date,
-              returned_quantity,
-              remaining_quantity
-            )
+            equipments(name)
           `)
           .eq("company_id", companyId)
           .gte("loan_date", startDate)
@@ -103,10 +98,6 @@ export function EquipmentLoansHistoryReport({
         if (error) { console.error(error); if (!cancelled) setRows([]); return; }
 
         const parsed: LoanRow[] = (data ?? []).map((r: any) => {
-          const returns: any[] = r.equipment_loan_returns ?? [];
-          const last = returns.sort((a: any, b: any) =>
-            new Date(b.return_date).getTime() - new Date(a.return_date).getTime()
-          )[0] ?? null;
           return {
             id: r.id,
             loan_date: r.loan_date,
@@ -117,9 +108,9 @@ export function EquipmentLoansHistoryReport({
             note_number: r.note_number ?? null,
             status: r.status ?? null,
             equipmentName: r.equipments?.name ?? "—",
-            returnDateActual: last?.return_date ?? null,
-            returnedQty: last?.returned_quantity ?? null,
-            remainingQty: last?.remaining_quantity ?? null,
+            returnDateActual: r.return_date ?? null,
+            returnedQty: r.status === "returned" ? r.quantity : null,
+            remainingQty: r.status === "active" ? r.quantity : null,
           };
         });
 

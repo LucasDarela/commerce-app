@@ -553,7 +553,7 @@ export default function ViewOrderPage() {
 
         const { data: loans, error } = await supabase
           .from("equipment_loans")
-          .select("id, quantity, equipment:equipment_id(name)")
+          .select("id, quantity, returned_quantity, equipment:equipment_id(name)")
           .eq("customer_id", customerResolved.id)
           .eq("company_id", order.company?.id ?? "")
           .eq("status", "active");
@@ -563,11 +563,15 @@ export default function ViewOrderPage() {
           return;
         }
 
-        const formatted = (loans ?? []).map((loan: any) => ({
-          loanId: loan.id,
-          equipmentName: loan.equipment?.name || "Equipamento",
-          quantity: loan.quantity,
-        }));
+        const formatted = (loans ?? [])
+          .map((loan: any) => ({
+            loanId: loan.id,
+            equipmentName: loan.equipment?.name || "Equipamento",
+            quantity: Math.max(0, loan.quantity - (loan.returned_quantity || 0)),
+            originalQuantity: loan.quantity,
+            returnedQuantity: loan.returned_quantity || 0,
+          }))
+          .filter(l => l.quantity > 0);
 
         if (formatted.length === 0) {
           toast.warning("Nenhum item de empréstimo encontrado para retornar.");

@@ -36,7 +36,7 @@ export async function GET() {
     const filePath = path.join(
       process.cwd(),
       "private-assets",
-      "ChoppHubDriver.apk",
+      "ChoppHubDriver-v1.1.5.apk",
     );
 
     if (!fs.existsSync(filePath)) {

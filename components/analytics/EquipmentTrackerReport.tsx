@@ -115,8 +115,7 @@ export function EquipmentTrackerReport({
             note_number,
             status,
             equipment_id,
-            equipments(name),
-            equipment_loan_returns(return_date, returned_quantity, remaining_quantity)
+            equipments(name)
           `)
           .eq("company_id", companyId)
           .in("equipment_id", equipIds)
@@ -131,22 +130,17 @@ export function EquipmentTrackerReport({
 
         // Constrói os registros de histórico
         const records: EquipmentHistory[] = (loanData ?? []).map((r: any) => {
-          const returns: any[] = r.equipment_loan_returns ?? [];
-          const lastReturn = returns.sort(
-            (a: any, b: any) => new Date(b.return_date).getTime() - new Date(a.return_date).getTime()
-          )[0] ?? null;
-
-          const hasReturn = !!(lastReturn?.return_date || r.return_date);
+          const hasReturn = r.status === "returned" || !!r.return_date;
 
           return {
             id: r.id,
             loan_date: r.loan_date,
-            actual_return_date: lastReturn?.return_date ?? r.return_date ?? null,
+            actual_return_date: r.return_date ?? null,
             customer_name: r.customer_name ?? "—",
             equipment_name: r.equipments?.name ?? "—",
             quantity: r.quantity ?? 0,
-            returned_qty: lastReturn?.returned_quantity ?? null,
-            remaining_qty: lastReturn?.remaining_quantity ?? null,
+            returned_qty: r.status === "returned" ? r.quantity : null,
+            remaining_qty: r.status === "active" ? r.quantity : null,
             note_number: r.note_number ?? null,
             is_current: !hasReturn,
           };
