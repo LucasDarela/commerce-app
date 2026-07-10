@@ -86,7 +86,9 @@ export function LoanEquipmentModal({
     setNoteNumber("");
   }, []);
 
-  const fetchNextNoteNumber = useCallback(async () => {
+  // Gera o próximo número de nota a ser usado.
+  // NÃO garante unicidade por si só — a garantia vem do INSERT na lock table.
+  const generateCandidateNoteNumber = useCallback(async (): Promise<string> => {
     if (!companyId) return "";
 
     const { data, error } = await supabase
@@ -98,18 +100,34 @@ export function LoanEquipmentModal({
 
     if (error) {
       console.error("Erro ao buscar último número de nota:", error);
-      return "";
+      // Fallback: timestamp para garantir unicidade mínima
+      return "E" + String(Date.now()).slice(-6);
     }
 
-    const maxNote = (data || []).reduce((max, record) => {
-      const parsed = parseInt(record.note_number.replace(/\D/g, ""), 10);
-      if (Number.isFinite(parsed) && parsed > max) {
-        return parsed;
-      }
-      return max;
+    const maxFromLoans = (data || []).reduce((max, record) => {
+      const parsed = parseInt(
+        (record.note_number ?? "").replace(/\D/g, ""),
+        10,
+      );
+      return Number.isFinite(parsed) && parsed > max ? parsed : max;
     }, 0);
-      
-    return "E" + (isNaN(maxNote) ? 1 : maxNote + 1).toString().padStart(4, "0");
+
+    // Consulta também a tabela de lock para pegar o maior já reservado
+    const { data: lockData } = await supabase
+      .from("equipment_loan_note_locks")
+      .select("note_number")
+      .eq("company_id", companyId);
+
+    const maxFromLocks = (lockData || []).reduce((max, record) => {
+      const parsed = parseInt(
+        (record.note_number ?? "").replace(/\D/g, ""),
+        10,
+      );
+      return Number.isFinite(parsed) && parsed > max ? parsed : max;
+    }, 0);
+
+    const next = Math.max(maxFromLoans, maxFromLocks) + 1;
+    return "E" + next.toString().padStart(4, "0");
   }, [companyId, supabase]);
 
   const fetchBaseData = useCallback(async () => {
@@ -117,7 +135,7 @@ export function LoanEquipmentModal({
 
     setIsLoadingData(true);
 
-    const [equipmentsRes, customersRes, nextNote] = await Promise.all([
+    const [equipmentsRes, customersRes] = await Promise.all([
       supabase
         .from("equipments")
         .select("id, name")
@@ -128,7 +146,6 @@ export function LoanEquipmentModal({
         .select("id, name")
         .eq("company_id", companyId)
         .order("name", { ascending: true }),
-      fetchNextNoteNumber(),
     ]);
 
     if (equipmentsRes.error) {
@@ -145,9 +162,10 @@ export function LoanEquipmentModal({
       setCustomers((customersRes.data as CustomerOption[]) || []);
     }
 
-    setNoteNumber(nextNote);
+    // Número da nota é gerado apenas no momento do INSERT — não pré-gerado aqui.
+    setNoteNumber("");
     setIsLoadingData(false);
-  }, [companyId, supabase, fetchNextNoteNumber]);
+  }, [companyId, supabase]);
 
   const handleAddItem = () => {
     if (!selectedEquipmentId) return;
@@ -200,85 +218,101 @@ export function LoanEquipmentModal({
     setIsSubmitting(true);
     const loadingToast = toast.loading("Salvando empréstimo...");
 
+    // Agrupa itens por equipamento antes do loop de retry
+    const grouped = new Map<string, LoanItem>();
+    for (const item of loanItems) {
+      const key = item.equipment_id;
+      if (grouped.has(key)) {
+        grouped.get(key)!.quantity += item.quantity;
+      } else {
+        grouped.set(key, { ...item });
+      }
+    }
+
+    const MAX_RETRIES = 5;
+    let reservedNoteNumber: string | null = null;
+
     try {
-      const currentNoteNumber = noteNumber || (await fetchNextNoteNumber());
+      // ── ETAPA 1: reservar o número na lock table (atomicamente) ──
+      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        const candidate = await generateCandidateNoteNumber();
 
-      if (!currentNoteNumber) {
-        toast.dismiss(loadingToast);
-        toast.error("Não foi possível gerar o número da nota.");
-        return;
-      }
-
-      const { data: duplicatedNote, error: checkError } = await supabase
-        .from("equipment_loans")
-        .select("id")
-        .eq("company_id", companyId)
-        .eq("note_number", currentNoteNumber)
-        .limit(1)
-        .maybeSingle();
-
-      if (checkError) {
-        console.error("Erro ao validar duplicidade:", checkError);
-        toast.dismiss(loadingToast);
-        toast.error("Erro ao validar duplicidade de nota.");
-        return;
-      }
-
-      if (duplicatedNote) {
-        const regenerated = await fetchNextNoteNumber();
-
-        if (!regenerated) {
+        if (!candidate) {
           toast.dismiss(loadingToast);
-          toast.error("Erro: número de nota já existe. Tente novamente.");
+          toast.error("Não foi possível gerar o número da nota.");
           return;
         }
 
-        setNoteNumber(regenerated);
+        const { error: lockError } = await supabase
+          .from("equipment_loan_note_locks")
+          .insert({ company_id: companyId, note_number: candidate });
 
+        if (!lockError) {
+          // Reserva bem-sucedida — número único garantido pelo PK da lock table
+          reservedNoteNumber = candidate;
+          break;
+        }
+
+        // Código 23505 = unique_violation: outro processo reservou este número
+        const isConflict =
+          lockError.code === "23505" ||
+          lockError.message?.toLowerCase().includes("unique") ||
+          lockError.message?.toLowerCase().includes("duplicate");
+
+        if (isConflict && attempt < MAX_RETRIES) {
+          console.warn(
+            `Nota ${candidate} já reservada — tentativa ${attempt}/${MAX_RETRIES}. Regenerando...`,
+          );
+          await new Promise((r) => setTimeout(r, 50 * attempt));
+          continue;
+        }
+
+        // Esgotou tentativas ou erro desconhecido
+        console.error("Erro ao reservar número de nota:", lockError);
         toast.dismiss(loadingToast);
-        toast.error("Número de nota já existia. Tente salvar novamente.");
+        toast.error("Não foi possível gerar um número único. Tente novamente.");
         return;
       }
 
-      const grouped = new Map<string, LoanItem>();
-
-      for (const item of loanItems) {
-        const key = item.equipment_id;
-        if (grouped.has(key)) {
-          grouped.get(key)!.quantity += item.quantity;
-        } else {
-          grouped.set(key, {
-            equipment_id: item.equipment_id,
-            name: item.name,
-            quantity: item.quantity,
-          });
-        }
+      if (!reservedNoteNumber) {
+        toast.dismiss(loadingToast);
+        toast.error("Não foi possível reservar o número da nota.");
+        return;
       }
 
+      // ── ETAPA 2: inserir os itens do empréstimo com o número reservado ──
       const inserts = Array.from(grouped.values()).map((item) => ({
         company_id: companyId,
         customer_id: selectedCustomer.id,
         customer_name: selectedCustomer.name,
         equipment_id: item.equipment_id,
         loan_date: noteDate,
-        note_number: currentNoteNumber,
+        note_number: reservedNoteNumber,
         note_date: noteDate,
         quantity: item.quantity,
         status: "active",
       }));
 
-      const { error } = await supabase.from("equipment_loans").insert(inserts);
+      const { error: insertError } = await supabase
+        .from("equipment_loans")
+        .insert(inserts);
 
-      toast.dismiss(loadingToast);
-
-      if (error) {
-        console.error("Erro ao salvar empréstimo:", error);
-        toast.error("Erro ao salvar empréstimo");
+      if (insertError) {
+        console.error("Erro ao salvar empréstimo:", insertError);
+        // Libera o lock para não desperdiçar o número
+        await supabase
+          .from("equipment_loan_note_locks")
+          .delete()
+          .eq("company_id", companyId)
+          .eq("note_number", reservedNoteNumber);
+        toast.dismiss(loadingToast);
+        toast.error("Erro ao salvar empréstimo.");
         return;
       }
 
+      setNoteNumber(reservedNoteNumber);
+      toast.dismiss(loadingToast);
       toast.success("Empréstimo registrado com sucesso");
-
       resetLocalState();
       onLoanSaved?.();
       onOpenChange(false);
@@ -362,7 +396,8 @@ export function LoanEquipmentModal({
                 type="text"
                 value={noteNumber}
                 readOnly
-                className="bg-muted cursor-not-allowed"
+                placeholder="Gerado automaticamente ao salvar"
+                className="bg-muted cursor-not-allowed text-muted-foreground"
               />
             </div>
           </div>

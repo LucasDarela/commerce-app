@@ -49,9 +49,8 @@ export default function LoanEquipmentPage() {
   const [noteDate, setNoteDate] = useState(
     () => new Date().toISOString().split("T")[0],
   );
-  const [noteNumber, setNoteNumber] = useState(
-    () => Date.now().toString().slice(-6),
-  );
+  // Número será gerado e reservado atomicamente no momento do INSERT
+  const [noteNumber, setNoteNumber] = useState("");
   const [saving, setSaving] = useState(false);
 
   const selectedCustomer = useMemo(
@@ -187,8 +186,74 @@ export default function LoanEquipmentPage() {
     }
 
     setSaving(true);
+    const loadingToast = toast.loading("Salvando empréstimo...");
+
+    const MAX_RETRIES = 5;
+    let reservedNoteNumber: string | null = null;
 
     try {
+      // ── ETAPA 1: Gerar e reservar número atomicamente na lock table ──
+      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        // Lê o maior número de ambas as tabelas
+        const [loansRes, locksRes] = await Promise.all([
+          supabase
+            .from("equipment_loans")
+            .select("note_number")
+            .eq("company_id", companyId)
+            .not("note_number", "is", null)
+            .neq("note_number", ""),
+          supabase
+            .from("equipment_loan_note_locks")
+            .select("note_number")
+            .eq("company_id", companyId),
+        ]);
+
+        const maxFromLoans = (loansRes.data || []).reduce((max, r) => {
+          const n = parseInt((r.note_number ?? "").replace(/\D/g, ""), 10);
+          return Number.isFinite(n) && n > max ? n : max;
+        }, 0);
+
+        const maxFromLocks = (locksRes.data || []).reduce((max, r) => {
+          const n = parseInt((r.note_number ?? "").replace(/\D/g, ""), 10);
+          return Number.isFinite(n) && n > max ? n : max;
+        }, 0);
+
+        const candidate =
+          "E" + (Math.max(maxFromLoans, maxFromLocks) + 1).toString().padStart(4, "0");
+
+        const { error: lockError } = await supabase
+          .from("equipment_loan_note_locks")
+          .insert({ company_id: companyId, note_number: candidate });
+
+        if (!lockError) {
+          reservedNoteNumber = candidate;
+          break;
+        }
+
+        const isConflict =
+          lockError.code === "23505" ||
+          lockError.message?.toLowerCase().includes("unique") ||
+          lockError.message?.toLowerCase().includes("duplicate");
+
+        if (isConflict && attempt < MAX_RETRIES) {
+          console.warn(`Nota ${candidate} já reservada — tentativa ${attempt}/${MAX_RETRIES}.`);
+          await new Promise((r) => setTimeout(r, 50 * attempt));
+          continue;
+        }
+
+        console.error("Erro ao reservar número de nota:", lockError);
+        toast.dismiss(loadingToast);
+        toast.error("Não foi possível gerar um número único. Tente novamente.");
+        return;
+      }
+
+      if (!reservedNoteNumber) {
+        toast.dismiss(loadingToast);
+        toast.error("Não foi possível reservar o número da nota.");
+        return;
+      }
+
+      // ── ETAPA 2: Inserir os itens do empréstimo ──
       const payload = loanItems.map((item) => ({
         company_id: companyId,
         customer_id: selectedCustomerId,
@@ -196,7 +261,7 @@ export default function LoanEquipmentPage() {
         equipment_id: item.equipment_id,
         quantity: item.quantity,
         note_date: noteDate,
-        note_number: noteNumber,
+        note_number: reservedNoteNumber,
         status: "active",
         loan_date: noteDate,
       }));
@@ -205,11 +270,20 @@ export default function LoanEquipmentPage() {
 
       if (error) {
         console.error("Erro ao salvar empréstimo:", error);
+        // Libera o lock para não desperdiçar o número
+        await supabase
+          .from("equipment_loan_note_locks")
+          .delete()
+          .eq("company_id", companyId)
+          .eq("note_number", reservedNoteNumber);
+        toast.dismiss(loadingToast);
         toast.error("Erro ao salvar empréstimo");
         return;
       }
 
+      toast.dismiss(loadingToast);
       toast.success("Empréstimo registrado com sucesso");
+      setNoteNumber(reservedNoteNumber);
       setSelectedCustomerId("");
       setSearchCustomer("");
       setLoanItems([]);
@@ -218,9 +292,8 @@ export default function LoanEquipmentPage() {
       setShowCustomers(false);
       setShowEquipments(false);
       setNoteDate(new Date().toISOString().split("T")[0]);
-      setNoteNumber(Date.now().toString().slice(-6));
-    } catch (error) {
-      console.error("Erro inesperado ao salvar empréstimo:", error);
+    } catch (err) {
+      console.error("Erro inesperado ao salvar empréstimo:", err);
       toast.error("Erro inesperado ao salvar empréstimo");
     } finally {
       setSaving(false);
