@@ -42,7 +42,7 @@ const formSchema = z
     group: z.string().optional(),
     specification: z.string().optional(),
 
-    icms_situacao_tributaria: z.string().min(1, "Informe o ICMS/CSOSN"),
+    icms_situacao_tributaria: z.string().optional(),
 
     cst_icms: z.string().optional(),
     csosn_icms: z.string().optional(),
@@ -563,7 +563,7 @@ export default function FiscalOperationForm() {
                   name="icms_situacao_tributaria"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>CST/CSOSN Geral</FormLabel>
+                      <FormLabel>CST/CSOSN Geral (Opcional)</FormLabel>
                       <FormControl>
                         <Input placeholder="ex: 00 ou 102" {...field} />
                       </FormControl>
