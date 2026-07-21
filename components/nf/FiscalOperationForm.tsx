@@ -64,6 +64,8 @@ const formSchema = z
     aliquota_pis: z.string().optional(),
     aliquota_cofins: z.string().optional(),
     aliquota_icms: z.string().optional(),
+    aliquota_icms_uf_dest: z.string().optional(),
+    aliquota_icms_inter: z.string().optional(),
     state: z.string().optional(),
     ibs_cbs_situacao_tributaria: z.string().optional(),
     ibs_cbs_classificacao_tributaria: z.string().optional(),
@@ -111,12 +113,14 @@ type FiscalOperationRow = {
   aliquota_cbs?: string | null;
   aliquota_pis?: string | null;
   aliquota_cofins?: string | null;
+  aliquota_icms?: string | null;
+  aliquota_icms_uf_dest?: string | null;
+  aliquota_icms_inter?: string | null;
   ibs_cbs_situacao_tributaria?: string | null;
   ibs_cbs_classificacao_tributaria?: string | null;
   cst_icms?: string | null;
   csosn_icms?: string | null;
   icms_origem?: string | null;
-  aliquota_icms?: number | null;
   cfop?: string | null;
   ncm?: string | null;
   ipi?: string | null;
@@ -150,9 +154,11 @@ const defaultValuesForm = {
   vicms_st_ret: "",
   aliquota_ibs: "",
   aliquota_cbs: "",
-  aliquota_pis: "",
-  aliquota_cofins: "",
-  aliquota_icms: "17.0",
+  aliquota_pis: "1.65",
+  aliquota_cofins: "7.6",
+  aliquota_icms: "17",
+  aliquota_icms_uf_dest: "",
+  aliquota_icms_inter: "",
   ibs_cbs_situacao_tributaria: "000",
   ibs_cbs_classificacao_tributaria: "000001",
 };
@@ -248,9 +254,15 @@ export default function FiscalOperationForm() {
       const full = {
         ...data,
         company_id: companyId,
-        cst_icms: isSN ? null : pad2(data.icms_situacao_tributaria),
-        csosn_icms: isSN ? pad2(data.icms_situacao_tributaria) : null,
-        state: data.state?.toUpperCase() || undefined,
+        cst_icms: isSN ? null : (pad2(data.icms_situacao_tributaria) ?? null),
+        csosn_icms: isSN ? (pad2(data.icms_situacao_tributaria) ?? null) : null,
+        state: data.state?.toUpperCase() || null,
+        aliquota_pis: data.aliquota_pis || null,
+        aliquota_cofins: data.aliquota_cofins || null,
+        aliquota_icms: data.aliquota_icms || null,
+        aliquota_icms_uf_dest: data.aliquota_icms_uf_dest || null,
+        aliquota_icms_inter: data.aliquota_icms_inter || null,
+        ibs_cbs_situacao_tributaria: data.ibs_cbs_situacao_tributaria || null,
       };
 
       const allow: (keyof typeof full)[] = [
@@ -275,6 +287,8 @@ export default function FiscalOperationForm() {
         "aliquota_pis",
         "aliquota_cofins",
         "aliquota_icms",
+        "aliquota_icms_uf_dest",
+        "aliquota_icms_inter",
         "ibs_cbs_situacao_tributaria",
         "ibs_cbs_classificacao_tributaria",
       ];
@@ -347,6 +361,7 @@ export default function FiscalOperationForm() {
 
   const handleEdit = (row: FiscalOperationRow) => {
     setEditId(row.id);
+
     form.reset({
       description: row.description ?? "",
       operation_id: row.operation_id ?? 1,
@@ -357,12 +372,12 @@ export default function FiscalOperationForm() {
       csosn_icms: row.csosn_icms ?? "",
       state: row.state ?? "",
       natureza_operacao: row.natureza_operacao ?? "",
-      tipo_documento: row.tipo_documento ?? "1",
-      local_destino: row.local_destino ?? "1",
-      finalidade_emissao: row.finalidade_emissao ?? "1",
-      consumidor_final: row.consumidor_final ?? "1",
-      presenca_comprador: row.presenca_comprador ?? "1",
-      modalidade_frete: row.modalidade_frete ?? "0",
+      tipo_documento: (["0","1"] as const).includes(row.tipo_documento as any) ? row.tipo_documento : "1",
+      local_destino: (["1","2","3"] as const).includes(row.local_destino as any) ? row.local_destino! : "1",
+      finalidade_emissao: (["1","2","3","4"] as const).includes(row.finalidade_emissao as any) ? row.finalidade_emissao! : "1",
+      consumidor_final: (["0","1"] as const).includes(row.consumidor_final as any) ? row.consumidor_final! : "1",
+      presenca_comprador: (["0","1","2","3","4","9"] as const).includes(row.presenca_comprador as any) ? row.presenca_comprador! : "1",
+      modalidade_frete: (["0","1","2","9"] as const).includes(row.modalidade_frete as any) ? row.modalidade_frete! : "0",
       icms_origem: row.icms_origem ?? "0",
       vbc_st_ret: row.vbc_st_ret ? String(row.vbc_st_ret) : "",
       pst: row.pst ? String(row.pst) : "",
@@ -372,11 +387,11 @@ export default function FiscalOperationForm() {
       vicms_st_ret: row.vicms_st_ret ? String(row.vicms_st_ret) : "",
       aliquota_ibs: row.aliquota_ibs ? String(row.aliquota_ibs) : "",
       aliquota_cbs: row.aliquota_cbs ? String(row.aliquota_cbs) : "",
-      aliquota_pis: row.aliquota_pis ? String(row.aliquota_pis) : "",
-      aliquota_cofins: row.aliquota_cofins
-        ? String(row.aliquota_cofins)
-        : "",
-      aliquota_icms: row.aliquota_icms ? String(row.aliquota_icms) : "17.0",
+      aliquota_pis: row.aliquota_pis ? String(row.aliquota_pis) : "1.65",
+      aliquota_cofins: row.aliquota_cofins ? String(row.aliquota_cofins) : "7.6",
+      aliquota_icms: row.aliquota_icms ? String(row.aliquota_icms) : "17",
+      aliquota_icms_uf_dest: row.aliquota_icms_uf_dest ? String(row.aliquota_icms_uf_dest) : "",
+      aliquota_icms_inter: row.aliquota_icms_inter ? String(row.aliquota_icms_inter) : "",
       ibs_cbs_situacao_tributaria: row.ibs_cbs_situacao_tributaria || "000",
       ibs_cbs_classificacao_tributaria: row.ibs_cbs_classificacao_tributaria || "000001",
     });
@@ -399,8 +414,6 @@ export default function FiscalOperationForm() {
     await fetchOperations();
   };
 
-  const icms = form.watch("icms_situacao_tributaria")?.trim();
-
   return (
     <div className="space-y-6">
       <Card>
@@ -420,7 +433,11 @@ export default function FiscalOperationForm() {
         </CardHeader>
         <CardContent>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={form.handleSubmit(onSubmit, (errors) => {
+              const firstKey = Object.keys(errors)[0];
+              const firstError = errors[firstKey as keyof typeof errors];
+              toast.error(`Erro no campo "${firstKey}": ${firstError?.message || "valor inválido"}`);
+            })} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <FormField
                   control={form.control}
@@ -675,8 +692,53 @@ export default function FiscalOperationForm() {
                     <FormItem>
                       <FormLabel>Alíquota ICMS (%)</FormLabel>
                       <FormControl>
-                        <Input inputMode="decimal" placeholder="17" {...field} />
+                        <Input
+                          placeholder="Ex: 17"
+                          {...field}
+                        />
                       </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* DIFAL Row */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <FormField
+                  control={form.control}
+                  name="aliquota_icms_uf_dest"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Alíquota ICMS Destino - DIFAL (%)</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Ex: 17 ou 18"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription className="text-zinc-500 text-xs">
+                        Usado em vendas fora do estado p/ Não Contribuinte.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="aliquota_icms_inter"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Alíquota Interestadual - DIFAL (%)</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Ex: 4, 7 ou 12"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription className="text-zinc-500 text-xs">
+                        Geralmente 12% (Sul/Sudeste) ou 7% (Norte/Nordeste).
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}

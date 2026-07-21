@@ -59,10 +59,19 @@ const itemSchema = z
     aliquota_ibs: z.number().optional(),
     valor_bc_ibs: z.number().optional(),
     valor_ibs: z.union([z.number(), z.string()]).optional(),
-    cbs_situacao_tributaria: z.string().optional(),
     aliquota_cbs: z.number().optional(),
     valor_bc_cbs: z.number().optional(),
     valor_cbs: z.union([z.number(), z.string()]).optional(),
+
+    // DIFAL (ICMS UF Destino)
+    valor_bc_uf_dest: z.number().optional(),
+    percentual_fcp_uf_dest: z.number().optional(),
+    aliquota_icms_uf_dest: z.number().optional(),
+    aliquota_icms_inter: z.number().optional(),
+    percentual_partilha_uf_dest: z.number().optional(),
+    valor_fcp_uf_dest: z.number().optional(),
+    valor_icms_uf_dest: z.number().optional(),
+    valor_icms_uf_remet: z.number().optional(),
   })
   .superRefine((it, ctx) => {
 

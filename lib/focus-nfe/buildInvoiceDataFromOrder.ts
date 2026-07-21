@@ -252,6 +252,45 @@ export async function buildInvoiceDataFromOrder({
   const customerDoc = getDocumentInfo(customer);
 
   const freight = toNumber(order.freight);
+
+  // Mapa de exceções: CFOPs que NÃO podem ser convertidos por simples troca de dígito
+  const CFOP_EXCEPTION_MAP: Record<string, Record<number, string>> = {
+    "5405": { 2: "6404", 3: "7404" },
+    "6404": { 1: "5405" },
+  };
+
+  // Ajusta CFOP automaticamente conforme o destino (idDest)
+  const adjustCfop = (cfop: string, idDest: number): string => {
+    if (!cfop || cfop.length !== 4) return cfop;
+
+    // 1) Verifica no mapa de exceções
+    const exception = CFOP_EXCEPTION_MAP[cfop];
+    if (exception && exception[idDest]) {
+      return exception[idDest];
+    }
+
+    // 2) Troca simples do primeiro dígito
+    const first = parseInt(cfop[0]);
+    const suffix = cfop.substring(1);
+    if (first >= 5 && first <= 7) {
+      if (idDest === 1) return `5${suffix}`;
+      if (idDest === 2) return `6${suffix}`;
+      if (idDest === 3) return `7${suffix}`;
+    }
+    if (first >= 1 && first <= 3) {
+      if (idDest === 1) return `1${suffix}`;
+      if (idDest === 2) return `2${suffix}`;
+      if (idDest === 3) return `3${suffix}`;
+    }
+    return cfop;
+  };
+
+  const idDestValue = ["1", "2", "3"].includes(
+    toText(fiscalOperation.local_destino, operationScope === "inside_state" ? "1" : "2")
+  )
+    ? Number(toText(fiscalOperation.local_destino, operationScope === "inside_state" ? "1" : "2"))
+    : operationScope === "inside_state" ? 1 : 2;
+
   const items = orderItems.map((item: any, index: number) => {
     const product = item.products ?? null;
 
@@ -259,7 +298,8 @@ export async function buildInvoiceDataFromOrder({
     const unitPrice = toNumber(item.price);
     const total = Number((quantity * unitPrice).toFixed(2));
 
-    const productCfop = toText(product?.cfop) || toText(fiscalOperation.cfop);
+    const rawCfop = toText(product?.cfop) || toText(fiscalOperation.cfop);
+    const productCfop = adjustCfop(rawCfop, idDestValue);
 
     const icmsOrigem =
       toText(product?.icms_origem) ||
@@ -366,13 +406,32 @@ export async function buildInvoiceDataFromOrder({
           ? toNumber(fiscalOperation.aliquota_cofins)
           : undefined,
       aliquota_icms:
-        fiscalOperation.aliquota_icms != null
+        fiscalOperation.aliquota_icms != null && cstIcms !== "60" && cstIcms !== "40" && cstIcms !== "41"
           ? toNumber(fiscalOperation.aliquota_icms)
           : undefined,
       ibs_cbs_situacao_tributaria:
         toText(fiscalOperation.ibs_cbs_situacao_tributaria) || undefined,
       ibs_cbs_classificacao_tributaria:
         toText(fiscalOperation.ibs_cbs_classificacao_tributaria) || undefined,
+
+      ...( !isSimplesNacional && idDestValue === 2 && Number(fiscalOperation.consumidor_final || 1) === 1 && (!customer.state_registration || customer.state_registration.trim() === "ISENTO")
+        ? (() => {
+            const baseDifal = total;
+            const aliqDestino = toNumber(fiscalOperation.aliquota_icms_uf_dest) || toNumber(fiscalOperation.aliquota_icms) || 17;
+            const aliqInter = toNumber(fiscalOperation.aliquota_icms_inter) || 12;
+            const difalVal = (baseDifal * (aliqDestino - aliqInter)) / 100;
+            return {
+              valor_bc_uf_dest: baseDifal,
+              percentual_fcp_uf_dest: 0,
+              aliquota_icms_uf_dest: aliqDestino,
+              aliquota_icms_inter: aliqInter,
+              percentual_partilha_uf_dest: 100,
+              valor_fcp_uf_dest: 0,
+              valor_icms_uf_dest: difalVal > 0 ? difalVal : 0,
+              valor_icms_uf_remet: 0,
+            };
+          })()
+        : {}),
     };
   });
 
@@ -413,21 +472,7 @@ export async function buildInvoiceDataFromOrder({
 
     tipo_documento: toIntEnum(fiscalOperation.tipo_documento, [0, 1], 1),
 
-    id_dest: ["1", "2", "3"].includes(
-      toText(
-        fiscalOperation.local_destino,
-        operationScope === "inside_state" ? "1" : "2",
-      ),
-    )
-      ? Number(
-          toText(
-            fiscalOperation.local_destino,
-            operationScope === "inside_state" ? "1" : "2",
-          ),
-        )
-      : operationScope === "inside_state"
-        ? 1
-        : 2,
+    id_dest: idDestValue,
 
     finalidade_emissao: toIntEnum(
       fiscalOperation.finalidade_emissao,

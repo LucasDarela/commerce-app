@@ -438,8 +438,48 @@ export default function EmitNfePage() {
         return;
       }
 
+      // Mapa de exceções: CFOPs que NÃO podem ser convertidos por simples troca de dígito
+      // Chave: CFOP origem → Valor: { destino: CFOP equivalente }
+      const CFOP_EXCEPTION_MAP: Record<string, Record<number, string>> = {
+        // 5405 (ST substituído interno) → 6404 (ST retido anteriormente interestadual)
+        "5405": { 2: "6404", 3: "7404" },
+        "6404": { 1: "5405" },
+        // Adicionar mais exceções conforme necessário
+      };
+
+      // Ajusta CFOP automaticamente conforme o destino (idDest)
+      const adjustCfop = (cfop: string, idDest: number): string => {
+        if (!cfop || cfop.length !== 4) return cfop;
+
+        // 1) Verifica no mapa de exceções
+        const exception = CFOP_EXCEPTION_MAP[cfop];
+        if (exception && exception[idDest]) {
+          return exception[idDest];
+        }
+
+        // 2) Troca simples do primeiro dígito
+        const first = parseInt(cfop[0]);
+        const suffix = cfop.substring(1);
+        // Saída: 5,6,7
+        if (first >= 5 && first <= 7) {
+          if (idDest === 1) return `5${suffix}`;
+          if (idDest === 2) return `6${suffix}`;
+          if (idDest === 3) return `7${suffix}`;
+        }
+        // Entrada: 1,2,3
+        if (first >= 1 && first <= 3) {
+          if (idDest === 1) return `1${suffix}`;
+          if (idDest === 2) return `2${suffix}`;
+          if (idDest === 3) return `3${suffix}`;
+        }
+        return cfop;
+      };
+
+      const idDest = Number(operacaoFiscal.local_destino || 1);
+
       const items = produtosParaNfe.map((p, index) => {
-        const cfop = String(p.cfop || "").replace(/\D/g, "");
+        const rawCfop = String(p.cfop || "").replace(/\D/g, "");
+        const cfop = adjustCfop(rawCfop, idDest);
         const ncm = String(p.ncm || "").replace(/\D/g, "");
         const cest = String(p.cest || "").replace(/\D/g, "");
         const pis = String(p.pis ?? "").replace(/\D/g, "");
@@ -470,13 +510,17 @@ export default function EmitNfePage() {
               }
             : {
                 icms_situacao_tributaria: icmsItem || "00",
-                valor_bc_icms: Number(p.price) * Number(p.netQty),
-                aliquota_icms: Number(operacaoFiscal.aliquota_icms || 17),
-                valor_icms:
-                  (Number(p.price) *
-                    Number(p.netQty) *
-                    Number(operacaoFiscal.aliquota_icms || 17)) /
-                  100,
+                ...(icmsItem !== "60" && icmsItem !== "40" && icmsItem !== "41"
+                  ? {
+                      valor_bc_icms: Number(p.price) * Number(p.netQty),
+                      aliquota_icms: Number(operacaoFiscal.aliquota_icms || 17),
+                      valor_icms:
+                        (Number(p.price) *
+                          Number(p.netQty) *
+                          Number(operacaoFiscal.aliquota_icms || 17)) /
+                        100,
+                    }
+                  : {}),
               }),
 
           pis_situacao_tributaria: pis.padStart(2, "0"),
@@ -538,6 +582,26 @@ export default function EmitNfePage() {
                   p.vicms_st_ret ?? operacaoFiscal.vicms_st_ret ?? 0,
                 ),
               }
+            : {}),
+
+          // Grupo ICMS UF Destino (DIFAL) - Obrigatório para consumidor final não contribuinte fora do estado (Apenas Regime Normal)
+          ...(!isSimples && idDest === 2 && Number(operacaoFiscal.consumidor_final || 1) === 1 && (!customer.state_registration || customer.state_registration.trim() === "ISENTO")
+            ? (() => {
+                const baseDifal = Number(p.price) * Number(p.netQty);
+                const aliqDestino = operacaoFiscal.aliquota_icms_uf_dest ? Number(operacaoFiscal.aliquota_icms_uf_dest) : (Number(operacaoFiscal.aliquota_icms) || 17);
+                const aliqInter = operacaoFiscal.aliquota_icms_inter ? Number(operacaoFiscal.aliquota_icms_inter) : 12;
+                const difalVal = (baseDifal * (aliqDestino - aliqInter)) / 100;
+                return {
+                  valor_bc_uf_dest: baseDifal,
+                  percentual_fcp_uf_dest: 0,
+                  aliquota_icms_uf_dest: aliqDestino,
+                  aliquota_icms_inter: aliqInter,
+                  percentual_partilha_uf_dest: 100,
+                  valor_fcp_uf_dest: 0,
+                  valor_icms_uf_dest: difalVal > 0 ? difalVal : 0,
+                  valor_icms_uf_remet: 0,
+                };
+              })()
             : {}),
         };
       });

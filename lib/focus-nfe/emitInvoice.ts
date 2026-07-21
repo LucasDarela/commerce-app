@@ -233,6 +233,20 @@ export async function emitInvoice({
         aliquota_cofins: Number(it.aliquota_cofins ?? 0),
         valor_cofins: Number(it.valor_cofins ?? 0),
 
+        // DIFAL
+        ...(it.valor_bc_uf_dest !== undefined
+          ? {
+              icms_base_calculo_uf_destino: Number(it.valor_bc_uf_dest),
+              icms_percentual_fcp_uf_destino: Number(it.percentual_fcp_uf_dest ?? 0),
+              icms_aliquota_interna_uf_destino: Number(it.aliquota_icms_uf_dest ?? 0),
+              icms_aliquota_interestadual: Number(it.aliquota_icms_inter ?? 0),
+              icms_percentual_partilha: Number(it.percentual_partilha_uf_dest ?? 100),
+              icms_valor_fcp_uf_destino: Number(it.valor_fcp_uf_dest ?? 0),
+              icms_valor_uf_destino: Number(it.valor_icms_uf_dest ?? 0),
+              icms_valor_uf_remetente: Number(it.valor_icms_uf_remet ?? 0),
+            }
+          : {}),
+
         informacoes_adicionais_item: `IBS: R$ ${Number(it.valor_ibs || 0).toFixed(2)} (${it.aliquota_ibs}%) | CBS: R$ ${Number(it.valor_cbs || 0).toFixed(2)} (${it.aliquota_cbs}%)`,
       };
     }),
