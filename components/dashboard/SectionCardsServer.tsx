@@ -63,8 +63,16 @@ export function SectionCards() {
 
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-      const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const startOfNextMonth = new Date(
+        now.getFullYear(),
+        now.getMonth() + 1,
+        1,
+      );
+      const startOfLastMonth = new Date(
+        now.getFullYear(),
+        now.getMonth() - 1,
+        1,
+      );
 
       const fmt = (d: Date) => format(d, "yyyy-MM-dd");
       const fmtToday = fmt(now);
@@ -167,7 +175,7 @@ export function SectionCards() {
           .select("total")
           .eq("company_id", companyId)
           .eq("payment_method", "Boleto")
-          .eq("payment_status", "pendente")
+          .in("payment_status", ["pendente", "Unpaid"])
           .lt("due_date", fmtToday),
 
         // A Pagar Hoje
@@ -190,7 +198,9 @@ export function SectionCards() {
       const orderIds = (ordersCurrent.data ?? []).map((o: any) => o.id);
       const entreguesIds = (entreguesRes.data ?? []).map((o: any) => o.id);
       const agendadosIds = (agendadosRes.data ?? []).map((o: any) => o.id);
-      const allRelevantIds = [...new Set([...orderIds, ...entreguesIds, ...agendadosIds])];
+      const allRelevantIds = [
+        ...new Set([...orderIds, ...entreguesIds, ...agendadosIds]),
+      ];
 
       let litrosMes = 0;
       let litrosEntreguesMes = 0;
@@ -229,8 +239,10 @@ export function SectionCards() {
           if (volume) {
             const added = volume * Number(item.quantity ?? 0);
             if (orderIds.includes(item.order_id)) litrosMes += added;
-            if (entreguesIds.includes(item.order_id)) litrosEntreguesMes += added;
-            if (agendadosIds.includes(item.order_id)) litrosAgendadosFuturo += added;
+            if (entreguesIds.includes(item.order_id))
+              litrosEntreguesMes += added;
+            if (agendadosIds.includes(item.order_id))
+              litrosAgendadosFuturo += added;
           }
         }
       }
@@ -243,32 +255,58 @@ export function SectionCards() {
       const inputsAnt = inputsLast.data ?? [];
       const outputsAnt = outputsLast.data ?? [];
 
-      const totalVendas = orders.reduce((sum: number, o: any) => sum + Number(o.total ?? 0), 0);
-      const totalFinanceiroSaida = outputs.reduce((sum: number, o: any) => sum + Number(o.amount ?? 0), 0);
+      const totalVendas = orders.reduce(
+        (sum: number, o: any) => sum + Number(o.total ?? 0),
+        0,
+      );
+      const totalFinanceiroSaida = outputs.reduce(
+        (sum: number, o: any) => sum + Number(o.amount ?? 0),
+        0,
+      );
       const totalReceber = totalVendas + totalFinanceiroSaida;
 
-      const totalPagar = inputs.reduce((sum: number, i: any) => sum + Number(i.amount ?? 0), 0);
+      const totalPagar = inputs.reduce(
+        (sum: number, i: any) => sum + Number(i.amount ?? 0),
+        0,
+      );
       const receitaAtual = totalReceber - totalPagar;
 
-      const totalVendasAnt = ordersAnt.reduce((sum: number, o: any) => sum + Number(o.total ?? 0), 0);
-      const totalFinanceiroSaidaAnt = outputsAnt.reduce((sum: number, o: any) => sum + Number(o.amount ?? 0), 0);
+      const totalVendasAnt = ordersAnt.reduce(
+        (sum: number, o: any) => sum + Number(o.total ?? 0),
+        0,
+      );
+      const totalFinanceiroSaidaAnt = outputsAnt.reduce(
+        (sum: number, o: any) => sum + Number(o.amount ?? 0),
+        0,
+      );
       const totalReceberAnt = totalVendasAnt + totalFinanceiroSaidaAnt;
 
-      const totalPagarAnt = inputsAnt.reduce((sum: number, i: any) => sum + Number(i.amount ?? 0), 0);
+      const totalPagarAnt = inputsAnt.reduce(
+        (sum: number, i: any) => sum + Number(i.amount ?? 0),
+        0,
+      );
       const receitaAnterior = totalReceberAnt - totalPagarAnt;
 
       const uniqueCustomers = new Set(
-        (customersRes.data ?? []).map((o: any) => o.customer_id).filter(Boolean),
+        (customersRes.data ?? [])
+          .map((o: any) => o.customer_id)
+          .filter(Boolean),
       );
 
       const ticketMedio = orders.length > 0 ? totalVendas / orders.length : 0;
       const pedidosMesAnterior = ordersAnt.length;
 
       // NOVOS CALCULOS
-      const inadimplentesValor = (vencidosRes.data ?? []).reduce((sum: number, o: any) => sum + Number(o.total ?? 0), 0);
+      const inadimplentesValor = (vencidosRes.data ?? []).reduce(
+        (sum: number, o: any) => sum + Number(o.total ?? 0),
+        0,
+      );
       const inadimplentesTotal = (vencidosRes.data ?? []).length;
 
-      const aPagarHojeValor = (aPagarHojeRes.data ?? []).reduce((sum: number, i: any) => sum + Number(i.amount ?? 0), 0);
+      const aPagarHojeValor = (aPagarHojeRes.data ?? []).reduce(
+        (sum: number, i: any) => sum + Number(i.amount ?? 0),
+        0,
+      );
       const aPagarHojeQtd = (aPagarHojeRes.data ?? []).length;
 
       setStats({
@@ -306,7 +344,9 @@ export function SectionCards() {
 
   const growthRate = (current: number, previous: number) =>
     previous === 0
-      ? current === 0 ? 0 : 100
+      ? current === 0
+        ? 0
+        : 100
       : ((current - previous) / Math.abs(previous)) * 100;
 
   const monthName = format(new Date(), "MMMM", { locale: ptBR });
