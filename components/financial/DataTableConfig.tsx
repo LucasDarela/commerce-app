@@ -31,11 +31,13 @@ type Props<T> = {
   rows?: Row<T>[];
   data?: T[];
   columns?: CustomColumnDef<T>[];
+  onRowClick?: (row: Row<T>, e: React.MouseEvent) => void;
 };
 
 export function DataTableConfig<T extends { id: string }>({
   table,
   rows,
+  onRowClick,
 }: Props<T>) {
   const visibleRows = rows ?? table.getRowModel().rows;
 
@@ -62,7 +64,11 @@ export function DataTableConfig<T extends { id: string }>({
         </TableHeader>
         <TableBody>
           {visibleRows.map((row) => (
-            <TableRow key={row.id}>
+            <TableRow
+              key={row.id}
+              onClick={(e) => onRowClick && onRowClick(row, e)}
+              className={onRowClick ? "cursor-pointer hover:bg-muted/50" : ""}
+            >
               {row.getVisibleCells().map((cell) => (
                 <TableCell className="h-13" key={cell.id}>
                   {flexRender(cell.column.columnDef.cell, cell.getContext())}

@@ -14,6 +14,7 @@ import { DataTableConfig } from "./DataTableConfig";
 import type { CombinedRecord } from "./types";
 import { TablePagination } from "@/components/ui/pagination";
 import type { FinancialRecord } from "@/components/types/financial";
+import { useRouter } from "next/navigation";
 import type { Order } from "@/components/types/orderSchema";
 
 type MonthlyFinancialTableProps = {
@@ -25,6 +26,7 @@ export function MonthlyFinancialTable({
   table,
   monthKey,
 }: MonthlyFinancialTableProps) {
+  const router = useRouter();
   const baseRows = table.getFilteredRowModel().rows;
 
   const filteredRows = React.useMemo(() => {
@@ -67,9 +69,27 @@ export function MonthlyFinancialTable({
     getSortedRowModel: getSortedRowModel(),
   });
 
+  const handleRowClick = (row: any, e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (
+      target.closest("button") ||
+      target.closest("a") ||
+      target.closest("[role='menuitem']")
+    ) {
+      return;
+    }
+
+    const isFinancial = row.original.source === "financial";
+    const id = row.original.id;
+    const viewHref = isFinancial
+      ? `/dashboard/financial/${id}/view`
+      : `/dashboard/orders/${id}/view`;
+    router.push(viewHref);
+  };
+
   return (
     <>
-      <DataTableConfig table={tableForMonth} />
+      <DataTableConfig table={tableForMonth} onRowClick={handleRowClick} />
       <TablePagination table={tableForMonth} />
     </>
   );
