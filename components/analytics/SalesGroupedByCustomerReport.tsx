@@ -249,11 +249,11 @@ export function SalesGroupedByCustomerReport({
       setTriggerDownload(true);
     };
 
-    window.addEventListener("download-sales-grouped-report", handleDownload);
+    window.addEventListener("download-sales-grouped-by-customer-report", handleDownload);
 
     return () => {
       window.removeEventListener(
-        "download-sales-grouped-report",
+        "download-sales-grouped-by-customer-report",
         handleDownload,
       );
     };
@@ -278,7 +278,10 @@ export function SalesGroupedByCustomerReport({
           >
             {({ url }) => {
               if (url) {
-                window.open(url, "_blank");
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `relatorio-vendas-agrupadas-${startDate}${endDate ? `-ate-${endDate}` : ""}.pdf`;
+                a.click();
                 setTimeout(() => setTriggerDownload(false), 300);
               }
               return null;

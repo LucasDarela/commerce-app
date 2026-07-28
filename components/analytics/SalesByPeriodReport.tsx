@@ -101,10 +101,10 @@ export function SalesByPeriodReport({
       setTriggerDownload(true);
     };
 
-    window.addEventListener("download-sales-report", handleDownload);
+    window.addEventListener("download-sales-by-period-report", handleDownload);
 
     return () => {
-      window.removeEventListener("download-sales-report", handleDownload);
+      window.removeEventListener("download-sales-by-period-report", handleDownload);
     };
   }, []);
 
@@ -234,7 +234,10 @@ export function SalesByPeriodReport({
           >
             {({ url }) => {
               if (url) {
-                window.open(url, "_blank");
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `relatorio-vendas-${startDate}${endDate ? `-ate-${endDate}` : ""}.pdf`;
+                a.click();
                 setTimeout(() => setTriggerDownload(false), 300);
               }
               return null;
