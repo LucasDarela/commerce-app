@@ -81,9 +81,15 @@ export default function Footer() {
         </div>
 
         <div className="flex flex-col items-center gap-6 mt-6">
-          <p className="mt-6">
+          <Link
+            href="/marketing/terms"
+            className="text-sm hover:text-primary transition-colors underline underline-offset-4"
+          >
+            Política de Privacidade &amp; Termos de Uso
+          </Link>
+          <p className="mt-2">
             © {new Date().getFullYear()}{" "}
-            <span className="font-bold">Chopp Hub</span>. Todos os direitos
+            <span className="font-bold text-white">Chopp Hub</span>. Todos os direitos
             reservados.
           </p>
         </div>
