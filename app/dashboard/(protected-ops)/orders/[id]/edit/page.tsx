@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectTrigger,
@@ -1138,15 +1139,39 @@ const handleEditPrice = (index: number, value: string) => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center mt-4">
-            <Input
-              type="text"
-              placeholder="Local da Entrega"
-              value={appointment.location}
-              onChange={(e) =>
-                setAppointment({ ...appointment, location: e.target.value })
-              }
-            />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start mt-4">
+            <div className="flex flex-col gap-2 w-full">
+              <Input
+                type="text"
+                placeholder="Local da Entrega"
+                value={appointment.location}
+                onChange={(e) =>
+                  setAppointment({ ...appointment, location: e.target.value })
+                }
+              />
+              <div className="flex items-center gap-2 px-1">
+                <Checkbox
+                  id="use-customer-address"
+                  disabled={!selectedCustomer}
+                  onCheckedChange={(checked) => {
+                    if (checked && selectedCustomer) {
+                      const addr = [
+                        selectedCustomer.address,
+                        selectedCustomer.number,
+                        selectedCustomer.neighborhood,
+                        selectedCustomer.city,
+                        selectedCustomer.state,
+                        selectedCustomer.zip_code
+                      ].filter(Boolean).join(", ");
+                      setAppointment({ ...appointment, location: addr });
+                    }
+                  }}
+                />
+                <label htmlFor="use-customer-address" className="text-xs font-medium cursor-pointer text-muted-foreground select-none">
+                  Localização do cadastro
+                </label>
+              </div>
+            </div>
 
             <Input
               type="number"
