@@ -174,7 +174,7 @@ export function CreateAccountForm() {
     <>
       <div className="flex flex-col justify-center items-center space-y-2 px-6">
         <span className="text-base pt-3 pb-1 text-muted-foreground">
-        Crie sua conta para iniciar o teste grátis.
+        Crie sua conta e inicie 15 dias de teste grátis. Sem cartão de crédito.
       </span>
       <Form {...form}>
         <form

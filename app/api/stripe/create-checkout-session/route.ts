@@ -188,6 +188,22 @@ export async function POST(req: Request) {
       lineItems.push({ price: addOnPriceId, quantity: 1 });
     }
 
+    // Se pode ter trial (15 dias sem cartão), criamos a assinatura direto, 
+    // sem redirecionar para o Stripe Checkout Session.
+    if (canHaveTrial) {
+      await stripe.subscriptions.create({
+        customer: stripeCustomerId,
+        items: lineItems.map(item => ({ price: item.price, quantity: item.quantity })),
+        trial_period_days: 15,
+        payment_behavior: "default_incomplete",
+        metadata: { companyId },
+      });
+
+      return NextResponse.json({ success: true, type: "trial_started" });
+    }
+
+    // Se NÃO pode ter trial (ex: add-ons, extras, skipTrial, planos sem trial)
+    // Redirecionamos para o Stripe Checkout exigindo o cartão
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       customer: stripeCustomerId,
@@ -197,12 +213,9 @@ export async function POST(req: Request) {
       cancel_url: cancelUrl,
       metadata: { companyId },
       subscription_data: {
-        trial_period_days: canHaveTrial ? 30 : undefined,
         metadata: { companyId },
       },
     });
-
-    return NextResponse.json({ url: session.url });
 
     return NextResponse.json({ url: session.url });
   } catch (err: any) {

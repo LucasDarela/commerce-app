@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Mail, Phone, Calendar, Building, CreditCard, Users, ShieldAlert } from "lucide-react";
+import { ArrowLeft, Mail, Phone, Calendar, Building, CreditCard, Users, ShieldAlert, Activity, TrendingUp, Clock } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -45,12 +45,20 @@ export default async function CompanyDetailsPage({
     { data: company },
     { data: subscription },
     { data: profiles },
-    { data: { users: authUsers } }
+    { data: { users: authUsers } },
+    { data: recentEvents },
   ] = await Promise.all([
     adminClient.from("companies").select("*").eq("id", companyId).single(),
     adminClient.from("subscriptions").select("*").eq("company_id", companyId).single(),
     adminClient.from("profiles").select("*").eq("company_id", companyId),
-    adminClient.auth.admin.listUsers()
+    adminClient.auth.admin.listUsers(),
+    adminClient
+      .from("user_events")
+      .select("event_name, event_type, metadata, created_at, user_id")
+      .eq("company_id", companyId)
+      .eq("event_type", "page_view")
+      .order("created_at", { ascending: false })
+      .limit(200),
   ]);
 
   if (!company) {
@@ -104,6 +112,44 @@ export default async function CompanyDetailsPage({
     incomplete_expired: "Pagamento Expirado",
     past_due: "Pagamento Atrasado"
   };
+
+  // --- Processa dados de analytics ---
+
+  // Top páginas visitadas
+  const pageCount: Record<string, { count: number; label: string }> = {};
+  for (const ev of recentEvents || []) {
+    const key = ev.event_name as string;
+    const label = (ev.metadata as any)?.label || key;
+    if (!pageCount[key]) pageCount[key] = { count: 0, label };
+    pageCount[key].count++;
+  }
+  const topPages = Object.entries(pageCount)
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, 5);
+  const maxPageCount = topPages[0]?.[1].count || 1;
+
+  // Heatmap semanal (quantos acessos por dia da semana)
+  const DAY_NAMES = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+  const weekdayCount = new Array(7).fill(0);
+  for (const ev of recentEvents || []) {
+    const day = new Date(ev.created_at as string).getDay();
+    weekdayCount[day]++;
+  }
+  const maxWeekdayCount = Math.max(...weekdayCount, 1);
+
+  // Últimos 20 eventos para timeline
+  const recentTimeline = (recentEvents || []).slice(0, 20);
+
+  const formatDateTime = (dateStr: string) =>
+    new Intl.DateTimeFormat("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(new Date(dateStr));
+
+  const totalEvents = recentEvents?.length || 0;
+  const lastActivity = recentEvents?.[0]?.created_at;
 
   return (
     <div className="flex-1 space-y-8 p-8 pt-6 pb-20 max-w-[1000px] mx-auto">
@@ -191,6 +237,130 @@ export default async function CompanyDetailsPage({
           </CardContent>
         </Card>
       </div>
+
+      {/* ===== SEÇÃO DE ANALYTICS ===== */}
+      <div className="space-y-6 pt-2">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+            <Activity className="w-5 h-5 text-blue-400" /> Atividade do Usuário
+          </h3>
+          <div className="flex items-center gap-4 text-sm text-neutral-400">
+            <span>{totalEvents} acessos registrados</span>
+            {lastActivity && (
+              <span className="flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5" />
+                Último: {formatDateTime(lastActivity as string)}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {totalEvents === 0 ? (
+          <Card className="bg-neutral-900 border-neutral-800">
+            <CardContent className="py-10 text-center text-neutral-500">
+              <Activity className="w-10 h-10 mx-auto mb-3 opacity-30" />
+              <p>Nenhum acesso registrado ainda.</p>
+              <p className="text-xs mt-1">Os dados aparecerão conforme o usuário navegar pelo sistema.</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* Top Páginas */}
+            <Card className="bg-neutral-900 border-neutral-800">
+              <CardHeader>
+                <CardTitle className="text-base text-white flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-emerald-400" />
+                  Páginas Mais Visitadas
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {topPages.length === 0 ? (
+                  <p className="text-neutral-500 text-sm">Sem dados ainda.</p>
+                ) : (
+                  topPages.map(([path, { count, label }]) => (
+                    <div key={path} className="space-y-1">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-neutral-300 truncate max-w-[200px]" title={label}>{label}</span>
+                        <span className="text-neutral-500 shrink-0 ml-2">{count}x</span>
+                      </div>
+                      <div className="h-1.5 w-full bg-neutral-800 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-blue-500 rounded-full transition-all"
+                          style={{ width: `${(count / maxPageCount) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Heatmap por dia da semana */}
+            <Card className="bg-neutral-900 border-neutral-800">
+              <CardHeader>
+                <CardTitle className="text-base text-white flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-purple-400" />
+                  Atividade por Dia da Semana
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-end gap-2 h-24">
+                  {DAY_NAMES.map((day, i) => {
+                    const pct = weekdayCount[i] / maxWeekdayCount;
+                    return (
+                      <div key={day} className="flex-1 flex flex-col items-center gap-1">
+                        <div
+                          className="w-full rounded-t-sm bg-purple-500/80 transition-all"
+                          style={{ height: `${Math.max(pct * 80, 4)}px`, opacity: 0.4 + pct * 0.6 }}
+                          title={`${weekdayCount[i]} acessos`}
+                        />
+                        <span className="text-[10px] text-neutral-500">{day}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-neutral-500 mt-3 text-center">
+                  Baseado nos últimos {totalEvents} acessos registrados
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Timeline de atividade recente */}
+        {recentTimeline.length > 0 && (
+          <Card className="bg-neutral-900 border-neutral-800">
+            <CardHeader>
+              <CardTitle className="text-base text-white flex items-center gap-2">
+                <Clock className="w-4 h-4 text-neutral-400" />
+                Últimas Atividades (20 mais recentes)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1">
+                {recentTimeline.map((ev, i) => {
+                  const label = (ev.metadata as any)?.label || ev.event_name;
+                  return (
+                    <div
+                      key={i}
+                      className="flex items-center justify-between py-2 border-b border-neutral-800 last:border-0 text-sm"
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
+                        <span className="text-neutral-300 truncate max-w-[340px]" title={ev.event_name as string}>{label}</span>
+                      </div>
+                      <span className="text-neutral-500 shrink-0 ml-4 text-xs">
+                        {formatDateTime(ev.created_at as string)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+      {/* ===== FIM ANALYTICS ===== */}
 
       <div className="space-y-4 pt-4">
         <div className="flex items-center justify-between">

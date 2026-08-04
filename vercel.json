@@ -7,6 +7,14 @@
     {
       "path": "/api/nfe/cron/check-status",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/trial-ending",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/abandoned-checkout",
+      "schedule": "0 10 * * *"
     }
   ]
 }

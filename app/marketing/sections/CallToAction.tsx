@@ -45,8 +45,8 @@ export default function CallToAction() {
         <p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-muted-foreground md:text-lg">
           Centralize pedidos, estoque, entregas, boletos e financeiro em um único sistema
           e tenha mais controle da sua distribuidora no dia a dia. Teste o Chopp Hub por
-          30 dias e veja na prática como sua operação pode ficar mais organizada, rápida
-          e lucrativa.
+          15 dias grátis, sem precisar de cartão de crédito, e veja na prática como sua operação
+          pode ficar mais organizada, rápida e lucrativa.
         </p>
 
         <div className="mt-8 flex flex-col items-center gap-3 text-sm text-muted-foreground md:text-base">
@@ -60,7 +60,7 @@ export default function CallToAction() {
           </div>
           <div className="flex items-center gap-2">
             <Check className="h-4 w-4 text-green-500" />
-            30 dias grátis para testar sem compromisso
+            15 dias grátis para testar sem compromisso
           </div>
         </div>
 

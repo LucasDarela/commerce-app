@@ -179,7 +179,7 @@ export default function Planos() {
           </p>
 
           <p className="mt-4 text-sm text-muted-foreground">
-            Teste grátis por <span className="font-semibold">30 dias</span> nos planos Essential e Pro.
+            Teste grátis por <span className="font-semibold">15 dias</span> nos planos Essential e Pro. Sem cartão de crédito.
           </p>
         </div>
 
@@ -297,7 +297,7 @@ export default function Planos() {
 
                 <p className="text-center text-xs text-muted-foreground mt-3">
                   {plan.hasTrial
-                    ? "Você não paga nada pelos primeiros 30 dias."
+                    ? "Você não paga nada pelos primeiros 15 dias. Sem cartão de crédito."
                     : "Neste plano, a contratação já inicia com cobrança imediata."}
                 </p>
               </CardContent>

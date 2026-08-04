@@ -114,7 +114,7 @@ export default function Functionalities() {
         </Button>
 
         <p className="text-xs text-muted-foreground mt-3">
-          Teste grátis por 30 dias.
+          Teste grátis por 15 dias. Sem cartão de crédito.
         </p>
       </div>
     </section>

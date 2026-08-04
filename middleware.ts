@@ -103,7 +103,7 @@ export async function middleware(req: NextRequest) {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("current_session_id")
+      .select("current_session_id, whatsapp_verified")
       .eq("id", user.id)
       .single();
 
@@ -118,6 +118,17 @@ export async function middleware(req: NextRequest) {
       response.cookies.delete("session_marker");
       
       return response;
+    }
+
+    // 📱 Verificação de WhatsApp (feature flag)
+    // Aplica apenas para owners (usuários sem invited_role nos metadados)
+    if (
+      process.env.WHATSAPP_VERIFICATION_ENABLED === "true" &&
+      profile?.whatsapp_verified === false &&
+      !user.user_metadata?.invited_role
+    ) {
+      console.log(`[Middleware] WhatsApp não verificado para owner ${user.id} — redirecionando`);
+      return NextResponse.redirect(new URL("/auth/verify-whatsapp", req.url));
     }
   }
 

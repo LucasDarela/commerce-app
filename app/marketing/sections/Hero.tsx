@@ -26,7 +26,7 @@ const slides = [
     title: "Pare de perder dinheiro com sua distribuidora de chopp desorganizada",
     description:
       "Acompanhe vendas, estoque e clientes em tempo real e tome decisões com dados reais do seu negócio.",
-    cta: "Testar por 30 dias grátis",
+    cta: "Testar por 15 dias grátis",
   },
   {
     image: heroImage3,

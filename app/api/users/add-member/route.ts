@@ -191,6 +191,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
+    // Se criou o usuário com sucesso, marca whatsapp_verified = true no perfil
+    // para que usuários convidados (membros, drivers) não precisem validar WhatsApp.
+    if (data?.user?.id) {
+      const { error: profileError } = await admin
+        .from("profiles")
+        .update({ whatsapp_verified: true })
+        .eq("id", data.user.id);
+        
+      if (profileError) {
+        console.error("[add-member] Erro ao atualizar whatsapp_verified:", profileError);
+      }
+    }
+
     console.log("========== [ADD MEMBER SUCCESS] ==========");
 
     return NextResponse.json(

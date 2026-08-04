@@ -353,7 +353,7 @@ export default function BillingPage() {
         <p className="text-muted-foreground text-lg">
           {isSubscribed
             ? "O upgrade é aplicado instantaneamente com rateio de valores."
-            : "Comece hoje mesmo com 30 dias de teste gratuito nos planos Essential e Pro. Você só paga quando decidir usar de verdade!"}
+            : "Comece hoje mesmo com 15 dias de teste gratuito nos planos Essential e Pro. Sem cartão de crédito — você só paga quando decidir usar de verdade!"}
         </p>
 
         <div className="flex flex-col items-center gap-4 pt-4">
@@ -448,7 +448,7 @@ export default function BillingPage() {
                   <p className="mt-4 text-sm text-muted-foreground">
                     {name === "Enterprise"
                       ? "Cobrança imediata"
-                      : "30 dias de teste grátis"}
+                      : "15 dias de teste grátis · sem cartão"}
                   </p>
                 )}
               </div>

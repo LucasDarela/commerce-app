@@ -3,6 +3,10 @@ export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
+import { Resend } from "resend";
+
+const resend = new Resend(process.env.RESEND_API_KEY!);
+
 
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error("STRIPE_SECRET_KEY não definida");
@@ -544,6 +548,11 @@ export async function POST(req: Request) {
           ? new Date(subscription.trial_end * 1000).toISOString()
           : null;
 
+        const trialEndFormatted = subscription.trial_end
+          ? new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+              .format(new Date(subscription.trial_end * 1000))
+          : "em breve";
+
         const { error } = await supabase
           .from("subscriptions")
           .upsert(
@@ -563,6 +572,47 @@ export async function POST(req: Request) {
         if (error) {
           console.error("Erro ao marcar aviso de fim do trial:", error);
           throw error;
+        }
+
+        // Busca e-mail do owner para enviar o aviso
+        try {
+          const { data: company } = await supabase
+            .from("companies")
+            .select("id, name, email")
+            .eq("id", resolvedCompanyId)
+            .single();
+
+          if (company?.email) {
+            const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || "https://chopphub.com";
+
+            await resend.emails.send({
+              from: "Chopp Hub <suporte@chopphub.com>",
+              to: [company.email],
+              subject: `⏳ Seu período de teste termina em 3 dias — adicione um método de pagamento`,
+              html: `
+                <div style="font-family: sans-serif; max-width: 560px; margin: 0 auto; color: #111;">
+                  <h2 style="color: #f59e0b;">Seu trial está quase no fim!</h2>
+                  <p>Olá${company.name ? ` da <strong>${company.name}</strong>` : ''},</p>
+                  <p>Seu período de teste gratuito no <strong>Chopp Hub</strong> termina em <strong>${trialEndFormatted}</strong>.</p>
+                  <p>Para continuar usando a plataforma sem interrupções, adicione um método de pagamento antes dessa data.</p>
+                  <p style="text-align: center; margin: 32px 0;">
+                    <a href="${siteUrl}/dashboard/billing"
+                       style="background: #f59e0b; color: #000; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: bold;">
+                      Adicionar forma de pagamento
+                    </a>
+                  </p>
+                  <p style="color: #6b7280; font-size: 14px;">Se precisar de ajuda, responda este e-mail ou entre em contato pelo chat da plataforma.</p>
+                  <hr style="border-color: #e5e7eb; margin: 24px 0;" />
+                  <p style="color: #9ca3af; font-size: 12px;">Chopp Hub — Gestão inteligente para o seu negócio de chopp.</p>
+                </div>
+              `,
+            });
+
+            console.log(`[trial_will_end] E-mail de aviso enviado para ${company.email}`);
+          }
+        } catch (emailErr) {
+          // Não falha o webhook por causa de erro no e-mail
+          console.error("[trial_will_end] Erro ao enviar e-mail de aviso:", emailErr);
         }
 
         break;

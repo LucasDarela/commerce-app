@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 
-// Crie uma API key no Resend
 const resend = new Resend(process.env.RESEND_API_KEY!);
 
 const admin = createClient(
@@ -10,9 +9,10 @@ const admin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || "https://chopphub.com";
+
 export async function GET(req: Request) {
   try {
-    // Para segurança, se quiser rodar por Vercel Cron, pode verificar um header de autorização
     const authHeader = req.headers.get("authorization");
     if (
       process.env.CRON_SECRET &&
@@ -23,8 +23,7 @@ export async function GET(req: Request) {
 
     console.log("[cron/abandoned-checkout] Iniciando varredura...");
 
-    // 1. Busca perfis criados nas últimas 48 horas para processarmos
-    // Assumindo que você criou a coluna created_at e as colunas de tracking em profiles
+    // Busca perfis com company_id (owners)
     const { data: profiles, error: profilesError } = await admin
       .from("profiles")
       .select(`
@@ -46,87 +45,134 @@ export async function GET(req: Request) {
     const results = [];
 
     for (const profile of profiles || []) {
-      // Busca a data real de criação no auth.users
+      // Busca o usuário real no auth para verificar metadados e data de criação
       const { data: userAuth } = await admin.auth.admin.getUserById(profile.id);
       if (!userAuth || !userAuth.user) continue;
 
-      // Se o usuário foi convidado para a empresa (tem invited_role), ele não é o dono que abandonou o checkout
+      // Se é usuário convidado (tem invited_role), não é o dono — ignorar
       if (userAuth.user.user_metadata?.invited_role) continue;
 
       const createdAt = new Date(userAuth.user.created_at);
       const hoursSinceCreation = Math.abs(now.getTime() - createdAt.getTime()) / 36e5;
 
-      // 2. Verifica se a empresa finalizou o checkout (tem stripe_subscription_id)
+      // NOVA LÓGICA: "abandonou" = não tem subscription OU status não é active/trialing/past_due
+      // Antes checar stripe_subscription_id IS NULL, mas com o novo trial sem cartão isso seria errado
       const { data: subscription } = await admin
         .from("subscriptions")
         .select("status, stripe_subscription_id")
         .eq("company_id", profile.company_id)
         .maybeSingle();
 
-      const hasCheckoutCompleted = subscription && subscription.stripe_subscription_id != null;
+      const isActive = subscription &&
+        ["active", "trialing", "past_due"].includes(subscription.status);
 
-      // Se tem um ID de assinatura real do Stripe, garantimos que não mandaremos mais mensagens
-      if (hasCheckoutCompleted) continue;
+      // Se a empresa já tem assinatura válida, não manda mais e-mails de abandono
+      if (isActive) continue;
 
-      // ---- STEP 1: 1 Hora depois (Email de Suporte) ----
+      // ---- STEP 1: 1 Hora depois (E-mail de boas-vindas + convite ao trial) ----
       if (
-        hoursSinceCreation >= 1 && 
+        hoursSinceCreation >= 1 &&
         hoursSinceCreation < 24 &&
         !profile.abandon_step_1_sent_at
       ) {
-        console.log(`[Step 1] Enviando email para ${profile.email}`);
-        
-        // Disparo de Email
+        console.log(`[Step 1] Enviando e-mail de ativação para ${profile.email}`);
+
         await resend.emails.send({
           from: "Chopp Hub <suporte@chopphub.com>",
           to: [profile.email],
-          subject: "Houve algum problema com o seu cartão?",
+          subject: "🎉 Sua conta está pronta — comece seu trial grátis agora!",
           html: `
-            <p>Olá${profile.name ? ` ${profile.name}` : ''},</p>
-            <p>Vimos que você criou sua conta no Chopp Hub mas não finalizou a configuração do seu plano.</p>
-            <p>Houve algum problema com o seu cartão ou ficou com alguma dúvida sobre a plataforma?</p>
-            <p>Se precisar de ajuda, é só responder este e-mail. Se quiser finalizar agora, <a href="${process.env.NEXT_PUBLIC_SITE_URL}/dashboard/account">clique aqui para acessar seu painel</a>.</p>
+            <div style="font-family: sans-serif; max-width: 560px; margin: 0 auto; color: #111;">
+              <h2 style="color: #3b82f6;">Bem-vindo ao Chopp Hub${profile.name ? `, ${profile.name}` : ''}!</h2>
+              <p>Sua conta foi criada com sucesso. Agora é hora de ativar seu <strong>trial gratuito de 15 dias</strong> e descobrir como o Chopp Hub pode transformar a gestão do seu negócio.</p>
+              <p>Você pode começar a usar agora mesmo, <strong>sem precisar cadastrar cartão de crédito</strong>.</p>
+              <p style="text-align: center; margin: 32px 0;">
+                <a href="${SITE_URL}/dashboard/billing"
+                   style="background: #3b82f6; color: #fff; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: bold; display: inline-block;">
+                  Ativar meu trial gratuito
+                </a>
+              </p>
+              <p style="color: #6b7280; font-size: 14px;">Ficou com alguma dúvida? É só responder este e-mail.</p>
+              <hr style="border-color: #e5e7eb; margin: 24px 0;" />
+              <p style="color: #9ca3af; font-size: 12px;">Chopp Hub — Gestão inteligente para o seu negócio de chopp.</p>
+            </div>
           `,
         });
 
-        // Marca como enviado
         await admin.from("profiles").update({ abandon_step_1_sent_at: new Date().toISOString() }).eq("id", profile.id);
         results.push({ id: profile.id, step: 1 });
       }
 
-      // ---- STEP 2: 24 Horas depois (WhatsApp) ----
+      // ---- STEP 2: 24 Horas depois (E-mail com benefícios) ----
       if (
-        hoursSinceCreation >= 24 && 
+        hoursSinceCreation >= 24 &&
         hoursSinceCreation < 48 &&
         !profile.abandon_step_2_sent_at
       ) {
-        console.log(`[Step 2] Enviando WhatsApp para ${profile.phone}`);
-        
-        // Aqui você faria o POST para sua API do WhatsApp (Evolution, Z-API, etc)
-        // if (profile.phone) { await fetch("SUA_API_WHATSAPP", {...}) }
+        console.log(`[Step 2] Enviando e-mail de benefícios para ${profile.email}`);
+
+        await resend.emails.send({
+          from: "Chopp Hub <suporte@chopphub.com>",
+          to: [profile.email],
+          subject: "📊 Veja o que você pode gerenciar com o Chopp Hub",
+          html: `
+            <div style="font-family: sans-serif; max-width: 560px; margin: 0 auto; color: #111;">
+              <h2 style="color: #8b5cf6;">Você sabe o que o Chopp Hub pode fazer por você?</h2>
+              <p>Olá${profile.name ? ` ${profile.name}` : ''},</p>
+              <p>Você criou sua conta no Chopp Hub mas ainda não ativou seu trial. Deixa a gente te mostrar o que está esperando por você:</p>
+              <ul style="line-height: 2;">
+                <li>📦 <strong>Gestão de estoque</strong> em tempo real</li>
+                <li>🚚 <strong>Controle de rotas</strong> e entregas de chopp</li>
+                <li>📄 <strong>Emissão de NF-e</strong> integrada</li>
+                <li>💰 <strong>Controle financeiro</strong> e boletos</li>
+                <li>📱 <strong>App para motoristas</strong> (offline)</li>
+              </ul>
+              <p style="text-align: center; margin: 32px 0;">
+                <a href="${SITE_URL}/dashboard/billing"
+                   style="background: #8b5cf6; color: #fff; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: bold; display: inline-block;">
+                  Começar agora — 15 dias grátis
+                </a>
+              </p>
+              <hr style="border-color: #e5e7eb; margin: 24px 0;" />
+              <p style="color: #9ca3af; font-size: 12px;">Chopp Hub — Gestão inteligente para o seu negócio de chopp.</p>
+            </div>
+          `,
+        });
 
         await admin.from("profiles").update({ abandon_step_2_sent_at: new Date().toISOString() }).eq("id", profile.id);
         results.push({ id: profile.id, step: 2 });
       }
 
-      // ---- STEP 3: 48 Horas depois (Email Escassez) ----
+      // ---- STEP 3: 48 Horas depois (E-mail de urgência) ----
       if (
-        hoursSinceCreation >= 48 && 
+        hoursSinceCreation >= 48 &&
         !profile.abandon_step_3_sent_at
       ) {
-        console.log(`[Step 3] Enviando email de escassez para ${profile.email}`);
-        
-        // Disparo de Email
+        console.log(`[Step 3] Enviando e-mail de urgência para ${profile.email}`);
+
         await resend.emails.send({
           from: "Chopp Hub <suporte@chopphub.com>",
           to: [profile.email],
-          subject: "Sua conta temporária vai expirar em breve",
+          subject: "⚠️ Sua conta pode ser excluída em breve",
           html: `
-            <p>Olá,</p>
-            <p>Notamos que você ainda não finalizou o seu cadastro no Chopp Hub.</p>
-            <p>Para liberar espaço em nosso sistema, contas incompletas são deletadas após alguns dias.</p>
-            <p>Mas temos uma condição especial para você: finalize agora e ganhe os primeiros 15 dias grátis para testar a plataforma na prática.</p>
-            <p><a href="${process.env.NEXT_PUBLIC_SITE_URL}/dashboard/account">Ativar minha conta agora</a></p>
+            <div style="font-family: sans-serif; max-width: 560px; margin: 0 auto; color: #111;">
+              <h2 style="color: #ef4444;">Não perca acesso à sua conta!</h2>
+              <p>Olá,</p>
+              <p>Notamos que você criou uma conta no Chopp Hub há alguns dias mas ainda não ativou seu período de trial.</p>
+              <p>Contas inativas por muito tempo podem ser removidas do nosso sistema para liberar espaço.</p>
+              <p>
+                Mas ainda dá tempo: ative agora e ganhe <strong>15 dias grátis</strong> para testar tudo sem compromisso.
+                <strong>Sem cartão de crédito necessário.</strong>
+              </p>
+              <p style="text-align: center; margin: 32px 0;">
+                <a href="${SITE_URL}/dashboard/billing"
+                   style="background: #ef4444; color: #fff; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: bold; display: inline-block;">
+                  Ativar minha conta agora
+                </a>
+              </p>
+              <hr style="border-color: #e5e7eb; margin: 24px 0;" />
+              <p style="color: #9ca3af; font-size: 12px;">Chopp Hub — Gestão inteligente para o seu negócio de chopp.</p>
+            </div>
           `,
         });
 
