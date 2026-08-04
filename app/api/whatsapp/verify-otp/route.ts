@@ -139,22 +139,51 @@ export async function POST(req: Request) {
                 .eq("id", companyId);
             }
 
-            // Cria a assinatura com trial de 15 dias no plano Essential Mensal
-            await stripe.subscriptions.create({
-              customer: stripeCustomerId,
-              items: [{ price: "price_1TKV9t4Ik5RguVVSjcoyxCkh", quantity: 1 }],
-              trial_period_days: 15,
-              payment_behavior: "default_incomplete",
-              metadata: { companyId },
-            });
-            
-            console.log(`[verify-otp] Trial automático de 15 dias criado para company ${companyId}`);
+            try {
+              // Cria a assinatura com trial de 15 dias no plano Essential Mensal
+              await stripe.subscriptions.create({
+                customer: stripeCustomerId,
+                items: [{ price: "price_1TKV9t4Ik5RguVVSjcoyxCkh", quantity: 1 }],
+                trial_period_days: 15,
+                payment_behavior: "default_incomplete",
+                metadata: { companyId },
+              });
+              console.log(`[verify-otp] Trial automático de 15 dias criado para company ${companyId}`);
+            } catch (stripeErr: any) {
+              // Se o cliente existir em outro ambiente (live/test mode mismatch), recriamos o cliente
+              if (stripeErr?.code === 'resource_missing' && stripeErr?.param === 'customer') {
+                console.log(`[verify-otp] Conflito de ambiente Stripe. Recriando customer para company ${companyId}...`);
+                const newCustomer = await stripe.customers.create({
+                  email: company.email ?? undefined,
+                  name: company.name ?? undefined,
+                  metadata: { companyId },
+                });
+                stripeCustomerId = newCustomer.id;
+
+                await adminClient
+                  .from("companies")
+                  .update({ stripe_customer_id: stripeCustomerId })
+                  .eq("id", companyId);
+
+                await stripe.subscriptions.create({
+                  customer: stripeCustomerId,
+                  items: [{ price: "price_1TKV9t4Ik5RguVVSjcoyxCkh", quantity: 1 }],
+                  trial_period_days: 15,
+                  payment_behavior: "default_incomplete",
+                  metadata: { companyId },
+                });
+                console.log(`[verify-otp] Trial criado após recriar customer.`);
+              } else {
+                throw stripeErr; // Repassa outros erros
+              }
+            }
           }
         }
       }
     } catch (trialErr: any) {
       console.error("[verify-otp] Erro ao criar trial automático:", trialErr);
-      // Não retorna erro para o frontend, pois o WhatsApp foi verificado com sucesso
+      // Retornar erro para o frontend para evitar redirecionamento silencioso que prende o usuário
+      return NextResponse.json({ error: "WhatsApp verificado, mas erro ao ativar teste grátis: " + trialErr.message }, { status: 500 });
     }
 
     return NextResponse.json({ ok: true });
