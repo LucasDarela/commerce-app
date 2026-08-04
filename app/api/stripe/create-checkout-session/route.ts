@@ -1,4 +1,5 @@
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
@@ -191,15 +192,42 @@ export async function POST(req: Request) {
     // Se pode ter trial (15 dias sem cartão), criamos a assinatura direto, 
     // sem redirecionar para o Stripe Checkout Session.
     if (canHaveTrial) {
-      await stripe.subscriptions.create({
-        customer: stripeCustomerId,
-        items: lineItems.map(item => ({ price: item.price, quantity: item.quantity })),
-        trial_period_days: 15,
-        payment_behavior: "default_incomplete",
-        metadata: { companyId },
-      });
+      try {
+        await stripe.subscriptions.create({
+          customer: stripeCustomerId,
+          items: lineItems.map(item => ({ price: item.price, quantity: item.quantity })),
+          trial_period_days: 15,
+          payment_behavior: "default_incomplete",
+          metadata: { companyId },
+        });
+        return NextResponse.json({ success: true, type: "trial_started" });
+      } catch (stripeErr: any) {
+        if (stripeErr?.code === 'resource_missing' && stripeErr?.param === 'customer') {
+          console.log(`[checkout] Conflito de ambiente Stripe. Recriando customer...`);
+          const newCustomer = await stripe.customers.create({
+            email: company.email ?? undefined,
+            name: company.name ?? undefined,
+            metadata: { companyId },
+          });
+          stripeCustomerId = newCustomer.id;
 
-      return NextResponse.json({ success: true, type: "trial_started" });
+          await supabase
+            .from("companies")
+            .update({ stripe_customer_id: stripeCustomerId })
+            .eq("id", companyId);
+
+          await stripe.subscriptions.create({
+            customer: stripeCustomerId,
+            items: lineItems.map(item => ({ price: item.price, quantity: item.quantity })),
+            trial_period_days: 15,
+            payment_behavior: "default_incomplete",
+            metadata: { companyId },
+          });
+          return NextResponse.json({ success: true, type: "trial_started" });
+        } else {
+          throw stripeErr;
+        }
+      }
     }
 
     // Se NÃO pode ter trial (ex: add-ons, extras, skipTrial, planos sem trial)

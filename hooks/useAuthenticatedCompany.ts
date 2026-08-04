@@ -68,13 +68,19 @@ export function useAuthenticatedCompany(): AuthenticatedCompany {
         // Busca o plano atual de forma independente
         const { data: subData } = await supabase
           .from("subscriptions")
-          .select("status, plans(name)")
+          .select("status, price_id")
           .eq("company_id", companyUser.company_id)
           .in("status", ["active", "trialing"])
           .maybeSingle();
 
-        if (subData) {
-          setPlanName((subData as any).plans?.name || "Gratuito");
+        if (subData?.price_id) {
+          const { data: planData } = await supabase
+            .from("plans")
+            .select("name")
+            .eq("stripe_price_id", subData.price_id)
+            .maybeSingle();
+            
+          setPlanName(planData?.name || "Gratuito");
         } else {
           setPlanName("Gratuito");
         }
