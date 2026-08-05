@@ -154,7 +154,7 @@ export default function VerifyWhatsAppPage() {
       setVerified(true);
       // Redireciona após 1.5 segundos mostrando a tela de sucesso
       setTimeout(() => {
-        router.replace("/dashboard");
+        window.location.href = "/dashboard";
       }, 1500);
     } catch {
       toast.error("Erro ao verificar. Tente novamente.");

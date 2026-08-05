@@ -54,7 +54,10 @@ const formSchema = z
       .email("Deve ser um e-mail válido."),
     phone: z
       .string({ required_error: "O telefone é obrigatório." })
-      .regex(/^\(\d{2}\) 9 \d{4}-\d{4}$/, "Informe um telefone válido com o 9 adicional (ex: 11 9 9999-9999)."),
+      .regex(
+        /^\(\d{2}\) 9 \d{4}-\d{4}$/,
+        "Informe um telefone válido com o 9 adicional (ex: 11 9 9999-9999).",
+      ),
     password: z
       .string({ required_error: "A senha é obrigatória." })
       .min(8, "A senha deve ter pelo menos 8 caracteres.")
@@ -170,140 +173,165 @@ export function CreateAccountForm() {
     router.push("/login-signin");
   };
 
+  //remover depois
+  const whatsapp_number = "https://wa.me/5548991447684";
+
+  // return (
+  //   <>
+  //     <div className="flex flex-col justify-center items-center space-y-2 px-6">
+  //       <span className="text-base pt-3 pb-1 text-muted-foreground">
+  //         Crie sua conta e inicie 15 dias de teste grátis. Sem cartão de
+  //         crédito.
+  //       </span>
+  //       <Form {...form}>
+  //         <form
+  //           onSubmit={form.handleSubmit(onSubmit)}
+  //           className="flex flex-col space-y-2 w-full"
+  //         >
+  //           <FormField
+  //             control={form.control}
+  //             name="email"
+  //             render={({ field }) => (
+  //               <FormItem>
+  //                 <FormLabel>E-mail</FormLabel>
+  //                 <FormControl>
+  //                   <Input
+  //                     type="email"
+  //                     autoComplete="email"
+  //                     placeholder="E-mail"
+  //                     {...field}
+  //                   />
+  //                 </FormControl>
+  //                 <FormMessage />
+  //               </FormItem>
+  //             )}
+  //           />
+
+  //           <FormField
+  //             control={form.control}
+  //             name="phone"
+  //             render={({ field }) => (
+  //               <FormItem>
+  //                 <FormLabel>Telefone</FormLabel>
+  //                 <FormControl>
+  //                   <Input
+  //                     type="tel"
+  //                     autoComplete="tel"
+  //                     placeholder="(11) 9 9999-9999"
+  //                     {...field}
+  //                     onChange={(e) => {
+  //                       let v = e.target.value.replace(/\D/g, "");
+  //                       let formatted = "";
+  //                       if (v.length > 0) {
+  //                         if (v.length <= 2) formatted = `(${v}`;
+  //                         else if (v.length <= 6)
+  //                           formatted = `(${v.slice(0, 2)}) ${v.slice(2)}`;
+  //                         else if (v.length <= 10)
+  //                           formatted = `(${v.slice(0, 2)}) ${v.slice(2, 6)}-${v.slice(6)}`;
+  //                         else
+  //                           formatted = `(${v.slice(0, 2)}) ${v.slice(2, 3)} ${v.slice(3, 7)}-${v.slice(7, 11)}`;
+  //                       }
+  //                       field.onChange(formatted);
+  //                     }}
+  //                   />
+  //                 </FormControl>
+  //                 <FormMessage />
+  //               </FormItem>
+  //             )}
+  //           />
+
+  //           <FormField
+  //             control={form.control}
+  //             name="password"
+  //             render={({ field }) => (
+  //               <FormItem>
+  //                 <FormLabel>Senha</FormLabel>
+  //                 <FormControl>
+  //                   <PasswordInput
+  //                     placeholder="Senha"
+  //                     autoComplete="new-password"
+  //                     {...field}
+  //                   />
+  //                 </FormControl>
+  //                 {/* Checklist visual em tempo real */}
+  //                 <PasswordChecklist value={passwordValue ?? ""} />
+  //                 <FormMessage />
+  //               </FormItem>
+  //             )}
+  //           />
+
+  //           <FormField
+  //             control={form.control}
+  //             name="confirmPassword"
+  //             render={({ field }) => (
+  //               <FormItem>
+  //                 <FormLabel>Confirme a Senha</FormLabel>
+  //                 <FormControl>
+  //                   <PasswordInput
+  //                     placeholder="Confirme a Senha"
+  //                     autoComplete="new-password"
+  //                     {...field}
+  //                   />
+  //                 </FormControl>
+  //                 <FormMessage />
+  //               </FormItem>
+  //             )}
+  //           />
+
+  //           <Button type="submit" className="my-4 w-full" disabled={loading}>
+  //             {loading ? "Criando..." : "Criar Conta"}
+  //           </Button>
+  //         </form>
+  //       </Form>
+  //     </div>
+
+  //     <Dialog open={showSuccessModal} onOpenChange={handleCloseModal}>
+  //       <DialogContent className="sm:max-w-md">
+  //         <DialogHeader className="flex flex-col items-center justify-center pt-4">
+  //           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 mb-4">
+  //             <Mail className="h-6 w-6 text-primary" />
+  //           </div>
+  //           <DialogTitle className="text-xl text-center">
+  //             Confirme seu e-mail
+  //           </DialogTitle>
+  //           <DialogDescription className="text-center pt-2">
+  //             Falta pouco! Enviamos um link de confirmação para o seu e-mail.
+  //           </DialogDescription>
+  //         </DialogHeader>
+  //         <div className="flex flex-col items-center space-y-4 py-4 text-sm text-muted-foreground">
+  //           <p className="text-center">
+  //             Para começar a usar o Chopp Hub, por favor, clique no link que
+  //             enviamos para sua caixa de entrada.
+  //           </p>
+  //           <ul className="list-disc pl-4 space-y-2 text-left w-full">
+  //             <li>Verifique também a pasta de spam ou lixo eletrônico.</li>
+  //             <li>
+  //               O link de confirmação pode demorar alguns minutos para chegar.
+  //             </li>
+  //           </ul>
+  //         </div>
+  //         <DialogFooter className="sm:justify-center">
+  //           <Button
+  //             onClick={handleCloseModal}
+  //             className="w-full sm:w-auto gap-2"
+  //           >
+  //             Ir para o Login <ArrowRight className="h-4 w-4" />
+  //           </Button>
+  //         </DialogFooter>
+  //       </DialogContent>
+  //     </Dialog>
+  //   </>
+  // );
   return (
-    <>
-      <div className="flex flex-col justify-center items-center space-y-2 px-6">
-        <span className="text-base pt-3 pb-1 text-muted-foreground">
-        Crie sua conta e inicie 15 dias de teste grátis. Sem cartão de crédito.
+    <div className="flex flex-col justify-center items-center space-y-2 px-6">
+      <span className="text-base pt-3 pb-1 text-muted-foreground">
+        A criação de conta está indisponível no momento. Por favor, entre em
+        contato pelo{" "}
+        <a className="blue" target="_blank" href={whatsapp_number}>
+          WhatsApp, é só clicar aqui!
+        </a>
+        .
       </span>
-      <Form {...form}>
-        <form
-          onSubmit={form.handleSubmit(onSubmit)}
-          className="flex flex-col space-y-2 w-full"
-        >
-          <FormField
-            control={form.control}
-            name="email"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>E-mail</FormLabel>
-                <FormControl>
-                  <Input
-                    type="email"
-                    autoComplete="email"
-                    placeholder="E-mail"
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="phone"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Telefone</FormLabel>
-                <FormControl>
-                  <Input
-                    type="tel"
-                    autoComplete="tel"
-                    placeholder="(11) 9 9999-9999"
-                    {...field}
-                    onChange={(e) => {
-                      let v = e.target.value.replace(/\D/g, "");
-                      let formatted = "";
-                      if (v.length > 0) {
-                        if (v.length <= 2) formatted = `(${v}`;
-                        else if (v.length <= 6) formatted = `(${v.slice(0, 2)}) ${v.slice(2)}`;
-                        else if (v.length <= 10) formatted = `(${v.slice(0, 2)}) ${v.slice(2, 6)}-${v.slice(6)}`;
-                        else formatted = `(${v.slice(0, 2)}) ${v.slice(2, 3)} ${v.slice(3, 7)}-${v.slice(7, 11)}`;
-                      }
-                      field.onChange(formatted);
-                    }}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="password"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Senha</FormLabel>
-                <FormControl>
-                  <PasswordInput
-                    placeholder="Senha"
-                    autoComplete="new-password"
-                    {...field}
-                  />
-                </FormControl>
-                {/* Checklist visual em tempo real */}
-                <PasswordChecklist value={passwordValue ?? ""} />
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="confirmPassword"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Confirme a Senha</FormLabel>
-                <FormControl>
-                  <PasswordInput
-                    placeholder="Confirme a Senha"
-                    autoComplete="new-password"
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <Button type="submit" className="my-4 w-full" disabled={loading}>
-            {loading ? "Criando..." : "Criar Conta"}
-          </Button>
-        </form>
-      </Form>
     </div>
-
-      <Dialog open={showSuccessModal} onOpenChange={handleCloseModal}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader className="flex flex-col items-center justify-center pt-4">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 mb-4">
-              <Mail className="h-6 w-6 text-primary" />
-            </div>
-            <DialogTitle className="text-xl text-center">
-              Confirme seu e-mail
-            </DialogTitle>
-            <DialogDescription className="text-center pt-2">
-              Falta pouco! Enviamos um link de confirmação para o seu e-mail.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col items-center space-y-4 py-4 text-sm text-muted-foreground">
-            <p className="text-center">
-              Para começar a usar o Chopp Hub, por favor, clique no link que enviamos para sua caixa de entrada.
-            </p>
-            <ul className="list-disc pl-4 space-y-2 text-left w-full">
-              <li>Verifique também a pasta de spam ou lixo eletrônico.</li>
-              <li>O link de confirmação pode demorar alguns minutos para chegar.</li>
-            </ul>
-          </div>
-          <DialogFooter className="sm:justify-center">
-            <Button onClick={handleCloseModal} className="w-full sm:w-auto gap-2">
-              Ir para o Login <ArrowRight className="h-4 w-4" />
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
   );
 }
