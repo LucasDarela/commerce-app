@@ -20,6 +20,11 @@ function createSupabaseMiddlewareClient(req: NextRequest, res: NextResponse) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      global: {
+        fetch: (url: RequestInfo | URL, options?: RequestInit) => {
+          return fetch(url, { ...options, cache: "no-store" });
+        },
+      },
       cookies: {
         getAll() {
           return req.cookies.getAll();
@@ -99,7 +104,18 @@ export async function middleware(req: NextRequest) {
     }
 
     // ✅ Validação de Sessão Única
-    const sessionMarker = req.cookies.get("session_marker")?.value;
+    const smQuery = req.nextUrl.searchParams.get("sm");
+    const sessionMarker = smQuery || req.cookies.get("session_marker")?.value;
+
+    if (smQuery) {
+      // Se recebemos via query param, re-injetamos no cookie como a fonte de verdade absoluta
+      // Isso sobrepõe qualquer cookie bugado duplicado que o navegador tenha
+      res.cookies.set("session_marker", smQuery, {
+        path: "/",
+        maxAge: 2592000,
+        sameSite: "lax",
+      });
+    }
 
     const { data: profile } = await supabase
       .from("profiles")
@@ -113,8 +129,8 @@ export async function middleware(req: NextRequest) {
       
       const response = NextResponse.redirect(new URL("/login-signin?error=multiple_sessions", req.url));
       
-      // Limpa os cookies de autenticação e o marcador
-      await supabase.auth.signOut();
+      // Limpa os cookies de autenticação e o marcador sem invalidar a sessão no servidor (que pertence ao novo dispositivo)
+      await supabase.auth.signOut({ scope: "local" });
       response.cookies.delete("session_marker");
       
       return response;

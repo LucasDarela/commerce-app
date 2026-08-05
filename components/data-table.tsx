@@ -120,6 +120,8 @@ import CustomDateInput from "@/components/ui/CustomDateInput";
 import { ReturnProductModal } from "./products/ReturnProductModal";
 import type { Equipment } from "@/components/types/equipments";
 import type { ProductItem } from "@/components/types/products";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ShoppingCart } from "lucide-react";
 import { TableSkeleton } from "./ui/TableSkeleton";
 import { orderSchema, type Order } from "@/components/types/orderSchema";
 import EmitNfeMenuItem from "./nf/EmitNfeMenuItem";
@@ -2093,6 +2095,22 @@ export function DataTable({ companyId, user, role }: DataTableProps) {
 
   if (loading) {
     return <TableSkeleton />;
+  }
+
+  if (orders.length === 0 && !dateRange[0]) {
+    return (
+      <div className="p-6 mt-3 max-w-5xl mx-auto w-full">
+        <h2 className="text-xl font-bold mb-6">Vendas</h2>
+        <EmptyState
+          icon={ShoppingCart}
+          title="Nenhuma venda registrada"
+          description="Você ainda não registrou nenhuma venda. Comece a vender para acompanhar seus ganhos e entregas."
+          actionLabel="Registrar Venda"
+          actionHref="/dashboard/orders/add"
+          videoUrl="https://www.youtube.com/embed/CANFqnwqnk4?si=KpvdAxt-HUWRtuKN"
+        />
+      </div>
+    );
   }
 
   return (

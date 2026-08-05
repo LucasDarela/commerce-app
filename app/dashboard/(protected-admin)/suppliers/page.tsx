@@ -14,7 +14,7 @@ import {
 import { useRouter } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { toast } from "sonner";
-import { Pencil, Trash } from "lucide-react";
+import { Pencil, Trash, Truck } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +27,7 @@ import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import Link from "next/link";
 import { IconPlus } from "@tabler/icons-react";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 
 // 🔹 Supplier Type
 type Supplier = {
@@ -54,6 +55,7 @@ export default function ListSuppliers() {
   const { companyId, loading } = useAuthenticatedCompany();
 
   const [allSuppliers, setAllSuppliers] = useState<Supplier[]>([]);
+  const [isFetching, setIsFetching] = useState(true);
   const [search, setSearch] = useState<string>("");
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -66,6 +68,7 @@ export default function ListSuppliers() {
 
     const fetchSuppliers = async () => {
       try {
+        setIsFetching(true);
         const query = supabase
           .from("suppliers")
           .select("*")
@@ -86,6 +89,8 @@ export default function ListSuppliers() {
       } catch (error) {
         console.error("Erro inesperado:", error);
         toast.error("Erro inesperado ao carregar fornecedores.");
+      } finally {
+        if (isMounted) setIsFetching(false);
       }
     };
 
@@ -165,8 +170,24 @@ export default function ListSuppliers() {
     closeModal();
   };
 
-  if (loading) {
+  if (loading || isFetching) {
     return <TableSkeleton />;
+  }
+
+  if (allSuppliers.length === 0) {
+    return (
+      <div className="p-6 mt-3 max-w-5xl mx-auto w-full">
+        <h2 className="text-xl font-bold mb-6">Fornecedores</h2>
+        <EmptyState
+          icon={Truck}
+          title="Nenhum fornecedor cadastrado"
+          description="Os fornecedores abastecem seu estoque. Cadastre seu primeiro fornecedor para gerenciar suas compras e pagamentos."
+          actionLabel="Cadastrar Fornecedor"
+          actionHref="/dashboard/suppliers/add"
+          videoUrl="https://www.youtube.com/embed/-k9KWZp0aqM?si=PrFZRm4S-ZG5yF7-"
+        />
+      </div>
+    );
   }
 
   return (

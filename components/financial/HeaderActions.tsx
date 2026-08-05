@@ -38,16 +38,38 @@ export function HeaderActions<T>({ table }: HeaderActionsProps<T>) {
             {table
               .getAllColumns()
               .filter((col) => col.getCanHide())
-              .map((column) => (
-                <DropdownMenuCheckboxItem
-                  key={column.id}
-                  className="capitalize"
-                  checked={column.getIsVisible()}
-                  onCheckedChange={(value) => column.toggleVisibility(!!value)}
-                >
-                  {column.id}
-                </DropdownMenuCheckboxItem>
-              ))}
+              .map((column) => {
+                const columnTranslations: Record<string, string> = {
+                  due_date: "Data de Vencimento",
+                  customer_or_supplier: "Cliente / Fornecedor",
+                  type: "Tipo",
+                  category: "Categoria",
+                  payment_method: "Método de Pag.",
+                  payment_status: "Status do Pag.",
+                  remaining: "Restante",
+                  total: "Total",
+                  nfe_status: "Status NFe",
+                  boleto_status: "Status Boleto",
+                  actions: "Ações",
+                };
+
+                const title =
+                  columnTranslations[column.id] ||
+                  column.id.replace(/_/g, " ");
+
+                return (
+                  <DropdownMenuCheckboxItem
+                    key={column.id}
+                    className="capitalize"
+                    checked={column.getIsVisible()}
+                    onCheckedChange={(value) =>
+                      column.toggleVisibility(!!value)
+                    }
+                  >
+                    {title}
+                  </DropdownMenuCheckboxItem>
+                );
+              })}
           </DropdownMenuContent>
         </DropdownMenu>
 

@@ -14,6 +14,9 @@ import { HeaderActions } from "./HeaderActions";
 import { PaymentSheet } from "./PaymentSheet";
 import { mapToFinancialPaymentMethod, groupByDueMonth } from "./utils";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
+import { EmptyState } from "@/components/ui/empty-state";
+import { CircleDollarSign } from "lucide-react";
+import { TableSkeleton } from "@/components/ui/TableSkeleton";
 import {
   useReactTable,
   getCoreRowModel,
@@ -505,6 +508,26 @@ const combinedData: CombinedRecord[] = useMemo(() => {
       totalSaidaVencidas,
     };
   }, [currentMonthRows]);
+
+  if (loading) {
+    return <TableSkeleton />;
+  }
+
+  if (orders.length === 0 && financialRecords.length === 0 && !dateRange[0]) {
+    return (
+      <div className="p-6 mt-3 max-w-5xl mx-auto w-full">
+        <h2 className="text-xl font-bold mb-6">Financeiro</h2>
+        <EmptyState
+          icon={CircleDollarSign}
+          title="Nenhum registro financeiro"
+          description="Seu painel financeiro está vazio. Registre vendas ou despesas para acompanhar a saúde do seu negócio."
+          actionLabel="Adicionar Receita/Despesa"
+          actionHref="/dashboard/financial/add"
+          videoUrl="https://www.youtube.com/embed/2wbcF_T8naU?si=u8B5j96Qx9O_mhrk"
+        />
+      </div>
+    );
+  }
 
   return (
     <>

@@ -53,6 +53,7 @@ export interface Database {
           abandon_step_2_sent_at?: string | null;
           abandon_step_3_sent_at?: string | null;
           is_super_admin?: boolean;
+          has_seen_onboarding?: boolean;
         };
         Insert: Partial<Database["public"]["Tables"]["profiles"]["Row"]>;
         Update: Partial<Database["public"]["Tables"]["profiles"]["Row"]>;

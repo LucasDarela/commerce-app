@@ -5,6 +5,8 @@ import { fetchEquipments } from "@/lib/fetchEquipments";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import { DataEquipments } from "@/components/data-equipments";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Wrench } from "lucide-react";
 
 export default function EquipmentsPage() {
   const { companyId, loading } = useAuthenticatedCompany();
@@ -27,6 +29,22 @@ export default function EquipmentsPage() {
 
   if (loading || isFetching) {
     return <TableSkeleton />;
+  }
+
+  if (equipments.length === 0) {
+    return (
+      <div className="flex flex-1 flex-col p-6 mt-3 max-w-5xl mx-auto w-full">
+        <h2 className="text-xl font-bold mb-6">Equipamentos</h2>
+        <EmptyState
+          icon={Wrench}
+          title="Nenhum equipamento cadastrado"
+          description="Controle suas chopeiras, barris, cilindros e freezers. Cadastre seu primeiro equipamento para gerenciar comodatos e manutenções."
+          actionLabel="Cadastrar Equipamento"
+          actionHref="/dashboard/equipments/add"
+          videoUrl="https://www.youtube.com/embed/2ZJH5QYY-Fo?si=gzQu23YXVpwhfmb9"
+        />
+      </div>
+    );
   }
 
   return (

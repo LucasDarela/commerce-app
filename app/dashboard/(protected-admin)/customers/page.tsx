@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { EmptyState } from "@/components/ui/empty-state";
 import {  
   Table,
   TableBody,
@@ -14,7 +15,7 @@ import {
 import { useRouter } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { toast } from "sonner";
-import { Pencil, Trash } from "lucide-react";
+import { Pencil, Trash, Users } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -60,6 +61,7 @@ export default function ListCustomers() {
   const router = useRouter();
   const { user, companyId, loading } = useAuthenticatedCompany();
   const [allClientes, setAllClientes] = useState<Cliente[]>([]);
+  const [isFetching, setIsFetching] = useState(true);
   const [search, setSearch] = useState<string>("");
   const [debouncedSearch, setDebouncedSearch] = useState<string>("");
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
@@ -74,6 +76,7 @@ export default function ListCustomers() {
 
     const fetchCustomers = async () => {
       try {
+        setIsFetching(true);
         const query = supabase
           .from("customers")
           .select("*")
@@ -93,6 +96,8 @@ export default function ListCustomers() {
       } catch (err) {
         console.error("❌ Erro inesperado ao buscar clientes:", err);
         toast.error("Erro inesperado ao carregar clientes.");
+      } finally {
+        setIsFetching(false);
       }
     };
 
@@ -198,8 +203,24 @@ export default function ListCustomers() {
     }
   };
 
-  if (loading) {
+  if (loading || isFetching) {
     return <TableSkeleton />;
+  }
+
+  if (allClientes.length === 0) {
+    return (
+      <div className="p-6 mt-3 max-w-5xl mx-auto w-full">
+        <h2 className="text-xl font-bold mb-6">Clientes</h2>
+        <EmptyState
+          icon={Users}
+          title="Nenhum cliente cadastrado"
+          description="Os clientes são a base do seu negócio. Comece cadastrando seu primeiro cliente para realizar vendas e gerenciar contatos."
+          actionLabel="Cadastrar Cliente"
+          actionHref="/dashboard/customers/add"
+          videoUrl="https://www.youtube.com/embed/-k9KWZp0aqM?si=PrFZRm4S-ZG5yF7-"
+        />
+      </div>
+    );
   }
 
   return (

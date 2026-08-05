@@ -17,6 +17,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableSkeleton } from "./ui/TableSkeleton";
+import { EmptyState } from "@/components/ui/empty-state";
+import { FileSpreadsheet } from "lucide-react";
 
 type Product = {
   id: string;
@@ -378,17 +380,27 @@ export function PriceTableManager() {
       <h2 className="text-xl font-bold">Catálogo Personalizado</h2>
 
       {/* ================= LIST ================= */}
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>#</TableHead>
-            <TableHead>Nome</TableHead>
-            <TableHead>Produtos</TableHead>
-            <TableHead>Ações</TableHead>
-          </TableRow>
-        </TableHeader>
+      {savedCatalogs.length === 0 && catalogs.length === 0 ? (
+        <EmptyState
+          icon={FileSpreadsheet}
+          title="Nenhuma tabela de preços"
+          description="Crie tabelas de preços personalizadas para seus clientes especiais ou para vendas no atacado."
+          actionLabel="Criar Tabela de Preços"
+          actionOnClick={handleAddCatalog}
+          tutorialHref="#"
+        />
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>#</TableHead>
+              <TableHead>Nome</TableHead>
+              <TableHead>Produtos</TableHead>
+              <TableHead>Ações</TableHead>
+            </TableRow>
+          </TableHeader>
 
-        <TableBody>
+          <TableBody>
           {savedCatalogs.map((catalog, idx) => (
             <React.Fragment key={catalog.id || idx}>
               <TableRow>
@@ -445,6 +457,7 @@ export function PriceTableManager() {
           ))}
         </TableBody>
       </Table>
+      )}
 
       {/* ================= EDIT ================= */}
       {editingCatalog && (
@@ -502,7 +515,9 @@ export function PriceTableManager() {
       )}
 
       {/* ================= CREATE ================= */}
-      <Button onClick={handleAddCatalog}>+ Adicionar</Button>
+      {catalogs.length > 0 || savedCatalogs.length > 0 ? (
+        <Button onClick={handleAddCatalog}>+ Adicionar</Button>
+      ) : null}
 
       {catalogs.map((catalog, index) => (
         <Card key={index} className="p-4 space-y-4">

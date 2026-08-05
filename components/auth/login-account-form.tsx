@@ -32,6 +32,7 @@ const formSchema = z.object({
 
 export function LoginAccountForm() {
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingText, setLoadingText] = useState("Acessando...");
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
   const [sendingReset, setSendingReset] = useState(false);
@@ -119,6 +120,20 @@ export function LoginAccountForm() {
         return;
       }
 
+      // Verifica se o usuário já tinha uma sessão ativa para dar feedback visual
+      const { data: existingProfile } = await supabase
+        .from("profiles")
+        .select("current_session_id")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (existingProfile?.current_session_id) {
+        setLoadingText("Desconectando você de outro dispositivo...");
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+      }
+
+      setLoadingText("Iniciando sua sessão...");
+
       // ✅ Gera um identificador único para esta sessão
       const sessionMarker =
         Math.random().toString(36).substring(2) + Date.now().toString(36);
@@ -132,8 +147,11 @@ export function LoginAccountForm() {
       if (sessionUpdateError) {
         console.error("Erro ao registrar sessão:", sessionUpdateError);
       } else {
+        // Força a limpeza de qualquer cookie antigo para evitar duplicação que confunda o middleware
+        document.cookie = "session_marker=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;";
+        document.cookie = "session_marker=; path=/; domain=.chopphub.com; expires=Thu, 01 Jan 1970 00:00:01 GMT;";
+
         // ✅ Salva o marcador localmente para o middleware validar.
-        // Se estivermos em chopphub.com, garantimos que o cookie abranja os subdomínios (.chopphub.com)
         let domainStr = "";
         const hostname = window.location.hostname;
         if (hostname.includes("chopphub.com")) {
@@ -155,19 +173,19 @@ export function LoginAccountForm() {
 
       // Adicionamos um pequeno delay para garantir que a atualização no banco (Supabase)
       // seja propagada antes que o middleware verifique a sessão na próxima rota.
-      await new Promise((resolve) => setTimeout(resolve, 400));
+      await new Promise((resolve) => setTimeout(resolve, 800));
 
       if (companyUser?.role === "admin") {
-        window.location.href = "/dashboard";
+        window.location.href = `/dashboard?sm=${sessionMarker}`;
         return;
       }
 
       if (companyUser?.role === "driver" || companyUser?.role === "normal") {
-        window.location.href = "/dashboard/orders";
+        window.location.href = `/dashboard/orders?sm=${sessionMarker}`;
         return;
       }
 
-      window.location.href = "/dashboard";
+      window.location.href = `/dashboard?sm=${sessionMarker}`;
     } catch (error) {
       console.error("LoginAccountForm:onSubmit", error);
       toast.error("Erro inesperado ao tentar efetuar login.");
@@ -254,9 +272,11 @@ export function LoginAccountForm() {
             )}
           />
 
-          <Button type="submit" className="my-4 w-full" disabled={isLoading}>
-            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isLoading ? "Entrando..." : "Login"}
+          <Button type="submit" disabled={isLoading} className="w-full h-11">
+            {isLoading ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : null}
+            {isLoading ? loadingText : "Acessar Plataforma"}
           </Button>
         </form>
       </Form>

@@ -89,6 +89,11 @@ const data = {
       url: "/dashboard/nfe",
       icon: IconFileDots,
     },
+    // {
+    //   title: "Boletos",
+    //   url: "/dashboard/tickets",
+    //   icon: IconReceipt,
+    // },
     {
       title: "Relatórios",
       url: "/dashboard/analytics",

@@ -28,6 +28,8 @@ import Link from "next/link";
 import { IconPlus } from "@tabler/icons-react";
 import { TableSkeleton } from "@/components/ui/TableSkeleton";
 import { ExportProductsButton } from "@/components/products/ExportProductsButton";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PackageOpen } from "lucide-react";
 
 type Equipment = {
   id: string;
@@ -62,6 +64,7 @@ export default function ListProduct() {
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
 
   const [products, setProducts] = useState<Product[]>([]);
+  const [isFetching, setIsFetching] = useState(true);
   const [search, setSearch] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -74,6 +77,7 @@ export default function ListProduct() {
 
     const fetchProducts = async () => {
       try {
+        setIsFetching(true);
         const { data, error } = await supabase
           .from("products")
           .select("*")
@@ -92,6 +96,8 @@ export default function ListProduct() {
       } catch (error) {
         toast.error("Unexpected error while loading products.");
         console.error(error);
+      } finally {
+        if (isMounted) setIsFetching(false);
       }
     };
 
@@ -189,8 +195,24 @@ export default function ListProduct() {
     closeModal();
   };
 
-  if (loading) {
+  if (loading || isFetching) {
     return <TableSkeleton />;
+  }
+
+  if (products.length === 0) {
+    return (
+      <div className="p-6 mt-3 max-w-5xl mx-auto w-full">
+        <h2 className="text-xl font-bold mb-6">Produtos</h2>
+        <EmptyState
+          icon={PackageOpen}
+          title="Nenhum produto cadastrado"
+          description="Os produtos são os itens que você vende. Comece cadastrando seu primeiro produto para gerenciar estoque e realizar vendas."
+          actionLabel="Cadastrar Produto"
+          actionHref="/dashboard/products/add"
+          videoUrl="https://www.youtube.com/embed/2ZJH5QYY-Fo?si=gzQu23YXVpwhfmb9"
+        />
+      </div>
+    );
   }
 
   return (

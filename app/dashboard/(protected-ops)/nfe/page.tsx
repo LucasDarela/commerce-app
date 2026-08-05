@@ -44,12 +44,13 @@ import {
   IconLoader,
   IconPlus,
   IconTrash,
+  IconLock,
 } from "@tabler/icons-react";
 import { NfeActionsDropdown } from "@/components/nf/NfeActionsDropdown";
 
 export default function NfePage() {
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
-  const { companyId, loading } = useAuthenticatedCompany();
+  const { companyId, loading, planName } = useAuthenticatedCompany();
   const [invoices, setInvoices] = useState<any[]>([]);
   const [filters, setFilters] = useState({
     customerName: "",
@@ -294,6 +295,56 @@ export default function NfePage() {
 
   if (loading || !companyId) {
     return <TableSkeleton />;
+  }
+
+  const isLimitedPlan =
+    !planName ||
+    planName.toLowerCase().includes("essential") ||
+    planName.toLowerCase() === "gratuito";
+
+  if (isLimitedPlan) {
+    return (
+      <main className="min-h-[80vh] flex items-center justify-center p-6">
+        <div className="max-w-md w-full text-center space-y-6">
+          <div className="mx-auto w-20 h-20 bg-primary/10 rounded-3xl flex items-center justify-center">
+            <IconLock className="w-10 h-10 text-primary" />
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-3xl font-bold tracking-tight">
+              Recurso Premium
+            </h1>
+            <p className="text-muted-foreground leading-relaxed">
+              A emissão e o gerenciamento automático de Notas Fiscais (NF-e) são
+              exclusivas para assinantes dos planos Pro e Enterprise.
+            </p>
+          </div>
+          <Card className="bg-muted/50 border-dashed">
+            <CardContent className="p-6 text-sm text-left space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                <span>Emissão de NF-e em 1 clique</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                <span>Integração automática com vendas</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                <span>Cancelamento e carta de correção pelo painel</span>
+              </div>
+            </CardContent>
+          </Card>
+          <div className="flex flex-col gap-3 pt-4">
+            <Button asChild size="lg" className="w-full font-bold">
+              <Link href="/dashboard/billing">Fazer Upgrade</Link>
+            </Button>
+            <Button variant="ghost" asChild>
+              <Link href="/dashboard">Voltar ao início</Link>
+            </Button>
+          </div>
+        </div>
+      </main>
+    );
   }
 
   return (

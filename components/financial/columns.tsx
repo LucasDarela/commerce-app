@@ -237,8 +237,10 @@ export function financialColumns({
       id: "category",
       header: "Categoria",
       accessorFn: (row) => (isFinancial(row) ? row.category : "order"),
-      cell: ({ row }) =>
-        isFinancial(row.original) ? row.original.category : "Pedido",
+      cell: ({ row }) => {
+        const cat = isFinancial(row.original) ? row.original.category : "Pedido";
+        return cat ? cat.replace(/_/g, " ") : "—";
+      },
     },
     {
       id: "payment_method",

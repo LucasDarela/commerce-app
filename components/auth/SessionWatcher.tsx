@@ -31,7 +31,6 @@ export function SessionWatcher() {
       const currentMarker = getCookie("session_marker");
       console.log("[SessionWatcher] Marcador local:", currentMarker);
 
-      // 2. Escuta mudanças na tabela profiles para este usuário
       channel = supabase
         .channel(`session_check_${user.id}`)
         .on(
@@ -46,15 +45,25 @@ export function SessionWatcher() {
             console.log("[SessionWatcher] Evento recebido do Supabase:", payload);
             const newMarker = payload.new.current_session_id;
             
-            console.log("[SessionWatcher] Comparando markers:", { local: currentMarker, banco: newMarker });
+            // 🚨 Pegar o cookie atualizado EXATAMENTE AGORA (evita closure antigo)
+            const freshCurrentMarker = getCookie("session_marker");
+            
+            console.log("[SessionWatcher] Comparando markers:", { local: freshCurrentMarker, banco: newMarker });
 
-            if (newMarker && newMarker !== currentMarker) {
+            if (newMarker && newMarker !== freshCurrentMarker) {
               console.log("[SessionWatcher] Diferença detectada! Deslogando...");
               
-              supabase.auth.signOut().then(() => {
+              // Em vez de chamar supabase.auth.signOut(), vamos limpar localmente
+              // se chamarmos signOut(), pode revogar a sessão do novo dispositivo
+              // se eles compartilharem o mesmo cliente por algum motivo.
+              // Mas signOut({ scope: 'local' }) garante que não revoguemos o token no servidor,
+              // apenas limpamos localmente! Isso previne que a ação deslogue o NOVO dispositivo também.
+              supabase.auth.signOut({ scope: "local" }).then(() => {
                 document.cookie = "session_marker=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;";
                 window.location.href = "/login-signin?error=multiple_sessions";
               });
+            } else {
+              console.log("[SessionWatcher] Mesma sessão ou mesmo dispositivo. Ignorando.");
             }
           }
         )

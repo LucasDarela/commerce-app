@@ -16,6 +16,8 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Handshake } from "lucide-react";
 
 type GroupedByCustomer = {
   customerId: string;
@@ -201,8 +203,17 @@ export default function LoanByCustomerPage() {
         />
       </div>
 
-      {filteredGroups.length === 0 ? (
-        <p className="text-muted-foreground">Nenhum empréstimo ativo encontrado.</p>
+      {groupedData.length === 0 && search === "" ? (
+        <EmptyState
+          icon={Handshake}
+          title="Nenhum comodato ativo"
+          description="Os comodatos são os equipamentos emprestados para seus clientes. Registre o primeiro empréstimo para manter o controle exato."
+          actionLabel="Novo Empréstimo"
+          actionOnClick={() => setIsLoanModalOpen(true)}
+          videoUrl="https://www.youtube.com/embed/dedTuYAXwPc?si=7pkUJkju9EdUH1-Q"
+        />
+      ) : filteredGroups.length === 0 ? (
+        <p className="text-muted-foreground text-center mt-8">Nenhum empréstimo ativo encontrado para essa busca.</p>
       ) : (
         <Accordion
           type="multiple"
