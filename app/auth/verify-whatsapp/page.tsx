@@ -3,7 +3,14 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { MessageCircle, RefreshCw, CheckCircle2, Loader2, ArrowRight, ShieldCheck } from "lucide-react";
+import {
+  MessageCircle,
+  RefreshCw,
+  CheckCircle2,
+  Loader2,
+  ArrowRight,
+  ShieldCheck,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -100,7 +107,10 @@ export default function VerifyWhatsAppPage() {
     }
   };
 
-  const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (
+    index: number,
+    e: React.KeyboardEvent<HTMLInputElement>,
+  ) => {
     if (e.key === "Backspace" && !otp[index] && index > 0) {
       inputRefs.current[index - 1]?.focus();
     }
@@ -160,8 +170,10 @@ export default function VerifyWhatsAppPage() {
           <div className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/10">
             <CheckCircle2 className="h-10 w-10 text-emerald-500" />
           </div>
-          <h2 className="text-2xl font-bold">WhatsApp verificado!</h2>
-          <p className="text-muted-foreground">Redirecionando para o painel...</p>
+          <h2 className="text-2xl font-bold">Celular verificado!</h2>
+          <p className="text-muted-foreground">
+            Redirecionando para o painel...
+          </p>
         </div>
       </div>
     );
@@ -177,7 +189,7 @@ export default function VerifyWhatsAppPage() {
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm mb-4">
               <MessageCircle className="h-7 w-7 text-white" />
             </div>
-            <h1 className="text-2xl font-bold">Verifique seu WhatsApp</h1>
+            <h1 className="text-2xl font-bold">Verifique seu Celular (SMS)</h1>
             <p className="text-emerald-100 text-sm mt-1">
               Etapa obrigatória para ativar sua conta
             </p>
@@ -188,11 +200,13 @@ export default function VerifyWhatsAppPage() {
             <div className="flex items-start gap-3 rounded-xl bg-muted/60 px-4 py-3">
               <ShieldCheck className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Enviamos um código de 6 dígitos para o WhatsApp{" "}
+                Para garantir a segurança da plataforma, enviamos um código via SMS para o seu número.{" "}
                 {maskedPhone ? (
-                  <span className="font-semibold text-foreground">{maskedPhone}</span>
+                  <span className="font-semibold text-foreground">
+                    {maskedPhone}
+                  </span>
                 ) : (
-                  "cadastrado na sua conta"
+                  "seu número"
                 )}
                 . Digite-o abaixo para confirmar seu número.
               </p>
@@ -200,12 +214,16 @@ export default function VerifyWhatsAppPage() {
 
             {/* Inputs OTP */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">Código de verificação</label>
+              <label className="text-sm font-medium">
+                Código de verificação
+              </label>
               <div className="flex gap-2 justify-center" onPaste={handlePaste}>
                 {otp.map((digit, i) => (
                   <Input
                     key={i}
-                    ref={(el) => { inputRefs.current[i] = el; }}
+                    ref={(el) => {
+                      inputRefs.current[i] = el;
+                    }}
                     type="text"
                     inputMode="numeric"
                     maxLength={1}
@@ -243,7 +261,9 @@ export default function VerifyWhatsAppPage() {
 
             {/* Reenviar código */}
             <div className="text-center">
-              <p className="text-sm text-muted-foreground mb-2">Não recebeu o código?</p>
+              <p className="text-sm text-muted-foreground mb-2">
+                Não recebeu o SMS?
+              </p>
               <Button
                 variant="ghost"
                 size="sm"
@@ -275,7 +295,10 @@ export default function VerifyWhatsAppPage() {
         {/* Rodapé */}
         <p className="text-center text-xs text-muted-foreground mt-6">
           Número incorreto?{" "}
-          <a href="/dashboard/account" className="underline hover:text-foreground transition-colors">
+          <a
+            href="/dashboard/account"
+            className="underline hover:text-foreground transition-colors"
+          >
             Atualize seu perfil
           </a>{" "}
           e solicite um novo código.

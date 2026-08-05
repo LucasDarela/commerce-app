@@ -54,8 +54,7 @@ const formSchema = z
       .email("Deve ser um e-mail válido."),
     phone: z
       .string({ required_error: "O telefone é obrigatório." })
-      .min(16, "Informe um telefone válido com o 9 adicional (ex: 11 9 9999-9999).")
-      .max(16, "Informe um telefone válido."),
+      .regex(/^\(\d{2}\) 9 \d{4}-\d{4}$/, "Informe um telefone válido com o 9 adicional (ex: 11 9 9999-9999)."),
     password: z
       .string({ required_error: "A senha é obrigatória." })
       .min(8, "A senha deve ter pelo menos 8 caracteres.")
