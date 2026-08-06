@@ -208,7 +208,9 @@ export async function POST(req: Request) {
             stripe_subscription_id: subscription.id,
             price_id: lineItems[0].price,
             status: subscription.status,
-            current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+            current_period_end: (subscription.items.data[0] as any)?.current_period_end 
+              ? new Date((subscription.items.data[0] as any).current_period_end * 1000).toISOString()
+              : (subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : new Date().toISOString()),
             trial_end: subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null,
             updated_at: new Date().toISOString(),
         }, { onConflict: "stripe_subscription_id" });
@@ -243,7 +245,9 @@ export async function POST(req: Request) {
               stripe_subscription_id: subscription.id,
               price_id: lineItems[0].price,
               status: subscription.status,
-              current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+              current_period_end: (subscription.items.data[0] as any)?.current_period_end 
+                ? new Date((subscription.items.data[0] as any).current_period_end * 1000).toISOString()
+                : (subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : new Date().toISOString()),
               trial_end: subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null,
               updated_at: new Date().toISOString(),
           }, { onConflict: "stripe_subscription_id" });
