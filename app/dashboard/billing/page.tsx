@@ -171,10 +171,10 @@ export default function BillingPage() {
 
       if (data.success) {
         toast.success("Plano atualizado com sucesso!");
-        // Aguarda 2 segundos para o Webhook processar e recarrega os dados
+        // Redireciona o usuário para o Dashboard principal após a assinatura para mostrar o Onboarding
         setTimeout(() => {
-          fetchBillingData({ showLoading: true });
-        }, 2000);
+          window.location.href = "/dashboard";
+        }, 1000);
         return;
       }
 
