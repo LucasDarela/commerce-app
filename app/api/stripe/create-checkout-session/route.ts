@@ -193,13 +193,26 @@ export async function POST(req: Request) {
     // sem redirecionar para o Stripe Checkout Session.
     if (canHaveTrial) {
       try {
-        await stripe.subscriptions.create({
+        const subscription = await stripe.subscriptions.create({
           customer: stripeCustomerId,
           items: lineItems.map(item => ({ price: item.price, quantity: item.quantity })),
           trial_period_days: 15,
           payment_behavior: "default_incomplete",
           metadata: { companyId },
         });
+        
+        // Inserção otimista para não depender do Webhook no recarregamento imediato
+        await supabase.from("subscriptions").upsert({
+            company_id: companyId,
+            stripe_customer_id: stripeCustomerId,
+            stripe_subscription_id: subscription.id,
+            price_id: lineItems[0].price,
+            status: subscription.status,
+            current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+            trial_end: subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null,
+            updated_at: new Date().toISOString(),
+        }, { onConflict: "stripe_subscription_id" });
+
         return NextResponse.json({ success: true, type: "trial_started" });
       } catch (stripeErr: any) {
         if (stripeErr?.code === 'resource_missing' && stripeErr?.param === 'customer') {
@@ -216,13 +229,25 @@ export async function POST(req: Request) {
             .update({ stripe_customer_id: stripeCustomerId })
             .eq("id", companyId);
 
-          await stripe.subscriptions.create({
+          const subscription = await stripe.subscriptions.create({
             customer: stripeCustomerId,
             items: lineItems.map(item => ({ price: item.price, quantity: item.quantity })),
             trial_period_days: 15,
             payment_behavior: "default_incomplete",
             metadata: { companyId },
           });
+
+          await supabase.from("subscriptions").upsert({
+              company_id: companyId,
+              stripe_customer_id: stripeCustomerId,
+              stripe_subscription_id: subscription.id,
+              price_id: lineItems[0].price,
+              status: subscription.status,
+              current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+              trial_end: subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null,
+              updated_at: new Date().toISOString(),
+          }, { onConflict: "stripe_subscription_id" });
+
           return NextResponse.json({ success: true, type: "trial_started" });
         } else {
           throw stripeErr;
