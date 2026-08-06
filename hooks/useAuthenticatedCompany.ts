@@ -13,6 +13,8 @@ type AuthenticatedCompany = {
   loading: boolean;
   mobileOfflineEnabled: boolean;
   planName: string | null;
+  subscriptionStatus: string | null;
+  trialEnd: string | null;
 };
 
 export function useAuthenticatedCompany(): AuthenticatedCompany {
@@ -23,6 +25,8 @@ export function useAuthenticatedCompany(): AuthenticatedCompany {
   const [role, setRole] = useState<UserRole | null>(null);
   const [mobileOfflineEnabled, setMobileOfflineEnabled] = useState(false);
   const [planName, setPlanName] = useState<string | null>(null);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
+  const [trialEnd, setTrialEnd] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchCompany = useCallback(async () => {
@@ -68,10 +72,15 @@ export function useAuthenticatedCompany(): AuthenticatedCompany {
         // Busca o plano atual de forma independente
         const { data: subData } = await supabase
           .from("subscriptions")
-          .select("status, price_id")
+          .select("status, price_id, trial_end")
           .eq("company_id", companyUser.company_id)
           .in("status", ["active", "trialing"])
           .maybeSingle();
+
+        if (subData) {
+          setSubscriptionStatus(subData.status);
+          setTrialEnd(subData.trial_end);
+        }
 
         if (subData?.price_id) {
           const { data: planData } = await supabase
@@ -98,5 +107,5 @@ export function useAuthenticatedCompany(): AuthenticatedCompany {
     fetchCompany();
   }, [fetchCompany]);
 
-  return { user, companyId, companyName, role, loading, mobileOfflineEnabled, planName };
+  return { user, companyId, companyName, role, loading, mobileOfflineEnabled, planName, subscriptionStatus, trialEnd };
 }

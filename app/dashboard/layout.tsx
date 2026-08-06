@@ -5,6 +5,7 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Analytics } from "@vercel/analytics/next";
 import { SessionWatcher } from "@/components/auth/SessionWatcher";
 import { PageTracker } from "@/components/analytics/page-tracker";
+import { TrialBanner } from "@/components/dashboard/TrialBanner";
 
 export default function SidebarLayout({
   children,
@@ -25,6 +26,7 @@ export default function SidebarLayout({
         <SessionWatcher />
         <PageTracker />
         <SiteHeader />
+        <TrialBanner />
         {children}
       </SidebarInset>
     </SidebarProvider>
