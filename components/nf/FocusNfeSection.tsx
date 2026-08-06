@@ -58,14 +58,16 @@ export default function FocusNFeSection() {
           return;
         }
 
-        const { error: upCredErr } = await supabase.from("nfe_credentials").upsert(
-          {
-            company_id: companyId,
-            focus_token: focusToken,
-            cnpj: companyCnpj,
-          },
-          { onConflict: "company_id" },
-        );
+        const { error: upCredErr } = await supabase
+          .from("nfe_credentials")
+          .upsert(
+            {
+              company_id: companyId,
+              focus_token: focusToken,
+              cnpj: companyCnpj,
+            },
+            { onConflict: "company_id" },
+          );
         if (upCredErr) throw upCredErr;
       }
 
@@ -89,7 +91,9 @@ export default function FocusNFeSection() {
       <h3 className="text-xl font-bold">NFe</h3>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <Label className="mb-2 w-[200px]">Token da Focus NFe</Label>
+          <Label className="mb-2 w-[200px]">
+            Token de Produção - Focus NFe
+          </Label>
           <PasswordInput
             name="focus_token"
             value={focusToken}

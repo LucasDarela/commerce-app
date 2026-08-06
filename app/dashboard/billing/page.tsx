@@ -57,6 +57,7 @@ export default function BillingPage() {
   const handleActivateNow = async () => {
     if (!companyId) return;
     setSubmitting(true);
+    let shouldRedirect = false;
     try {
       const res = await fetch("/api/stripe/activate-now", {
         method: "POST",
@@ -64,13 +65,26 @@ export default function BillingPage() {
         body: JSON.stringify({ companyId }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      
+      if (!res.ok) {
+        if (data.needs_payment_method) {
+          toast.info(data.error || "Adicione um cartão de crédito para ativar.");
+          shouldRedirect = true;
+          return;
+        }
+        throw new Error(data.error);
+      }
+      
       toast.success("Assinatura ativada com sucesso! Cobrança processada.");
       fetchBillingData({ showLoading: true });
     } catch (e: any) {
       toast.error(e.message);
     } finally {
-      setSubmitting(false);
+      if (shouldRedirect) {
+        handleManageBilling();
+      } else {
+        setSubmitting(false);
+      }
     }
   };
 

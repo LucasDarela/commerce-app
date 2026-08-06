@@ -44,6 +44,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true });
   } catch (err: any) {
     console.error("Erro ao ativar assinatura agora:", err);
+    if (
+      err.message?.includes("payment source") ||
+      err.message?.includes("default payment method")
+    ) {
+      return NextResponse.json(
+        {
+          error: "Você precisa adicionar um cartão de crédito para ativar a cobrança.",
+          needs_payment_method: true,
+        },
+        { status: 400 }
+      );
+    }
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

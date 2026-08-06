@@ -137,13 +137,13 @@ export async function middleware(req: NextRequest) {
     }
 
     // 📱 Verificação de WhatsApp (feature flag)
-    // Aplica apenas para owners (usuários sem invited_role nos metadados)
+    // Desabilitado temporariamente a pedido do usuário
     if (
-      process.env.WHATSAPP_VERIFICATION_ENABLED === "true" &&
+      false && process.env.WHATSAPP_VERIFICATION_ENABLED === "true" &&
       profile?.whatsapp_verified === false &&
-      !user.user_metadata?.invited_role
+      !user?.user_metadata?.invited_role
     ) {
-      console.log(`[Middleware] WhatsApp não verificado para owner ${user.id} — redirecionando`);
+      console.log(`[Middleware] WhatsApp não verificado para owner ${user?.id} — redirecionando`);
       return NextResponse.redirect(new URL("/auth/verify-whatsapp", req.url));
     }
   }

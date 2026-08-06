@@ -5,10 +5,12 @@ import ClientChart from "./ClientChart";
 import { InactiveCustomersCard } from "@/components/dashboard/InactiveCustomersCard";
 import { PayablesTodayCard } from "@/components/dashboard/PayablesTodayCard";
 import { WelcomeOnboardingModal } from "@/components/dashboard/WelcomeOnboardingModal";
+import { PlanSelectionModal } from "@/components/dashboard/PlanSelectionModal";
 
 export default async function DashboardPage() {
   return (
     <div className="flex flex-1 flex-col">
+      <PlanSelectionModal />
       <WelcomeOnboardingModal />
       <div className="@container/main flex flex-1 flex-col gap-2">
         <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">

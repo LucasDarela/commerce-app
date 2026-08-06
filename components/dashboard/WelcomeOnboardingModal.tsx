@@ -34,15 +34,26 @@ export function WelcomeOnboardingModal() {
       try {
         const { data, error } = await supabase
           .from("profiles")
-          .select("has_seen_onboarding")
+          .select("has_seen_onboarding, company_id")
           .eq("id", user.id)
           .single();
 
         // Só mostra se explicitamente for falso ou null
-        if (!error && data?.has_seen_onboarding !== true) {
-          timeoutId = setTimeout(() => {
-            setIsOpen(true);
-          }, 800);
+        if (!error && data?.has_seen_onboarding !== true && data?.company_id) {
+          
+          // Checa se já escolheu o plano. Caso contrário, o PlanSelectionModal estará na tela.
+          const { data: sub } = await supabase
+            .from("subscriptions")
+            .select("id, status")
+            .eq("company_id", data.company_id)
+            .limit(1)
+            .maybeSingle();
+            
+          if (sub && sub.status) {
+            timeoutId = setTimeout(() => {
+              setIsOpen(true);
+            }, 800);
+          }
         }
       } catch (err) {
         console.error("Erro ao verificar onboarding:", err);
