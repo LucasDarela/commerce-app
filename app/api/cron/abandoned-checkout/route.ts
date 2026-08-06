@@ -29,7 +29,7 @@ export async function GET(req: Request) {
       .select(`
         id, 
         email, 
-        name, 
+        username, 
         phone, 
         company_id, 
         created_at, 
@@ -83,7 +83,7 @@ export async function GET(req: Request) {
           subject: "🎉 Sua conta está pronta — comece seu trial grátis agora!",
           html: `
             <div style="font-family: sans-serif; max-width: 560px; margin: 0 auto; color: #111;">
-              <h2 style="color: #3b82f6;">Bem-vindo ao Chopp Hub${profile.name ? `, ${profile.name}` : ''}!</h2>
+              <h2 style="color: #3b82f6;">Bem-vindo ao Chopp Hub${profile.username ? `, ${profile.username}` : ''}!</h2>
               <p>Sua conta foi criada com sucesso. Agora é hora de ativar seu <strong>trial gratuito de 15 dias</strong> e descobrir como o Chopp Hub pode transformar a gestão do seu negócio.</p>
               <p>Você pode começar a usar agora mesmo, <strong>sem precisar cadastrar cartão de crédito</strong>.</p>
               <p style="text-align: center; margin: 32px 0;">
@@ -118,7 +118,7 @@ export async function GET(req: Request) {
           html: `
             <div style="font-family: sans-serif; max-width: 560px; margin: 0 auto; color: #111;">
               <h2 style="color: #8b5cf6;">Você sabe o que o Chopp Hub pode fazer por você?</h2>
-              <p>Olá${profile.name ? ` ${profile.name}` : ''},</p>
+              <p>Olá${profile.username ? ` ${profile.username}` : ''},</p>
               <p>Você criou sua conta no Chopp Hub mas ainda não ativou seu trial. Deixa a gente te mostrar o que está esperando por você:</p>
               <ul style="line-height: 2;">
                 <li>📦 <strong>Gestão de estoque</strong> em tempo real</li>
