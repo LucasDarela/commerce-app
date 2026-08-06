@@ -467,26 +467,41 @@ const handleEditPrice = (index: number, price: string) => {
       }
 
       // Verificação anti-duplicação de nota
-      if (order.note_number) {
-        const { data: dupOrder, error: checkError } = await supabase
-          .from("orders")
-          .select("id")
-          .eq("company_id", companyId)
-          .eq("note_number", order.note_number)
-          .maybeSingle();
+      let currentNoteNumber = order.note_number;
+      let maxRetries = 5;
 
-        if (checkError) {
-          toast.error("Erro ao verificar duplicidade de nota no banco.");
+      if (currentNoteNumber) {
+        while (maxRetries > 0) {
+          const { data: dupOrder, error: checkError } = await supabase
+            .from("orders")
+            .select("id")
+            .eq("company_id", companyId)
+            .eq("note_number", currentNoteNumber)
+            .maybeSingle();
+
+          if (checkError) {
+            toast.error("Erro ao verificar duplicidade de nota no banco.");
+            isSubmittingRef.current = false;
+            return;
+          }
+
+          if (dupOrder) {
+            currentNoteNumber = await generateNextNoteNumber(companyId!);
+            maxRetries--;
+          } else {
+            break;
+          }
+        }
+
+        if (maxRetries === 0) {
+          toast.error("Não foi possível gerar um número único após várias tentativas. Tente preencher manualmente.");
           isSubmittingRef.current = false;
           return;
         }
 
-        if (dupOrder) {
-          const next = await generateNextNoteNumber(companyId!);
-          setOrder((prev) => ({ ...prev, note_number: next }));
-          toast.error(`A nota ${order.note_number} já existe. Uma nova nota (${next}) foi gerada. Clique em Salvar novamente.`);
-          isSubmittingRef.current = false;
-          return;
+        if (currentNoteNumber !== order.note_number) {
+          setOrder((prev) => ({ ...prev, note_number: currentNoteNumber }));
+          toast.info(`A nota foi ajustada automaticamente para ${currentNoteNumber} para evitar duplicidade.`);
         }
       }
 
@@ -537,7 +552,7 @@ const handleEditPrice = (index: number, price: string) => {
         phone: selectedCustomer?.phone ?? "N/A",
         products: productsDescription,
         amount,
-        note_number: order.note_number,
+        note_number: currentNoteNumber,
         document_type: order!.document_type,
         payment_method: capitalize(order?.payment_method || ""),
         payment_status: "Unpaid",

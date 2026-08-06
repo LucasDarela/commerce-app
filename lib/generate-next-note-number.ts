@@ -9,7 +9,9 @@ export async function generateNextNoteNumber(companyId: string) {
     .eq("company_id", companyId)
     .eq("document_type", "internal")
     .not("note_number", "is", null)
-    .neq("note_number", "");
+    .neq("note_number", "")
+    .order("created_at", { ascending: false })
+    .limit(1000);
 
   if (error) {
     console.error("Erro ao gerar próximo número de nota:", {
