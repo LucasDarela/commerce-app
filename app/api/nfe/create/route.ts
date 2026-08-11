@@ -90,7 +90,7 @@ export async function POST(req: Request) {
 
     const { data: previous } = await supabase
       .from("invoices")
-      .select("id, numero, serie, ref, status, created_at")
+      .select("id, numero, serie, ref, status, note_number, created_at")
       .eq("company_id", companyId)
       .eq("order_id", invoiceData.order_id)
       .order("created_at", { ascending: false })
@@ -99,7 +99,8 @@ export async function POST(req: Request) {
     const prev = previous?.[0];
     const isRetry =
       prev?.status === "nota_rejeitada" || 
-      prev?.status === "erro_autorizacao" ||
+      prev?.status === "erro_autorizacao";
+    const isCancelledReissue =
       prev?.status === "cancelado" ||
       prev?.status === "cancelada";
 
@@ -125,6 +126,39 @@ export async function POST(req: Request) {
       );
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // Re-emissão após cancelamento: gera novo note_number para evitar erro
+    // da SEFAZ "número já aceito" (o número cancelado não pode ser reutilizado)
+    // ─────────────────────────────────────────────────────────────────────────
+    if (isCancelledReissue) {
+      const { data: maxNoteData } = await supabase
+        .from("invoices")
+        .select("note_number")
+        .eq("company_id", companyId)
+        .order("note_number", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const maxNoteNumber = Number(maxNoteData?.note_number ?? 0);
+      const newNoteNumber = String(maxNoteNumber + 1);
+
+      console.log("[NFe create] Re-emissão pós-cancelamento:", {
+        note_number_anterior: invoiceData.note_number,
+        note_number_novo: newNoteNumber,
+        companyId,
+        order_id: invoiceData.order_id,
+      });
+
+      invoiceData.note_number = newNoteNumber;
+
+      // Atualiza o note_number no pedido
+      await supabase
+        .from("orders")
+        .update({ note_number: newNoteNumber })
+        .eq("id", invoiceData.order_id)
+        .eq("company_id", companyId);
+    }
+
     const { data: dup } = await supabase
       .from("invoices")
       .select("id, status, ref, numero")
@@ -144,15 +178,16 @@ export async function POST(req: Request) {
     const baseRef = `${invoiceData.note_number}`;
     const numSuffix = invoiceData.numero ? `_n${invoiceData.numero}` : "";
 
-    const isActuallyCancelled = prev?.status === "cancelado" || prev?.status === "cancelada";
-
+    // Para retry de rejeição: reusa a mesma ref. Para re-emissão pós-cancelamento
+    // ou nova emissão: gera nova ref com o novo note_number.
     invoiceData.ref =
-      (isRetry && !isActuallyCancelled && prev?.ref) 
+      (isRetry && prev?.ref) 
         ? prev.ref 
         : `${baseRef}${numSuffix}_s${invoiceData.serie}`;
 
     console.log("[NFe create] ref gerada:", invoiceData.ref, {
       isRetry,
+      isCancelledReissue,
       order_id: invoiceData.order_id,
       note_number: invoiceData.note_number,
       companyId,
@@ -173,6 +208,8 @@ export async function POST(req: Request) {
 
     const numeroDefinitivo = (result as any)?.raw?.numero ?? numeroParaBanco;
 
+    // Para retry de rejeição: atualiza a invoice existente (mesma ref).
+    // Para cancelamento ou nova emissão: sempre insere nova linha.
     if (isRetry && prev?.id) {
       const { error: updateErr } = await supabase
         .from("invoices")

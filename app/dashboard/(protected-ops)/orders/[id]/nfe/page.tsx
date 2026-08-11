@@ -8,16 +8,6 @@ import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import { Label } from "@/components/ui/label";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { emitInvoice } from "@/lib/focus-nfe/emitInvoice";
-import {
   Select,
   SelectTrigger,
   SelectValue,
@@ -74,10 +64,6 @@ export default function EmitNfePage() {
   const [operations, setOperations] = useState<any[]>([]);
   const [selectedOperation, setSelectedOperation] = useState<string>("");
   const [loading, setLoading] = useState(false);
-  const [showNumberModal, setShowNumberModal] = useState(false);
-  const [nextNumber, setNextNumber] = useState<string>("");
-  const [nextSerie, setNextSerie] = useState<string>("");
-  const [lastNfeStatus, setLastNfeStatus] = useState<string | null>(null);
 
   useEffect(() => {
     if (!companyId || !id) return;
@@ -237,20 +223,16 @@ export default function EmitNfePage() {
 
       // 6) Verificar se já existe nota (e se foi cancelada)
       const { data: nfeData } = await supabase
-        .from("nfe")
-        .select("*")
+        .from("invoices")
+        .select("status, numero, serie")
         .eq("order_id", id)
+        .eq("company_id", companyId)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      if (nfeData) {
-        setLastNfeStatus(nfeData.status);
-        if (nfeData.numero) {
-          setNextNumber(String(Number(nfeData.numero) + 1));
-          setNextSerie(String(nfeData.serie || ""));
-        }
-      }
+      // nfeData disponível para uso futuro (ex: exibir status atual)
+      void nfeData;
     };
 
     fetchAll();
@@ -282,14 +264,8 @@ export default function EmitNfePage() {
     return Number(totalProdutosLiquido) + Number(freight);
   }, [totalProdutosLiquido, freight]);
 
-  const handleEmit = async (manualNumber?: string, manualSerie?: string) => {
+  const handleEmit = async () => {
     if (loading) return;
-
-    // Se já teve nota cancelada e NÃO estamos passando um número manual ainda, abre o modal
-    if (lastNfeStatus === "cancelado" && !manualNumber && !showNumberModal) {
-      setShowNumberModal(true);
-      return;
-    }
 
     if (!operacaoFiscal)
       return toast.error("Selecione um tipo de operação fiscal");
@@ -608,8 +584,6 @@ export default function EmitNfePage() {
 
       const invoiceData = {
         ambiente: emissor.environment || "producao", // Produção restaurada ✅
-        numero: manualNumber || undefined,
-        serie: manualSerie || undefined,
         order_id: id,
 
         data_emissao: hoje,
@@ -784,55 +758,6 @@ export default function EmitNfePage() {
         {loading ? "Emitindo NF-e..." : "Emitir NF-e"}
       </Button>
 
-      <Dialog open={showNumberModal} onOpenChange={setShowNumberModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Nota Anterior Cancelada</DialogTitle>
-            <DialogDescription>
-              Detectamos que este pedido já possui uma nota cancelada. Para
-              emitir uma nova, você deve informar o próximo número da sequência.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="number" className="text-right">
-                Número
-              </Label>
-              <Input
-                id="number"
-                value={nextNumber}
-                onChange={(e) => setNextNumber(e.target.value)}
-                className="col-span-3"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="serie" className="text-right">
-                Série
-              </Label>
-              <Input
-                id="serie"
-                value={nextSerie}
-                onChange={(e) => setNextSerie(e.target.value)}
-                className="col-span-3"
-                placeholder="Ex: 1"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowNumberModal(false)}>
-              Cancelar
-            </Button>
-            <Button
-              onClick={() => {
-                setShowNumberModal(false);
-                handleEmit(nextNumber, nextSerie);
-              }}
-            >
-              Emitir com Novo Número
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
