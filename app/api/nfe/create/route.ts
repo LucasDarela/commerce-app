@@ -139,16 +139,23 @@ export async function POST(req: Request) {
         .eq("company_id", companyId)
         .not("note_number", "is", null);
 
-      const maxNoteNumber = Math.max(
+      const maxFromInvoices = Math.max(
         0,
         ...(allNoteData?.map((r: any) => Number(r.note_number) || 0) ?? [0]),
       );
+
+      // Também considera o note_number atual do pedido (orders.note_number),
+      // pois pode ter sido atualizado por uma tentativa anterior que não salvou no invoices.
+      const currentNoteNumber = Number(invoiceData.note_number) || 0;
+
+      const maxNoteNumber = Math.max(maxFromInvoices, currentNoteNumber);
       const newNoteNumber = String(maxNoteNumber + 1);
 
       console.log("[NFe create] Re-emissão pós-cancelamento:", {
-        note_number_anterior: invoiceData.note_number,
+        note_number_do_pedido: invoiceData.note_number,
+        max_das_invoices: maxFromInvoices,
+        max_considerado: maxNoteNumber,
         note_number_novo: newNoteNumber,
-        maxNoteNumber,
         companyId,
         order_id: invoiceData.order_id,
       });
