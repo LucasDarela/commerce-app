@@ -330,6 +330,7 @@ export async function emitInvoice({
     e.focus = body;
     e.status = resp.status;
     e.erros = erros;
+    e.ref = ref; // necessário para recuperação de already_processed
     throw e;
   }
 

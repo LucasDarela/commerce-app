@@ -131,20 +131,24 @@ export async function POST(req: Request) {
     // da SEFAZ "número já aceito" (o número cancelado não pode ser reutilizado)
     // ─────────────────────────────────────────────────────────────────────────
     if (isCancelledReissue) {
-      const { data: maxNoteData } = await supabase
+      // Busca TODOS os note_numbers da empresa e calcula o máximo numericamente
+      // (não usar ORDER BY text pois "9" > "1234" em ordenação alfabética)
+      const { data: allNoteData } = await supabase
         .from("invoices")
         .select("note_number")
         .eq("company_id", companyId)
-        .order("note_number", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .not("note_number", "is", null);
 
-      const maxNoteNumber = Number(maxNoteData?.note_number ?? 0);
+      const maxNoteNumber = Math.max(
+        0,
+        ...(allNoteData?.map((r: any) => Number(r.note_number) || 0) ?? [0]),
+      );
       const newNoteNumber = String(maxNoteNumber + 1);
 
       console.log("[NFe create] Re-emissão pós-cancelamento:", {
         note_number_anterior: invoiceData.note_number,
         note_number_novo: newNoteNumber,
+        maxNoteNumber,
         companyId,
         order_id: invoiceData.order_id,
       });
@@ -321,6 +325,95 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true, result }, { status: 200 });
   } catch (err: any) {
     console.error("❌ Erro ao emitir NF-e:", err);
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Tratamento especial: Focus retornou "already_processed"
+    // Isso ocorre quando a nota já foi autorizada em uma tentativa anterior
+    // mas não foi salva corretamente no banco. Buscamos o estado atual e salvamos.
+    // ─────────────────────────────────────────────────────────────────────────
+    if (err?.focus?.codigo === "already_processed" && err?.ref) {
+      try {
+        const supabase = await createServerSupabaseClient();
+        const { data: membership2 } = await supabase
+          .from("company_users")
+          .select("company_id")
+          .eq("user_id", (await supabase.auth.getUser()).data.user?.id ?? "")
+          .maybeSingle();
+
+        if (membership2?.company_id) {
+          const recovered = await fetchInvoiceStatus({
+            supabase,
+            companyId: membership2.company_id,
+            ref: err.ref,
+            poll: 5,
+            intervalMs: 1500,
+            includeRaw: true,
+          });
+
+          if (!("error" in recovered) && recovered.data?.status) {
+            const toIsoInner = (s?: string | null) => {
+              if (!s) return new Date().toISOString();
+              const d = new Date(s);
+              return Number.isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+            };
+
+            // Upsert por ref: atualiza se existir, insere se não
+            const { data: existingInv } = await supabase
+              .from("invoices")
+              .select("id")
+              .eq("ref", err.ref)
+              .eq("company_id", membership2.company_id)
+              .maybeSingle();
+
+            const invPayload = {
+              status: recovered.data.status,
+              numero: recovered.data.numero ?? null,
+              serie: recovered.data.serie ?? null,
+              chave_nfe: recovered.data.chave ?? null,
+              xml_url: recovered.data.xml_url ?? null,
+              danfe_url: recovered.data.danfe_url ?? null,
+              data_emissao: recovered.data.data_emissao
+                ? toIsoInner(recovered.data.data_emissao)
+                : new Date().toISOString(),
+            };
+
+            if (existingInv?.id) {
+              await supabase
+                .from("invoices")
+                .update(invPayload)
+                .eq("id", existingInv.id)
+                .eq("company_id", membership2.company_id);
+            }
+
+            console.log("[NFe create] already_processed recuperado:", {
+              ref: err.ref,
+              status: recovered.data.status,
+            });
+
+            const isAuthRecovered = (recovered.data.status || "")
+              .toLowerCase()
+              .includes("autorizad");
+
+            return NextResponse.json(
+              {
+                success: isAuthRecovered,
+                recovered: true,
+                result: {
+                  status: recovered.data.status,
+                  ref: err.ref,
+                  chave: recovered.data.chave,
+                  xml_url: recovered.data.xml_url,
+                  danfe_url: recovered.data.danfe_url,
+                },
+              },
+              { status: 200 },
+            );
+          }
+        }
+      } catch (recoverErr) {
+        console.error("[NFe create] Falha ao recuperar already_processed:", recoverErr);
+      }
+    }
 
     const detalhes: Array<{ campo?: string; codigo?: any; mensagem?: string }> =
       Array.isArray(err?.erros)

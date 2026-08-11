@@ -210,21 +210,24 @@ export async function POST(request: Request, { params }: Params) {
     // da SEFAZ "número já aceito" (o número cancelado não pode ser reutilizado)
     // ─────────────────────────────────────────────────────────────────────────
     if (isCancelledReissue) {
-      // Busca o maior note_number já utilizado por esta empresa em todas as invoices
-      const { data: maxNoteData } = await supabase
+      // Busca TODOS os note_numbers da empresa e calcula o máximo numericamente
+      // (não usar ORDER BY text pois "9" > "1234" em ordenação alfabética)
+      const { data: allNoteData } = await supabase
         .from("invoices")
         .select("note_number")
         .eq("company_id", companyId)
-        .order("note_number", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .not("note_number", "is", null);
 
-      const maxNoteNumber = Number(maxNoteData?.note_number ?? 0);
+      const maxNoteNumber = Math.max(
+        0,
+        ...(allNoteData?.map((r: any) => Number(r.note_number) || 0) ?? [0]),
+      );
       const newNoteNumber = String(maxNoteNumber + 1);
 
       console.log("[mobile emit-nfe] Re-emissão pós-cancelamento:", {
         note_number_anterior: invoiceData.note_number,
         note_number_novo: newNoteNumber,
+        maxNoteNumber,
         companyId,
         orderId,
       });
