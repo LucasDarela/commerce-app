@@ -127,7 +127,18 @@ export function LoginAccountForm() {
         .eq("id", user.id)
         .maybeSingle();
 
-      if (existingProfile?.current_session_id) {
+      // Verifica se o usuário já tinha uma sessão ativa em OUTRO dispositivo
+      // Compara o session_id do banco com o cookie local do browser atual
+      const localMarker = document.cookie
+        .split("; ")
+        .find((row) => row.startsWith("session_marker="))
+        ?.split("=")[1];
+
+      const hasOtherDeviceConnected =
+        !!existingProfile?.current_session_id &&
+        existingProfile.current_session_id !== localMarker;
+
+      if (hasOtherDeviceConnected) {
         setLoadingText("Desconectando você de outro dispositivo...");
         await new Promise((resolve) => setTimeout(resolve, 1500));
       }
