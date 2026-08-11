@@ -104,12 +104,13 @@ export async function middleware(req: NextRequest) {
     }
 
     // ✅ Validação de Sessão Única
+    // Lê o marcador: primeiro do query param (recente, logo após login),
+    // depois do cookie (sessões subsequentes).
     const smQuery = req.nextUrl.searchParams.get("sm");
     const sessionMarker = smQuery || req.cookies.get("session_marker")?.value;
 
     if (smQuery) {
       // Se recebemos via query param, re-injetamos no cookie como a fonte de verdade absoluta
-      // Isso sobrepõe qualquer cookie bugado duplicado que o navegador tenha
       res.cookies.set("session_marker", smQuery, {
         path: "/",
         maxAge: 2592000,
@@ -123,15 +124,34 @@ export async function middleware(req: NextRequest) {
       .eq("id", user.id)
       .single();
 
-    if (profile?.current_session_id && profile.current_session_id !== sessionMarker) {
-      // Sessão foi invalidada por um login mais recente
+    // Só invalida se:
+    // 1. O banco TEM um session_id cadastrado (ou seja, a feature está ativa)
+    // 2. O sessionMarker local existe e é diferente do banco
+    // Não invalida se sessionMarker estiver ausente (pode ser primeira request após login)
+    if (
+      profile?.current_session_id &&
+      sessionMarker &&
+      profile.current_session_id !== sessionMarker
+    ) {
       console.log(`[Middleware] Sessão invalidada para o usuário ${user.id}. DB: ${profile.current_session_id}, Cookie: ${sessionMarker}`);
       
-      const response = NextResponse.redirect(new URL("/login-signin?error=multiple_sessions", req.url));
-      
-      // Limpa os cookies de autenticação e o marcador sem invalidar a sessão no servidor (que pertence ao novo dispositivo)
-      await supabase.auth.signOut({ scope: "local" });
-      response.cookies.delete("session_marker");
+      // Cria o redirect e copia os cookies do Supabase (incluindo auth tokens)
+      // para que o browser receba a atualização de cookies corretamente.
+      const redirectUrl = new URL("/login-signin?error=multiple_sessions", req.url);
+      const response = NextResponse.redirect(redirectUrl);
+
+      // Copia todos os cookies que o Supabase definiu no res original
+      // (inclui sb-auth-token e outros) para o response de redirect.
+      res.cookies.getAll().forEach((cookie) => {
+        response.cookies.set(cookie.name, cookie.value);
+      });
+
+      // Apaga o session_marker no browser do dispositivo antigo
+      response.cookies.set("session_marker", "", {
+        path: "/",
+        maxAge: 0,
+        expires: new Date(0),
+      });
       
       return response;
     }

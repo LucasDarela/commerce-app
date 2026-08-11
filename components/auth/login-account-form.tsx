@@ -152,12 +152,12 @@ export function LoginAccountForm() {
         document.cookie = "session_marker=; path=/; domain=.chopphub.com; expires=Thu, 01 Jan 1970 00:00:01 GMT;";
 
         // ✅ Salva o marcador localmente para o middleware validar.
-        let domainStr = "";
+        // Em produção (HTTPS) o cookie DEVE ter o atributo Secure.
+        const isProduction = window.location.protocol === "https:";
         const hostname = window.location.hostname;
-        if (hostname.includes("chopphub.com")) {
-          domainStr = "domain=.chopphub.com; ";
-        }
-        document.cookie = `session_marker=${sessionMarker}; path=/; max-age=2592000; SameSite=Lax; ${domainStr}`;
+        const domainStr = hostname.includes("chopphub.com") ? "domain=.chopphub.com; " : "";
+        const secureStr = isProduction ? "Secure; " : "";
+        document.cookie = `session_marker=${sessionMarker}; path=/; max-age=2592000; SameSite=Lax; ${secureStr}${domainStr}`;
       }
 
       const { data: companyUser, error: companyUserError } = await supabase
@@ -171,9 +171,11 @@ export function LoginAccountForm() {
         return;
       }
 
-      // Adicionamos um pequeno delay para garantir que a atualização no banco (Supabase)
-      // seja propagada antes que o middleware verifique a sessão na próxima rota.
-      await new Promise((resolve) => setTimeout(resolve, 800));
+      // Adicionamos um delay para garantir que:
+      // 1. A atualização do banco (current_session_id) propague antes da próxima request
+      // 2. O cookie session_marker seja gravado no browser antes do redirect
+      // Em produção, redes e CDNs podem adicionar latência extra, por isso 1200ms.
+      await new Promise((resolve) => setTimeout(resolve, 1200));
 
       if (companyUser?.role === "admin") {
         window.location.href = `/dashboard?sm=${sessionMarker}`;
