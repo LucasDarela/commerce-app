@@ -180,7 +180,7 @@ export async function POST(request: Request, { params }: Params) {
 
     const { data: previous } = await supabase
       .from("invoices")
-      .select("id, numero, serie, ref, status, created_at")
+      .select("id, numero, serie, ref, status, note_number, created_at")
       .eq("company_id", companyId)
       .eq("order_id", orderId)
       .order("created_at", { ascending: false })
@@ -189,6 +189,8 @@ export async function POST(request: Request, { params }: Params) {
     const prev = previous?.[0];
     const isRetry =
       prev?.status === "nota_rejeitada" || prev?.status === "erro_autorizacao";
+    const isCancelledReissue =
+      prev?.status === "cancelado" || prev?.status === "cancelada";
 
     invoiceData.serie = invoiceData.serie || prev?.serie || "1";
 
@@ -203,13 +205,54 @@ export async function POST(request: Request, { params }: Params) {
       );
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // Re-emissão após cancelamento: gera novo note_number para evitar erro
+    // da SEFAZ "número já aceito" (o número cancelado não pode ser reutilizado)
+    // ─────────────────────────────────────────────────────────────────────────
+    if (isCancelledReissue) {
+      // Busca o maior note_number já utilizado por esta empresa em todas as invoices
+      const { data: maxNoteData } = await supabase
+        .from("invoices")
+        .select("note_number")
+        .eq("company_id", companyId)
+        .order("note_number", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const maxNoteNumber = Number(maxNoteData?.note_number ?? 0);
+      const newNoteNumber = String(maxNoteNumber + 1);
+
+      console.log("[mobile emit-nfe] Re-emissão pós-cancelamento:", {
+        note_number_anterior: invoiceData.note_number,
+        note_number_novo: newNoteNumber,
+        companyId,
+        orderId,
+      });
+
+      invoiceData.note_number = newNoteNumber;
+
+      // Atualiza o note_number no pedido para manter consistência
+      await supabase
+        .from("orders")
+        .update({ note_number: newNoteNumber })
+        .eq("id", orderId)
+        .eq("company_id", companyId);
+    }
+
+    // Verifica duplicata apenas para notas ATIVAS (não canceladas)
+    const ACTIVE_NON_CANCELLED_STATUSES = [
+      "processando_autorizacao",
+      "autorizado",
+      "autorizada",
+    ];
+
     const { data: dup } = await supabase
       .from("invoices")
       .select("id, status, ref, numero")
       .eq("company_id", companyId)
       .eq("serie", invoiceData.serie)
       .eq("note_number", invoiceData.note_number)
-      .in("status", ACTIVE_INVOICE_STATUSES)
+      .in("status", ACTIVE_NON_CANCELLED_STATUSES)
       .maybeSingle();
 
     if (dup) {
@@ -221,11 +264,14 @@ export async function POST(request: Request, { params }: Params) {
 
     const baseRef = `${invoiceData.note_number}`;
 
+    // Para retry de rejeição: reusa a mesma ref. Para re-emissão pós-cancelamento
+    // ou nova emissão: gera nova ref com o novo note_number.
     invoiceData.ref =
       isRetry && prev?.ref ? prev.ref : `${baseRef}_s${invoiceData.serie}`;
 
     console.log("[mobile emit-nfe] ref gerada:", invoiceData.ref, {
       isRetry,
+      isCancelledReissue,
       order_id: orderId,
       note_number: invoiceData.note_number,
       companyId,
