@@ -5,6 +5,7 @@ type EmitParams = {
   companyId: string;
   invoiceData: any; // já validado no invoiceSchema
   supabaseClient: SupabaseClient;
+  extraErrorContext?: Record<string, any>; // contexto extra para recuperação de erros
 };
 
 const pad2 = (v: any) => String(v ?? "").padStart(2, "0");
@@ -42,6 +43,7 @@ export async function emitInvoice({
   companyId,
   invoiceData,
   supabaseClient,
+  extraErrorContext,
 }: EmitParams) {
   // 1) Credenciais Focus + ambiente
   const { data: cred, error: credErr } = await supabaseClient
@@ -331,6 +333,7 @@ export async function emitInvoice({
     e.status = resp.status;
     e.erros = erros;
     e.ref = ref; // necessário para recuperação de already_processed
+    e.ctx = extraErrorContext ?? {}; // contexto extra do chamador
     throw e;
   }
 

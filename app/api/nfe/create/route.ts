@@ -208,6 +208,16 @@ export async function POST(req: Request) {
       companyId,
       invoiceData,
       supabaseClient: supabase,
+      // propaga contexto no erro para o catch poder fazer upsert
+      extraErrorContext: {
+        companyId,
+        orderId: invoiceData.order_id,
+        noteNumber: invoiceData.note_number,
+        serie: invoiceData.serie,
+        valorTotal: invoiceData.valor_total,
+        naturezaOperacao: invoiceData.natureza_operacao,
+        nomeDestinatario: invoiceData.nome_destinatario,
+      },
     });
 
     const numeroDefinitivo = (result as any)?.raw?.numero ?? numeroParaBanco;
@@ -333,16 +343,16 @@ export async function POST(req: Request) {
     // ─────────────────────────────────────────────────────────────────────────
     if (err?.focus?.codigo === "already_processed" && err?.ref) {
       try {
-        const supabase = await createServerSupabaseClient();
-        const { data: membership2 } = await supabase
+        const supabase2 = await createServerSupabaseClient();
+        const { data: membership2 } = await supabase2
           .from("company_users")
           .select("company_id")
-          .eq("user_id", (await supabase.auth.getUser()).data.user?.id ?? "")
+          .eq("user_id", (await supabase2.auth.getUser()).data.user?.id ?? "")
           .maybeSingle();
 
         if (membership2?.company_id) {
           const recovered = await fetchInvoiceStatus({
-            supabase,
+            supabase: supabase2,
             companyId: membership2.company_id,
             ref: err.ref,
             poll: 5,
@@ -357,18 +367,19 @@ export async function POST(req: Request) {
               return Number.isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
             };
 
-            // Upsert por ref: atualiza se existir, insere se não
-            const { data: existingInv } = await supabase
+            const { data: existingInv } = await supabase2
               .from("invoices")
               .select("id")
               .eq("ref", err.ref)
               .eq("company_id", membership2.company_id)
               .maybeSingle();
 
-            const invPayload = {
+            const ctx = err.ctx ?? {}; // contexto propagado pelo emitInvoice
+
+            const invPayload: Record<string, any> = {
               status: recovered.data.status,
               numero: recovered.data.numero ?? null,
-              serie: recovered.data.serie ?? null,
+              serie: recovered.data.serie ?? ctx.serie ?? null,
               chave_nfe: recovered.data.chave ?? null,
               xml_url: recovered.data.xml_url ?? null,
               danfe_url: recovered.data.danfe_url ?? null,
@@ -378,17 +389,37 @@ export async function POST(req: Request) {
             };
 
             if (existingInv?.id) {
-              await supabase
+              // Atualiza o registro existente
+              await supabase2
                 .from("invoices")
                 .update(invPayload)
                 .eq("id", existingInv.id)
                 .eq("company_id", membership2.company_id);
-            }
 
-            console.log("[NFe create] already_processed recuperado:", {
-              ref: err.ref,
-              status: recovered.data.status,
-            });
+              console.log("[NFe create] already_processed: registro atualizado", {
+                ref: err.ref, id: existingInv.id,
+              });
+            } else if (ctx.orderId) {
+              // Não existe registro — insere novo card para a nota re-emitida
+              const { error: insertRecovErr } = await supabase2.from("invoices").insert([{
+                company_id: membership2.company_id,
+                order_id: ctx.orderId,
+                ref: err.ref,
+                note_number: ctx.noteNumber ?? null,
+                valor_total: ctx.valorTotal ?? null,
+                natureza_operacao: ctx.naturezaOperacao ?? null,
+                customer_name: ctx.nomeDestinatario ?? null,
+                ...invPayload,
+              }]);
+
+              if (insertRecovErr) {
+                console.error("[NFe create] already_processed: falha ao inserir:", insertRecovErr);
+              } else {
+                console.log("[NFe create] already_processed: novo card inserido", {
+                  ref: err.ref, order_id: ctx.orderId,
+                });
+              }
+            }
 
             const isAuthRecovered = (recovered.data.status || "")
               .toLowerCase()
