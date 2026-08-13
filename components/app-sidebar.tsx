@@ -106,11 +106,11 @@ const data = {
       url: "/dashboard/orders",
       icon: IconShoppingCart,
     },
-    // {
-    //   title: "Rotas",
-    //   url: "/dashboard/routes-delivery",
-    //   icon: IconMapPin,
-    // },
+    {
+      title: "Rotas",
+      url: "/dashboard/routes-delivery",
+      icon: IconMapPin,
+    },
     {
       title: "Comodatos",
       url: "/dashboard/loan",
@@ -124,7 +124,7 @@ const data = {
       icon: IconSettings,
     },
     {
-      title: "Mobile",
+      title: "ChoppHub Driver",
       url: "/dashboard/mobile",
       icon: IconDeviceMobile,
     },

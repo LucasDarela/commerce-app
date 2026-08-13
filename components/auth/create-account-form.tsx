@@ -27,6 +27,8 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import Link from "next/link";
+import { Checkbox } from "@/components/ui/checkbox";
 
 // ─── Regras de senha ──────────────────────────────────────────────────────────
 const passwordRules = [
@@ -67,6 +69,13 @@ const formSchema = z
     confirmPassword: z.string({
       required_error: "Você deve confirmar sua senha.",
     }),
+    terms: z
+      .boolean()
+      .default(false)
+      .refine((val) => val === true, {
+        message:
+          "Você deve aceitar as Políticas de Privacidade e Termos de Uso.",
+      }),
   })
   .refine((d) => d.password === d.confirmPassword, {
     message: "As senhas devem corresponder.",
@@ -109,7 +118,13 @@ export function CreateAccountForm() {
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: { email: "", phone: "", password: "", confirmPassword: "" },
+    defaultValues: {
+      email: "",
+      phone: "",
+      password: "",
+      confirmPassword: "",
+      terms: false,
+    },
   });
 
   // Observa o valor do campo senha em tempo real
@@ -271,6 +286,35 @@ export function CreateAccountForm() {
                     />
                   </FormControl>
                   <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="terms"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-2 space-y-0 pt-2 pb-1">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      className="mt-0.5"
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel className="text-sm font-normal block">
+                      Aceito as{" "}
+                      <Link
+                        href="/marketing/terms"
+                        target="_blank"
+                        className="text-primary hover:underline"
+                      >
+                        Políticas de Privacidade e Termos de Uso
+                      </Link>
+                    </FormLabel>
+                    <FormMessage />
+                  </div>
                 </FormItem>
               )}
             />
