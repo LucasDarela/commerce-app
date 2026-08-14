@@ -102,9 +102,11 @@
     "@types/react-google-recaptcha": "^2.1.9",
     "@types/react-slick": "^0.23.13",
     "@types/stripe": "^8.0.416",
+    "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "15.5.15",
     "prettier": "^3.5.3",
+    "server-only": "^0.0.1",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
