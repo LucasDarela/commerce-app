@@ -43,7 +43,7 @@ export async function POST(req: Request) {
     const cert = String(body?.cert ?? "").trim();
     const key = String(body?.key ?? "").trim();
     const account = String(body?.account ?? "").replace(/\D/g, ""); // só dígitos
-    const env = body?.env === "sandbox" ? "sandbox" : "production";
+    const env = (body?.env === "sandbox" ? "sandbox" : "production") as "sandbox" | "production";
 
     // Validações mínimas
     if (!client_id) {
@@ -93,6 +93,35 @@ export async function POST(req: Request) {
         { error: `Falha ao salvar integração: ${upsertErr.message}` },
         { status: 400 },
       );
+    }
+
+    // ─── Configurar Webhook no Banco Inter ────────────────────────────────────
+    try {
+      const proto = req.headers.get("x-forwarded-proto") || "https";
+      const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
+      const baseUrl = host ? `${proto}://${host}` : new URL(req.url).origin;
+      const webhookUrl = `${baseUrl}/api/inter/webhook`;
+
+      const { interFetch } = await import("@/lib/inter");
+      
+      const creds = {
+        clientId: client_id,
+        clientSecret: client_secret,
+        cert,
+        key,
+        account,
+        env,
+      };
+
+      await interFetch(creds, "/cobrancas/webhook", {
+        method: "PUT",
+        body: JSON.stringify({ webhookUrl }),
+      });
+      console.log(`[Inter] Webhook configurado com sucesso para: ${webhookUrl}`);
+    } catch (whErr: any) {
+      console.error("[Inter] Falha ao configurar webhook:", whErr?.message || whErr);
+      // Não interrompemos o fluxo, pois as credenciais já foram salvas.
+      // O usuário pode tentar salvar novamente depois se o webhook falhou.
     }
 
     return NextResponse.json({ ok: true }, { status: 201 });
