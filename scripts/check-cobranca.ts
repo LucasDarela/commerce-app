@@ -31,9 +31,17 @@ async function checkCobranca() {
       "Content-Type": "application/x-www-form-urlencoded",
     });
 
-    const codigoSolicitacao = "ebe44fd3-3287-497b-bd4a-e302234fb4d5";
-    const url = `https://cdpj.partners.bancointer.com.br/cobranca/v3/cobrancas/${codigoSolicitacao}`;
+    const inicio = new Date();
+    inicio.setHours(0, 0, 0, 0);
+    const fim = new Date();
+    fim.setHours(23, 59, 59, 999);
+
+    const inicioStr = inicio.toISOString();
+    const fimStr = fim.toISOString();
+
+    const url = `https://cdpj.partners.bancointer.com.br/cobranca/v3/cobrancas/webhook/callbacks?dataHoraInicio=${inicioStr}&dataHoraFim=${fimStr}`;
     
+    console.log("Buscando callbacks do webhook...");
     const response = await makeRequest(url, "GET", inter_cert, inter_key, inter_account, undefined, {
       "Content-Type": "application/json",
       Authorization: `Bearer ${tokenResponse.access_token}`,

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createRouteSupabaseClient } from "@/lib/supabase/server";
+import { createClient } from "@supabase/supabase-js";
 
 /**
  * Webhook do Banco Inter — Cobrança V3
@@ -23,7 +23,13 @@ export async function POST(req: Request) {
 
     console.log("[Inter Webhook] Payload recebido:", JSON.stringify(body, null, 2));
 
-    const supabase = await createRouteSupabaseClient();
+    // Como o webhook é chamado de forma anônima pelo Banco Inter (sem cookies de sessão),
+    // precisamos usar a Service Role Key para ignorar o RLS (Row Level Security)
+    // e conseguir ler e atualizar a tabela de orders.
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
 
     // Na API v3, o webhook envia um array de cobranças. Se for objeto único, convertemos para array.
     const payloads = Array.isArray(body) ? body : [body];
