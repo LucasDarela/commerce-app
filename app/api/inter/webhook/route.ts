@@ -29,20 +29,22 @@ export async function POST(req: Request) {
     const payloads = Array.isArray(body) ? body : [body];
 
     for (const payload of payloads) {
-      const {
-        codigoSolicitacao,
-        situacao,
-        linhaDigitavel,
-        codigoBarras,
-        dataHoraSituacao,
-        valorRecebido,
-        valorTotal,
-        pixCopiaECola,
-        linkVisualizacao,
-      } = payload;
+      // Suporte para payloads aninhados da API V3 (ex: { cobranca: {...}, boleto: {...}, pix: {...} })
+      const cobrancaObj = payload.cobranca || payload;
+      const boletoObj = payload.boleto || payload;
+      const pixObj = payload.pix || payload;
+
+      const codigoSolicitacao = cobrancaObj.codigoSolicitacao;
+      const situacao = cobrancaObj.situacao;
+      const linhaDigitavel = boletoObj.linhaDigitavel;
+      const codigoBarras = boletoObj.codigoBarras;
+      const dataHoraSituacao = cobrancaObj.dataHoraSituacao || cobrancaObj.dataSituacao;
+      const valorRecebido = cobrancaObj.valorTotalRecebido || cobrancaObj.valorRecebido;
+      const valorTotal = cobrancaObj.valorNominal || cobrancaObj.valorTotal;
+      const linkVisualizacao = boletoObj.linkVisualizacao || payload.linkVisualizacao;
 
       if (!codigoSolicitacao) {
-        console.warn("[Inter Webhook] Ignorando payload sem codigoSolicitacao.");
+        console.warn("[Inter Webhook] Ignorando payload sem codigoSolicitacao:", JSON.stringify(payload));
         continue;
       }
 
