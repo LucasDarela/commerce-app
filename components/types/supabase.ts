@@ -20,8 +20,16 @@ export interface Database {
       company_integrations: {
         Row: {
           company_id: string;
-          provider: "mercado_pago" | "stripe"; // adicione outros se tiver
-          access_token: string;
+          provider: "stripe" | "asaas" | "banco_inter";
+          access_token: string | null;
+          env: "sandbox" | "production" | null;
+          webhook_token: string | null;
+          // Banco Inter specific fields
+          inter_client_id: string | null;
+          inter_client_secret: string | null;
+          inter_cert: string | null;
+          inter_key: string | null;
+          inter_account: string | null;
         };
         Insert: Partial<
           Database["public"]["Tables"]["company_integrations"]["Row"]

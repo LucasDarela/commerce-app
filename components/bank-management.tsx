@@ -198,9 +198,7 @@ export default function BankManagement() {
   }
 
   return (
-    <div className="space-y-6 py-8">
-      <h2 className="text-xl font-bold mb-4">Registre uma Conta Bancária</h2>
-
+    <div className="space-y-6 py-6">
       <div className="w-full flex justify-center gap-2 pb-4">
         <Input
           placeholder="Código do Banco"

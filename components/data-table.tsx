@@ -1443,7 +1443,6 @@ export function DataTable({ companyId, user, role }: DataTableProps) {
                   <GenerateBoletoButtons
                     orderId={row.original.id}
                     paymentMethod={row.original.payment_method}
-                    signatureData={row.original.customer_signature || ""}
                     asDropdownItem
                   />
                 )}

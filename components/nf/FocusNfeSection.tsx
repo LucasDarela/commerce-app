@@ -86,39 +86,86 @@ export default function FocusNFeSection() {
     }
   }
 
+  const isConfigured = !!focusToken;
+
   return (
-    <div className="space-y-6  py-8">
-      <h3 className="text-xl font-bold">NFe</h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="space-y-4">
+      {/* Status banner */}
+      <div
+        className={`flex items-center gap-2 rounded-lg border px-4 py-3 text-sm ${
+          isConfigured
+            ? "bg-green-50 border-green-200 text-green-800"
+            : "bg-amber-50 border-amber-200 text-amber-800"
+        }`}
+      >
+        <span className="text-base">{isConfigured ? "✅" : "⚠️"}</span>
         <div>
-          <Label className="mb-2 w-[200px]">
-            Token de Produção - Focus NFe
-          </Label>
-          <PasswordInput
-            name="focus_token"
-            value={focusToken}
-            onChange={(e) => setFocusToken(e.target.value)}
-            placeholder="Ex: a7ff01da-xxxx-xxxx-xxxx-44c75d490245"
-          />
-        </div>
-        <div>
-          <Label className="mb-2 w-[200px]">CPF Sócio Emitente NFe</Label>
-          <PasswordInput
-            name="cpf_emitente"
-            value={cpfEmitente}
-            onChange={(e) => setCpfEmitente(e.target.value.replace(/\D/g, ""))}
-            maxLength={11}
-            placeholder="Somente números (ex: 12345678909)"
-          />
+          <span className="font-semibold">
+            {isConfigured
+              ? "Integração configurada"
+              : "Integração não configurada"}
+          </span>
+          <span className="text-xs ml-2 opacity-75">
+            {isConfigured
+              ? "Token Focus NFe ativo. Emissão habilitada."
+              : "Preencha o token abaixo para habilitar a emissão de NF-e."}
+          </span>
         </div>
       </div>
-      <p className="text-sm italic text-muted-foreground">
-        Para evitar erros de emissão NFe, preencha corretamente todos os campos
-        acima.
-      </p>
-      <Button onClick={handleSave} disabled={loading}>
-        {loading ? "Salvando NFe..." : "Salvar NFe"}
-      </Button>
+
+      {/* Fields card */}
+      <div className="rounded-xl border bg-card p-5 space-y-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="space-y-1.5">
+            <Label htmlFor="focus_token" className="font-medium">
+              Token de Produção — Focus NFe
+            </Label>
+            <PasswordInput
+              id="focus_token"
+              name="focus_token"
+              value={focusToken}
+              onChange={(e) => setFocusToken(e.target.value)}
+              placeholder="a7ff01da-xxxx-xxxx-xxxx-44c75d490245"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Use apenas o token de <strong>produção</strong>, nunca o de
+              homologação.
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="cpf_emitente" className="font-medium">
+              CPF do Sócio Emitente
+            </Label>
+            <Input
+              id="cpf_emitente"
+              name="cpf_emitente"
+              value={cpfEmitente}
+              onChange={(e) =>
+                setCpfEmitente(e.target.value.replace(/\D/g, ""))
+              }
+              maxLength={11}
+              placeholder="Somente dígitos — ex: 12345678909"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              CPF do responsável pela emissão das notas fiscais.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 pt-1 border-t">
+          <Button
+            onClick={handleSave}
+            disabled={loading}
+            className="min-w-[120px]"
+          >
+            {loading ? "Salvando…" : "Salvar configurações"}
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            Preencha corretamente todos os campos para evitar erros na emissão.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

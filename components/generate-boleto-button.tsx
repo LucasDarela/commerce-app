@@ -31,17 +31,15 @@ function openBoleto(url: string) {
   }
 }
 
-type Provider = "asaas" | "mercado_pago" | null;
+type Provider = "asaas" | "banco_inter" | null;
 
 export function GenerateBoletoButtons({
   orderId,
   paymentMethod,
-  signatureData,
   asDropdownItem,
 }: {
   orderId: string;
   paymentMethod: string;
-  signatureData?: string;
   asDropdownItem?: boolean;
 }) {
   const supabase = createBrowserSupabaseClient();
@@ -69,9 +67,8 @@ export function GenerateBoletoButtons({
           .filter((r) => !!r.access_token)
           .map((r) => r.provider as string);
 
-        if (providers.includes("asaas")) setProvider("asaas");
-        else if (providers.includes("mercado_pago"))
-          setProvider("mercado_pago");
+        if (providers.includes("banco_inter")) setProvider("banco_inter");
+        else if (providers.includes("asaas")) setProvider("asaas");
         else setProvider(null);
       } finally {
         setChecking(false);
@@ -83,6 +80,16 @@ export function GenerateBoletoButtons({
   if (!paymentMethod || paymentMethod.toLowerCase() !== "boleto") return null;
   if (!provider) return null;
 
+  if (provider === "banco_inter") {
+    return (
+      <GenerateBoletoInterButton
+        orderId={orderId}
+        paymentMethod={paymentMethod}
+        asDropdownItem={asDropdownItem}
+      />
+    );
+  }
+
   if (provider === "asaas") {
     return (
       <GenerateBoletoAsaasButton
@@ -92,41 +99,34 @@ export function GenerateBoletoButtons({
       />
     );
   }
-  return (
-    <GenerateBoletoMPButton
-      orderId={orderId}
-      paymentMethod={paymentMethod}
-      signatureData={signatureData || ""}
-      asDropdownItem={asDropdownItem}
-    />
-  );
+
+  return null;
 }
 
-/** === Mercado Pago === */
-function GenerateBoletoMPButton({
+/** === Banco Inter === */
+function GenerateBoletoInterButton({
   orderId,
   paymentMethod,
-  signatureData,
   asDropdownItem,
 }: {
   orderId: string;
   paymentMethod: string;
-  signatureData: string;
   asDropdownItem?: boolean;
 }) {
   const supabase = createBrowserSupabaseClient();
   const [loading, setLoading] = useState(false);
 
-  const handleGenerateBoleto = async () => {
+  const handleGenerateBoletoInter = async () => {
     try {
       setLoading(true);
-      const { data: order } = await supabase
+
+      const { data: order, error } = await supabase
         .from("orders")
         .select(`*, customers:customers(*)`)
         .eq("id", orderId)
         .single();
 
-      if (!order || !order.customers) {
+      if (error || !order || !order.customers) {
         toast.error("⚠️ Dados do cliente não encontrados.");
         return;
       }
@@ -137,57 +137,59 @@ function GenerateBoletoMPButton({
         return;
       }
 
+      const appt = order.appointment_date
+        ? String(order.appointment_date).slice(0, 10)
+        : new Date().toISOString().slice(0, 10);
+
+      const value = Number(order.total || 0);
       const cliente = order.customers;
-      const payload = {
-        nome: cliente.name,
-        document: cliente.document,
-        email: cliente.email,
-        total: order.total,
-        days_ticket: order.days_ticket,
-        order_id: order.id,
-        zip_code: cliente.zip_code,
-        address: cliente.address,
-        number: cliente.number,
-        neighborhood: cliente.neighborhood,
-        city: cliente.city,
-        state: cliente.state,
-        phone: cliente.phone,
-        signatureData,
+
+      const payload: any = {
+        orderId,
+        customerId: cliente.id,
+        value,
+        appointmentDate: appt,
+        daysTicket: Number(order.days_ticket || 0),
+        description: `Pedido #${order.note_number}`,
       };
 
-      const res = await fetch("/api/create-payment", {
+      const res = await fetch("/api/inter/boleto/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const result = await res.json();
+      const json = await res.json();
+      console.log("🔎 Inter /boleto/create:", json);
 
       if (!res.ok) {
-        if (result?.error?.includes("Access Token")) {
-          toast.error("⚠️ Integração com Mercado Pago não configurada.");
-        } else {
-          toast.error(result?.error || "❌ Erro ao gerar boleto (MP).");
-        }
-        console.error("Erro MP:", result);
+        console.error("Inter error:", json);
+        toast.error(json.error || "Falha ao criar boleto (Banco Inter)");
         return;
       }
 
-      const { data: updatedOrder } = await supabase
-        .from("orders")
-        .select("boleto_url")
-        .eq("id", order.id)
-        .single();
-
-      if (!updatedOrder?.boleto_url) {
-        toast.error("❌ Boleto gerado mas não encontrado no Supabase.");
-        return;
+      if (json.boletoUrl) {
+        await supabase
+          .from("orders")
+          .update({ boleto_url: json.boletoUrl })
+          .eq("id", orderId);
       }
 
-      toast.success("🎉 Boleto (Mercado Pago) gerado!");
-      openBoleto(updatedOrder.boleto_url);
+      toast.success("🎉 Boleto (Banco Inter) gerado!");
+      if (json.boletoUrl) openBoleto(json.boletoUrl);
+      else if (json.digitableLine) {
+        toast.info(
+          "Linha digitável: " + json.digitableLine,
+          { duration: 10000 },
+        );
+      } else {
+        toast.info(
+          "Boleto criado! O código será disponibilizado em instantes via webhook.",
+          { duration: 8000 },
+        );
+      }
     } catch (e: any) {
-      console.error("❌ MP:", e);
-      toast.error(e?.message || "Erro inesperado (MP).");
+      console.error("❌ Inter:", e);
+      toast.error(e?.message || "Erro ao criar boleto (Banco Inter)");
     } finally {
       setLoading(false);
     }
@@ -197,18 +199,26 @@ function GenerateBoletoMPButton({
 
   if (asDropdownItem) {
     return (
-      <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleGenerateBoleto(); }} disabled={loading}>
-        {loading ? "Gerando Boleto (MP)..." : "Gerar Boleto (Mercado Pago)"}
+      <DropdownMenuItem
+        onSelect={(e) => { e.preventDefault(); handleGenerateBoletoInter(); }}
+        disabled={loading}
+      >
+        {loading ? "Gerando Boleto ..." : "Gerar Boleto"}
       </DropdownMenuItem>
     );
   }
 
   return (
-    <Button onClick={handleGenerateBoleto} disabled={loading} variant="default">
-      {loading ? "Gerando Boleto (MP)..." : "Gerar Boleto (Mercado Pago)"}
+    <Button
+      onClick={handleGenerateBoletoInter}
+      disabled={loading}
+      variant="default"
+    >
+      {loading ? "Gerando Boleto..." : "Gerar Boleto"}
     </Button>
   );
 }
+
 
 /** === Asaas === */
 function GenerateBoletoAsaasButton({

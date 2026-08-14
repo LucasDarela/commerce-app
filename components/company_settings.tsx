@@ -81,7 +81,8 @@ export default function CompanySettingsForm() {
 
       const { data, error } = await supabase
         .from("companies")
-        .select(`
+        .select(
+          `
           document,
           corporate_name,
           trade_name,
@@ -97,7 +98,8 @@ export default function CompanySettingsForm() {
           state_registration,
           regime_tributario,
           logo_url
-        `)
+        `,
+        )
         .eq("id", companyId)
         .maybeSingle();
 
@@ -240,7 +242,9 @@ export default function CompanySettingsForm() {
       return null;
     }
 
-    const { data } = supabase.storage.from("companylogos").getPublicUrl(filePath);
+    const { data } = supabase.storage
+      .from("companylogos")
+      .getPublicUrl(filePath);
 
     return data.publicUrl;
   };
@@ -314,9 +318,7 @@ export default function CompanySettingsForm() {
   };
 
   return (
-    <div className="space-y-4 py-8">
-      <h2 className="text-xl font-bold">Configure os dados da sua empresa</h2>
-
+    <div className="space-y-4 py-6">
       <div className="mb-4">
         <Image
           src={logoUrl}
@@ -405,11 +407,7 @@ export default function CompanySettingsForm() {
 
         <div>
           <Label className="mb-2">Cidade</Label>
-          <Input
-            name="city"
-            value={formData.city}
-            onChange={handleChange}
-          />
+          <Input name="city" value={formData.city} onChange={handleChange} />
         </div>
 
         <div>
@@ -442,20 +440,12 @@ export default function CompanySettingsForm() {
 
         <div>
           <Label className="mb-2">Telefone</Label>
-          <Input
-            name="phone"
-            value={formData.phone}
-            onChange={handleChange}
-          />
+          <Input name="phone" value={formData.phone} onChange={handleChange} />
         </div>
 
         <div>
           <Label className="mb-2">Email (Opcional)</Label>
-          <Input
-            name="email"
-            value={formData.email}
-            onChange={handleChange}
-          />
+          <Input name="email" value={formData.email} onChange={handleChange} />
         </div>
 
         <div>

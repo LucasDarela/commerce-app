@@ -938,7 +938,6 @@ export default function ViewOrderPage() {
             <GenerateBoletoButtons
               orderId={order.id}
               paymentMethod={order.payment_method}
-              signatureData={signatureData}
             />
           )}
 
