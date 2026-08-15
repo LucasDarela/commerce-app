@@ -1,43 +1,45 @@
 // app/api/mobile/orders/[orderId]/refresh-boleto-data/route.ts
 import { NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { getAuthenticatedContext } from "../../_utils";
 import { asaasFetch } from "@/lib/asaas";
 
 type Params = {
   params: Promise<{ orderId: string }>;
 };
 
+async function detectBoletoProvider(
+  supabase: any,
+  companyId: string,
+): Promise<"inter" | "asaas"> {
+  try {
+    const { data } = await supabase
+      .from("company_integrations")
+      .select("provider, inter_client_id")
+      .eq("company_id", companyId)
+      .eq("provider", "banco_inter")
+      .maybeSingle();
+
+    if (data?.inter_client_id) return "inter";
+  } catch {
+    // Fallback para Asaas
+  }
+  return "asaas";
+}
+
 export async function POST(_: Request, { params }: Params) {
   try {
     const { orderId } = await params;
 
-    const supabase = await createServerSupabaseClient();
+    const ctx = await getAuthenticatedContext(_);
 
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError || !user) {
+    if (ctx.error) {
       return NextResponse.json(
-        { error: "Não autenticado" },
-        { status: 401 },
+        { error: ctx.error.error },
+        { status: ctx.error.status },
       );
     }
 
-    const { data: comp, error: compErr } = await supabase
-      .from("current_user_company_id")
-      .select("company_id")
-      .maybeSingle();
-
-    if (compErr || !comp?.company_id) {
-      return NextResponse.json(
-        { error: "company_id não encontrado" },
-        { status: 403 },
-      );
-    }
-
-    const companyId = comp.company_id;
+    const { supabase, companyId } = ctx;
 
     const { data: order, error: orderErr } = await supabase
       .from("orders")
@@ -76,52 +78,99 @@ export async function POST(_: Request, { params }: Params) {
       );
     }
 
-    const payment = await asaasFetch<any>(
-      supabase,
-      companyId,
-      `/payments/${order.boleto_id}`,
-      { method: "GET" },
-    );
+    const provider = await detectBoletoProvider(supabase, companyId);
 
-    let digitableLine: string | null = null;
-    let barcode: string | null = null;
+    let digitableLine: string | null = order.boleto_digitable_line ?? null;
+    let barcode: string | null = order.boleto_barcode_number ?? null;
+    let boletoUrl: string | null = order.boleto_url ?? null;
+    let expirationDate: string | null = order.boleto_expiration_date ?? null;
 
-    try {
-      const identification = await asaasFetch<any>(
-        supabase,
-        companyId,
-        `/payments/${order.boleto_id}/identificationField`,
-        { method: "GET" },
-      );
+    // =========================================================================
+    // INTER
+    // =========================================================================
+    if (provider === "inter") {
+      try {
+        const { getInterCredsForCompany, interFetch } = await import(
+          "@/lib/inter"
+        );
+        const creds = await getInterCredsForCompany(supabase, companyId);
+        const detail: any = await interFetch(
+          creds,
+          `/cobrancas/${order.boleto_id}`,
+          { method: "GET" },
+        );
 
-      digitableLine =
-        identification?.identificationField ??
-        identification?.digitableLine ??
-        null;
+        const resLinha =
+          detail?.boleto?.linhaDigitavel ?? detail?.linhaDigitavel ?? null;
+        const resBarras =
+          detail?.boleto?.codigoBarras ?? detail?.codigoBarras ?? null;
+        // O PDF do Inter é servido pela nossa rota proxy
+        const resLink = `/api/inter/boleto/${order.boleto_id}/pdf`;
+        const resDue =
+          detail?.dataVencimento ?? detail?.boleto?.dataVencimento ?? null;
 
-      barcode =
-        identification?.barCode ??
-        identification?.barcode ??
-        identification?.bankSlipBarcode ??
-        null;
-    } catch (idErr: any) {
-      console.warn(
-        "⚠️ Não foi possível obter linha digitável/código de barras:",
-        idErr?.message || idErr,
-      );
+        if (resLinha) digitableLine = resLinha;
+        if (resBarras) barcode = resBarras;
+        if (resLink) boletoUrl = resLink;
+        if (resDue) expirationDate = resDue;
+      } catch (interErr: any) {
+        console.warn(
+          "⚠️ [refresh-boleto/inter] Falha ao consultar Inter:",
+          interErr?.message || interErr,
+        );
+        // Continua com os dados que temos no banco
+      }
+    } else {
+      // =========================================================================
+      // ASAAS (default)
+      // =========================================================================
+      try {
+        const payment = await asaasFetch<any>(
+          supabase,
+          companyId,
+          `/payments/${order.boleto_id}`,
+          { method: "GET" },
+        );
+
+        boletoUrl =
+          payment?.bankSlipUrl ?? payment?.invoiceUrl ?? boletoUrl;
+        expirationDate = payment?.dueDate ?? expirationDate;
+      } catch (payErr: any) {
+        console.warn(
+          "⚠️ [refresh-boleto/asaas] Falha ao obter payment:",
+          payErr?.message || payErr,
+        );
+      }
+
+      try {
+        const identification = await asaasFetch<any>(
+          supabase,
+          companyId,
+          `/payments/${order.boleto_id}/identificationField`,
+          { method: "GET" },
+        );
+
+        const newLine =
+          identification?.identificationField ??
+          identification?.digitableLine ??
+          null;
+        const newBarcode =
+          identification?.barCode ??
+          identification?.barcode ??
+          identification?.bankSlipBarcode ??
+          null;
+
+        if (newLine) digitableLine = newLine;
+        if (newBarcode) barcode = newBarcode;
+      } catch (idErr: any) {
+        console.warn(
+          "⚠️ [refresh-boleto/asaas] Não foi possível obter identificationField:",
+          idErr?.message || idErr,
+        );
+      }
     }
 
-    const boletoUrl =
-      payment?.bankSlipUrl ??
-      payment?.invoiceUrl ??
-      order.boleto_url ??
-      null;
-
-    const expirationDate =
-      payment?.dueDate ??
-      order.boleto_expiration_date ??
-      null;
-
+    // ── Salvar dados atualizados no banco ─────────────────────────────────────
     const updatePayload: Record<string, any> = {
       boleto_url: boletoUrl,
       boleto_digitable_line: digitableLine,
@@ -173,16 +222,10 @@ export async function POST(_: Request, { params }: Params) {
     return NextResponse.json(
       {
         success: true,
+        provider,
         message: "Dados do boleto atualizados com sucesso.",
         data: {
           order: updatedOrder,
-          payment: {
-            id: payment?.id ?? order.boleto_id,
-            status: payment?.status ?? null,
-            dueDate: payment?.dueDate ?? null,
-            bankSlipUrl: payment?.bankSlipUrl ?? null,
-            invoiceUrl: payment?.invoiceUrl ?? null,
-          },
         },
       },
       { status: 200 },

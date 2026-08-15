@@ -109,6 +109,31 @@ export async function GET(_: Request, { params }: Params) {
       .in("status", ACTIVE_INVOICE_STATUSES)
       .maybeSingle();
 
+    // ── Detectar provider de boleto ───────────────────────────────────────────
+    let boletoProvider: "inter" | "asaas" | null = null;
+    try {
+      const { data: interInt } = await supabase
+        .from("company_integrations")
+        .select("provider, inter_client_id")
+        .eq("company_id", companyId)
+        .eq("provider", "banco_inter")
+        .maybeSingle();
+
+      if (interInt?.inter_client_id) {
+        boletoProvider = "inter";
+      } else {
+        const { data: asaasInt } = await supabase
+          .from("company_integrations")
+          .select("provider")
+          .eq("company_id", companyId)
+          .eq("provider", "asaas")
+          .maybeSingle();
+        if (asaasInt) boletoProvider = "asaas";
+      }
+    } catch {
+      // Não bloqueia se falhar — provider fica null
+    }
+
     const paymentMethod = normalizePaymentMethod(order.payment_method);
     const canEmitBoleto = paymentMethod === "boleto";
 
@@ -175,6 +200,7 @@ export async function GET(_: Request, { params }: Params) {
           boleto: {
             can_emit: canEmitBoleto,
             already_generated: boletoAlreadyGenerated,
+            provider: boletoProvider,
             reason: canEmitBoleto
               ? null
               : "Esta venda não está configurada para boleto.",
@@ -184,6 +210,7 @@ export async function GET(_: Request, { params }: Params) {
               boleto_digitable_line: order.boleto_digitable_line,
               boleto_barcode_number: order.boleto_barcode_number,
               boleto_expiration_date: order.boleto_expiration_date,
+              provider: boletoProvider,
             },
           },
           nfe: {

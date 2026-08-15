@@ -7,10 +7,35 @@ import {
   plusDays,
 } from "../../_utils";
 import { sendBoletoEmailIfReady } from "@/lib/asaas/sendBoletoEmail";
+import {
+  getInterCredsForCompany,
+  createInterCobranca,
+  type InterCobranca,
+} from "@/lib/inter";
 
 type Params = {
   params: Promise<{ orderId: string }>;
 };
+
+// ── Detecta qual provider está configurado para a empresa ─────────────────────
+async function detectBoletoProvider(
+  supabase: any,
+  companyId: string,
+): Promise<"inter" | "asaas"> {
+  try {
+    const { data } = await supabase
+      .from("company_integrations")
+      .select("provider, inter_client_id")
+      .eq("company_id", companyId)
+      .eq("provider", "banco_inter")
+      .maybeSingle();
+
+    if (data?.inter_client_id) return "inter";
+  } catch {
+    // Fallback para Asaas
+  }
+  return "asaas";
+}
 
 export async function POST(_: Request, { params }: Params) {
   try {
@@ -83,6 +108,157 @@ export async function POST(_: Request, { params }: Params) {
       );
     }
 
+    const appointmentYmd = parseDateToYmd(order.appointment_date);
+    if (!appointmentYmd) {
+      return NextResponse.json(
+        { error: "appointment_date inválida no pedido" },
+        { status: 422 },
+      );
+    }
+
+    const daysTicket = Number(order.days_ticket ?? 0);
+    const dueDate = plusDays(appointmentYmd, daysTicket > 0 ? daysTicket : 12);
+
+    // ── Detectar provider ─────────────────────────────────────────────────────
+    const provider = await detectBoletoProvider(supabase, companyId);
+
+    // =========================================================================
+    // INTER
+    // =========================================================================
+    if (provider === "inter") {
+      const { data: customer, error: cliErr } = await supabase
+        .from("customers")
+        .select(
+          "id, company_id, name, document, email, phone, zip_code, address, number, neighborhood, city, state",
+        )
+        .eq("id", order.customer_id)
+        .eq("company_id", companyId)
+        .maybeSingle();
+
+      if (cliErr) {
+        return NextResponse.json({ error: cliErr.message }, { status: 400 });
+      }
+
+      if (!customer) {
+        return NextResponse.json(
+          { error: "Cliente não encontrado" },
+          { status: 404 },
+        );
+      }
+
+      if (!customer.document) {
+        return NextResponse.json(
+          {
+            error:
+              "CPF/CNPJ do cliente não cadastrado. Atualize o cadastro do cliente.",
+          },
+          { status: 400 },
+        );
+      }
+
+      const creds = await getInterCredsForCompany(supabase, companyId);
+
+      const cpfCnpj = (customer.document as string).replace(/\D/g, "");
+      let rawPhone = customer.phone?.replace(/\D/g, "") || "";
+      if (
+        rawPhone.startsWith("55") &&
+        (rawPhone.length === 12 || rawPhone.length === 13)
+      ) {
+        rawPhone = rawPhone.slice(2);
+      }
+      const ddd =
+        rawPhone.length >= 10 ? rawPhone.slice(0, 2) : undefined;
+      const telefone =
+        rawPhone.length >= 10
+          ? rawPhone.slice(2).slice(0, 9)
+          : undefined;
+
+      const referencia = orderId.replace(/-/g, "").slice(0, 15);
+
+      const interPayload: InterCobranca = {
+        seuNumero: referencia,
+        valorNominal: Number(order.total ?? 0),
+        dataVencimento: dueDate,
+        pagador: {
+          cpfCnpj,
+          tipoPessoa: cpfCnpj.length === 14 ? "JURIDICA" : "FISICA",
+          nome: customer.name,
+          email: customer.email ?? undefined,
+          ddd,
+          telefone,
+          cep: customer.zip_code?.replace(/\D/g, "") ?? undefined,
+          endereco: customer.address ?? undefined,
+          numero: customer.number ?? undefined,
+          bairro: customer.neighborhood ?? undefined,
+          cidade: customer.city ?? undefined,
+          uf:
+            (customer.state as string | null)
+              ?.slice(0, 2)
+              .toUpperCase() ?? undefined,
+        },
+        mensagem: {
+          linha1: `Pedido ${order.note_number || orderId.slice(0, 8)} - ${order.customer || customer.name}`.slice(0, 77),
+        },
+        formasRecebimento: ["BOLETO", "PIX"],
+      };
+
+      const result = await createInterCobranca(creds, interPayload);
+
+      const update: Record<string, any> = {
+        boleto_id: result.codigoSolicitacao,
+        boleto_url: result.linkVisualizacao,
+        boleto_digitable_line: result.linhaDigitavel,
+        boleto_barcode_number: result.codigoBarras,
+        due_date: dueDate,
+        issue_date: appointmentYmd,
+        payment_status: "Unpaid",
+      };
+
+      const { error: updErr } = await supabase
+        .from("orders")
+        .update(update)
+        .eq("id", orderId)
+        .eq("company_id", companyId);
+
+      if (updErr) {
+        console.error("❌ [Inter] Falha ao atualizar order:", updErr.message);
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Boleto gerado, mas houve falha ao salvar no banco.",
+            details: updErr.message,
+          },
+          { status: 500 },
+        );
+      }
+
+      if (result.linhaDigitavel) {
+        sendBoletoEmailIfReady(orderId, companyId, supabase).catch((err) =>
+          console.error("[mobile/emit-boleto/inter] Erro ao disparar email:", err),
+        );
+      }
+
+      return NextResponse.json(
+        {
+          success: true,
+          provider: "inter",
+          message: "Boleto Inter gerado com sucesso.",
+          data: {
+            order_id: orderId,
+            codigoSolicitacao: result.codigoSolicitacao,
+            digitableLine: result.linhaDigitavel,
+            barcode: result.codigoBarras,
+            boletoUrl: result.linkVisualizacao,
+            pixCopiaECola: result.pixCopiaECola,
+          },
+        },
+        { status: 200 },
+      );
+    }
+
+    // =========================================================================
+    // ASAAS (default)
+    // =========================================================================
     const { data: customer, error: cliErr } = await supabase
       .from("customers")
       .select(`
@@ -113,17 +289,6 @@ export async function POST(_: Request, { params }: Params) {
       );
     }
 
-    const appointmentYmd = parseDateToYmd(order.appointment_date);
-    if (!appointmentYmd) {
-      return NextResponse.json(
-        { error: "appointment_date inválida no pedido" },
-        { status: 422 },
-      );
-    }
-
-    const daysTicket = Number(order.days_ticket ?? 0);
-    const dueDate = plusDays(appointmentYmd, daysTicket > 0 ? daysTicket : 12);
-
     const payload: Record<string, any> = {
       customer: customer.asaas_customer_id,
       billingType: "BOLETO",
@@ -148,17 +313,14 @@ export async function POST(_: Request, { params }: Params) {
     let digitableLine: string | null =
       created.identificationField ?? created.digitableLine ?? null;
 
-    let barcode: string | null =
-      created.bankSlipBarcode ?? null;
+    let barcode: string | null = created.bankSlipBarcode ?? null;
 
-    // O Asaas leva alguns segundos para processar o boleto antes de disponibilizar
-    // o identificationField. Tentamos até 3x com delay crescente.
     const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
     const MAX_RETRIES = 3;
     const RETRY_DELAY_MS = 2000;
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-      if (digitableLine && barcode) break; // já temos os dados
+      if (digitableLine && barcode) break;
 
       try {
         await sleep(RETRY_DELAY_MS);
@@ -183,11 +345,6 @@ export async function POST(_: Request, { params }: Params) {
 
         if (newLine) digitableLine = newLine;
         if (newBarcode) barcode = newBarcode;
-
-        console.log(`[emit-boleto] tentativa ${attempt}/${MAX_RETRIES}:`, {
-          digitableLine,
-          barcode,
-        });
       } catch (err) {
         console.warn(
           `⚠️ [emit-boleto] tentativa ${attempt}/${MAX_RETRIES} - erro ao obter identificationField:`,
@@ -225,7 +382,6 @@ export async function POST(_: Request, { params }: Params) {
       );
     }
 
-    // Envio automático de e-mail do boleto via Resend
     sendBoletoEmailIfReady(orderId, companyId, supabase).catch((err) =>
       console.error("[mobile/emit-boleto] Erro ao disparar email:", err),
     );
@@ -233,6 +389,7 @@ export async function POST(_: Request, { params }: Params) {
     return NextResponse.json(
       {
         success: true,
+        provider: "asaas",
         message: "Boleto gerado com sucesso.",
         data: {
           order_id: orderId,
