@@ -1,41 +1,37 @@
 import { NextResponse } from "next/server";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createClient } from "@supabase/supabase-js";
 import { getInterCredsForCompany, interFetch } from "@/lib/inter";
 
 export async function GET(
   req: Request,
-  { params }: { params: { codigo: string } }
+  { params }: { params: Promise<{ codigo: string }> }
 ) {
   try {
-    const { codigo } = params;
-    const supabase = await createServerSupabaseClient();
+    const { codigo } = await params;
+    
+    // 1. Usar service_role para permitir acesso público ao PDF (sem cookie)
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
 
-    // 1. Validar a sessão do usuário logado
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
-    }
-
-    // 2. Pegar a empresa atual
-    const { data: comp, error: compErr } = await supabase
-      .from("current_user_company_id")
+    // 2. Localizar o pedido pelo boleto_id (codigoSolicitacao)
+    const { data: order, error: orderErr } = await supabaseAdmin
+      .from("orders")
       .select("company_id")
+      .eq("boleto_id", codigo)
       .maybeSingle();
 
-    if (compErr || !comp?.company_id) {
+    if (orderErr || !order?.company_id) {
       return NextResponse.json(
-        { error: "company_id não encontrado" },
-        { status: 403 }
+        { error: "Boleto não encontrado no sistema" },
+        { status: 404 }
       );
     }
-    const companyId = comp.company_id;
+    const companyId = order.company_id;
 
     // 3. Obter as credenciais da conta Inter da empresa
-    const creds = await getInterCredsForCompany(supabase, companyId);
+    const creds = await getInterCredsForCompany(supabaseAdmin, companyId);
 
     // 4. Buscar o PDF no Banco Inter
     const json: any = await interFetch(creds, `/cobrancas/${codigo}/pdf`, {

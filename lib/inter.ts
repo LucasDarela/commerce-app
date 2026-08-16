@@ -328,7 +328,9 @@ export async function createInterCobranca(
       // A API v3 no GET retorna campos aninhados em 'boleto' e 'pix'
       const resLinha = detail?.boleto?.linhaDigitavel || detail?.linhaDigitavel;
       const resBarras = detail?.boleto?.codigoBarras || detail?.codigoBarras;
-      const resLink = `/api/inter/boleto/${created.codigoSolicitacao}/pdf`;
+      // Montar a URL absoluta do nosso proxy do PDF
+      const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.chopphub.com';
+      const resLink = `${baseUrl}/api/inter/boleto/${created.codigoSolicitacao}/pdf`;
       const resPix = detail?.pix?.pixCopiaECola || detail?.pixCopiaECola;
 
       if (resLinha) linhaDigitavel = resLinha;
