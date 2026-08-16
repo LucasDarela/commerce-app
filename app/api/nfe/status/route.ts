@@ -63,6 +63,9 @@ export async function POST(req: Request) {
     let query = supabase.from("company_users").select("company_id").eq("user_id", user.id);
     
     if (bodyCompanyId) {
+      if (typeof bodyCompanyId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(bodyCompanyId)) {
+        return NextResponse.json({ error: "company_id inválido" }, { status: 400 });
+      }
       query = query.eq("company_id", bodyCompanyId);
     }
 

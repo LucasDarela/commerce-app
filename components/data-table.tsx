@@ -1875,7 +1875,7 @@ export function DataTable({ companyId, user, role }: DataTableProps) {
                 companyId: companyId,
                 productId: item.product_id,
                 quantity: Number(item.quantity ?? 0),
-                type: "exit",
+                type: "output",
                 reason: "Venda entregue",
                 noteId: selectedCustomer.id,
                 createdBy: null,

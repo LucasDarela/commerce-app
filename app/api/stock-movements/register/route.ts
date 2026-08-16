@@ -41,6 +41,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    console.error("❌ Erro em /api/stock-movements/register:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : String(error) },
       { status: 500 }

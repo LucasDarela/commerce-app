@@ -90,8 +90,14 @@ ${colorConfig
     const color =
       itemConfig.theme?.[theme as keyof typeof itemConfig.theme] ||
       itemConfig.color;
-    return color ? `  --color-${key}: ${color};` : null;
+    
+    // XSS Sanitization: remove characters that could break out of CSS context
+    const safeKey = key.replace(/[^a-zA-Z0-9_-]/g, "");
+    const safeColor = color ? color.replace(/[<>"';{}]/g, "") : "";
+
+    return safeColor ? `  --color-${safeKey}: ${safeColor};` : null;
   })
+  .filter(Boolean)
   .join("\n")}
 }
 `,

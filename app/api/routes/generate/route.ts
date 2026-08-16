@@ -9,15 +9,42 @@ const getAdminClient = () => {
   );
 };
 
-export async function POST(request: Request) {
-  const supabase = getAdminClient();
+/** Valida que o usuário autenticado pertence ao companyId informado. */
+async function validateCompany(request: Request, companyId: string): Promise<{ error?: NextResponse }> {
+  const userClient = await createServerSupabaseClient();
+  const { data: { user }, error: userErr } = await userClient.auth.getUser();
 
+  if (userErr || !user) {
+    return { error: NextResponse.json({ error: "Não autenticado" }, { status: 401 }) };
+  }
+
+  const { data: membership } = await userClient
+    .from("company_users")
+    .select("company_id")
+    .eq("user_id", user.id)
+    .eq("company_id", companyId)
+    .maybeSingle();
+
+  if (!membership?.company_id) {
+    return { error: NextResponse.json({ error: "Acesso negado para esta empresa" }, { status: 403 }) };
+  }
+
+  return {};
+}
+
+export async function POST(request: Request) {
   const body = await request.json();
   const { deliveryIds, driverId, date, type, stops, companyId } = body;
 
   if (!deliveryIds?.length || !driverId || !date || !type || !stops || !companyId) {
     return NextResponse.json({ error: "Dados incompletos" }, { status: 400 });
   }
+
+  // ── Valida que o usuário pertence à empresa informada (anti-IDOR) ──────────
+  const { error: authError } = await validateCompany(request, companyId);
+  if (authError) return authError;
+
+  const supabase = getAdminClient();
 
   // 1️⃣ Descobre o próximo número de rota do dia
   const { data: lastRoute } = await supabase
@@ -65,14 +92,18 @@ export async function POST(request: Request) {
   return NextResponse.json({ success: true, routeNumber: nextRouteNumber });
 }
 export async function PUT(request: Request) {
-  const supabase = getAdminClient();
-
   const body = await request.json();
   const { routeId, routeNumber, deliveryIds, driverId, date, type, stops, companyId } = body;
 
   if (!routeId || !routeNumber || !deliveryIds?.length || !driverId || !date || !type || !stops || !companyId) {
     return NextResponse.json({ error: "Dados incompletos para atualização" }, { status: 400 });
   }
+
+  // ── Valida que o usuário pertence à empresa informada (anti-IDOR) ──────────
+  const { error: authError } = await validateCompany(request, companyId);
+  if (authError) return authError;
+
+  const supabase = getAdminClient();
 
   // 1️⃣ Resetar os pedidos antigos que pertenciam a esta rota
   const { error: resetError } = await supabase
@@ -122,15 +153,23 @@ export async function PUT(request: Request) {
   return NextResponse.json({ success: true, routeNumber: routeNumber });
 }
 export async function DELETE(request: Request) {
-  const supabase = getAdminClient();
-  
   try {
     const url = new URL(request.url);
     const routeId = url.searchParams.get("routeId");
-    
+    const companyId = url.searchParams.get("companyId");
+
     if (!routeId) {
       return NextResponse.json({ error: "ID da rota não fornecido" }, { status: 400 });
     }
+
+    // ── Valida que o usuário pertence à empresa informada (anti-IDOR) ─────────
+    if (!companyId) {
+      return NextResponse.json({ error: "companyId é obrigatório" }, { status: 400 });
+    }
+    const { error: authError } = await validateCompany(request, companyId);
+    if (authError) return authError;
+
+    const supabase = getAdminClient();
 
     // 1️⃣ Buscar a rota para saber o route_number e company_id (opcional, mas bom)
     const { data: route, error: fetchError } = await supabase

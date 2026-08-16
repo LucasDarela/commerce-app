@@ -12,6 +12,14 @@ export async function GET(req: Request) {
   }
 
   try {
+    const { createRouteSupabaseClient } = await import("@/lib/supabase/server");
+    const supabase = await createRouteSupabaseClient();
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+    }
+
     // Primeira tentativa: BrasilAPI
     const { data } = await axios.get(
       `https://brasilapi.com.br/api/cnpj/v1/${cnpj}`,

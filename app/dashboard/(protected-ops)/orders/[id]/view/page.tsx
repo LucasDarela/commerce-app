@@ -391,7 +391,7 @@ export default function ViewOrderPage() {
           companyId: order.company.id,
           productId: item.product_id,
           quantity: Number(item.quantity ?? 0),
-          type: "exit",
+          type: "output",
           reason: "Venda entregue",
           noteId: order.id,
           createdBy: currentUserId ?? null,
@@ -401,6 +401,7 @@ export default function ViewOrderPage() {
       if (!movementRes.ok) {
         const movementData = await movementRes.json().catch(() => null);
         console.error("Erro ao registrar redução de estoque:", movementData);
+        toast.error(`Erro ao reduzir estoque: ${movementData?.error || "Desconhecido"}`);
       }
     }
   };

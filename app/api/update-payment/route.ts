@@ -24,19 +24,47 @@ export async function POST(req: Request) {
 
     const supabase = await createRouteSupabaseClient();
 
+    // ── Autenticação ──────────────────────────────────────────────────────────
+    const {
+      data: { user },
+      error: userErr,
+    } = await supabase.auth.getUser();
+
+    if (userErr || !user) {
+      return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+    }
+
+    // ── Obter empresa do usuário logado ───────────────────────────────────────
+    const { data: companyUser, error: compErr } = await supabase
+      .from("company_users")
+      .select("company_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (compErr || !companyUser?.company_id) {
+      return NextResponse.json(
+        { error: "Empresa não encontrada para o usuário" },
+        { status: 403 },
+      );
+    }
+
+    const companyId = companyUser.company_id;
+
+    // ── Buscar pedido verificando que pertence à empresa do usuário (anti-IDOR) ─
     const { data: order, error: orderError } = await supabase
       .from("orders")
-      .select("id, total, total_payed")
-      .eq("id", order_id as any)
+      .select("id, total, total_payed, company_id")
+      .eq("id", order_id)
+      .eq("company_id", companyId) // garante que o pedido é desta empresa
       .single();
 
-    if (!order || "code" in order) {
-      console.error("❌ Pedido não encontrado:", orderError);
+    if (!order || orderError) {
       return NextResponse.json(
         { error: "Pedido não encontrado" },
         { status: 404 },
       );
     }
+
     const safeOrder = order as {
       id: string;
       total: number;

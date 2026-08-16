@@ -3,7 +3,7 @@ import { createRouteSupabaseClient } from "@/lib/supabase/server";
 type RegisterStockMovementInput = {
   companyId: string;
   productId: string;
-  type: "entry" | "exit" | "return";
+  type: "input" | "output" | "return";
   quantity: number;
   reason?: string;
   noteId?: string;
@@ -36,15 +36,15 @@ export async function registerStockMovement({
 
   let newStock = currentStock;
 
-  if (type === "entry" || type === "return") {
+  if (type === "input" || type === "return") {
     newStock = currentStock + quantity;
-  } else if (type === "exit") {
+  } else if (type === "output") {
     newStock = currentStock - quantity;
   } else {
     throw new Error("Tipo de movimentação inválido.");
   }
 
-  if (type === "exit" && newStock < 0) {
+  if (type === "output" && newStock < 0) {
     throw new Error("Estoque não pode ficar negativo.");
   }
 
@@ -71,7 +71,8 @@ export async function registerStockMovement({
     });
 
   if (movementError) {
-    throw new Error("Erro ao registrar movimentação de estoque.");
+    console.error("DB Error on stock_movements insert:", movementError);
+    throw new Error(`Erro ao registrar histórico de movimentação: ${movementError.message}`);
   }
 
   return { success: true };

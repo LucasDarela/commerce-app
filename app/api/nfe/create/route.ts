@@ -33,6 +33,10 @@ export async function POST(req: Request) {
     }
 
     // --- Multi-tenant fix: Verify company membership ---
+    if (bodyCompanyId && (typeof bodyCompanyId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(bodyCompanyId))) {
+      return NextResponse.json({ error: "company_id inválido" }, { status: 400 });
+    }
+
     const { data: membership, error: compErr } = await supabase
       .from("company_users")
       .select("company_id")
