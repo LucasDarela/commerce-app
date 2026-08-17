@@ -109,6 +109,31 @@ export async function GET(_: Request, { params }: Params) {
       .in("status", ACTIVE_INVOICE_STATUSES)
       .maybeSingle();
 
+    // ── Buscar itens para imprimir os impostos no app mobile ───────────────
+    const { data: orderItems } = await supabase
+      .from("order_items")
+      .select(`
+        id,
+        product_id,
+        quantity,
+        price,
+        products (
+          id,
+          name,
+          ncm,
+          cfop,
+          cst_icms,
+          csosn_icms,
+          icms_situacao_tributaria
+        )
+      `)
+      .eq("order_id", orderId);
+
+    const { data: fiscalOps } = await supabase
+      .from("fiscal_operations")
+      .select("*")
+      .eq("company_id", companyId);
+
     // ── Detectar provider de boleto ───────────────────────────────────────────
     let boletoProvider: "inter" | "asaas" | null = null;
     try {
@@ -219,8 +244,55 @@ export async function GET(_: Request, { params }: Params) {
             reason: canEmitNfe
               ? null
               : "O cliente não está habilitado para emitir NF-e. Revise as informações de cadastro.",
-            operation_scope: operationScope,
-            current: activeInvoice ?? null,
+            current: activeInvoice ? (() => {
+              const itemsList = (orderItems || []).map((it) => {
+                const product = Array.isArray(it.products)
+                  ? it.products[0]
+                  : it.products;
+                
+                const operacaoFiscal = fiscalOps?.length ? fiscalOps[0] : null;
+                const isSimples = company?.regime_tributario === "simples_nacional";
+                const cstFromOp = isSimples ? operacaoFiscal?.csosn_icms : operacaoFiscal?.cst_icms;
+
+                return {
+                  id: it.product_id,
+                  name: product?.name || "Produto sem nome",
+                  quantity: it.quantity,
+                  price: it.price,
+                  ncm: product?.ncm ? String(product.ncm).replace(/\D/g, "") : null,
+                  cfop: product?.cfop || null,
+                  cst_icms: cstFromOp || product?.cst_icms || product?.csosn_icms || product?.icms_situacao_tributaria || null
+                };
+              });
+
+              return {
+                ...activeInvoice,
+                items: itemsList,
+                cst_icms: itemsList.length > 0 ? itemsList[0].cst_icms : null,
+                taxes: (() => {
+                  let totalBc = 0;
+                  let totalIcms = 0;
+                  const operacaoFiscal = fiscalOps?.length ? fiscalOps[0] : null;
+
+                  for (const it of orderItems || []) {
+                    
+                    const isSimples = company?.regime_tributario === "simples_nacional";
+                    const icmsItem = String(
+                      (isSimples ? operacaoFiscal?.csosn_icms : operacaoFiscal?.cst_icms) ?? ""
+                    ).trim();
+                    
+                    if (!isSimples && icmsItem !== "60" && icmsItem !== "40" && icmsItem !== "41") {
+                       const qty = Number(it.quantity || 1);
+                       const price = Number(it.price || 0);
+                       const aliq = Number(operacaoFiscal?.aliquota_icms || 17);
+                       totalBc += (price * qty);
+                       totalIcms += (price * qty * aliq) / 100;
+                    }
+                  }
+                  return { base_calculo: totalBc, valor_icms: totalIcms };
+                })(),
+              };
+            })() : null,
           },
         },
       },

@@ -268,14 +268,15 @@ export default function LoanEquipmentPage() {
 
       const { error } = await supabase.from("equipment_loans").insert(payload);
 
+      // Sempre libera o lock, independentemente de sucesso ou erro
+      await supabase
+        .from("equipment_loan_note_locks")
+        .delete()
+        .eq("company_id", companyId)
+        .eq("note_number", reservedNoteNumber);
+
       if (error) {
         console.error("Erro ao salvar empréstimo:", error);
-        // Libera o lock para não desperdiçar o número
-        await supabase
-          .from("equipment_loan_note_locks")
-          .delete()
-          .eq("company_id", companyId)
-          .eq("note_number", reservedNoteNumber);
         toast.dismiss(loadingToast);
         toast.error("Erro ao salvar empréstimo");
         return;

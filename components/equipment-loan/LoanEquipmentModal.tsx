@@ -297,14 +297,16 @@ export function LoanEquipmentModal({
         .from("equipment_loans")
         .insert(inserts);
 
+      // Sempre libera o lock, independentemente de sucesso ou erro, pois o número já
+      // foi salvo na tabela principal ou a transação falhou.
+      await supabase
+        .from("equipment_loan_note_locks")
+        .delete()
+        .eq("company_id", companyId)
+        .eq("note_number", reservedNoteNumber);
+
       if (insertError) {
         console.error("Erro ao salvar empréstimo:", insertError);
-        // Libera o lock para não desperdiçar o número
-        await supabase
-          .from("equipment_loan_note_locks")
-          .delete()
-          .eq("company_id", companyId)
-          .eq("note_number", reservedNoteNumber);
         toast.dismiss(loadingToast);
         toast.error("Erro ao salvar empréstimo.");
         return;
