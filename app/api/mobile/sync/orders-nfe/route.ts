@@ -5,7 +5,7 @@ import {
   ACTIVE_INVOICE_STATUSES,
   getAuthenticatedContext,
   normalizeState,
-} from "../../_utils";
+} from "../../orders/_utils";
 
 export async function POST(req: NextRequest) {
   try {
@@ -35,8 +35,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ data: {} }, { status: 200 });
     }
 
-    const customerIds = [...new Set(orders.map(o => o.customer_id).filter(Boolean))];
-    const companyIds = [...new Set(orders.map(o => o.company_id).filter(Boolean))];
+    const customerIds = [...new Set(orders.map((o: any) => o.customer_id).filter(Boolean))];
+    const companyIds = [...new Set(orders.map((o: any) => o.company_id).filter(Boolean))];
 
     // 2. Fetch Customers & Companies
     const { data: customers } = await supabase
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 4. Fetch Order Items for the orders that actually have invoices
-    const invoiceOrderIds = invoices.map(i => i.order_id);
+    const invoiceOrderIds = invoices.map((i: any) => i.order_id);
     const { data: allOrderItems } = await supabase
       .from("order_items")
       .select(`
@@ -92,13 +92,13 @@ export async function POST(req: NextRequest) {
 
     for (const invoice of invoices) {
       const orderId = invoice.order_id;
-      const order = orders.find(o => o.id === orderId);
+      const order = orders.find((o: any) => o.id === orderId);
       if (!order) continue;
 
-      const customer = customers?.find(c => c.id === order.customer_id);
-      const company = companies?.find(c => c.id === order.company_id);
-      const fiscalOps = allFiscalOps?.filter(f => f.company_id === order.company_id) || [];
-      const orderItems = allOrderItems?.filter(oi => oi.order_id === orderId) || [];
+      const customer = customers?.find((c: any) => c.id === order.customer_id);
+      const company = companies?.find((c: any) => c.id === order.company_id);
+      const fiscalOps = allFiscalOps?.filter((f: any) => f.company_id === order.company_id) || [];
+      const orderItems = allOrderItems?.filter((oi: any) => oi.order_id === orderId) || [];
 
       let operationScope: "inside_state" | "outside_state" | "export" = "inside_state";
       if (company && customer) {
@@ -108,7 +108,7 @@ export async function POST(req: NextRequest) {
         else if (compState !== custState) operationScope = "outside_state";
       }
 
-      const itemsList = orderItems.map((it) => {
+      const itemsList = orderItems.map((it: any) => {
         const product = Array.isArray(it.products) ? it.products[0] : it.products;
         const operacaoFiscal = fiscalOps.length ? fiscalOps[0] : null;
         
