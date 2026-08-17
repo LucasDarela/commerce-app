@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+export const dynamic = "force-dynamic";
 import {
   ACTIVE_INVOICE_STATUSES,
   getAuthenticatedContext,
@@ -123,8 +124,7 @@ export async function GET(_: Request, { params }: Params) {
           ncm,
           cfop,
           cst_icms,
-          csosn_icms,
-          icms_situacao_tributaria
+          csosn_icms
         )
       `)
       .eq("order_id", orderId);
@@ -261,7 +261,7 @@ export async function GET(_: Request, { params }: Params) {
                   price: it.price,
                   ncm: product?.ncm ? String(product.ncm).replace(/\D/g, "") : null,
                   cfop: product?.cfop || null,
-                  cst_icms: cstFromOp || product?.cst_icms || product?.csosn_icms || product?.icms_situacao_tributaria || null
+                  cst_icms: cstFromOp || product?.cst_icms || product?.csosn_icms || null
                 };
               });
 
