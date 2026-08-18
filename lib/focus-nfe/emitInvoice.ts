@@ -153,14 +153,15 @@ export async function emitInvoice({
     uf_destinatario: invoiceData.uf_destinatario,
     cep_destinatario: invoiceData.cep_destinatario,
     pais_destinatario: invoiceData.pais_destinatario,
-    indicador_inscricao_estadual_destinatario: invoiceData.indicador_inscricao_estadual_destinatario || 9,
- 
+    indicador_inscricao_estadual_destinatario:
+      invoiceData.indicador_inscricao_estadual_destinatario || 9,
+
     presenca_comprador: invoiceData.presenca_comprador,
- 
+
     // Manual numbering (optional)
     ...(invoiceData.numero ? { numero: invoiceData.numero } : {}),
     ...(invoiceData.serie ? { serie: invoiceData.serie } : {}),
- 
+
     url_notificacao: `${
       process.env.NEXT_PUBLIC_APP_URL ||
       process.env.NEXT_PUBLIC_SITE_URL ||
@@ -168,18 +169,19 @@ export async function emitInvoice({
       "https://www.chopphub.com"
     }/api/nfe/webhook`,
 
-
-
     // 👈 AQUI: envie o ARRAY completo
     itens: items.map((it, idx) => {
-      let sitTrib = String(it.icms_situacao_tributaria ?? (isSN ? "102" : "00")).trim();
+      let sitTrib = String(
+        it.icms_situacao_tributaria ?? (isSN ? "102" : "00"),
+      ).trim();
       if (!isSN && sitTrib.length === 3) {
         sitTrib = sitTrib.slice(1);
       } else if (!isSN && sitTrib.length < 2) {
         sitTrib = sitTrib.padStart(2, "0");
       }
 
-      const isCST60 = sitTrib === "60" || sitTrib === "500" || sitTrib === "060";
+      const isCST60 =
+        sitTrib === "60" || sitTrib === "500" || sitTrib === "060";
 
       return {
         numero_item: it.numero_item,
@@ -208,14 +210,18 @@ export async function emitInvoice({
             }
           : {
               icms_situacao_tributaria: sitTrib,
-              valor_bc_icms: Number(it.valor_bc_icms ?? 0),
-              aliquota_icms: Number(it.aliquota_icms ?? 0),
-              valor_icms: Number(it.valor_icms ?? 0),
+              icms_modalidade_base_calculo: "3", // Valor da Operação
+              icms_base_calculo: Number(it.valor_bc_icms ?? 0),
+              icms_aliquota: Number(it.aliquota_icms ?? 0),
+              icms_valor: Number(it.valor_icms ?? 0),
             }),
 
         // Reforma Tributária 2026 - Padrão Focus Oficial
-        ibs_cbs_situacao_tributaria: String(it.ibs_cbs_situacao_tributaria || "000").padStart(3, "0"),
-        ibs_cbs_classificacao_tributaria: it.ibs_cbs_classificacao_tributaria || "000001",
+        ibs_cbs_situacao_tributaria: String(
+          it.ibs_cbs_situacao_tributaria || "000",
+        ).padStart(3, "0"),
+        ibs_cbs_classificacao_tributaria:
+          it.ibs_cbs_classificacao_tributaria || "000001",
         ibs_cbs_base_calculo: Number(it.valor_bc_ibs ?? it.valor_bruto ?? 0),
         ibs_uf_aliquota: Number(it.aliquota_ibs ?? 0),
         ibs_uf_valor: Number(it.valor_ibs ?? 0),
@@ -242,10 +248,16 @@ export async function emitInvoice({
         ...(it.valor_bc_uf_dest !== undefined
           ? {
               icms_base_calculo_uf_destino: Number(it.valor_bc_uf_dest),
-              icms_percentual_fcp_uf_destino: Number(it.percentual_fcp_uf_dest ?? 0),
-              icms_aliquota_interna_uf_destino: Number(it.aliquota_icms_uf_dest ?? 0),
+              icms_percentual_fcp_uf_destino: Number(
+                it.percentual_fcp_uf_dest ?? 0,
+              ),
+              icms_aliquota_interna_uf_destino: Number(
+                it.aliquota_icms_uf_dest ?? 0,
+              ),
               icms_aliquota_interestadual: Number(it.aliquota_icms_inter ?? 0),
-              icms_percentual_partilha: Number(it.percentual_partilha_uf_dest ?? 100),
+              icms_percentual_partilha: Number(
+                it.percentual_partilha_uf_dest ?? 100,
+              ),
               icms_valor_fcp_uf_destino: Number(it.valor_fcp_uf_dest ?? 0),
               icms_valor_uf_destino: Number(it.valor_icms_uf_dest ?? 0),
               icms_valor_uf_remetente: Number(it.valor_icms_uf_remet ?? 0),
@@ -259,11 +271,16 @@ export async function emitInvoice({
     informacoes_adicionais_contribuinte: [
       invoiceData.informacoes_adicionais_contribuinte,
       `Trib. Reforma 2026: IBS Total R$ ${items.reduce((acc, it) => acc + Number(it.valor_ibs || 0), 0).toFixed(2)} | CBS Total R$ ${items.reduce((acc, it) => acc + Number(it.valor_cbs || 0), 0).toFixed(2)}`,
-      "Emitido por ChoppHub - Tecnologia para Distribuidores"
-    ].filter(Boolean).join(" | ")
+      "Emitido por ChoppHub - Tecnologia para Distribuidores",
+    ]
+      .filter(Boolean)
+      .join(" | "),
   };
 
-  console.log("Focus NFe - Itens Mapeados:", JSON.stringify(payload.itens, null, 2));
+  console.log(
+    "Focus NFe - Itens Mapeados:",
+    JSON.stringify(payload.itens, null, 2),
+  );
 
   // 5) Referência que vai na query (?ref=)
   const ref =
