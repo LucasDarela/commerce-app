@@ -172,9 +172,14 @@ export async function emitInvoice({
 
     // 👈 AQUI: envie o ARRAY completo
     itens: items.map((it, idx) => {
-      const isCST60 =
-        String(it.icms_situacao_tributaria) === "60" ||
-        String(it.icms_situacao_tributaria) === "500";
+      let sitTrib = String(it.icms_situacao_tributaria ?? (isSN ? "102" : "00")).trim();
+      if (!isSN && sitTrib.length === 3) {
+        sitTrib = sitTrib.slice(1);
+      } else if (!isSN && sitTrib.length < 2) {
+        sitTrib = sitTrib.padStart(2, "0");
+      }
+
+      const isCST60 = sitTrib === "60" || sitTrib === "500" || sitTrib === "060";
 
       return {
         numero_item: it.numero_item,
@@ -195,16 +200,14 @@ export async function emitInvoice({
 
         ...(isCST60
           ? {
-              icms_situacao_tributaria: "60",
+              icms_situacao_tributaria: isSN ? "500" : "60",
               icms_base_calculo_retido_st: Number(it.vbc_st_ret ?? 0),
               icms_aliquota_final: Number(it.pst ?? 0),
               icms_valor_substituto: Number(it.vicms_substituto ?? 0),
               icms_valor_retido_st: Number(it.vicms_st_ret ?? 0),
             }
           : {
-              icms_situacao_tributaria: isSN
-                ? String(it.icms_situacao_tributaria ?? "102")
-                : String(it.icms_situacao_tributaria ?? "00"),
+              icms_situacao_tributaria: sitTrib,
               valor_bc_icms: Number(it.valor_bc_icms ?? 0),
               aliquota_icms: Number(it.aliquota_icms ?? 0),
               valor_icms: Number(it.valor_icms ?? 0),
