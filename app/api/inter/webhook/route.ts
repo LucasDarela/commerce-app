@@ -81,7 +81,8 @@ export async function POST(req: Request) {
         VENCIDO: "Overdue",
       };
 
-      const newStatus = statusMap[situacao] ?? order.payment_status;
+      const safeSituacao = String(situacao || "").toUpperCase();
+      const newStatus = statusMap[safeSituacao] ?? order.payment_status;
 
       const update: Record<string, any> = {
         payment_status: newStatus,
@@ -95,7 +96,10 @@ export async function POST(req: Request) {
         if (dataHoraSituacao) update.paid_at = dataHoraSituacao;
         // API v3 usa valorRecebido, v2 usa valorPago
         const amount = valorRecebido ?? payload.valorPago ?? valorTotal;
-        if (amount != null) update.amount_paid = amount;
+        if (amount != null) {
+          const parsedAmount = typeof amount === "string" ? parseFloat(amount.replace(",", ".")) : amount;
+          if (!isNaN(parsedAmount)) update.amount_paid = parsedAmount;
+        }
       }
 
       const { error: updErr } = await supabase
