@@ -11,6 +11,8 @@ import {
   IconLogout,
   IconNotification,
   IconUserCircle,
+  IconSettings,
+  IconHelp,
 } from "@tabler/icons-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -117,6 +119,16 @@ export function NavUser({
               >
                 <IconCreditCard className="mr-2 h-4 w-4" />
                 Pagamento
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => router.push("/dashboard/settings")}
+              >
+                <IconSettings className="mr-2 h-4 w-4" />
+                Configurações
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push("/dashboard/help")}>
+                <IconHelp className="mr-2 h-4 w-4" />
+                Ajuda
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />

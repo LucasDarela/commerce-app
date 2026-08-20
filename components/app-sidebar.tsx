@@ -13,12 +13,10 @@ import {
   IconFileDescription,
   IconFileWord,
   IconFolder,
-  IconHelp,
   IconInnerShadowTop,
   IconListDetails,
   IconReport,
   IconSearch,
-  IconSettings,
   IconUsers,
   IconShoppingCart,
   IconPackage,
@@ -119,19 +117,9 @@ const data = {
   ],
   navSecondary: [
     {
-      title: "Configurações",
-      url: "/dashboard/settings",
-      icon: IconSettings,
-    },
-    {
       title: "ChoppHub Driver",
       url: "/dashboard/mobile",
       icon: IconDeviceMobile,
-    },
-    {
-      title: "Ajuda",
-      url: "/dashboard/help",
-      icon: IconHelp,
     },
   ],
 };
