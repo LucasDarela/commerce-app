@@ -14,6 +14,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import {
   Loader2,
@@ -316,6 +324,64 @@ export default function CreateRoutePage() {
   const [leftPanelWidth, setLeftPanelWidth] = useState(70);
   const isDragging = useRef(false);
   const [editingRoute, setEditingRoute] = useState<any>(null);
+
+  useEffect(() => {
+    if (optimizedRoute.length > 0 && directionsResponse) {
+      setOptimizedRoute(prevStops => {
+        let startTime = new Date();
+        if (departureDate) {
+          const [year, month, day] = departureDate.split("-");
+          startTime.setFullYear(
+            parseInt(year, 10),
+            parseInt(month, 10) - 1,
+            parseInt(day, 10),
+          );
+        }
+        if (departureTime) {
+          const [hours, minutes] = departureTime.split(":");
+          startTime.setHours(parseInt(hours, 10));
+          startTime.setMinutes(parseInt(minutes, 10));
+          startTime.setSeconds(0);
+        } else {
+          startTime.setMinutes(startTime.getMinutes() + 5);
+        }
+
+        const formatETA = (date: Date) => {
+          const day = date.getDate().toString().padStart(2, "0");
+          const month = (date.getMonth() + 1).toString().padStart(2, "0");
+          const time = date.toLocaleTimeString("pt-BR", {
+            hour: "2-digit",
+            minute: "2-digit",
+          });
+          return `${day}/${month} ${time}`;
+        };
+
+        const route = directionsResponse.routes[0];
+        const legs = route.legs;
+        
+        const newStops = prevStops.map(stop => ({ ...stop }));
+        newStops.forEach((stop, index) => {
+          if (index === 0) {
+            stop.estimatedArrival = "Partida (" + formatETA(startTime) + ")";
+          } else {
+            const leg = legs[index - 1];
+            const durationSeconds = leg?.duration?.value || 0;
+
+            startTime.setSeconds(startTime.getSeconds() + durationSeconds);
+            stop.estimatedArrival = formatETA(startTime);
+
+            if (!stop.isDepot && index < newStops.length - 1) {
+              const mins = stop.delivery_status === "Coletar"
+                  ? collectionServiceTime
+                  : deliveryServiceTime;
+              startTime.setMinutes(startTime.getMinutes() + mins);
+            }
+          }
+        });
+        return newStops;
+      });
+    }
+  }, [departureTime, departureDate, deliveryServiceTime, collectionServiceTime, directionsResponse]);
 
   useEffect(() => {
     const now = new Date();
@@ -825,7 +891,7 @@ export default function CreateRoutePage() {
           <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-6 min-w-0 w-full max-w-full">
           {!directionsResponse ? (
             <div className="space-y-4 min-w-0 w-full max-w-full">
-              <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 w-full min-w-0">
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 w-full min-w-0">
                 <div className="space-y-3 p-3 bg-muted/30 rounded-lg border">
                   <div className="flex items-center gap-2">
                     <Filter className="w-4 h-4 text-muted-foreground" />
@@ -940,71 +1006,6 @@ export default function CreateRoutePage() {
                       />
                     </div>
                   )}
-                </div>
-
-                <div className="space-y-3 p-3 bg-muted/30 rounded-lg border">
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-muted-foreground" />
-                    <h3 className="text-sm font-semibold">
-                      Parâmetros de Tempo
-                    </h3>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-xs text-muted-foreground mb-1 block">
-                        Data de Saída
-                      </label>
-                      <Input
-                        type="date"
-                        value={departureDate}
-                        onChange={(e) => setDepartureDate(e.target.value)}
-                        className="text-sm h-9"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground mb-1 block">
-                        Horário de Saída
-                      </label>
-                      <Input
-                        type="time"
-                        value={departureTime}
-                        onChange={(e) => setDepartureTime(e.target.value)}
-                        className="text-sm h-9"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-xs text-muted-foreground mb-1 block">
-                        Min. p/ Entrega
-                      </label>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={deliveryServiceTime}
-                        onChange={(e) =>
-                          setDeliveryServiceTime(parseInt(e.target.value) || 0)
-                        }
-                        className="text-sm h-9"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground mb-1 block">
-                        Min. p/ Coleta
-                      </label>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={collectionServiceTime}
-                        onChange={(e) =>
-                          setCollectionServiceTime(
-                            parseInt(e.target.value) || 0,
-                          )
-                        }
-                        className="text-sm h-9"
-                      />
-                    </div>
-                  </div>
                 </div>
               </div>
 
@@ -1162,6 +1163,7 @@ export default function CreateRoutePage() {
                   <p className="text-sm font-medium">
                     {selectedOrderIds.size} pedidos selecionados
                   </p>
+                  
                   <Button
                     onClick={() => calculateRoute()}
                     disabled={
@@ -1187,6 +1189,24 @@ export default function CreateRoutePage() {
             </div>
           ) : (
             <div className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 bg-muted/30 rounded-lg border mb-2">
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground mb-1 flex items-center gap-1"><Clock className="w-3 h-3" /> Data de Saída</label>
+                  <Input type="date" value={departureDate} onChange={(e) => setDepartureDate(e.target.value)} className="text-sm h-8" />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground mb-1 block">Horário de Saída</label>
+                  <Input type="time" value={departureTime} onChange={(e) => setDepartureTime(e.target.value)} className="text-sm h-8" />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground mb-1 block">Min. p/ Entrega</label>
+                  <Input type="number" min="0" value={deliveryServiceTime} onChange={(e) => setDeliveryServiceTime(parseInt(e.target.value) || 0)} className="text-sm h-8" />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground mb-1 block">Min. p/ Coleta</label>
+                  <Input type="number" min="0" value={collectionServiceTime} onChange={(e) => setCollectionServiceTime(parseInt(e.target.value) || 0)} className="text-sm h-8" />
+                </div>
+              </div>
               <div className="flex items-center justify-between">
                 <h2 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">
                   Sequência da Rota
