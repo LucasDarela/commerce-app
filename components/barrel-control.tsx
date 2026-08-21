@@ -481,7 +481,7 @@ export default function BarrelControl() {
   }
 
   return (
-    <div className="w-full @container px-2 space-y-6 mt-9">
+    <div className="w-full @container p-6 sm:p-8 space-y-6 max-w-7xl mx-auto">
       <div className="w-full">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4">
           <div className="space-y-1">

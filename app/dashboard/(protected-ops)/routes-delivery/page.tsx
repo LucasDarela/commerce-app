@@ -1,5 +1,5 @@
 "use client";
-
+import Link from "next/link";
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
@@ -36,6 +36,7 @@ import {
   GripVertical,
   Clock,
   Trash2,
+  Lock,
 } from "lucide-react";
 import {
   GoogleMap,
@@ -279,7 +280,7 @@ function EditableTableCell({
 }
 
 export default function CreateRoutePage() {
-  const { companyId, loading: companyLoading } = useAuthenticatedCompany();
+  const { companyId, loading: companyLoading, planName } = useAuthenticatedCompany();
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
 
   const [orders, setOrders] = useState<OrderForRoute[]>([]);
@@ -430,9 +431,15 @@ export default function CreateRoutePage() {
 
       if (!compError && compData) {
         setCompany(compData);
-        setOriginAddress(
-          `${compData.address}, ${compData.number}, ${compData.neighborhood}, ${compData.city}, ${compData.state}, ${compData.zip_code}`,
-        );
+        const parts = [
+          compData.address,
+          compData.number,
+          compData.neighborhood,
+          compData.city,
+          compData.state,
+          compData.zip_code,
+        ].filter(Boolean);
+        setOriginAddress(parts.length > 0 ? parts.join(", ") : "");
       }
 
       const { data: ordData, error: ordError } = await supabase
@@ -864,6 +871,49 @@ export default function CreateRoutePage() {
       <div className="flex h-full items-center justify-center p-8">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
+    );
+  }
+
+  if (planName === "Starter") {
+    return (
+      <main className="min-h-[80vh] flex items-center justify-center p-6">
+        <div className="max-w-md w-full text-center space-y-6">
+          <div className="mx-auto w-20 h-20 bg-primary/10 rounded-3xl flex items-center justify-center">
+            <Lock className="w-10 h-10 text-primary" />
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-3xl font-bold tracking-tight">Recurso Premium</h1>
+            <p className="text-muted-foreground leading-relaxed">
+              O módulo de roteirização e logística é um recurso avançado.
+              Faça o upgrade do seu plano para liberar as rotas inteligentes para sua frota.
+            </p>
+          </div>
+          <Card className="bg-muted/50 border-dashed">
+            <CardContent className="p-6 text-sm text-left space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                <span>Roteirização inteligente via Google Maps</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                <span>Atribuição direta de rotas aos motoristas no app</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                <span>Cálculo automático de distância e tempo estimado</span>
+              </div>
+            </CardContent>
+          </Card>
+          <div className="flex flex-col gap-3 pt-4">
+            <Button asChild size="lg" className="w-full font-bold">
+              <Link href="/dashboard/billing">Fazer Upgrade</Link>
+            </Button>
+            <Button variant="ghost" asChild>
+              <Link href="/dashboard">Voltar ao início</Link>
+            </Button>
+          </div>
+        </div>
+      </main>
     );
   }
 
