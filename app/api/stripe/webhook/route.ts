@@ -263,13 +263,37 @@ async function upsertSubscriptionFromStripeSubscription(
     extraSeats,
   });
 
-  const { error } = await supabase.from("subscriptions").upsert(payload, {
-    onConflict: "stripe_subscription_id",
-  });
+  const { data: upsertedSub, error } = await supabase
+    .from("subscriptions")
+    .upsert(payload, {
+      onConflict: "stripe_subscription_id",
+    })
+    .select("id")
+    .single();
 
-  if (error) {
+  if (error || !upsertedSub) {
     console.error("Erro ao fazer upsert da subscription:", error);
-    throw error;
+    throw error || new Error("Não foi possível obter o ID da assinatura");
+  }
+
+  // Prepara os dados para a tabela subscription_items
+  const itemsPayload = subscription.items.data.map((item) => ({
+    subscription_id: upsertedSub.id,
+    stripe_subscription_item_id: item.id,
+    price_id: item.price.id,
+    quantity: item.quantity ?? 1,
+  }));
+
+  // Faz o upsert dos itens (cria ou atualiza os existentes)
+  const { error: itemsError } = await supabase
+    .from("subscription_items")
+    .upsert(itemsPayload, {
+      onConflict: "stripe_subscription_item_id",
+    });
+
+  if (itemsError) {
+    console.error("Erro ao fazer upsert de subscription_items:", itemsError);
+    throw itemsError;
   }
 
   // Atualiza os dados da empresa (Customer ID, Flag do Mobile e Assentos Extras)
