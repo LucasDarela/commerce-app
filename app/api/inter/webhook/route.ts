@@ -93,12 +93,11 @@ export async function POST(req: Request) {
       if (linkVisualizacao) update.boleto_url = linkVisualizacao;
 
       if (newStatus === "Paid") {
-        if (dataHoraSituacao) update.paid_at = dataHoraSituacao;
         // API v3 usa valorRecebido, v2 usa valorPago
         const amount = valorRecebido ?? payload.valorPago ?? valorTotal;
         if (amount != null) {
           const parsedAmount = typeof amount === "string" ? parseFloat(amount.replace(",", ".")) : amount;
-          if (!isNaN(parsedAmount)) update.amount_paid = parsedAmount;
+          if (!isNaN(parsedAmount)) update.total_payed = parsedAmount;
         }
       }
 

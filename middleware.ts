@@ -156,10 +156,10 @@ export async function middleware(req: NextRequest) {
       return response;
     }
 
-    // 📱 Verificação de WhatsApp (feature flag)
-    // Desabilitado temporariamente a pedido do usuário
+    // 📱 Verificação de WhatsApp/Telefone (feature flag)
+    // Habilitado novamente a pedido do usuário após recarga Twilio
     if (
-      false && process.env.WHATSAPP_VERIFICATION_ENABLED === "true" &&
+      process.env.WHATSAPP_VERIFICATION_ENABLED === "true" &&
       profile?.whatsapp_verified === false &&
       !user?.user_metadata?.invited_role
     ) {
