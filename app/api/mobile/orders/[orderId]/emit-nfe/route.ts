@@ -366,9 +366,12 @@ export async function POST(request: Request, { params }: Params) {
       }
     }
 
-    const isAuth = (result.status || "").toLowerCase().includes("autorizad");
+    const statusLower = (result.status || "").toLowerCase();
+    const needsPolling =
+      statusLower.includes("processando_autorizacao") ||
+      (statusLower.includes("autorizad") && (!result.xml_url || !result.danfe_url));
 
-    if (isAuth && (!result.xml_url || !result.danfe_url)) {
+    if (needsPolling) {
       const res = await fetchInvoiceStatus({
         supabase,
         companyId,
