@@ -109,7 +109,6 @@ export async function PUT(request: Request) {
   const { error: resetError } = await supabase
     .from("orders")
     .update({
-      driver_id: null,
       route_number: null
     })
     .eq("company_id", companyId)
@@ -186,7 +185,6 @@ export async function DELETE(request: Request) {
     const { error: ordersError } = await supabase
       .from("orders")
       .update({
-        driver_id: null,
         route_number: null
       })
       .eq("company_id", route.company_id)

@@ -465,7 +465,6 @@ export default function CreateRoutePage() {
         )
         .eq("company_id", companyId)
         .in("delivery_status", ["Entregar", "Coletar"])
-        .or(editingRoute ? `route_number.is.null,route_number.eq.${editingRoute.route_number}` : `route_number.is.null`)
         .order("appointment_date", { ascending: true });
 
       if (ordError) {
@@ -979,6 +978,20 @@ export default function CreateRoutePage() {
                           popperClassName="z-[9999]"
                           wrapperClassName="w-full"
                         />
+                        {(startDate || endDate) && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setDateRange([null, null]);
+                            }}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground transition-colors hover:bg-muted rounded-full"
+                            title="Limpar data"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        )}
                       </div>
                     </div>
                     <div>

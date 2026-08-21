@@ -124,7 +124,7 @@ export function CreatedRoutesList({
 
     try {
       const res = await fetch(
-        `/api/routes/generate?routeId=${routeToDelete.id}`,
+        `/api/routes/generate?routeId=${routeToDelete.id}&companyId=${companyId}`,
         {
           method: "DELETE",
         },
