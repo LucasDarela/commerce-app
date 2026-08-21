@@ -194,7 +194,9 @@ export async function POST(_req: Request) {
     }
 
     // Retorna os últimos 4 dígitos para mostrar na UI (sem expor o número completo)
-    const maskedPhone = `(${phone.slice(2, 4)}) ${"*".repeat(phone.length - 6)}${phone.slice(-4)}`;
+    // O formato do phone aqui é sempre +55DDXXXXXXXXX (ex: +5548999900087)
+    // Então o DDD está nas posições 3 e 4 (slice(3, 5))
+    const maskedPhone = `(${phone.slice(3, 5)}) ${"*".repeat(phone.length - 7)}${phone.slice(-4)}`;
 
     console.log(`[send-otp] OTP enviado para ${maskedPhone} (user ${user.id})`);
     return NextResponse.json({ ok: true, maskedPhone, expiresAt });
