@@ -173,13 +173,15 @@ export default function Planos() {
           </h2>
 
           <p className="text-muted-foreground mt-4 max-w-3xl mx-auto leading-7">
-            Pare de perder dinheiro com pedidos desorganizados, falhas no estoque,
-            cobranças mal controladas e falta de visibilidade da operação. O{" "}
-            <strong>Chopp Hub</strong> centraliza tudo em um único sistema.
+            Pare de perder dinheiro com pedidos desorganizados, falhas no
+            estoque, cobranças mal controladas e falta de visibilidade da
+            operação. O <strong>Chopp Hub</strong> centraliza tudo em um único
+            sistema.
           </p>
 
           <p className="mt-4 text-sm text-muted-foreground">
-            Teste grátis por <span className="font-semibold">15 dias</span> nos planos Essential e Pro. Sem cartão de crédito.
+            Teste grátis por <span className="font-semibold">15 dias</span> nos
+            planos Essential e Pro. Sem cartão de crédito.
           </p>
         </div>
 
@@ -192,7 +194,7 @@ export default function Planos() {
                 "rounded-lg px-5 py-2 text-sm font-medium transition",
                 billingPeriod === "monthly"
                   ? "bg-background shadow text-foreground"
-                  : "text-muted-foreground"
+                  : "text-muted-foreground",
               )}
             >
               Mensal
@@ -205,7 +207,7 @@ export default function Planos() {
                 "rounded-lg px-5 py-2 text-sm font-medium transition",
                 billingPeriod === "yearly"
                   ? "bg-background shadow text-foreground"
-                  : "text-muted-foreground"
+                  : "text-muted-foreground",
               )}
             >
               Anual
@@ -221,7 +223,7 @@ export default function Planos() {
                 "relative rounded-2xl border-border/60 shadow-sm transition-all duration-300",
                 plan.highlight
                   ? "border-2 border-primary shadow-xl lg:-translate-y-2"
-                  : "hover:shadow-lg"
+                  : "hover:shadow-lg",
               )}
             >
               {plan.badge ? (
@@ -231,10 +233,14 @@ export default function Planos() {
                       "text-xs uppercase px-4 py-1 rounded-full flex items-center gap-2 shadow",
                       plan.highlight
                         ? "bg-primary text-primary-foreground"
-                        : "bg-foreground text-background"
+                        : "bg-foreground text-background",
                     )}
                   >
-                    {plan.highlight ? <Star size={14} /> : <BadgePercent size={14} />}
+                    {plan.highlight ? (
+                      <Star size={14} />
+                    ) : (
+                      <BadgePercent size={14} />
+                    )}
                     {plan.badge}
                   </span>
                 </div>
@@ -246,7 +252,9 @@ export default function Planos() {
 
                   <div className="mt-4">
                     <span className="text-4xl font-bold">{plan.price}</span>
-                    <span className="text-muted-foreground ml-1">{plan.periodLabel}</span>
+                    <span className="text-muted-foreground ml-1">
+                      {plan.periodLabel}
+                    </span>
                   </div>
 
                   <p className="mt-4 text-sm text-muted-foreground leading-6">
@@ -262,7 +270,10 @@ export default function Planos() {
                   <ul className="space-y-3 text-sm">
                     {plan.features.map((feature, index) => (
                       <li key={index} className="flex items-start gap-3">
-                        <Check className="text-green-500 mt-0.5 shrink-0" size={18} />
+                        <Check
+                          className="text-green-500 mt-0.5 shrink-0"
+                          size={18}
+                        />
                         <span>{feature}</span>
                       </li>
                     ))}
@@ -271,7 +282,9 @@ export default function Planos() {
 
                 {plan.limitations.length > 0 && (
                   <div className="mt-6 rounded-xl border bg-muted/40 p-4">
-                    <p className="text-sm font-medium mb-2">Não inclui neste plano:</p>
+                    <p className="text-sm font-medium mb-2">
+                      Não inclui neste plano:
+                    </p>
                     <ul className="space-y-2 text-sm text-muted-foreground">
                       {plan.limitations.map((item, index) => (
                         <li key={index}>• {item}</li>
@@ -287,7 +300,7 @@ export default function Planos() {
                 <Button
                   className={cn(
                     "w-full mt-8 h-12 text-base font-semibold",
-                    plan.highlight && "shadow-md"
+                    plan.highlight && "shadow-md",
                   )}
                   variant={plan.highlight ? "default" : "outline"}
                   onClick={() => handleCTA(plan.name)}
@@ -316,9 +329,10 @@ export default function Planos() {
                   </div>
 
                   <p className="mt-2 text-sm text-muted-foreground leading-6">
-                    Adicione o app mobile ao seu plano para que o motorista possa
-                    atualizar entregas em campo com mais praticidade. Ideal para quem
-                    quer mais controle operacional sem precisar trocar de plano.
+                    Adicione o app mobile ao seu plano para que o motorista
+                    possa atualizar entregas em campo com mais praticidade.
+                    Ideal para quem quer mais controle operacional sem precisar
+                    trocar de plano.
                   </p>
 
                   <p className="mt-2 text-sm font-medium">
@@ -342,9 +356,10 @@ export default function Planos() {
 
         <div className="mt-8 text-center">
           <p className="text-sm text-muted-foreground max-w-3xl mx-auto leading-6">
-            O plano <strong>Pro</strong> é o mais recomendado para distribuidoras que
-            querem controlar pedidos, estoque, entregas, cobranças e financeiro em um
-            só lugar, sem depender de planilhas ou processos manuais.
+            O plano <strong>Pro</strong> é o mais recomendado para
+            distribuidoras que querem controlar pedidos, estoque, entregas,
+            cobranças e financeiro em um só lugar, sem depender de planilhas ou
+            processos manuais.
           </p>
         </div>
       </div>

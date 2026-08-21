@@ -20,7 +20,10 @@ import dynamic from "next/dynamic";
 import { Loader2 } from "lucide-react";
 
 const LoginAccountForm = dynamic(
-  () => import("@/components/auth/login-account-form").then((mod) => mod.LoginAccountForm),
+  () =>
+    import("@/components/auth/login-account-form").then(
+      (mod) => mod.LoginAccountForm,
+    ),
   {
     loading: () => (
       <div className="flex flex-col items-center justify-center py-10 space-y-3">
@@ -28,11 +31,11 @@ const LoginAccountForm = dynamic(
         <p className="text-sm text-muted-foreground">Carregando...</p>
       </div>
     ),
-  }
+  },
 );
 
 const navLinks = [
-  { label: "Funcionalidades", href: "#features" },
+  { label: "Recursos", href: "#features" },
   { label: "Clientes", href: "#testimonials" },
   { label: "Preços", href: "#plans" },
   { label: "FAQ", href: "#faq" },

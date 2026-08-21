@@ -74,14 +74,14 @@ export default function Functionalities() {
 
   return (
     <section id="features" className="max-w-6xl mx-auto py-20 text-center">
-      <div className="section-heading section-header px-6">
+      <div className="px-10">
         <h2 className="section-title text-primary">
           Tudo o que sua distribuidora de bebidas precisa para vender mais
         </h2>
 
         <p className="section-description mt-5 text-muted-foreground max-w-3xl mx-auto">
-          Pare de depender de planilhas, controles soltos e processos manuais.
-          O Chopp Hub centraliza pedidos, estoque, entregas, notas fiscais,
+          Pare de depender de planilhas, controles soltos e processos manuais. O
+          Chopp Hub centraliza pedidos, estoque, entregas, notas fiscais,
           boletos, financeiro e operação em uma única plataforma.
         </p>
       </div>

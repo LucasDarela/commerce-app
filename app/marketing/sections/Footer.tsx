@@ -43,7 +43,7 @@ export default function Footer() {
             className="hover:text-primary"
             onClick={(e) => handleScroll(e, "#features")}
           >
-            Funcionalidades
+            Recursos
           </a>
           <a
             href="#testimonials"
@@ -89,8 +89,8 @@ export default function Footer() {
           </Link>
           <p className="mt-2">
             © {new Date().getFullYear()}{" "}
-            <span className="font-bold text-white">Chopp Hub</span>. Todos os direitos
-            reservados.
+            <span className="font-bold text-white">Chopp Hub</span>. Todos os
+            direitos reservados.
           </p>
         </div>
       </div>

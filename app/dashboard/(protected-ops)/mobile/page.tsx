@@ -16,7 +16,8 @@ import { useAuthenticatedCompany } from "@/hooks/useAuthenticatedCompany";
 
 export default function DownloadAppPage() {
   const { mobileOfflineEnabled, loading } = useAuthenticatedCompany();
-  const androidDownloadUrl = "/api/download/apk";
+  const androidDownloadUrl =
+    "https://play.google.com/store/apps/details?id=com.chopphubdriver";
 
   const features = [
     {
@@ -120,7 +121,7 @@ export default function DownloadAppPage() {
                 size="lg"
                 className="h-12 px-6 text-base font-semibold"
               >
-                <a href={androidDownloadUrl} download>
+                <a href={androidDownloadUrl} download target="_blank">
                   <Download className="mr-2 h-5 w-5" />
                   Baixar app Android
                 </a>
@@ -214,7 +215,7 @@ export default function DownloadAppPage() {
             </div>
 
             <Button asChild variant="outline">
-              <Link href="/contato">Falar com suporte</Link>
+              <Link href="https://wa.me/5548991447684">Falar com suporte</Link>
             </Button>
           </div>
         </div>
